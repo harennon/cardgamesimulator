@@ -1,0 +1,10 @@
+# configuration files
+.env
+*.cert
+*.key
+
+# build directory
+build/
+
+# dependency directory
+node_modules/

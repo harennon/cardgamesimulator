@@ -1,0 +1,42 @@
+{
+  "name": "cardgamesimulator",
+  "version": "0.0.1",
+  "description": "Play card games with friends",
+  "engines": {
+    "node": ">=18.x <=22.x",
+    "npm": ">=9.x <=10.x"
+  },
+  "scripts": {
+    "start": "npm run clean && npm run lint:fix && npm run build && npm run start:server",
+    "start:server": "node build/src/index.js",
+    "build": "tsc --build src/tsconfig.json",
+    "clean": "rm -rf ./build/",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint:fix": "eslint --fix src --ext ts --ext vue"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harennon/cardgamesimulator.git"
+  },
+  "author": "Neil Jurling",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/harennon/cardgamesimulator/issues"
+  },
+  "homepage": "https://github.com/harennon/cardgamesimulator#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "@types/express": "^5.0.0",
+    "eslint": "^9.22.0",
+    "eslint-plugin-vue": "^10.0.0",
+    "globals": "^16.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.1"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.0.1",
+    "helmet": "^8.1.0"
+  }
+}
