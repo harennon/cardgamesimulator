@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "description": "Play card games with friends",
   "engines": {
-    "node": ">=18.x <=22.x",
-    "npm": ">=9.x <=10.x"
+    "node": ">=18 <=24",
+    "npm": ">=9 <=10.9.2"
   },
   "scripts": {
     "start": "npm run clean && npm run lint:fix && npm run build && npm run start:server",

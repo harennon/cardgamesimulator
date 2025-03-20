@@ -18,7 +18,6 @@ try {
     server.start();
     process.on("SIGTERM", () => onCloseSignal(server, false))
     process.on("SIGINT", () => onCloseSignal(server, true))
-    process.on("SIGKILL", () => onCloseSignal(server, true))
 } catch (err) {
     console.error("Encountered error while starting server");
     console.error(err);
