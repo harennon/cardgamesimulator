@@ -1,5 +1,6 @@
 import * as dotenv from 'dotenv';
-import { Server } from './server/server';
+
+import { Server } from '@/server';
 
 const onCloseSignal = (server: Server, force: boolean) => {
 	console.log("Close signal received, shutting down");

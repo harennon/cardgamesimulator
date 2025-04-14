@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": { "@/*": [ "./*" ], "@shared/*": [ "../shared/*" ] }, 
+  },
+  "extends": "../../tsconfig.json",
+  "include": [
+      "**/*.ts",
+      "**/*.cert",
+  ],
+}

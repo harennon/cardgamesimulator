@@ -1,0 +1,47 @@
+services:
+  frontend:
+    image: nginx-frontend
+    env_file:
+      - path: ./.env
+    build: 
+      context: .
+      dockerfile: ./src/frontend/Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks: 
+      - frontend
+      - backend
+  
+  backend:
+    image: express-backend
+    env_file:
+      - path: ./.env
+    build:
+      context: .
+      dockerfile: ./src/backend/Dockerfile
+    depends_on:
+      database:
+        condition: service_healthy
+        restart: true
+    networks: 
+      - backend
+
+  database:
+    image: postgres:17.4-alpine
+    env_file:
+      - path: ./.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    networks:
+      - backend
+    
+
+networks: 
+  frontend:
+  backend:
