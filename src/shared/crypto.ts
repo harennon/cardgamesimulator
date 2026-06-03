@@ -24,7 +24,7 @@ export function decryptFromHex(ciphertext: string, nonce: string): string {
 function b64ToUint8Array(input: string): Uint8Array {
     const byteChars = atob(input);
     const arr = new Uint8Array(byteChars.length);
-    for (var i = 0; i < byteChars.length; i++) {
+    for (let i = 0; i < byteChars.length; i++) {
         arr[i] = byteChars.charCodeAt(i);
     }
     return arr;

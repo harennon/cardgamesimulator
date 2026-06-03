@@ -62,9 +62,8 @@ export interface AccountPayload {
 }
 
 // GAME Requests
-export type GameType = "tonk" | "big2";
-
-export type GameStatus = "CREATED" | "IN_PROGRESS" | "PAUSED" | "COMPLETED"
+import type { GameType, GameStatus } from "./engine-types.js";
+export type { GameType, GameStatus };
 
 export interface CreateGameRequest {
     "gameType": GameType;

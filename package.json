@@ -16,7 +16,7 @@
     "dev": "vite serve build/frontend",
     "preview": "vite preview",
     "clean": "rm -rf ./build",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "lint:fix": "eslint --fix src --ext ts --ext vue",
     "postinstall": "git config core.hooksPath .githooks"
   },
@@ -47,6 +47,7 @@
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.26.1",
     "typescript-transform-paths": "^3.5.5",
+    "vitest": "^4.1.8",
     "vite": "^6.2.2",
     "vite-plugin-vue-devtools": "^7.7.2",
     "vue-tsc": "^2.2.8"
