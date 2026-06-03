@@ -67,11 +67,13 @@ Commit
 | Persona | Reads | Writes |
 |---------|-------|--------|
 | CEO | HLD, CX doc, execution plan, feedback/data | Updates to HLD, CX doc, execution plan |
-| Architect | HLD, execution plan, architecture principles, existing code | `docs/lld/*.md` |
-| Design Reviewer | LLD under review, architecture + testing principles, HLD, CX doc | Verdict (approve/reject with specifics) |
+| Architect | HLD, execution plan, architecture principles, existing code, **direct upstream LLDs** | `docs/lld/*.md` |
+| Design Reviewer | LLD under review, architecture + testing principles, HLD, CX doc, **direct upstream LLDs** | Verdict (approve/reject with specifics) |
 | Implementer | Approved LLD, DEVELOPMENT.md, existing code | `src/` code, `tests/`, CHANGELOG.md |
 | Code Reviewer | Implementation diff, LLD, architecture + testing principles | Verdict (approve/reject with specifics) |
 | QA | CX doc, running app or implementation code | QA report (pass/fail with specifics) |
+
+**Direct upstream LLDs** = only the LLDs listed in the "depends on:" field of the execution plan for the current work item. Not transitive — e.g., LLD 6 reads LLDs 3, 4, 5 but not also 1, 2. This keeps context bounded (typically 1–3 docs).
 
 ### Escalation Protocol
 

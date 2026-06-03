@@ -10,6 +10,26 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ---
 
+## [2026-06-03] — Add changelog pre-commit hook
+
+### Added
+- `.githooks/pre-commit` — rejects commits without CHANGELOG.md staged
+- `.claude/settings.json` — Claude Code hook warns before committing without changelog
+- `postinstall` script in `package.json` — auto-configures `core.hooksPath` on `npm install`
+
+---
+
+## [2026-06-03] — Add Phase 1 LLDs (Supabase Migration, Game Engine Interface)
+
+### Added
+- `docs/lld/01-supabase-migration.md` — LLD for replacing custom auth + Postgres with Supabase
+- `docs/lld/02-game-engine-interface.md` — LLD for the generic game engine interface contract
+
+### Changed
+- `DEVELOPMENT.md` — Architect and Design Reviewer now read direct upstream LLDs (per execution plan dependency graph) to ensure cross-doc consistency
+
+---
+
 ## [2026-06-03] — Add agent routing table and fix changelog dating
 
 ### Added
