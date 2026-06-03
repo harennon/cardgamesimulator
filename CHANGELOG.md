@@ -8,6 +8,21 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+---
+
+## [2026-06-03] — Add agent routing table and fix changelog dating
+
+### Added
+- Agent routing table in `CLAUDE.md` — maps trigger phrases to correct agent persona
+- Explicit commit requirement: changelog entries must be dated `[YYYY-MM-DD]` at commit time
+
+### Fixed
+- Changelog date: moved entries from `[Unreleased]` to `[2026-05-30]` to match commit date
+
+---
+
+## [2026-05-30] — Project design docs, development workflow, and agent personas
+
 ### Added
 - Project design documentation (`docs/`)
   - High-level design doc (`project-hld.md`)

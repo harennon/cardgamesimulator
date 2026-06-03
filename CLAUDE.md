@@ -27,6 +27,21 @@ Multiplayer card game simulator — hosts preset card games (Big2 first, Tonk la
 - `docs/execution-plan.md` — Phased work breakdown with dependencies.
 - `docs/customer-experience.md` — User flows and wireframes.
 
+## Agent Routing
+
+When dispatching work to subagents, use the correct persona:
+
+| Trigger | Agent |
+|---------|-------|
+| Design / write an LLD | `architect` |
+| Review an LLD before implementation | `design-reviewer` |
+| Implement / build from an approved LLD | `implementer` |
+| Review code after implementation | `code-reviewer` |
+| Verify UX / test against CX doc | `qa` |
+| Decide what to build next / prioritize / scope questions | `ceo` |
+
+Follow the workflow: **ceo → architect → design-reviewer → implementer → code-reviewer → qa**. Always route to the appropriate agent rather than doing the work inline.
+
 ## Commit Requirements
 
-Every commit must include an update to `CHANGELOG.md` under `[Unreleased]`. No exceptions.
+Every commit must include a dated changelog entry in `CHANGELOG.md`. Format: move content from `[Unreleased]` into a new `## [YYYY-MM-DD] — Short title` section (use today's date). `[Unreleased]` should be left empty. No exceptions.
