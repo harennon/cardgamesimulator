@@ -1,22 +1,25 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref } from "vue";
 
-import { EchoRequest, EchoResponse } from '@shared/model'
-import { axiosInstance } from '@/main';
+import { EchoRequest, EchoResponse } from "@shared/model";
+import { axiosInstance } from "@/main";
 
-const echo = ref('');
-const echoResponse = ref('');
+const echo = ref("");
+const echoResponse = ref("");
 
 async function sendEcho() {
-  const response = await axiosInstance.post<EchoResponse>('/api/echo', { string: echo.value } as EchoRequest);
+  const response = await axiosInstance.post<EchoResponse>("/api/echo", {
+    string: echo.value,
+  } as EchoRequest);
   echoResponse.value = response.data.string;
 }
 
 async function sendAuthenticatedEcho() {
-  const response = await axiosInstance.post<EchoResponse>('/api/authNedEcho', { string: echo.value } as EchoRequest);
+  const response = await axiosInstance.post<EchoResponse>("/api/authNedEcho", {
+    string: echo.value,
+  } as EchoRequest);
   echoResponse.value = response.data.string;
 }
-
 </script>
 
 <template>
@@ -28,12 +31,13 @@ async function sendAuthenticatedEcho() {
     </h3>
   </div>
 
-  <div><input v-model="echo" placeholder="Sample string" size="20"></div>
+  <div><input v-model="echo" placeholder="Sample string" size="20" /></div>
   <div><button @click="sendEcho">Echo</button></div>
   <div><button @click="sendAuthenticatedEcho">AuthN Echo</button></div>
 
-  <div><h1> {{ echoResponse }}</h1></div>
-  
+  <div>
+    <h1>{{ echoResponse }}</h1>
+  </div>
 </template>
 
 <style scoped>

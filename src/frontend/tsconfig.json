@@ -1,15 +1,11 @@
 {
   "compilerOptions": {
     "baseUrl": "./",
-    "paths": { "@/*": [ "./*" ], "@shared/*": [ "../shared/*" ] },
+    "paths": { "@/*": ["./*"], "@shared/*": ["../shared/*"] },
     "module": "ESNext",
     "moduleResolution": "bundler",
     "types": ["vite/client"]
   },
   "extends": "../../tsconfig.json",
-  "include": [
-      "**/*.ts",
-      "**/*.vue",
-      "**/*.cert"
-  ]
+  "include": ["**/*.ts", "**/*.vue", "**/*.cert"]
 }

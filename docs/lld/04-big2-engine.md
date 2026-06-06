@@ -7,6 +7,7 @@ Complete Big2 implementation against the `GameEngine` interface defined in LLD 2
 ## 1. Scope
 
 ### In scope
+
 - Big2 card ranking (rank order, suit order)
 - Valid hand types: single, pair, straight (5 cards), full house, four-of-a-kind + kicker, straight flush
 - Hand comparison rules (determining which hand beats which)
@@ -25,6 +26,7 @@ Complete Big2 implementation against the `GameEngine` interface defined in LLD 2
 - Game initialization (shuffle, deal, determine starting player)
 
 ### Out of scope
+
 - WebSocket transport (LLD 3)
 - Turn timer and auto-pass (LLD 7)
 - Frontend card rendering and selection (LLD 6)
@@ -76,10 +78,29 @@ Complete Big2 implementation against the `GameEngine` interface defined in LLD 2
 import type { Suit, Rank, Card } from "@shared/engine-types";
 
 // Suit ranking: clubs (lowest) < diamonds < hearts < spades (highest)
-export const SUIT_ORDER: readonly Suit[] = ["clubs", "diamonds", "hearts", "spades"];
+export const SUIT_ORDER: readonly Suit[] = [
+  "clubs",
+  "diamonds",
+  "hearts",
+  "spades",
+];
 
 // Rank ranking: 3 (lowest) through 2 (highest)
-export const RANK_ORDER: readonly Rank[] = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"];
+export const RANK_ORDER: readonly Rank[] = [
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "J",
+  "Q",
+  "K",
+  "A",
+  "2",
+];
 
 // Rank values for comparison (index in RANK_ORDER)
 export function rankValue(rank: Rank): number {
@@ -103,8 +124,8 @@ export function compareCards(a: Card, b: Card): number {
 export const THREE_OF_CLUBS: Card = { rank: "3", suit: "clubs" };
 
 // Full 52-card deck (generated at module load, immutable)
-export const FULL_DECK: readonly Card[] = SUIT_ORDER.flatMap(suit =>
-  RANK_ORDER.map(rank => ({ suit, rank }))
+export const FULL_DECK: readonly Card[] = SUIT_ORDER.flatMap((suit) =>
+  RANK_ORDER.map((rank) => ({ suit, rank })),
 );
 
 // Placement points by player count and finishing position (0-indexed)
@@ -206,7 +227,7 @@ export interface Big2HistoryEntry {
   readonly playerId: PlayerId;
   readonly displayName: string;
   readonly action: "play" | "pass";
-  readonly cards?: readonly Card[];  // Only present for "play" actions
+  readonly cards?: readonly Card[]; // Only present for "play" actions
   readonly handType?: HandType["kind"]; // Only present for "play" actions
 }
 
@@ -296,11 +317,11 @@ Player passes
 
 ### 4.2 What is persisted vs in-memory
 
-| Data | Location | Notes |
-|------|----------|-------|
-| Full `InternalGameState` (including `Big2State`) | Persisted to DB as JSON (via GameCache → GameService → GameRepository) | Restored on server restart |
-| `PlayerView` derivations | Computed on-demand, never stored | Pure function of `InternalGameState` + `playerId` |
-| Connection status (`isConnected`) | In-memory only (ConnectionManager, LLD 3) | Engine sets `true` as placeholder. The WebSocket broadcast layer (LLD 3) overwrites with real values from ConnectionManager before any view reaches a client. The engine must produce a value because `PlayerPublicInfo.isConnected` is required by the type, but the engine is pure and has no connection awareness — the field exists here solely so that `PlayerView` is the single source of truth for the frontend, avoiding client-side state reconciliation. |
+| Data                                             | Location                                                               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full `InternalGameState` (including `Big2State`) | Persisted to DB as JSON (via GameCache → GameService → GameRepository) | Restored on server restart                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `PlayerView` derivations                         | Computed on-demand, never stored                                       | Pure function of `InternalGameState` + `playerId`                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Connection status (`isConnected`)                | In-memory only (ConnectionManager, LLD 3)                              | Engine sets `true` as placeholder. The WebSocket broadcast layer (LLD 3) overwrites with real values from ConnectionManager before any view reaches a client. The engine must produce a value because `PlayerPublicInfo.isConnected` is required by the type, but the engine is pure and has no connection awareness — the field exists here solely so that `PlayerView` is the single source of truth for the frontend, avoiding client-side state reconciliation. |
 
 ### 4.3 Turn Order
 
@@ -332,14 +353,14 @@ export function detectHandType(cards: readonly Card[]): HandType | null;
 
 **Detection rules:**
 
-| Card count | Valid types | Detection criteria |
-|------------|------------|-------------------|
-| 1 | single | Always valid |
-| 2 | pair | Both cards same rank |
-| 3 | (invalid) | No triples allowed in Big2 |
-| 4 | (invalid) | Four cards alone is not a valid play |
-| 5 | straight, fullHouse, fourOfAKind, straightFlush | See below |
-| Other | (invalid) | No valid hand type |
+| Card count | Valid types                                     | Detection criteria                   |
+| ---------- | ----------------------------------------------- | ------------------------------------ |
+| 1          | single                                          | Always valid                         |
+| 2          | pair                                            | Both cards same rank                 |
+| 3          | (invalid)                                       | No triples allowed in Big2           |
+| 4          | (invalid)                                       | Four cards alone is not a valid play |
+| 5          | straight, fullHouse, fourOfAKind, straightFlush | See below                            |
+| Other      | (invalid)                                       | No valid hand type                   |
 
 **5-card detection (in evaluation order — first match wins):**
 
@@ -365,15 +386,15 @@ export function beats(challenger: HandType, current: HandType): boolean;
 
 **Comparison rules:**
 
-| Scenario | Rule |
-|----------|------|
-| Single vs single | Compare by rank first, then suit |
-| Pair vs pair | Compare by rank first, then by highest suit in the pair |
-| 5-card vs 5-card (different category) | Higher category wins (straight < fullHouse < fourOfAKind < straightFlush) |
-| Straight vs straight | Compare by high card (rank, then suit) |
-| Full house vs full house | Compare by triple rank (suits don't matter since there are only 4 of each rank — triple rank is unique) |
-| Four-of-a-kind vs four-of-a-kind | Compare by quad rank |
-| Straight flush vs straight flush | Compare by high card (rank, then suit) |
+| Scenario                              | Rule                                                                                                    |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Single vs single                      | Compare by rank first, then suit                                                                        |
+| Pair vs pair                          | Compare by rank first, then by highest suit in the pair                                                 |
+| 5-card vs 5-card (different category) | Higher category wins (straight < fullHouse < fourOfAKind < straightFlush)                               |
+| Straight vs straight                  | Compare by high card (rank, then suit)                                                                  |
+| Full house vs full house              | Compare by triple rank (suits don't matter since there are only 4 of each rank — triple rank is unique) |
+| Four-of-a-kind vs four-of-a-kind      | Compare by quad rank                                                                                    |
+| Straight flush vs straight flush      | Compare by high card (rank, then suit)                                                                  |
 
 **Critical constraint:** You can only play the same number of cards as the current play. A pair cannot beat a single. A straight cannot beat a pair. This is enforced in `applyAction`, not in `beats`.
 
@@ -386,7 +407,11 @@ export function beats(challenger: HandType, current: HandType): boolean;
  * Determine what actions the current player can take.
  * Returns action types (not every possible combination).
  */
-export function computeValidActions(state: Big2State, hand: readonly Card[], isFirstPlayOfGame: boolean): ValidAction[];
+export function computeValidActions(
+  state: Big2State,
+  hand: readonly Card[],
+  isFirstPlayOfGame: boolean,
+): ValidAction[];
 
 /**
  * Check if a specific play is valid given the current game state.
@@ -420,7 +445,10 @@ To determine whether to offer "playCards" as a valid action type, the engine mus
  * Used internally to determine if "playCards" should appear in validActions.
  * Does NOT enumerate all possibilities — short-circuits on first found.
  */
-export function canBeatLastPlay(hand: readonly Card[], lastPlay: Big2Play): boolean;
+export function canBeatLastPlay(
+  hand: readonly Card[],
+  lastPlay: Big2Play,
+): boolean;
 ```
 
 **Implementation approach for `canBeatLastPlay`:**
@@ -436,16 +464,20 @@ export function canBeatLastPlay(hand: readonly Card[], lastPlay: Big2Play): bool
  * Build and shuffle the deck for the given player count.
  * Returns { deck, lowestCard }.
  */
-export function buildDeck(playerCount: number, prng: PRNG): { deck: readonly Card[]; lowestCard: Card };
+export function buildDeck(
+  playerCount: number,
+  prng: PRNG,
+): { deck: readonly Card[]; lowestCard: Card };
 ```
 
-| Players | Deck size | Cards dealt per player | Removal |
-|---------|-----------|----------------------|---------|
-| 4 | 52 | 13 | None |
-| 3 | 51 | 17 | Remove 3 of clubs (lowest card by suit) |
-| 2 | 52 (deal 13 each) | 13 | Remaining 26 cards set aside (not revealed) |
+| Players | Deck size         | Cards dealt per player | Removal                                     |
+| ------- | ----------------- | ---------------------- | ------------------------------------------- |
+| 4       | 52                | 13                     | None                                        |
+| 3       | 51                | 17                     | Remove 3 of clubs (lowest card by suit)     |
+| 2       | 52 (deal 13 each) | 13                     | Remaining 26 cards set aside (not revealed) |
 
 **Lowest card determination:**
+
 - 4P: 3 of clubs (lowest rank + lowest suit in the full deck).
 - 3P: After removing 3 of clubs from the deck, the lowest card is 3 of diamonds.
 - 2P: Since only 26 of 52 cards are dealt, the starting player is whoever holds the lowest card among dealt cards. The engine must find it after dealing.
@@ -469,16 +501,17 @@ export function computeScores(
 **Scoring rules (placement-based):**
 
 | Player count | 1st place | 2nd place | 3rd place | 4th place |
-|--------------|-----------|-----------|-----------|-----------|
-| 4 | 5 | 3 | 1 | 0 |
-| 3 | 5 | 3 | 0 | — |
-| 2 | 5 | 0 | — | — |
+| ------------ | --------- | --------- | --------- | --------- |
+| 4            | 5         | 3         | 1         | 0         |
+| 3            | 5         | 3         | 0         | —         |
+| 2            | 5         | 0         | —         | —         |
 
 - Each player's score is determined solely by their finishing position.
 - `finishedPlayerIndices[0]` is 1st place (5 points), `finishedPlayerIndices[1]` is 2nd place, etc.
 - The last remaining player (automatically appended when game completes) gets 0 points.
 
 `PlayerScore.breakdown` keys (exact names for frontend compatibility):
+
 - **All players:** `{ placement: number }` — the player's finishing position (1, 2, 3, or 4)
 
 ---
@@ -493,8 +526,14 @@ export function computeScores(
 import type { GameEngine, GameEngineConfig } from "../game-engine";
 import type { PRNG } from "../prng";
 import type {
-  GameAction, ActionResult, InternalGameState,
-  PlayerView, SpectatorView, PlayerId, PlayerInfo, ValidAction,
+  GameAction,
+  ActionResult,
+  InternalGameState,
+  PlayerView,
+  SpectatorView,
+  PlayerId,
+  PlayerInfo,
+  ValidAction,
 } from "@shared/engine-types";
 import type { Big2State, Big2Action, Big2PublicState } from "./big2-types";
 
@@ -539,7 +578,10 @@ export class Big2Engine implements GameEngine {
     // 6. Return PlayerView
   }
 
-  getValidActions(state: InternalGameState, playerId: PlayerId): readonly ValidAction[] {
+  getValidActions(
+    state: InternalGameState,
+    playerId: PlayerId,
+  ): readonly ValidAction[] {
     // 1. If not IN_PROGRESS or not this player's turn, return []
     // 2. If player is in finishedPlayerIndices, return []
     // 3. Delegate to computeValidActions
@@ -549,7 +591,10 @@ export class Big2Engine implements GameEngine {
     return state.status === "COMPLETED";
   }
 
-  getSpectatorView(state: InternalGameState, spectatorCount: number): SpectatorView {
+  getSpectatorView(
+    state: InternalGameState,
+    spectatorCount: number,
+  ): SpectatorView {
     // Same as PlayerView minus `you` and `validActions`
     // Shows card counts, lastPlay, history, turn info, finishedPlayerIndices
   }
@@ -807,33 +852,33 @@ Players who have finished (their index is in `finishedPlayerIndices`) are always
 
 ## 7. Edge Cases
 
-| Edge case | Handling |
-|-----------|----------|
-| Player plays cards not in their hand | `isValidPlay` checks every card exists in the hand. Returns error "Cards not in hand." |
-| Player plays duplicate cards (same card twice in one play) | Validation checks that all played cards are distinct (no two have same rank+suit). |
-| Player plays cards that don't form a valid hand type | `detectHandType` returns null. Action rejected with "Invalid card combination." |
-| Player plays valid hand type but wrong size vs current play | Must match card count of `lastPlay`. E.g., cannot play a pair to beat a single. Error: "Must play same number of cards as current play." |
-| Player plays valid hand type but doesn't beat current play | `beats()` returns false. Error: "Play does not beat the current hand." |
-| First play of game doesn't include lowest card | Explicit check in `isValidPlay` when `isFirstPlayOfGame` is true. Error: "First play must include the [card]." |
-| Player tries to pass on first play | Rejected. Error: "Cannot pass on the first play." |
-| Player tries to pass when leading (free play) | Rejected. Error: "Cannot pass when leading a trick." |
-| Player submits action but it's not their turn | `applyAction` checks `currentPlayerIndex` vs player index. Error: "Not your turn." |
-| Action submitted after game is COMPLETED | Rejected immediately. Error: "Game is already over." |
-| Action submitted while game is CREATED | Rejected. Error: "Game has not started." |
+| Edge case                                                     | Handling                                                                                                                                                                                              |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Player plays cards not in their hand                          | `isValidPlay` checks every card exists in the hand. Returns error "Cards not in hand."                                                                                                                |
+| Player plays duplicate cards (same card twice in one play)    | Validation checks that all played cards are distinct (no two have same rank+suit).                                                                                                                    |
+| Player plays cards that don't form a valid hand type          | `detectHandType` returns null. Action rejected with "Invalid card combination."                                                                                                                       |
+| Player plays valid hand type but wrong size vs current play   | Must match card count of `lastPlay`. E.g., cannot play a pair to beat a single. Error: "Must play same number of cards as current play."                                                              |
+| Player plays valid hand type but doesn't beat current play    | `beats()` returns false. Error: "Play does not beat the current hand."                                                                                                                                |
+| First play of game doesn't include lowest card                | Explicit check in `isValidPlay` when `isFirstPlayOfGame` is true. Error: "First play must include the [card]."                                                                                        |
+| Player tries to pass on first play                            | Rejected. Error: "Cannot pass on the first play."                                                                                                                                                     |
+| Player tries to pass when leading (free play)                 | Rejected. Error: "Cannot pass when leading a trick."                                                                                                                                                  |
+| Player submits action but it's not their turn                 | `applyAction` checks `currentPlayerIndex` vs player index. Error: "Not your turn."                                                                                                                    |
+| Action submitted after game is COMPLETED                      | Rejected immediately. Error: "Game is already over."                                                                                                                                                  |
+| Action submitted while game is CREATED                        | Rejected. Error: "Game has not started."                                                                                                                                                              |
 | Player has no valid plays but it's their turn (non-free-play) | `getValidActions` returns only `[{ type: "pass" }]`. The "playCards" option is not offered. If somehow submitted anyway, `applyAction` rejects because no valid combo exists that beats current play. |
-| All active players pass back to the trick leader | Trick resets — leader gets free play. `consecutivePasses` is reset. `lastPlay` is cleared. |
-| Trick leader has since finished (went out) | When all active players pass and the trick leader's index is in `finishedPlayerIndices`, the next active player after the trick leader gets the free play instead. |
-| Finished player's turn is reached | Never happens — `getNextActivePlayerIndex` always skips finished players. `currentPlayerIndex` is never set to a finished player. |
-| Player finishes but game not over (3P/4P) | Player added to `finishedPlayerIndices`. Turn advances to next active player. Game continues among remaining players. |
-| Second-to-last player finishes (game completion) | The last remaining player is automatically placed last. Game status → COMPLETED. Scores computed based on placement order. |
-| 2-player game: first player goes out | Game immediately completes. The other player is automatically last place. Scores: 5 and 0. |
-| 3-player game with removed card | Deck built without 3 of clubs. Lowest card becomes 3 of diamonds. First player is whoever holds 3 of diamonds. |
-| 2-player game | Only 26 cards dealt (13 each). Remaining 26 are set aside unseen. Lowest card among dealt cards determines starting player. |
-| A is used in a straight | Only valid as high: 10-J-Q-K-A. A-2-3-4-5 is NOT valid (2 cannot be in a straight). |
-| Player tries to play 2 in a straight | `detectHandType` for straight rejects any hand containing rank "2". Returns null. |
-| Cards comparison for identical rank | Suit breaks the tie (clubs < diamonds < hearts < spades). |
-| Game initialized with fewer than 2 or more than 4 players | `initialize` throws Error("Big2 requires 2-4 players"). |
-| Finished player tries to submit an action | Rejected. They are not `currentPlayerIndex` so "Not your turn" error fires. Additionally, `getValidActions` returns `[]` for finished players. |
+| All active players pass back to the trick leader              | Trick resets — leader gets free play. `consecutivePasses` is reset. `lastPlay` is cleared.                                                                                                            |
+| Trick leader has since finished (went out)                    | When all active players pass and the trick leader's index is in `finishedPlayerIndices`, the next active player after the trick leader gets the free play instead.                                    |
+| Finished player's turn is reached                             | Never happens — `getNextActivePlayerIndex` always skips finished players. `currentPlayerIndex` is never set to a finished player.                                                                     |
+| Player finishes but game not over (3P/4P)                     | Player added to `finishedPlayerIndices`. Turn advances to next active player. Game continues among remaining players.                                                                                 |
+| Second-to-last player finishes (game completion)              | The last remaining player is automatically placed last. Game status → COMPLETED. Scores computed based on placement order.                                                                            |
+| 2-player game: first player goes out                          | Game immediately completes. The other player is automatically last place. Scores: 5 and 0.                                                                                                            |
+| 3-player game with removed card                               | Deck built without 3 of clubs. Lowest card becomes 3 of diamonds. First player is whoever holds 3 of diamonds.                                                                                        |
+| 2-player game                                                 | Only 26 cards dealt (13 each). Remaining 26 are set aside unseen. Lowest card among dealt cards determines starting player.                                                                           |
+| A is used in a straight                                       | Only valid as high: 10-J-Q-K-A. A-2-3-4-5 is NOT valid (2 cannot be in a straight).                                                                                                                   |
+| Player tries to play 2 in a straight                          | `detectHandType` for straight rejects any hand containing rank "2". Returns null.                                                                                                                     |
+| Cards comparison for identical rank                           | Suit breaks the tie (clubs < diamonds < hearts < spades).                                                                                                                                             |
+| Game initialized with fewer than 2 or more than 4 players     | `initialize` throws Error("Big2 requires 2-4 players").                                                                                                                                               |
+| Finished player tries to submit an action                     | Rejected. They are not `currentPlayerIndex` so "Not your turn" error fires. Additionally, `getValidActions` returns `[]` for finished players.                                                        |
 
 ---
 
@@ -865,12 +910,12 @@ tests/engine/big2/
 
 ## 9. Dependencies
 
-| Dependency | Status | Notes |
-|------------|--------|-------|
-| `src/backend/engine/game-engine.ts` | Implemented (LLD 2) | The `GameEngine` interface this implements |
-| `src/backend/engine/prng.ts` | Implemented (LLD 2) | `PRNG`, `SeededPRNG`, `FixedPRNG` |
-| `src/shared/engine-types.ts` | Implemented (LLD 2) | All shared types (`Card`, `Suit`, `Rank`, `InternalGameState`, `PlayerView`, etc.) |
-| `src/backend/engine/game-engine-factory.ts` | Implemented (LLD 2) | `Big2Engine` must be registered here at startup |
+| Dependency                                  | Status              | Notes                                                                              |
+| ------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------- |
+| `src/backend/engine/game-engine.ts`         | Implemented (LLD 2) | The `GameEngine` interface this implements                                         |
+| `src/backend/engine/prng.ts`                | Implemented (LLD 2) | `PRNG`, `SeededPRNG`, `FixedPRNG`                                                  |
+| `src/shared/engine-types.ts`                | Implemented (LLD 2) | All shared types (`Card`, `Suit`, `Rank`, `InternalGameState`, `PlayerView`, etc.) |
+| `src/backend/engine/game-engine-factory.ts` | Implemented (LLD 2) | `Big2Engine` must be registered here at startup                                    |
 
 No new npm packages required. All implementations use the existing type system and PRNG infrastructure.
 
@@ -880,124 +925,124 @@ No new npm packages required. All implementations use the existing type system a
 
 ### 10.1 Unit Tests: Hand Detection (`tests/engine/big2/hand-detection.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| Single card detected | Any 1 card → `{ kind: "single", card }` |
-| Pair detected | Two cards same rank → pair with correct highCard (by suit) |
-| Non-pair rejected (2 cards, different rank) | Returns null |
-| 3 cards rejected | Always returns null |
-| 4 cards rejected | Always returns null |
-| 6+ cards rejected | Always returns null |
-| Straight detected (3-4-5-6-7) | Valid straight, highCard is 7 of highest suit |
-| Straight detected (10-J-Q-K-A) | A-high straight valid |
-| Straight rejected (contains 2) | Any 5-sequence containing rank 2 → null |
-| Straight rejected (wrapping Q-K-A-3-4) | Non-consecutive → null |
-| Straight rejected (non-consecutive) | e.g., 3-4-5-6-8 → null |
-| Full house detected | 3+2 of different ranks → fullHouse with correct tripleRank |
-| Four of a kind detected | 4+1 → fourOfAKind with correct quadRank |
-| Straight flush detected | 5 consecutive same suit → straightFlush |
-| Straight flush (10-J-Q-K-A same suit) | Valid |
-| 5 cards that are none of the above | e.g., 3C 3D 5H 8S JC → null |
+| Test                                        | What it verifies                                           |
+| ------------------------------------------- | ---------------------------------------------------------- |
+| Single card detected                        | Any 1 card → `{ kind: "single", card }`                    |
+| Pair detected                               | Two cards same rank → pair with correct highCard (by suit) |
+| Non-pair rejected (2 cards, different rank) | Returns null                                               |
+| 3 cards rejected                            | Always returns null                                        |
+| 4 cards rejected                            | Always returns null                                        |
+| 6+ cards rejected                           | Always returns null                                        |
+| Straight detected (3-4-5-6-7)               | Valid straight, highCard is 7 of highest suit              |
+| Straight detected (10-J-Q-K-A)              | A-high straight valid                                      |
+| Straight rejected (contains 2)              | Any 5-sequence containing rank 2 → null                    |
+| Straight rejected (wrapping Q-K-A-3-4)      | Non-consecutive → null                                     |
+| Straight rejected (non-consecutive)         | e.g., 3-4-5-6-8 → null                                     |
+| Full house detected                         | 3+2 of different ranks → fullHouse with correct tripleRank |
+| Four of a kind detected                     | 4+1 → fourOfAKind with correct quadRank                    |
+| Straight flush detected                     | 5 consecutive same suit → straightFlush                    |
+| Straight flush (10-J-Q-K-A same suit)       | Valid                                                      |
+| 5 cards that are none of the above          | e.g., 3C 3D 5H 8S JC → null                                |
 
 ### 10.2 Unit Tests: Hand Comparison (`tests/engine/big2/hand-comparison.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| Higher rank single beats lower | 4S beats 3S |
-| Higher suit single beats same rank | 3S beats 3H |
-| Higher rank pair beats lower | Pair of 5s beats pair of 4s |
-| Same rank pair, higher suit wins | Pair(5S,5H) beats Pair(5D,5C) — compare high suit |
-| Straight beats straight (higher high card) | 4-5-6-7-8 beats 3-4-5-6-7 |
-| Full house beats full house (higher triple rank) | FH(KKK,44) beats FH(QQQ,AA) |
-| Four-of-a-kind beats four-of-a-kind | Quad K beats quad Q |
-| Straight flush beats straight flush | Higher high card wins |
-| Full house beats any straight | Category hierarchy |
-| Four-of-a-kind beats any full house | Category hierarchy |
-| Straight flush beats any four-of-a-kind | Category hierarchy |
-| Same hand does not beat itself | beats(X, X) returns false |
+| Test                                             | What it verifies                                  |
+| ------------------------------------------------ | ------------------------------------------------- |
+| Higher rank single beats lower                   | 4S beats 3S                                       |
+| Higher suit single beats same rank               | 3S beats 3H                                       |
+| Higher rank pair beats lower                     | Pair of 5s beats pair of 4s                       |
+| Same rank pair, higher suit wins                 | Pair(5S,5H) beats Pair(5D,5C) — compare high suit |
+| Straight beats straight (higher high card)       | 4-5-6-7-8 beats 3-4-5-6-7                         |
+| Full house beats full house (higher triple rank) | FH(KKK,44) beats FH(QQQ,AA)                       |
+| Four-of-a-kind beats four-of-a-kind              | Quad K beats quad Q                               |
+| Straight flush beats straight flush              | Higher high card wins                             |
+| Full house beats any straight                    | Category hierarchy                                |
+| Four-of-a-kind beats any full house              | Category hierarchy                                |
+| Straight flush beats any four-of-a-kind          | Category hierarchy                                |
+| Same hand does not beat itself                   | beats(X, X) returns false                         |
 
 ### 10.3 Unit Tests: Valid Actions (`tests/engine/big2/valid-actions.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| First play of game: only "playCards" offered | Pass not available |
-| Free play (after trick win): only "playCards" offered | Pass not available |
-| Normal turn with valid plays: both offered | "playCards" and "pass" available |
-| Normal turn with NO valid plays: only "pass" offered | Cannot play anything that beats current |
-| isValidPlay: cards not in hand rejected | Error message |
-| isValidPlay: invalid combination rejected | Error message |
-| isValidPlay: wrong card count vs lastPlay rejected | Error message |
-| isValidPlay: doesn't beat lastPlay rejected | Error message |
-| isValidPlay: first play without lowest card rejected | Error message |
-| isValidPlay: valid play accepted | Returns valid=true with correct handType |
-| canBeatLastPlay: returns true when beatable | Player has at least one combo |
-| canBeatLastPlay: returns false when unbeatable | No combo in hand can beat current |
+| Test                                                  | What it verifies                         |
+| ----------------------------------------------------- | ---------------------------------------- |
+| First play of game: only "playCards" offered          | Pass not available                       |
+| Free play (after trick win): only "playCards" offered | Pass not available                       |
+| Normal turn with valid plays: both offered            | "playCards" and "pass" available         |
+| Normal turn with NO valid plays: only "pass" offered  | Cannot play anything that beats current  |
+| isValidPlay: cards not in hand rejected               | Error message                            |
+| isValidPlay: invalid combination rejected             | Error message                            |
+| isValidPlay: wrong card count vs lastPlay rejected    | Error message                            |
+| isValidPlay: doesn't beat lastPlay rejected           | Error message                            |
+| isValidPlay: first play without lowest card rejected  | Error message                            |
+| isValidPlay: valid play accepted                      | Returns valid=true with correct handType |
+| canBeatLastPlay: returns true when beatable           | Player has at least one combo            |
+| canBeatLastPlay: returns false when unbeatable        | No combo in hand can beat current        |
 
 ### 10.4 Unit Tests: Game Flow (`tests/engine/big2/game-flow.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| Initialize deals correct card count (4P) | Each player has 13 cards |
-| Initialize deals correct card count (3P) | Each player has 17 cards, deck has 51 |
-| Initialize deals correct card count (2P) | Each player has 13 cards |
-| Starting player holds lowest card | currentPlayerIndex points to correct player |
-| Turn advances after valid play | currentPlayerIndex moves to next active player |
-| Turn advances after pass | currentPlayerIndex moves to next active player |
-| Trick resets after all active players pass | isFreePlay=true, lastPlay=null, currentPlayer=trick winner |
-| Cannot pass on first play | applyAction returns failure |
-| Cannot pass on free play | applyAction returns failure |
-| Player finishes — added to finishedPlayerIndices | finishedPlayerIndices grows by 1, player's hand is empty |
-| Player finishes — turn skips to next active player | currentPlayerIndex skips the finished player |
-| Game continues after 1st place finishes (4P) | status remains IN_PROGRESS, 3 active players remain |
-| Game completes when second-to-last finishes (4P) | status=COMPLETED, last player auto-placed, winner set to 1st finisher |
-| Game completes immediately in 2P | First player to empty hand wins, other is last place |
+| Test                                                      | What it verifies                                                           |
+| --------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Initialize deals correct card count (4P)                  | Each player has 13 cards                                                   |
+| Initialize deals correct card count (3P)                  | Each player has 17 cards, deck has 51                                      |
+| Initialize deals correct card count (2P)                  | Each player has 13 cards                                                   |
+| Starting player holds lowest card                         | currentPlayerIndex points to correct player                                |
+| Turn advances after valid play                            | currentPlayerIndex moves to next active player                             |
+| Turn advances after pass                                  | currentPlayerIndex moves to next active player                             |
+| Trick resets after all active players pass                | isFreePlay=true, lastPlay=null, currentPlayer=trick winner                 |
+| Cannot pass on first play                                 | applyAction returns failure                                                |
+| Cannot pass on free play                                  | applyAction returns failure                                                |
+| Player finishes — added to finishedPlayerIndices          | finishedPlayerIndices grows by 1, player's hand is empty                   |
+| Player finishes — turn skips to next active player        | currentPlayerIndex skips the finished player                               |
+| Game continues after 1st place finishes (4P)              | status remains IN_PROGRESS, 3 active players remain                        |
+| Game completes when second-to-last finishes (4P)          | status=COMPLETED, last player auto-placed, winner set to 1st finisher      |
+| Game completes immediately in 2P                          | First player to empty hand wins, other is last place                       |
 | Trick winner finished — next active player gets free play | When all pass and trick leader has gone out, free play goes to next active |
-| Finished player turn is skipped | Turn never lands on a player in finishedPlayerIndices |
-| Version increments on every action | newState.version = state.version + 1 |
-| State is immutable | Original state unchanged after applyAction |
-| Wrong player's turn rejected | Error: "Not your turn" |
-| Action after game over rejected | Error: "Game is already over" |
-| Finished player submitting action rejected | Error: "Not your turn" |
+| Finished player turn is skipped                           | Turn never lands on a player in finishedPlayerIndices                      |
+| Version increments on every action                        | newState.version = state.version + 1                                       |
+| State is immutable                                        | Original state unchanged after applyAction                                 |
+| Wrong player's turn rejected                              | Error: "Not your turn"                                                     |
+| Action after game over rejected                           | Error: "Game is already over"                                              |
+| Finished player submitting action rejected                | Error: "Not your turn"                                                     |
 
 ### 10.5 Unit Tests: Scoring (`tests/engine/big2/scoring.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| 4P scoring: 5/3/1/0 | First finisher gets 5, second gets 3, third gets 1, last gets 0 |
-| 3P scoring: 5/3/0 | First finisher gets 5, second gets 3, last gets 0 |
-| 2P scoring: 5/0 | First finisher gets 5, other gets 0 |
+| Test                         | What it verifies                                                           |
+| ---------------------------- | -------------------------------------------------------------------------- |
+| 4P scoring: 5/3/1/0          | First finisher gets 5, second gets 3, third gets 1, last gets 0            |
+| 3P scoring: 5/3/0            | First finisher gets 5, second gets 3, last gets 0                          |
+| 2P scoring: 5/0              | First finisher gets 5, other gets 0                                        |
 | Breakdown contains placement | Each player's breakdown has `{ placement: N }` where N is 1-based position |
-| Winner is first finisher | scores[0] corresponds to the player who finished first |
-| All players accounted for | scores array has one entry per player |
+| Winner is first finisher     | scores[0] corresponds to the player who finished first                     |
+| All players accounted for    | scores array has one entry per player                                      |
 
 ### 10.6 Integration Tests: Full Game Simulation (`tests/engine/big2/full-game.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| Complete 4P game using seeded PRNG | Game terminates, all players placed, scores computed |
-| Complete 3P game | Same as above with 3 players |
-| Complete 2P game | Same as above with 2 players |
-| Invariant: total cards constant | Sum of all hand sizes + played cards = expected total (every turn) |
-| Invariant: no deadlock | validActions is never empty for current player (game always progresses) |
-| Invariant: status never goes backwards | Only forward: IN_PROGRESS → COMPLETED |
-| Invariant: version strictly increases | Each action increments by exactly 1 |
-| Invariant: finishedPlayerIndices only grows | Never shrinks, entries never removed |
-| Invariant: currentPlayerIndex is never a finished player | During IN_PROGRESS, current player is always active |
-| Random strategy game (pick random valid action) | Completes without error over 100 random seeds |
-| Multiple players finish in sequence | finishedPlayerIndices reflects correct ordering |
+| Test                                                     | What it verifies                                                        |
+| -------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Complete 4P game using seeded PRNG                       | Game terminates, all players placed, scores computed                    |
+| Complete 3P game                                         | Same as above with 3 players                                            |
+| Complete 2P game                                         | Same as above with 2 players                                            |
+| Invariant: total cards constant                          | Sum of all hand sizes + played cards = expected total (every turn)      |
+| Invariant: no deadlock                                   | validActions is never empty for current player (game always progresses) |
+| Invariant: status never goes backwards                   | Only forward: IN_PROGRESS → COMPLETED                                   |
+| Invariant: version strictly increases                    | Each action increments by exactly 1                                     |
+| Invariant: finishedPlayerIndices only grows              | Never shrinks, entries never removed                                    |
+| Invariant: currentPlayerIndex is never a finished player | During IN_PROGRESS, current player is always active                     |
+| Random strategy game (pick random valid action)          | Completes without error over 100 random seeds                           |
+| Multiple players finish in sequence                      | finishedPlayerIndices reflects correct ordering                         |
 
 ### 10.7 Security Tests: Information Hiding (`tests/engine/big2/information-hiding.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| PlayerView for A does not contain B's hand | No cards from player B appear in A's view |
-| PlayerView shows only your own hand | `you.hand` matches your actual hand |
-| PlayerView shows opponent card counts (not cards) | `players[].cardCount` is a number, no Card objects |
-| SpectatorView contains no hands | No Card arrays anywhere in spectator view |
-| gameSpecificPublicState contains no hands | Only public info (lastPlay, history, finishedPlayerIndices, etc.) |
-| After a play, played cards visible to all | lastPlay.cards appears in all views |
-| Played cards no longer in player's hand | PlayerView.you.hand shrinks after play |
-| Finished player's hand is empty in their view | After finishing, `you.hand` is `[]` |
+| Test                                              | What it verifies                                                  |
+| ------------------------------------------------- | ----------------------------------------------------------------- |
+| PlayerView for A does not contain B's hand        | No cards from player B appear in A's view                         |
+| PlayerView shows only your own hand               | `you.hand` matches your actual hand                               |
+| PlayerView shows opponent card counts (not cards) | `players[].cardCount` is a number, no Card objects                |
+| SpectatorView contains no hands                   | No Card arrays anywhere in spectator view                         |
+| gameSpecificPublicState contains no hands         | Only public info (lastPlay, history, finishedPlayerIndices, etc.) |
+| After a play, played cards visible to all         | lastPlay.cards appears in all views                               |
+| Played cards no longer in player's hand           | PlayerView.you.hand shrinks after play                            |
+| Finished player's hand is empty in their view     | After finishing, `you.hand` is `[]`                               |
 
 ---
 

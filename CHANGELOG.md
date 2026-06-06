@@ -13,10 +13,12 @@ Format: each entry has a date, short description, and category. Most recent firs
 ## [2026-06-06] — Add Phase 2 LLDs (WebSocket Layer, Big2 Engine)
 
 ### Added
+
 - `docs/lld/03-websocket-layer.md` — LLD for Socket.IO integration, room management, and real-time game communication
 - `docs/lld/04-big2-engine.md` — LLD for Big2 rules engine implementing the GameEngine interface
 
 ### Changed
+
 - `docs/execution-plan.md` — Updated Big2 straights rule (A is high only) and scoring (placement-based 5/3/1/0)
 
 ---
@@ -24,6 +26,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 ## [2026-06-06] — Fix all ESLint errors (lint:check now passes)
 
 ### Fixed
+
 - `eslint.config.mjs` — added `argsIgnorePattern: "^_"` so `_`-prefixed unused parameters are ignored; fixes `handler.ts`, `serveAsset.ts`, `serializer.ts`, `routes.ts`
 - `src/backend/util/errors.ts` — changed `instanceOfErrorWithStatus` parameter from `any` to `unknown` with proper `typeof`/null guards
 - `src/backend/util/types.ts` — changed default generic to `unknown`; added inline eslint-disable for the unavoidable Express `any` in type params
@@ -39,6 +42,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 ## [2026-06-06] — Supabase Migration (LLD 1)
 
 ### Added
+
 - `src/backend/middleware/authMiddleware.ts` — Supabase JWT verification middleware (HS256, `SUPABASE_JWT_SECRET`); extracts `userId` and `displayName` from JWT claims
 - `src/backend/database/entities/Game.ts` — Redesigned Game entity: UUID PK, JSONB state, version column (optimistic locking), timestamps
 - `src/backend/database/entities/PlayerStats.ts` — New PlayerStats entity for per-user win/loss/score tracking
@@ -51,6 +55,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 - `tests/middleware/authMiddleware.test.ts` — 14 unit tests: missing token, invalid token, wrong secret, expired token, wrong algorithm, anon role rejection, valid token extraction, displayName fallback, next() invocation
 
 ### Changed
+
 - `src/backend/database/database.ts` — Replaced `Database` interface with `GameRepository` + `PlayerStatsRepository` interfaces; removed all auth methods; imports `GameType` from `@shared/engine-types`
 - `src/backend/database/postgres.ts` — Removed all auth methods; updated entity list to `[Game, PlayerStats]`; updated connection config to use Supabase env vars (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`); default port 54322 (Supabase local); `saveGame` uses optimistic locking (transaction + version check)
 - `src/backend/server.ts` — Removed auth routes (`/auth/*`), SSE route (`/event`), `/authNedEcho`; replaced `authNHandler` with `authMiddleware`; removed `cookieParser` middleware
@@ -74,6 +79,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 - `vitest.config.ts` — Added `@` path alias pointing to `src/backend` (required for middleware tests)
 
 ### Removed
+
 - `src/backend/api/auth/getNonce.ts` — Nonce flow eliminated
 - `src/backend/api/auth/createAccount.ts` — Supabase handles account creation
 - `src/backend/api/auth/getAuthToken.ts` — Supabase handles sign-in
@@ -94,6 +100,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 ## [2026-06-03] — Implement Game Engine Interface (LLD 2)
 
 ### Added
+
 - `src/shared/engine-types.ts` — All shared engine types: `Card`, `Suit`, `Rank`, `GameAction`, `ValidAction`, `ActionResult`, `InternalGameState`, `PlayerView`, `PlayerPublicInfo`, `PlayerPrivateInfo`, `SpectatorView`, `GameStatus`, `GameType`, `PlayerId`, `PlayerInfo`, `PlayerScore`
 - `src/backend/engine/game-engine.ts` — `GameEngine` interface and `GameEngineConfig` type
 - `src/backend/engine/game-engine-factory.ts` — `GameEngineFactory` class (register, getEngine, hasEngine, getRegisteredTypes)
@@ -105,6 +112,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 - `vitest.config.ts` — Vitest configuration with `@shared` path alias
 
 ### Changed
+
 - `src/shared/model.ts` — `GameType` and `GameStatus` now re-exported from `engine-types.ts`; removed `"PAUSED"` status
 - `package.json` — `test` script now runs `vitest run`; added `vitest` dev dependency
 
@@ -113,6 +121,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 ## [2026-06-03] — Add changelog pre-commit hook
 
 ### Added
+
 - `.githooks/pre-commit` — rejects commits without CHANGELOG.md staged
 - `.claude/settings.json` — Claude Code hook warns before committing without changelog
 - `postinstall` script in `package.json` — auto-configures `core.hooksPath` on `npm install`
@@ -122,10 +131,12 @@ Format: each entry has a date, short description, and category. Most recent firs
 ## [2026-06-03] — Add Phase 1 LLDs (Supabase Migration, Game Engine Interface)
 
 ### Added
+
 - `docs/lld/01-supabase-migration.md` — LLD for replacing custom auth + Postgres with Supabase
 - `docs/lld/02-game-engine-interface.md` — LLD for the generic game engine interface contract
 
 ### Changed
+
 - `DEVELOPMENT.md` — Architect and Design Reviewer now read direct upstream LLDs (per execution plan dependency graph) to ensure cross-doc consistency
 
 ---
@@ -133,10 +144,12 @@ Format: each entry has a date, short description, and category. Most recent firs
 ## [2026-06-03] — Add agent routing table and fix changelog dating
 
 ### Added
+
 - Agent routing table in `CLAUDE.md` — maps trigger phrases to correct agent persona
 - Explicit commit requirement: changelog entries must be dated `[YYYY-MM-DD]` at commit time
 
 ### Fixed
+
 - Changelog date: moved entries from `[Unreleased]` to `[2026-05-30]` to match commit date
 
 ---
@@ -144,6 +157,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 ## [2026-05-30] — Project design docs, development workflow, and agent personas
 
 ### Added
+
 - Project design documentation (`docs/`)
   - High-level design doc (`project-hld.md`)
   - Architecture principles (`architecture-principles.md`)
@@ -161,6 +175,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 - `CHANGELOG.md` — this file
 
 ### Changed
+
 - Updated `CLAUDE.md` — slimmed to orientation file, moved commands/conventions to DEVELOPMENT.md
 
 ---

@@ -1,34 +1,38 @@
 import {
-  Entity, PrimaryColumn, Column, CreateDateColumn,
-  UpdateDateColumn, VersionColumn
-} from 'typeorm';
+  Entity,
+  PrimaryColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  VersionColumn,
+} from "typeorm";
 
-import type { GameType, GameStatus } from '@shared/engine-types';
+import type { GameType, GameStatus } from "@shared/engine-types";
 
-@Entity('games')
+@Entity("games")
 export class Game {
-  @PrimaryColumn({ type: 'uuid' })
-  gameId: string = '';
+  @PrimaryColumn({ type: "uuid" })
+  gameId: string = "";
 
-  @Column({ type: 'varchar', length: 50 })
-  gameType: GameType = 'big2';
+  @Column({ type: "varchar", length: 50 })
+  gameType: GameType = "big2";
 
-  @Column({ type: 'uuid', array: true, default: '{}' })
+  @Column({ type: "uuid", array: true, default: "{}" })
   playerIds: string[] = [];
 
-  @Column({ type: 'int' })
+  @Column({ type: "int" })
   maxPlayers: number = 4;
 
-  @Column({ type: 'varchar', length: 20 })
-  status: GameStatus = 'CREATED';
+  @Column({ type: "varchar", length: 20 })
+  status: GameStatus = "CREATED";
 
-  @Column({ type: 'jsonb', default: '{}' })
+  @Column({ type: "jsonb", default: "{}" })
   state: Record<string, unknown> = {};
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date = new Date();
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date = new Date();
 
   @VersionColumn()

@@ -47,6 +47,7 @@ You are an expert TypeScript implementer building features against approved low-
 ## Testing Requirements
 
 Per `docs/testing-principles.md`:
+
 - Engine tests: pure function calls, no I/O
 - Controlled randomness: seeded PRNG or disabled shuffle
 - Self-contained: each test constructs its own state

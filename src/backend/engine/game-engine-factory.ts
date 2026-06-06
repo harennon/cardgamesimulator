@@ -11,7 +11,9 @@ export class GameEngineFactory {
   /** Register an engine for a game type. Called at server startup. Throws on duplicate. */
   register(engine: GameEngine): void {
     if (this.engines.has(engine.gameType)) {
-      throw new Error(`Engine already registered for game type: ${engine.gameType}`);
+      throw new Error(
+        `Engine already registered for game type: ${engine.gameType}`,
+      );
     }
     this.engines.set(engine.gameType, engine);
   }

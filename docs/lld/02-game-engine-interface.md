@@ -7,6 +7,7 @@ The contract that all game engines implement, plus shared types, injectable rand
 ## 1. Scope
 
 **In scope:**
+
 - `GameEngine` interface with full method signatures and behavioral contracts
 - Shared card types (Card, Suit, Rank)
 - Game action and result types (GameAction, ActionResult)
@@ -18,6 +19,7 @@ The contract that all game engines implement, plus shared types, injectable rand
 - Concurrency strategy (optimistic locking via version field)
 
 **Out of scope:**
+
 - Big2-specific rules and logic (LLD 4)
 - WebSocket layer (LLD 3)
 - Database schema and persistence (LLD 1)
@@ -38,7 +40,20 @@ All types in this section go to `src/shared/engine-types.ts` (shared between fro
 export type Suit = "clubs" | "diamonds" | "hearts" | "spades";
 
 // Standard playing card ranks (string literals for readability)
-export type Rank = "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K" | "A" | "2";
+export type Rank =
+  | "3"
+  | "4"
+  | "5"
+  | "6"
+  | "7"
+  | "8"
+  | "9"
+  | "10"
+  | "J"
+  | "Q"
+  | "K"
+  | "A"
+  | "2";
 
 // A single playing card — immutable value object
 export interface Card {
@@ -48,6 +63,7 @@ export interface Card {
 ```
 
 **Design notes:**
+
 - `Rank` uses Big2-compatible ordering (3 lowest, 2 highest). The array index of the rank in a constant array determines numeric value for comparisons — that logic lives in the Big2 engine, not here.
 - Cards are value objects: two cards with the same suit and rank are equal. Engines must compare by value, not reference.
 - The `Card` type is game-agnostic. Games that need non-standard decks (e.g., jokers) will extend this in their own types — not here.
@@ -86,23 +102,23 @@ export interface PlayerInfo {
 // Base type for all game actions. Each game engine defines its own
 // action types that extend this with game-specific payloads.
 export interface GameAction {
-  readonly type: string;         // Action discriminator (e.g., "playCards", "pass")
-  readonly playerId: PlayerId;   // Who is performing the action
+  readonly type: string; // Action discriminator (e.g., "playCards", "pass")
+  readonly playerId: PlayerId; // Who is performing the action
 }
 
 // The subset of actions a player can currently perform.
 // Sent to the client as part of PlayerView.
 // The client uses this to enable/disable UI elements.
 export interface ValidAction {
-  readonly type: string;         // Action type the player may submit
+  readonly type: string; // Action type the player may submit
   readonly description?: string; // Human-readable label (e.g., "Pass", "Play selected cards")
 }
 
 // Result of attempting to apply an action to game state.
 export interface ActionResult {
   readonly success: boolean;
-  readonly newState: InternalGameState | null;  // null if action was rejected
-  readonly error?: string;                       // Human-readable rejection reason
+  readonly newState: InternalGameState | null; // null if action was rejected
+  readonly error?: string; // Human-readable rejection reason
 }
 ```
 
@@ -117,14 +133,14 @@ export interface InternalGameState {
   readonly gameId: string;
   readonly gameType: GameType;
   readonly status: GameStatus;
-  readonly version: number;               // Optimistic locking — increments on every state change
+  readonly version: number; // Optimistic locking — increments on every state change
   readonly players: readonly PlayerInfo[];
-  readonly currentPlayerIndex: number;    // Index into players array (-1 if no current turn, e.g., CREATED or COMPLETED)
-  readonly turnNumber: number;            // Monotonically increasing, starts at 1
-  readonly gameSpecificState: unknown;    // Game engine casts this to its concrete type
-  readonly winner: PlayerId | null;       // Set when status becomes COMPLETED
+  readonly currentPlayerIndex: number; // Index into players array (-1 if no current turn, e.g., CREATED or COMPLETED)
+  readonly turnNumber: number; // Monotonically increasing, starts at 1
+  readonly gameSpecificState: unknown; // Game engine casts this to its concrete type
+  readonly winner: PlayerId | null; // Set when status becomes COMPLETED
   readonly scores: readonly PlayerScore[] | null; // Set when status becomes COMPLETED
-  readonly randomSeed: string;            // Seed used at initialize() (for replay/debugging — not reconstructed at applyAction time)
+  readonly randomSeed: string; // Seed used at initialize() (for replay/debugging — not reconstructed at applyAction time)
 }
 
 export interface PlayerScore {
@@ -135,6 +151,7 @@ export interface PlayerScore {
 ```
 
 **Design notes:**
+
 - `gameSpecificState` is typed as `unknown` at the interface level. Each engine defines its own concrete type (e.g., `Big2State`) and casts internally. This keeps the generic interface agnostic while allowing engines full type safety inside their implementation.
 - `version` starts at 1 when the game is created and increments by exactly 1 on every successful `applyAction` call.
 - `currentPlayerIndex` of -1 indicates no active turn (game not started or game over).
@@ -152,8 +169,8 @@ export interface PlayerView {
   readonly you: PlayerPrivateInfo;
   readonly currentPlayerIndex: number;
   readonly turnNumber: number;
-  readonly validActions: readonly ValidAction[];  // Empty array if not your turn or game is over
-  readonly gameSpecificPublicState: unknown;      // Public game state (e.g., last play, discard pile)
+  readonly validActions: readonly ValidAction[]; // Empty array if not your turn or game is over
+  readonly gameSpecificPublicState: unknown; // Public game state (e.g., last play, discard pile)
   readonly winner: PlayerId | null;
   readonly scores: readonly PlayerScore[] | null;
 }
@@ -162,19 +179,20 @@ export interface PlayerView {
 export interface PlayerPublicInfo {
   readonly playerId: PlayerId;
   readonly displayName: string;
-  readonly cardCount: number;        // How many cards they hold (not which cards)
-  readonly isConnected: boolean;     // For showing disconnection status in UI
+  readonly cardCount: number; // How many cards they hold (not which cards)
+  readonly isConnected: boolean; // For showing disconnection status in UI
 }
 
 // What you can see about yourself (includes your hand)
 export interface PlayerPrivateInfo {
   readonly playerId: PlayerId;
   readonly displayName: string;
-  readonly hand: readonly Card[];    // Your cards — the key piece of private information
+  readonly hand: readonly Card[]; // Your cards — the key piece of private information
 }
 ```
 
 **Information hiding contract:** `PlayerView` for player A must NEVER contain:
+
 - The specific cards in any other player's hand
 - The order or contents of the deck
 - Any `gameSpecificState` that reveals hidden info
@@ -304,7 +322,10 @@ export interface GameEngine {
    * - For games with combinatorial actions (e.g., Big2 where many card combinations are valid),
    *   this returns action TYPES (e.g., "playCards", "pass"), not every possible card combination
    */
-  getValidActions(state: InternalGameState, playerId: PlayerId): readonly ValidAction[];
+  getValidActions(
+    state: InternalGameState,
+    playerId: PlayerId,
+  ): readonly ValidAction[];
 
   /**
    * Check if the game has ended.
@@ -323,7 +344,10 @@ export interface GameEngine {
    * - Contains no hidden game state (deck contents, etc.)
    * - Shows card counts, last play, turn order, game status
    */
-  getSpectatorView(state: InternalGameState, spectatorCount: number): SpectatorView;
+  getSpectatorView(
+    state: InternalGameState,
+    spectatorCount: number,
+  ): SpectatorView;
 }
 ```
 
@@ -388,9 +412,15 @@ export class SeededPRNG implements PRNG {
     this.state = hashSeed(this.seed);
   }
 
-  next(): number { /* mulberry32 or xorshift32 */ }
-  nextInt(min: number, max: number): number { /* uses this.next() */ }
-  shuffle<T>(array: readonly T[]): T[] { /* Fisher-Yates using this.next() */ }
+  next(): number {
+    /* mulberry32 or xorshift32 */
+  }
+  nextInt(min: number, max: number): number {
+    /* uses this.next() */
+  }
+  shuffle<T>(array: readonly T[]): T[] {
+    /* Fisher-Yates using this.next() */
+  }
 }
 
 /** Generate a random seed string (used for production games) */
@@ -399,7 +429,9 @@ function generateSeed(): string {
 }
 
 /** Hash a seed string to a numeric state for the PRNG algorithm */
-function hashSeed(seed: string): number { /* djb2 or similar string hash */ }
+function hashSeed(seed: string): number {
+  /* djb2 or similar string hash */
+}
 ```
 
 ### 4.3 Test PRNG
@@ -426,12 +458,17 @@ export class FixedPRNG implements PRNG {
     return val;
   }
 
-  nextInt(min: number, max: number): number { /* derives from this.next() */ }
-  shuffle<T>(array: readonly T[]): T[] { /* returns input unshuffled if values empty, else Fisher-Yates */ }
+  nextInt(min: number, max: number): number {
+    /* derives from this.next() */
+  }
+  shuffle<T>(array: readonly T[]): T[] {
+    /* returns input unshuffled if values empty, else Fisher-Yates */
+  }
 }
 ```
 
 **Usage in tests:**
+
 - `new SeededPRNG("test-seed-42")` — reproducible but realistic shuffle
 - `new FixedPRNG([])` with empty values — no-op shuffle (cards stay in creation order)
 - `new FixedPRNG([0.1, 0.5, 0.9, ...])` — controlled sequence for specific arrangements
@@ -456,7 +493,9 @@ export class GameEngineFactory {
   /** Register an engine for a game type. Called at server startup. */
   register(engine: GameEngine): void {
     if (this.engines.has(engine.gameType)) {
-      throw new Error(`Engine already registered for game type: ${engine.gameType}`);
+      throw new Error(
+        `Engine already registered for game type: ${engine.gameType}`,
+      );
     }
     this.engines.set(engine.gameType, engine);
   }
@@ -483,6 +522,7 @@ export class GameEngineFactory {
 ```
 
 **Lifecycle:**
+
 - A single `GameEngineFactory` instance is created at server startup.
 - Each engine implementation is registered via `factory.register(new Big2Engine())`.
 - The factory is injected into the game service/WebSocket handler as a dependency.
@@ -501,14 +541,14 @@ import type { InternalGameState } from "@/shared/engine-types";
 
 export interface GameCacheEntry {
   state: InternalGameState;
-  lastAccessedAt: number;   // Date.now() timestamp
-  isDirty: boolean;         // true if state has changed since last DB write
+  lastAccessedAt: number; // Date.now() timestamp
+  isDirty: boolean; // true if state has changed since last DB write
 }
 
 export interface GameCacheConfig {
-  maxEntries: number;          // Maximum number of games in cache (default: 1000)
+  maxEntries: number; // Maximum number of games in cache (default: 1000)
   evictionCheckIntervalMs: number; // How often to run eviction (default: 60000 = 1 min)
-  inactivityThresholdMs: number;   // Evict after this much inactivity (default: 3600000 = 1 hour)
+  inactivityThresholdMs: number; // Evict after this much inactivity (default: 3600000 = 1 hour)
 }
 
 export class GameCache {
@@ -608,10 +648,15 @@ The `version` field on `InternalGameState` serves as an optimistic lock:
 **Implementation in the orchestration layer (GameService, not in the engine):**
 
 ```typescript
-async function handleAction(gameId: string, action: GameAction): Promise<ActionResult> {
+async function handleAction(
+  gameId: string,
+  action: GameAction,
+): Promise<ActionResult> {
   // 1. Read from cache (sync)
   const state = gameCache.get(gameId);
-  if (!state) { /* load from DB via await, then cache.set — race window here */ }
+  if (!state) {
+    /* load from DB via await, then cache.set — race window here */
+  }
 
   // 2. Apply action (sync, pure — no await, no race window)
   const result = engine.applyAction(state, action);
@@ -644,6 +689,7 @@ async function handleAction(gameId: string, action: GameAction): Promise<ActionR
 ### 7.4 Conflict Resolution for the Client
 
 When the client receives a version conflict rejection:
+
 - The WebSocket layer sends the current state to the client (via `game:state` event).
 - The client re-renders with the latest state and `validActions`.
 - If it is still the player's turn, they can resubmit. If another player acted (e.g., timer auto-pass), the UI updates accordingly.
@@ -689,6 +735,7 @@ tests/
 The existing `SerializableGame`, `SerializableGameState`, `GameType`, and `GameStatus` in `src/shared/model.ts` will be superseded by the types in `src/shared/engine-types.ts`.
 
 **Migration plan:**
+
 1. Create `src/shared/engine-types.ts` with all new types.
 2. Update `GameType` and `GameStatus` in `model.ts` to re-export from `engine-types.ts` (maintains backward compatibility during transition). Any existing code referencing `"PAUSED"` status must be removed in the same commit.
 3. Existing REST endpoints (`createGame`, `joinGame`, `getGameState`) will be updated in LLD 3 (WebSocket layer) to use the new types. Until then, they continue working with the old types.
@@ -700,88 +747,88 @@ The existing `SerializableGame`, `SerializableGameState`, `GameType`, and `GameS
 
 ### 10.1 PRNG Tests (`tests/engine/prng.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| Same seed produces same sequence | `new SeededPRNG("seed").next()` called N times produces identical results across runs |
-| Different seeds produce different sequences | Two PRNGs with different seeds diverge immediately |
-| `nextInt` respects bounds | Result is always in [min, max] inclusive, over 1000 calls |
-| `shuffle` returns all elements | Output has same length and same elements (no loss/duplication) |
-| `shuffle` does not mutate input | Original array unchanged after shuffle |
-| `shuffle` with same seed is deterministic | Same seed + same input = same output |
-| `FixedPRNG` returns predefined values | Sequence matches constructor input |
-| `FixedPRNG` wraps on exhaustion | After consuming all values, starts from index 0 |
+| Test                                        | What it verifies                                                                      |
+| ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Same seed produces same sequence            | `new SeededPRNG("seed").next()` called N times produces identical results across runs |
+| Different seeds produce different sequences | Two PRNGs with different seeds diverge immediately                                    |
+| `nextInt` respects bounds                   | Result is always in [min, max] inclusive, over 1000 calls                             |
+| `shuffle` returns all elements              | Output has same length and same elements (no loss/duplication)                        |
+| `shuffle` does not mutate input             | Original array unchanged after shuffle                                                |
+| `shuffle` with same seed is deterministic   | Same seed + same input = same output                                                  |
+| `FixedPRNG` returns predefined values       | Sequence matches constructor input                                                    |
+| `FixedPRNG` wraps on exhaustion             | After consuming all values, starts from index 0                                       |
 
 ### 10.2 GameCache Tests (`tests/engine/game-cache.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| `get` returns null for missing game | Cache miss returns null, not error |
-| `set` then `get` returns same state | Round-trip works |
-| `update` marks entry dirty | `getDirtyEntries()` includes updated game |
-| `markClean` clears dirty flag | After `markClean`, not in `getDirtyEntries()` |
-| `evict` removes entry | `get` returns null after evict |
-| Eviction on inactivity | Entry removed after threshold (use fake timers) |
-| Eviction on capacity overflow | Oldest entry evicted when max reached |
-| `has` returns correct boolean | true for cached games, false for others |
+| Test                                | What it verifies                                |
+| ----------------------------------- | ----------------------------------------------- |
+| `get` returns null for missing game | Cache miss returns null, not error              |
+| `set` then `get` returns same state | Round-trip works                                |
+| `update` marks entry dirty          | `getDirtyEntries()` includes updated game       |
+| `markClean` clears dirty flag       | After `markClean`, not in `getDirtyEntries()`   |
+| `evict` removes entry               | `get` returns null after evict                  |
+| Eviction on inactivity              | Entry removed after threshold (use fake timers) |
+| Eviction on capacity overflow       | Oldest entry evicted when max reached           |
+| `has` returns correct boolean       | true for cached games, false for others         |
 
 ### 10.3 GameEngineFactory Tests (`tests/engine/game-engine-factory.test.ts`)
 
-| Test | What it verifies |
-|------|------------------|
-| Register and retrieve | `getEngine` returns the registered engine |
-| Duplicate registration throws | Cannot register two engines for same type |
-| Missing engine throws | `getEngine` for unregistered type throws descriptive error |
-| `hasEngine` correctness | Returns true/false appropriately |
-| `getRegisteredTypes` lists all | Returns all registered game types |
+| Test                           | What it verifies                                           |
+| ------------------------------ | ---------------------------------------------------------- |
+| Register and retrieve          | `getEngine` returns the registered engine                  |
+| Duplicate registration throws  | Cannot register two engines for same type                  |
+| Missing engine throws          | `getEngine` for unregistered type throws descriptive error |
+| `hasEngine` correctness        | Returns true/false appropriately                           |
+| `getRegisteredTypes` lists all | Returns all registered game types                          |
 
 ### 10.4 GameEngine Interface Compliance (for each engine implementation)
 
 Each engine implementation (LLD 4 for Big2) must pass these generic tests:
 
-| Test category | What it verifies |
-|---------------|------------------|
-| Initialize produces valid state | Status is IN_PROGRESS, version is 1, all players present, cards dealt |
-| Initialize rejects invalid player count | Throws for < minPlayers or > maxPlayers |
-| applyAction increments version | newState.version === state.version + 1 |
-| applyAction is immutable | Original state object unchanged after call |
-| Invalid action returns success=false | Wrong player, invalid type, bad payload |
-| Invalid action does not change state | ActionResult.newState is null |
-| getPlayerView excludes hidden info | Player A's view never contains player B's cards |
-| getPlayerView has validActions only on turn | Non-current player gets empty validActions |
-| getSpectatorView has no hands | No Card arrays in spectator output |
-| Game over detected correctly | isGameOver returns true iff status is COMPLETED |
-| Full game simulation | Play to completion using only valid actions, assert invariants each step |
-| Card conservation invariant | Total cards across all hands + public areas is constant |
-| Status never goes backwards | Track status across all transitions, verify monotonic progression |
+| Test category                               | What it verifies                                                         |
+| ------------------------------------------- | ------------------------------------------------------------------------ |
+| Initialize produces valid state             | Status is IN_PROGRESS, version is 1, all players present, cards dealt    |
+| Initialize rejects invalid player count     | Throws for < minPlayers or > maxPlayers                                  |
+| applyAction increments version              | newState.version === state.version + 1                                   |
+| applyAction is immutable                    | Original state object unchanged after call                               |
+| Invalid action returns success=false        | Wrong player, invalid type, bad payload                                  |
+| Invalid action does not change state        | ActionResult.newState is null                                            |
+| getPlayerView excludes hidden info          | Player A's view never contains player B's cards                          |
+| getPlayerView has validActions only on turn | Non-current player gets empty validActions                               |
+| getSpectatorView has no hands               | No Card arrays in spectator output                                       |
+| Game over detected correctly                | isGameOver returns true iff status is COMPLETED                          |
+| Full game simulation                        | Play to completion using only valid actions, assert invariants each step |
+| Card conservation invariant                 | Total cards across all hands + public areas is constant                  |
+| Status never goes backwards                 | Track status across all transitions, verify monotonic progression        |
 
 ---
 
 ## 11. Edge Cases
 
-| Edge case | Handling |
-|-----------|----------|
-| Action submitted for wrong game | Orchestration layer validates gameId before reaching engine |
-| Action submitted by non-participant | Orchestration layer verifies playerId is in game's players array |
-| Action submitted after game over | `getValidActions` returns empty; `applyAction` returns failure |
-| Two actions submitted simultaneously | Optimistic locking rejects the slower one (version mismatch) |
-| Timer fires same instant as player action | Race resolved by optimistic lock — one succeeds, one gets version conflict |
-| Game state corrupted in cache (crash) | On cache miss, reload from DB. DB always has last persisted version |
-| Server restart mid-game | All cache lost. Games reloaded from DB on next access. May lose at most one un-persisted action (acceptable for turn-based) |
-| Player submits action not in validActions | `validateAction` returns false; `applyAction` returns failure with descriptive error |
-| Engine initialized with 0 or 1 players | `initialize` throws (minPlayers enforcement) |
-| Cache evicts dirty entry | Eviction loop calls `getDirtyEntries()` and persists before evicting |
+| Edge case                                 | Handling                                                                                                                    |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Action submitted for wrong game           | Orchestration layer validates gameId before reaching engine                                                                 |
+| Action submitted by non-participant       | Orchestration layer verifies playerId is in game's players array                                                            |
+| Action submitted after game over          | `getValidActions` returns empty; `applyAction` returns failure                                                              |
+| Two actions submitted simultaneously      | Optimistic locking rejects the slower one (version mismatch)                                                                |
+| Timer fires same instant as player action | Race resolved by optimistic lock — one succeeds, one gets version conflict                                                  |
+| Game state corrupted in cache (crash)     | On cache miss, reload from DB. DB always has last persisted version                                                         |
+| Server restart mid-game                   | All cache lost. Games reloaded from DB on next access. May lose at most one un-persisted action (acceptable for turn-based) |
+| Player submits action not in validActions | `validateAction` returns false; `applyAction` returns failure with descriptive error                                        |
+| Engine initialized with 0 or 1 players    | `initialize` throws (minPlayers enforcement)                                                                                |
+| Cache evicts dirty entry                  | Eviction loop calls `getDirtyEntries()` and persists before evicting                                                        |
 
 ---
 
 ## 12. Dependencies
 
-| Dependency | Status | Notes |
-|------------|--------|-------|
-| Node.js `crypto` module | Available | Used only in `generateSeed()` for real randomness |
-| TypeScript strict mode | Configured | Existing `tsconfig.json` has strict enabled |
-| `src/shared/` directory | Exists | Currently has `model.ts` and `crypto.ts` |
-| `src/backend/engine/` directory | Does not exist | Must be created |
-| `tests/engine/` directory | Does not exist | Must be created |
+| Dependency                      | Status         | Notes                                             |
+| ------------------------------- | -------------- | ------------------------------------------------- |
+| Node.js `crypto` module         | Available      | Used only in `generateSeed()` for real randomness |
+| TypeScript strict mode          | Configured     | Existing `tsconfig.json` has strict enabled       |
+| `src/shared/` directory         | Exists         | Currently has `model.ts` and `crypto.ts`          |
+| `src/backend/engine/` directory | Does not exist | Must be created                                   |
+| `tests/engine/` directory       | Does not exist | Must be created                                   |
 
 No external npm packages required. All implementations use Node.js standard library only.
 

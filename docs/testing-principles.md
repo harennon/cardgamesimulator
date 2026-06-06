@@ -96,6 +96,7 @@ Never use `Math.random()` directly in game logic. Route all randomness through a
 **Principle:** Define invariants that must hold after every action, and assert them broadly.
 
 Invariants for a card game:
+
 - Total cards in the system (all hands + deck + discard + played) = expected total (no cards created or destroyed)
 - Current turn player is always one of the active players
 - `validActions` is never empty for the current player (the game isn't stuck)
@@ -128,6 +129,7 @@ This is your smoke test — if a full game can be played without crashing or ent
 **Principle:** Structure test files around game concepts, not implementation files.
 
 Suggested structure:
+
 ```
 tests/
   engine/

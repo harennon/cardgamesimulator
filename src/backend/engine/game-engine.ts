@@ -85,7 +85,10 @@ export interface GameEngine {
    * - Returns empty array if game status is not "IN_PROGRESS"
    * - Returns action TYPES (e.g., "playCards", "pass"), not every possible combination
    */
-  getValidActions(state: InternalGameState, playerId: PlayerId): readonly ValidAction[];
+  getValidActions(
+    state: InternalGameState,
+    playerId: PlayerId,
+  ): readonly ValidAction[];
 
   /**
    * Check if the game has ended.
@@ -104,5 +107,8 @@ export interface GameEngine {
    * - Contains no hidden game state
    * - Shows card counts, last play, turn order, game status
    */
-  getSpectatorView(state: InternalGameState, spectatorCount: number): SpectatorView;
+  getSpectatorView(
+    state: InternalGameState,
+    spectatorCount: number,
+  ): SpectatorView;
 }

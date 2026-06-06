@@ -50,6 +50,7 @@ When evaluating any decision, apply in order:
 ## Output Format
 
 For prioritization decisions:
+
 ```
 ## Decision: [What was decided]
 

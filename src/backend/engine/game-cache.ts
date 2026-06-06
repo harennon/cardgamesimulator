@@ -26,8 +26,11 @@ export class GameCache {
   constructor(config?: Partial<GameCacheConfig>) {
     this.config = {
       maxEntries: config?.maxEntries ?? DEFAULT_CONFIG.maxEntries,
-      evictionCheckIntervalMs: config?.evictionCheckIntervalMs ?? DEFAULT_CONFIG.evictionCheckIntervalMs,
-      inactivityThresholdMs: config?.inactivityThresholdMs ?? DEFAULT_CONFIG.inactivityThresholdMs,
+      evictionCheckIntervalMs:
+        config?.evictionCheckIntervalMs ??
+        DEFAULT_CONFIG.evictionCheckIntervalMs,
+      inactivityThresholdMs:
+        config?.inactivityThresholdMs ?? DEFAULT_CONFIG.inactivityThresholdMs,
     };
   }
 

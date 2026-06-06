@@ -2,7 +2,20 @@
 export type Suit = "clubs" | "diamonds" | "hearts" | "spades";
 
 // Standard playing card ranks (Big2-compatible: 3 lowest, 2 highest)
-export type Rank = "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K" | "A" | "2";
+export type Rank =
+  | "3"
+  | "4"
+  | "5"
+  | "6"
+  | "7"
+  | "8"
+  | "9"
+  | "10"
+  | "J"
+  | "Q"
+  | "K"
+  | "A"
+  | "2";
 
 // A single playing card — immutable value object
 export interface Card {
