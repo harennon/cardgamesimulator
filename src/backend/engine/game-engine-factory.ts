@@ -1,5 +1,6 @@
 import type { GameEngine } from "./game-engine.js";
 import type { GameType } from "@shared/engine-types";
+import { Big2Engine } from "./big2/big2-engine.js";
 
 /**
  * Maps game type identifiers to engine instances.
@@ -37,3 +38,7 @@ export class GameEngineFactory {
     return Array.from(this.engines.keys());
   }
 }
+
+/** Singleton factory with all supported game engines pre-registered. */
+export const engineFactory = new GameEngineFactory();
+engineFactory.register(new Big2Engine());
