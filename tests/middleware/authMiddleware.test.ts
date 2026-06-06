@@ -7,7 +7,8 @@ const TEST_JWT_SECRET = "test-jwt-secret-for-unit-tests";
 process.env.SUPABASE_JWT_SECRET = TEST_JWT_SECRET;
 
 // Dynamic import so env var is set before module initializes
-const { authMiddleware } = await import("../../src/backend/middleware/authMiddleware.js");
+const { authMiddleware } =
+  await import("../../src/backend/middleware/authMiddleware.js");
 import type { Request, Response, Next } from "../../src/backend/util/types.js";
 
 function makeRequest(overrides: Partial<Request> = {}): Request {
@@ -19,7 +20,9 @@ function makeRequest(overrides: Partial<Request> = {}): Request {
 
 function makeNext(): { fn: Next; called: boolean } {
   const state = { called: false };
-  const fn: Next = () => { state.called = true; };
+  const fn: Next = () => {
+    state.called = true;
+  };
   return { fn, called: state.called };
 }
 
@@ -38,12 +41,13 @@ function validToken(overrides: object = {}): string {
   return jwt.sign(payload, TEST_JWT_SECRET, { algorithm: "HS256" });
 }
 
-// The middleware throws UnauthorizedError (status 401) for all rejection cases.
-// Note: UnauthorizedError has a pre-existing prototype bug where setPrototypeOf
-// sets AccessDeniedError.prototype. We assert on status 401 instead of instanceof.
 function expectUnauthorized(fn: () => void): void {
   let thrown: unknown;
-  try { fn(); } catch (e) { thrown = e; }
+  try {
+    fn();
+  } catch (e) {
+    thrown = e;
+  }
   expect(thrown).toBeDefined();
   expect((thrown as { status?: number }).status).toBe(401);
 }
@@ -71,18 +75,27 @@ describe("authMiddleware", () => {
 
   describe("invalid token", () => {
     it("throws 401 for a malformed token", () => {
-      const req = makeRequest({ headers: { authorization: "Bearer not.a.valid.jwt" } });
+      const req = makeRequest({
+        headers: { authorization: "Bearer not.a.valid.jwt" },
+      });
       const { fn: next } = makeNext();
       expectUnauthorized(() => authMiddleware(req, {} as Response, next));
     });
 
     it("throws 401 for a token signed with the wrong secret", () => {
       const token = jwt.sign(
-        { sub: "u1", email: "a@b.com", role: "authenticated", user_metadata: {} },
+        {
+          sub: "u1",
+          email: "a@b.com",
+          role: "authenticated",
+          user_metadata: {},
+        },
         "wrong-secret",
-        { algorithm: "HS256" }
+        { algorithm: "HS256" },
       );
-      const req = makeRequest({ headers: { authorization: `Bearer ${token}` } });
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+      });
       const { fn: next } = makeNext();
       expectUnauthorized(() => authMiddleware(req, {} as Response, next));
     });
@@ -90,19 +103,32 @@ describe("authMiddleware", () => {
     it("throws 401 for an expired token", () => {
       const now = Math.floor(Date.now() / 1000);
       const token = jwt.sign(
-        { sub: "u1", email: "a@b.com", role: "authenticated", aud: "authenticated", user_metadata: {}, iat: now - 7200, exp: now - 3600 },
+        {
+          sub: "u1",
+          email: "a@b.com",
+          role: "authenticated",
+          aud: "authenticated",
+          user_metadata: {},
+          iat: now - 7200,
+          exp: now - 3600,
+        },
         TEST_JWT_SECRET,
-        { algorithm: "HS256" }
+        { algorithm: "HS256" },
       );
-      const req = makeRequest({ headers: { authorization: `Bearer ${token}` } });
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+      });
       const { fn: next } = makeNext();
       expectUnauthorized(() => authMiddleware(req, {} as Response, next));
     });
 
     it("throws 401 for a token with RS256 algorithm header (wrong algorithm)", () => {
       // Middleware only accepts HS256 — a forged RS256 header token is rejected
-      const malformedToken = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1MSIsInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.invalidsig";
-      const req = makeRequest({ headers: { authorization: `Bearer ${malformedToken}` } });
+      const malformedToken =
+        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1MSIsInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.invalidsig";
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${malformedToken}` },
+      });
       const { fn: next } = makeNext();
       expectUnauthorized(() => authMiddleware(req, {} as Response, next));
     });
@@ -111,14 +137,18 @@ describe("authMiddleware", () => {
   describe("anon role rejection", () => {
     it("throws 401 when role is 'anon'", () => {
       const token = validToken({ role: "anon" });
-      const req = makeRequest({ headers: { authorization: `Bearer ${token}` } });
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+      });
       const { fn: next } = makeNext();
       expectUnauthorized(() => authMiddleware(req, {} as Response, next));
     });
 
     it("throws 401 when role is empty string", () => {
       const token = validToken({ role: "" });
-      const req = makeRequest({ headers: { authorization: `Bearer ${token}` } });
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+      });
       const { fn: next } = makeNext();
       expectUnauthorized(() => authMiddleware(req, {} as Response, next));
     });
@@ -127,7 +157,9 @@ describe("authMiddleware", () => {
   describe("valid token", () => {
     it("extracts userId from JWT sub claim", () => {
       const token = validToken({ sub: "expected-user-uuid" });
-      const req = makeRequest({ headers: { authorization: `Bearer ${token}` } });
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+      });
       const { fn: next } = makeNext();
       authMiddleware(req, {} as Response, next);
       expect(req.userId).toBe("expected-user-uuid");
@@ -135,15 +167,22 @@ describe("authMiddleware", () => {
 
     it("extracts displayName from user_metadata.display_name", () => {
       const token = validToken({ user_metadata: { display_name: "Alice" } });
-      const req = makeRequest({ headers: { authorization: `Bearer ${token}` } });
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+      });
       const { fn: next } = makeNext();
       authMiddleware(req, {} as Response, next);
       expect(req.displayName).toBe("Alice");
     });
 
     it("falls back to email when display_name is absent", () => {
-      const token = validToken({ email: "fallback@example.com", user_metadata: {} });
-      const req = makeRequest({ headers: { authorization: `Bearer ${token}` } });
+      const token = validToken({
+        email: "fallback@example.com",
+        user_metadata: {},
+      });
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+      });
       const { fn: next } = makeNext();
       authMiddleware(req, {} as Response, next);
       expect(req.displayName).toBe("fallback@example.com");
@@ -151,16 +190,22 @@ describe("authMiddleware", () => {
 
     it("calls next() on valid authenticated token", () => {
       const token = validToken();
-      const req = makeRequest({ headers: { authorization: `Bearer ${token}` } });
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+      });
       let nextCalled = false;
-      const next: Next = () => { nextCalled = true; };
+      const next: Next = () => {
+        nextCalled = true;
+      };
       authMiddleware(req, {} as Response, next);
       expect(nextCalled).toBe(true);
     });
 
     it("does not throw for a valid token", () => {
       const token = validToken();
-      const req = makeRequest({ headers: { authorization: `Bearer ${token}` } });
+      const req = makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+      });
       const { fn: next } = makeNext();
       expect(() => authMiddleware(req, {} as Response, next)).not.toThrow();
     });
