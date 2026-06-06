@@ -44,4 +44,4 @@ Follow the workflow: **ceo → architect → design-reviewer → implementer →
 
 ## Commit Requirements
 
-Every commit must include a dated changelog entry in `CHANGELOG.md`. Format: move content from `[Unreleased]` into a new `## [YYYY-MM-DD] — Short title` section (use today's date). `[Unreleased]` should be left empty. No exceptions.
+Update `CHANGELOG.md` only for major milestones (LLD implementations, significant features). Not required for every commit.

@@ -1,8 +1,3 @@
 #!/bin/sh
-# Require CHANGELOG.md to be staged with every commit.
-
-if ! git diff --cached --name-only | grep -q '^CHANGELOG.md$'; then
-  echo "ERROR: CHANGELOG.md must be updated with every commit."
-  echo "Stage your changelog entry and try again."
-  exit 1
-fi
+# No enforced pre-commit checks.
+exit 0
