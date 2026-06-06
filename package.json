@@ -17,6 +17,7 @@
     "preview": "vite preview",
     "clean": "rm -rf ./build",
     "test": "vitest run",
+    "lint:check": "eslint src --ext ts --ext vue",
     "lint:fix": "eslint --fix src --ext ts --ext vue",
     "postinstall": "git config core.hooksPath .githooks"
   },

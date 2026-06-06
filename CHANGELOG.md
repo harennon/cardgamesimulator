@@ -10,6 +10,14 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ---
 
+## [2026-06-06] — Add GitHub Actions CI pipeline
+
+### Added
+- `.github/workflows/ci.yml` — Runs lint:check, build, and test on push to main and PRs
+- `package.json` — Added `lint:check` script (eslint without `--fix` for CI use)
+
+---
+
 ## [2026-06-03] — Implement Game Engine Interface (LLD 2)
 
 ### Added
