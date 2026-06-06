@@ -304,9 +304,11 @@ Guests can do almost everything — the only incentives to register are persiste
 **Happy path (registered):**
 
 1. A player plays their last card(s) → game immediately ends
-2. All players see results screen: winner announcement, scoring breakdown, final card counts
+2. All players see results screen: winner announcement, placement-based scoring, final card counts
 3. Options: "Rematch" (same players, new game) or "Back to Home"
 4. Stats updated (wins/losses/score)
+
+**Scoring is per-game-type.** Big2 uses placement-based scoring: 1st = 5pts, 2nd = 3pts, 3rd = 1pt, 4th = 0pts. Other game types (e.g., Tonk) will define their own scoring systems.
 
 **Happy path (guest):**
 
@@ -329,12 +331,12 @@ Guests can do almost everything — the only incentives to register are persiste
 │                   🏆 Alice wins!                             │
 │                                                              │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │  Player     Cards Left    Penalty    Score           │    │
+│  │  Player     Place    Cards Left    Points           │    │
 │  ├─────────────────────────────────────────────────────┤    │
-│  │  Alice      0             —          +24            │    │
-│  │  Bob        3             ×1         -3             │    │
-│  │  Charlie    7             ×1         -7             │    │
-│  │  Dave       12            ×2         -24            │    │
+│  │  Alice      1st      0             5               │    │
+│  │  Bob        2nd      3             3               │    │
+│  │  Charlie    3rd      7             1               │    │
+│  │  Dave       4th      12            0               │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                                                              │
 │  ┌──────────────────┐    ┌──────────────────┐               │

@@ -10,6 +10,33 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ---
 
+## [2026-06-06] — Implement Big2 Engine (LLD 4)
+
+### Added
+
+- `src/backend/engine/big2/constants.ts` — `SUIT_ORDER`, `RANK_ORDER`, `rankValue`, `suitValue`, `compareCards`, `THREE_OF_CLUBS`, `FULL_DECK`, `PLACEMENT_POINTS`
+- `src/backend/engine/big2/hand-types.ts` — `HandType` discriminated union, `FIVE_CARD_HIERARCHY`, `HAND_SIZE`
+- `src/backend/engine/big2/big2-types.ts` — `Big2State`, `Big2Play`, `Big2HistoryEntry`, `Big2PlayCardsAction`, `Big2PassAction`, `Big2Action`, `Big2PublicState`
+- `src/backend/engine/big2/hand-detection.ts` — `detectHandType`: single, pair, straight, full house, four-of-a-kind, straight flush; rejects triples, 4-card hands, straights containing 2
+- `src/backend/engine/big2/hand-comparison.ts` — `beats`: same-category and cross-category (straight < fullHouse < fourOfAKind < straightFlush) comparison
+- `src/backend/engine/big2/scoring.ts` — `computeScores`: placement-based points (5/3/1/0 for 4P, 5/3/0 for 3P, 5/0 for 2P)
+- `src/backend/engine/big2/deck.ts` — `buildDeck`: shuffles via PRNG, deals per player count (4P: 13 each, 3P: 17 each with 3♣ removed, 2P: 13 each), finds lowest dealt card
+- `src/backend/engine/big2/valid-actions.ts` — `computeValidActions`, `isValidPlay`, `canBeatLastPlay`: full validation including first-play lowest-card requirement, card-count matching, hand comparison
+- `src/backend/engine/big2/big2-engine.ts` — `Big2Engine` implementing `GameEngine`: initialize, applyAction, getPlayerView, getValidActions, getSpectatorView, isGameOver; handles game completion, player finishing, trick resets, turn skipping for finished players
+- `tests/engine/big2/hand-detection.test.ts` — 18 tests covering all hand types and rejection cases
+- `tests/engine/big2/hand-comparison.test.ts` — 20 tests covering same-category and cross-category comparisons
+- `tests/engine/big2/valid-actions.test.ts` — 18 tests: computeValidActions, isValidPlay, canBeatLastPlay
+- `tests/engine/big2/scoring.test.ts` — 10 tests: correct placement points for 2P/3P/4P, breakdown field
+- `tests/engine/big2/game-flow.test.ts` — 22 tests: initialization, turn advancement, trick reset, rejection cases, immutability, finished player handling
+- `tests/engine/big2/information-hiding.test.ts` — 11 tests: PlayerView never exposes other players' hands, SpectatorView has no hands or validActions
+- `tests/engine/big2/full-game.test.ts` — 14 tests: complete 2P/3P/4P game simulation with seeded PRNG, invariant checks (version, finishedPlayerIndices monotonicity, currentPlayer never finished), 20-seed random strategy runs
+
+### Changed
+
+- `src/backend/engine/game-engine-factory.ts` — Added `engineFactory` singleton with `Big2Engine` pre-registered
+
+---
+
 ## [2026-06-06] — Add Phase 2 LLDs (WebSocket Layer, Big2 Engine)
 
 ### Added
