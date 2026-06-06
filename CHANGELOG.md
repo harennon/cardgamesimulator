@@ -10,6 +10,17 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ---
 
+## [2026-06-06] — Add Phase 2 LLDs (WebSocket Layer, Big2 Engine)
+
+### Added
+- `docs/lld/03-websocket-layer.md` — LLD for Socket.IO integration, room management, and real-time game communication
+- `docs/lld/04-big2-engine.md` — LLD for Big2 rules engine implementing the GameEngine interface
+
+### Changed
+- `docs/execution-plan.md` — Updated Big2 straights rule (A is high only) and scoring (placement-based 5/3/1/0)
+
+---
+
 ## [2026-06-06] — Fix all ESLint errors (lint:check now passes)
 
 ### Fixed

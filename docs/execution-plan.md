@@ -96,11 +96,11 @@ The game logic and guest access. After this phase, Big2 is playable via WebSocke
 
 - Card ranking (3 lowest → 2 highest, suits: ♣ < ♦ < ♥ < ♠)
 - Combination detection and ranking (single, pair, 5-card hands: straight, full house, quad+kicker, straight flush)
-- Straights: A can be low (A-2-3-4-5) or high (10-J-Q-K-A), no wrapping, 2 never in a straight
+- Straights: A is high only (10-J-Q-K-A is the highest, 3-4-5-6-7 is the lowest). 2 never participates in straights. No wrapping.
 - No flushes, no triples
 - 2–4 player support (deck adjustment: 3P removes 1 card for 17 each; 2P removes 26 cards for 13 each — exact removal scheme TBD in LLD)
-- Game flow (first play must include lowest card, trick reset on all pass, win on empty hand)
-- Scoring (penalty per remaining card with multipliers)
+- Game flow (first play must include lowest card, trick reset on all pass, play continues until last place)
+- Scoring (placement-based: 5/3/1/0 points by finishing order)
 - `getPlayerView()` implementation (hide other players' hands)
 - `getValidActions()` implementation (which combos from hand can beat current play)
 - Test suite: combination ranking, validation, full game simulation, invariant checks
