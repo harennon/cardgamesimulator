@@ -20,6 +20,9 @@ export class Game {
   @Column({ type: "uuid", array: true, default: "{}" })
   playerIds: string[] = [];
 
+  @Column({ type: "jsonb", default: "{}" })
+  playerDisplayNames: Record<string, string> = {};
+
   @Column({ type: "int" })
   maxPlayers: number = 4;
 

@@ -32,11 +32,13 @@ export class PostgresDB implements GameRepository, PlayerStatsRepository {
     gameType: GameType,
     creatorId: string,
     maxPlayers: number,
+    creatorDisplayName: string,
   ): Promise<Game> {
     const game = new Game();
     game.gameId = gameId;
     game.gameType = gameType;
     game.playerIds = [creatorId];
+    game.playerDisplayNames = { [creatorId]: creatorDisplayName };
     game.maxPlayers = maxPlayers;
     game.status = "CREATED";
     return this.dataSource!.getRepository(Game).save(game);

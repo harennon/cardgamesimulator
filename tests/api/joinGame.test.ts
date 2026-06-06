@@ -6,6 +6,7 @@ function makeGame(overrides: Partial<Game> = {}): Game {
   game.gameId = "game-1";
   game.gameType = "big2";
   game.playerIds = ["player-1"];
+  game.playerDisplayNames = { "player-1": "Player One" };
   game.maxPlayers = 4;
   game.status = "CREATED";
   game.state = {};
@@ -74,12 +75,21 @@ describe("JoinGameHandler", () => {
       expect(data.body).toEqual({ gameId: "game-1", gameType: "big2" });
       expect(mockSaveGame).toHaveBeenCalledOnce();
       expect(mockSaveGame.mock.calls[0][0].playerIds).toContain("player-2");
+      expect(mockSaveGame.mock.calls[0][0].playerDisplayNames["player-2"]).toBe(
+        "player-2",
+      );
     });
   });
 
   describe("duplicate join (idempotent)", () => {
-    it("returns success without saving when user already in game", async () => {
-      const game = makeGame({ playerIds: ["player-1", "player-2"] });
+    it("returns success without saving when user already in game with display name", async () => {
+      const game = makeGame({
+        playerIds: ["player-1", "player-2"],
+        playerDisplayNames: {
+          "player-1": "Player One",
+          "player-2": "Player Two",
+        },
+      });
       mockGetGame.mockResolvedValue(game);
 
       const { res, data } = makeResponse();
@@ -90,6 +100,26 @@ describe("JoinGameHandler", () => {
 
       expect(data.statusCode).toBe(200);
       expect(mockSaveGame).not.toHaveBeenCalled();
+    });
+
+    it("saves display name when user is already in game but name is missing", async () => {
+      const game = makeGame({
+        playerIds: ["player-1", "player-2"],
+        playerDisplayNames: { "player-1": "Player One" },
+      });
+      mockGetGame.mockResolvedValue(game);
+
+      const { res, data } = makeResponse();
+      await JoinGameHandler.INSTANCE.post(
+        makeRequest("player-2", "game-1"),
+        res,
+      );
+
+      expect(data.statusCode).toBe(200);
+      expect(mockSaveGame).toHaveBeenCalledOnce();
+      expect(mockSaveGame.mock.calls[0][0].playerDisplayNames["player-2"]).toBe(
+        "player-2",
+      );
     });
   });
 

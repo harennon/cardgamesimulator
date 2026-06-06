@@ -15,10 +15,19 @@ import { authMiddleware } from "@/middleware/authMiddleware";
 import { CreateGameHandler } from "@/api/game/createGame";
 import { JoinGameHandler } from "@/api/game/joinGame";
 import { GetGameStateHandler } from "@/api/game/getGameState";
+import { createSocketServer, type TypedServer } from "@/websocket/socketServer";
+import { socketAuthMiddleware } from "@/websocket/socketAuth";
+import { registerSocketHandlers } from "@/websocket/socketHandler";
+import { ConnectionManager } from "@/websocket/connectionManager";
+import { GameService } from "@/service/gameService";
+import { GameCache } from "@/engine/game-cache";
+import { engineFactory } from "@/engine/game-engine-factory";
+import { gameRepo } from "@/database";
 
 export class Server {
   private readonly app: Express;
   private readonly server: https.Server | http.Server;
+  private readonly io: TypedServer;
 
   constructor() {
     this.app = express();
@@ -50,6 +59,16 @@ export class Server {
 
     // initialize server
     this.server = this.createServer(this.app);
+
+    // Socket.IO setup
+    this.io = createSocketServer(this.server);
+    this.io.use(socketAuthMiddleware);
+
+    const gameCache = new GameCache();
+    gameCache.startEvictionLoop();
+    const gameService = new GameService(gameCache, engineFactory, gameRepo);
+    const connectionManager = new ConnectionManager();
+    registerSocketHandlers(this.io, gameService, connectionManager);
   }
 
   public async start() {

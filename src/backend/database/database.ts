@@ -8,6 +8,7 @@ export interface GameRepository {
     gameType: GameType,
     creatorId: string,
     maxPlayers: number,
+    creatorDisplayName: string,
   ): Promise<Game>;
   getGame(gameId: string): Promise<Game | null>;
   saveGame(game: Game): Promise<Game>; // throws OptimisticLockVersionMismatchError on version conflict
