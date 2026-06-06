@@ -29,7 +29,7 @@ Multiplayer card game simulator — hosts preset card games (Big2 first, Tonk la
 
 ## Agent Routing
 
-When dispatching work to subagents, use the correct persona:
+**STOP. Before implementing any LLD, reviewing any design, or writing any code — check the routing table below. If the task matches a trigger, you MUST delegate immediately. Do not read source files, do not gather context, do not "understand first." Dispatch to the agent with the task description and acceptance criteria. The subagent will read what it needs.**
 
 | Trigger | Agent |
 |---------|-------|
@@ -40,7 +40,7 @@ When dispatching work to subagents, use the correct persona:
 | Verify UX / test against CX doc | `qa` |
 | Decide what to build next / prioritize / scope questions | `ceo` |
 
-Follow the workflow: **ceo → architect → design-reviewer → implementer → code-reviewer → qa**. Always route to the appropriate agent rather than doing the work inline.
+Follow the workflow: **ceo → architect → design-reviewer → implementer → code-reviewer → qa**. Never do routable work inline.
 
 ## Commit Requirements
 

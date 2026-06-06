@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { defineProps, ref } from 'vue';
+import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { AuthNService } from '@/service/authNService';
-import { EventSourceSingleton } from '@/util/sse';
+import { signIn } from '@/service/authService';
 
-const authModel = defineProps({
-    username: { type: String, required: true },
-    password: { type: String, required: true },
-});
+const email = ref('');
+const password = ref('');
 
 const attemptedLogin = ref(false);
 const errorMessage = ref('');
@@ -15,10 +12,7 @@ const route = useRoute();
 const router = useRouter();
 
 async function sendLogin() {
-    AuthNService.login(authModel.username, authModel.password).then((_jwt: string) => {;
-        // open EventSource connection if not already
-        EventSourceSingleton.getInstance();
-
+    signIn(email.value, password.value).then(() => {
         // redirect to previous page
         const redirectedFrom = route.query.redirect;
         if (redirectedFrom !== undefined && typeof redirectedFrom === "string") {
@@ -31,7 +25,7 @@ async function sendLogin() {
     }).catch((error) => {
         console.error(error);
         if (error.response) {
-            errorMessage.value = `Failed to sign up because of error ${error.response.data}`;
+            errorMessage.value = `Failed to sign in because of error ${error.response.data}`;
         } else {
             errorMessage.value = `Failed to login`;
         }
@@ -71,12 +65,12 @@ form {
     <div class="login-screen">
         <form @submit.prevent="sendLogin">
             <div>
-                <label for="username">Username:</label>
-                <input id="username" type="text" required v-model="authModel.username"/>
+                <label for="email">Email:</label>
+                <input id="email" type="email" required v-model="email"/>
             </div>
             <div>
                 <label for="password">Password:</label>
-                <input type="password" required v-model="authModel.password"/>
+                <input type="password" required v-model="password"/>
             </div>
             <button type="submit">Login</button>
         </form>

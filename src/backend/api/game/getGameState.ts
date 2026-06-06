@@ -1,8 +1,8 @@
 import { type Request, type Response } from '@/util/types'
 import { Handler } from '@/api/handler'
 import { GetGameStateRequest, GetGameStateResponse } from '@shared/model'
-import { PostgresDB } from '@/database/postgres';
-import { AccessDeniedError, BadRequestError, NotFoundError } from '@/util/errors';
+import { gameRepo } from '@/database';
+import { BadRequestError, NotFoundError } from '@/util/errors';
 import { serializeGameForPlayer } from '@/util/serializer';
 
 export class GetGameStateHandler extends Handler {
@@ -15,29 +15,22 @@ export class GetGameStateHandler extends Handler {
         this.validateRequest(request);
 
         // check if game exists
-        const game = await PostgresDB.INSTANCE.getGame(request.query.gameId as string);
+        const game = await gameRepo.getGame(request.query.gameId as string);
         if (game === null) {
             throw new NotFoundError();
         }
 
         const getGameStateResponse: GetGameStateResponse = {
             gameId: game.gameId,
-            gameState: serializeGameForPlayer(game, request.accountId!),
+            gameState: serializeGameForPlayer(game, request.userId!),
         };
         response.status(200).json(getGameStateResponse);
     }
 
     private validateRequest(request: Request<GetGameStateRequest>) {
-        [request.query.accountId, request.query.gameId].forEach((value) => {
-            if (!value) {
-                console.error(`Invalid request received. AccountId: ${request.accountId}, Request: ${request.body}`);
-                throw new BadRequestError();
-            }
-        });
-
-        if (request.query.accountId !== request.accountId) {
-            console.error(`GetGameState called for another accountId`);
-            throw new AccessDeniedError();
+        if (!request.query.gameId) {
+            console.error(`Invalid request received. UserId: ${request.userId}, Request: ${request.body}`);
+            throw new BadRequestError();
         }
     }
 }

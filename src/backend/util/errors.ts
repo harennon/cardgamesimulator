@@ -3,8 +3,8 @@ export interface ErrorWithStatus extends Error {
     message: string;
 }
 
-export function instanceOfErrorWithStatus(object: any): object is ErrorWithStatus {
-    return "status" in object && "message" in object;
+export function instanceOfErrorWithStatus(object: unknown): object is ErrorWithStatus {
+    return typeof object === "object" && object !== null && "status" in object && "message" in object;
 }
 
 export class UnauthorizedError extends Error implements ErrorWithStatus {

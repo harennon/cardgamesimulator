@@ -3,7 +3,7 @@
     <form @submit.prevent="joinGame">
         <div>
             <label for="game-id">Game ID:</label>
-            <input v-model="joinGameForm.gameId" id="game-id" required>
+            <input v-model="gameId" id="game-id" required>
         </div>
         <p id="errorMessage">{{ errorMessage }}</p>
         <input type="submit">
@@ -35,19 +35,16 @@ form {
 <script setup lang="ts">
 import { axiosInstance } from '@/main';
 import { JoinGameRequest, JoinGameResponse } from '@shared/model';
-import { defineProps, ref } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const errorMessage = ref('');
+const gameId = ref('');
 
-const joinGameForm = defineProps({
-    gameId: { type: String, required: true },
-});
-
-async function joinGame() {    
+async function joinGame() {
     const joinGameRequest: JoinGameRequest = {
-        gameId: joinGameForm.gameId,
+        gameId: gameId.value,
     };
     await axiosInstance.post<JoinGameResponse>('/api/joinGame', joinGameRequest).then((response) => {
         router.push(`/game/${response.data.gameId}`);

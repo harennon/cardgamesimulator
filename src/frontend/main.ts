@@ -2,8 +2,7 @@ import { createApp } from 'vue';
 import axios, { type AxiosInstance } from 'axios';
 import App from '@/component/App.vue';
 import { router } from '@/routes';
-import { getJWTCookie } from './util/cookie';
-import { EventSourceSingleton } from './util/sse';
+import { getAccessToken } from '@/service/authService';
 
 function bootstrap() {
     createApp(App)
@@ -11,12 +10,14 @@ function bootstrap() {
         .mount('#app')
 }
 
-export const axiosInstance: AxiosInstance = axios.create()
-axiosInstance.defaults.headers.common["Authorization"] = `Bearer ${getJWTCookie()}`;
+export const axiosInstance: AxiosInstance = axios.create({ baseURL: '/api' });
 
-if (getJWTCookie() !== "") {
-    // open EventSource connection if authenticated already
-    EventSourceSingleton.getInstance();
-}
+axiosInstance.interceptors.request.use(async (config) => {
+    const token = await getAccessToken();
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
 
 bootstrap();
