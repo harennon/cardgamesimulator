@@ -1,5 +1,6 @@
 # configuration files
 .env
+.env.local
 *.cert
 *.key
 
@@ -8,3 +9,6 @@ build/
 
 # dependency directory
 node_modules/
+
+# Supabase local stack temp files
+supabase/.temp/

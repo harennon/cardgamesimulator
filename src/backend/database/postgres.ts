@@ -1,134 +1,61 @@
-import { DataSource, In, QueryFailedError, type Repository } from "typeorm";
-import { v4 as uuidv4 } from "uuid";
-import { DatabaseError } from "pg-protocol";
+import { DataSource } from 'typeorm';
 
-import { Database } from "@/database/database";
-import { Account, Game, NonceLookup } from "@/database/entities";
-import { DeleteResult } from "typeorm/browser";
-import { ExpireOldNonceLookupSubscriber, GameSubscriber } from "@/database/subscribers";
-import { AlreadyExistsError } from "@/util/errors";
-import { GameStatus, GameType } from "@shared/model";
+import { GameRepository, PlayerStatsRepository } from '@/database/database';
+import { Game } from '@/database/entities/Game';
+import type { GameType } from '@shared/engine-types';
+import { PlayerStats } from '@/database/entities/PlayerStats';
 
-export const isQueryFailedError = (error: unknown): error is QueryFailedError & DatabaseError =>
-    error instanceof QueryFailedError;
+export class PostgresDB implements GameRepository, PlayerStatsRepository {
+  public static readonly INSTANCE = new PostgresDB();
+  private dataSource: DataSource | undefined;
 
-export class PostgresDB implements Database {
-    public static readonly INSTANCE = new PostgresDB();
+  private constructor() {}
 
-    private dataSource: DataSource | undefined = undefined;
+  public async initialize(): Promise<void> {
+    if (this.dataSource) throw new Error('Database already initialized');
 
-    private constructor() { }
+    this.dataSource = await new DataSource({
+      type: 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      port: Number(process.env.DB_PORT || '54322'),
+      username: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres',
+      database: process.env.DB_NAME || 'postgres',
+      entities: [Game, PlayerStats],
+      synchronize: process.env.NODE_ENV !== 'production',
+      logging: process.env.NODE_ENV !== 'production' ? 'all' : ['error'],
+    }).initialize();
+  }
 
-    public async initialize(): Promise<void> {
-        if (this.dataSource != undefined) {
-            throw new Error("Database already initialized");
-        }
-        const postgresDataSource = new DataSource({
-            type: "postgres",
-            host: "database",
-            port: Number.parseInt(process.env.POSTGRES_PORT || '5432'),
-            username: process.env.POSTGRES_USER,
-            password: process.env.POSTGRES_PASSWORD,
-            entities: [NonceLookup, Account, Game],
-            subscribers: [ExpireOldNonceLookupSubscriber, GameSubscriber],
-            synchronize: true,
-            logging: "all",
-        });
+  public async createGame(gameId: string, gameType: GameType, creatorId: string, maxPlayers: number): Promise<Game> {
+    const game = new Game();
+    game.gameId = gameId;
+    game.gameType = gameType;
+    game.playerIds = [creatorId];
+    game.maxPlayers = maxPlayers;
+    game.status = 'CREATED';
+    return this.dataSource!.getRepository(Game).save(game);
+  }
 
-        this.dataSource = await postgresDataSource.initialize();
-    }
+  public async getGame(gameId: string): Promise<Game | null> {
+    return this.dataSource!.getRepository(Game).findOneBy({ gameId });
+  }
 
-    public async saveNonce(clientId: string, nonce: string): Promise<void> {
-        const nonceLookup = new NonceLookup()
-        nonceLookup.clientRequestId = clientId;
-        nonceLookup.nonce = nonce;
-        await this.dataSource!.getRepository(NonceLookup).save(nonceLookup);
-    }
+  public async saveGame(game: Game): Promise<Game> {
+    return this.dataSource!.manager.transaction(async (manager) => {
+      await manager.findOne(Game, {
+        where: { gameId: game.gameId },
+        lock: { mode: 'optimistic', version: game.version },
+      });
+      return manager.save(game);
+    });
+  }
 
-    public async getAndRemoveNonce(clientId: string): Promise<string> {
-        const table: Repository<NonceLookup> = this.dataSource!.getRepository(NonceLookup);
-        const nonceLookup = await table.findOneByOrFail({
-            clientRequestId: clientId,
-        }).then((returnedItem) => {
-            // remove returned item
-            table.remove(returnedItem);
-            return returnedItem;
-        });
-        return nonceLookup.nonce;
-    }
+  public async getStats(userId: string): Promise<PlayerStats | null> {
+    return this.dataSource!.getRepository(PlayerStats).findOneBy({ userId });
+  }
 
-    /**
-     * **INTERNAL METHOD**
-     * Used by NonceLookup subscriber to delete old entries]
-     * 
-     * @param expiresAt - Oldest date from which all previous items are removed
-     */
-    public async _deleteExpiredNonceLookup(expiresAt: Date): Promise<DeleteResult> {
-        return await this.dataSource!
-            .createQueryBuilder()
-            .delete()
-            .from(NonceLookup)
-            .where("createdAt <= :expiresAt", { expiresAt: expiresAt })
-            .execute();
-    }
-
-    public async createAccount(username: string, password: string): Promise<Account> {
-        const account = new Account();
-        account.accountId = uuidv4();
-        account.username = username;
-        account.password = password;
-
-        await this.dataSource!.getRepository(Account).save(account).catch((err) => {
-            if (isQueryFailedError(err)) {
-                // unique violation
-                if (err.code === "23505") {
-                    throw new AlreadyExistsError();
-                }
-            }
-        });
-        return account;
-    }
-
-    public async getAccount(username: string): Promise<Account | null> {
-        return await this.dataSource!.getRepository(Account).findOneBy({
-            username: username,
-        });
-    }
-
-    public async getAccountById(accountId: string): Promise<Account | null> {
-        return await this.dataSource!.getRepository(Account).findOneBy({
-            accountId: accountId,
-        });
-    }
-
-    public async getAccountsByIds(accountIds: string[]): Promise<Account[]> {
-        return await this.dataSource!.getRepository(Account).findBy({
-            accountId: In(accountIds),
-        });
-    }
-
-    public async createGame(gameType: GameType, accountId: string, maxPlayers: number): Promise<Game> {
-        const game = new Game();
-        game.gameId = uuidv4();
-        game.gameType = gameType,
-            game.accountIds = [accountId];
-        game.maxPlayers = maxPlayers;
-        game.status = "CREATED" as GameStatus;
-
-        // TODO: change to create and update subscribers to triggers on database level
-        return this.dataSource!.getRepository(Game).save(game);
-    }
-
-    public async getGame(gameId: string): Promise<Game | null> {
-        return await this.dataSource!.getRepository(Game).findOneBy({
-            gameId: gameId,
-        });
-    }
-
-    public async saveGame(game: Game): Promise<null> {
-        // TODO: change to update and update subscribers to triggers on database level
-        return this.dataSource!.getRepository(Game).save(game).then(() => {
-            return new Promise<null>((resolve, _reject) => resolve(null));
-        });
-    }
+  public async upsertStats(stats: PlayerStats): Promise<PlayerStats> {
+    return this.dataSource!.getRepository(PlayerStats).save(stats);
+  }
 }

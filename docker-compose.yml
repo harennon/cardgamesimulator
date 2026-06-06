@@ -1,47 +1,29 @@
 services:
   frontend:
     image: nginx-frontend
-    env_file:
-      - path: ./.env
-    build: 
+    build:
       context: .
       dockerfile: ./src/frontend/Dockerfile
     depends_on:
       - backend
     ports:
       - "80:80"
-    networks: 
-      - frontend
-      - backend
-  
+    networks:
+      - app
+
   backend:
     image: express-backend
     env_file:
-      - path: ./.env
+      - .env.local
     build:
       context: .
       dockerfile: ./src/backend/Dockerfile
-    depends_on:
-      database:
-        condition: service_healthy
-        restart: true
-    networks: 
-      - backend
-
-  database:
-    image: postgres:17.4-alpine
-    env_file:
-      - path: ./.env
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      retries: 5
-      start_period: 30s
-      timeout: 10s
+    ports:
+      - "3000:3000"
     networks:
-      - backend
-    
+      - app
+    # Note: backend connects to Supabase Postgres via DB_HOST env var
+    # For local: host.docker.internal or the Supabase container network
 
-networks: 
-  frontend:
-  backend:
+networks:
+  app:

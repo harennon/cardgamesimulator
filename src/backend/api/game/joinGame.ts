@@ -1,7 +1,7 @@
 import { type Request, type Response } from '@/util/types'
 import { Handler } from '@/api/handler'
 import { GameType, JoinGameRequest, JoinGameResponse } from '@shared/model'
-import { PostgresDB } from '@/database/postgres';
+import { gameRepo } from '@/database';
 import { BadRequestError, NotFoundError } from '@/util/errors';
 
 export class JoinGameHandler extends Handler {
@@ -14,17 +14,17 @@ export class JoinGameHandler extends Handler {
         this.validateRequest(request);
 
         // check if game exists
-        const game = await PostgresDB.INSTANCE.getGame(request.body.gameId);
+        const game = await gameRepo.getGame(request.body.gameId);
         if (game === null) {
             throw new NotFoundError();
         }
 
-        if (game.accountIds.push(request.accountId!) > game.maxPlayers) {
+        if (game.playerIds.push(request.userId!) > game.maxPlayers) {
             console.error("Cannot join game as max players has been met");
             throw new BadRequestError();
         };
 
-        await PostgresDB.INSTANCE.saveGame(game);
+        await gameRepo.saveGame(game);
 
         const joinGameResponse: JoinGameResponse = {
             gameId: game.gameId,
@@ -34,9 +34,9 @@ export class JoinGameHandler extends Handler {
     }
 
     private validateRequest(request: Request<JoinGameRequest>) {
-        [request.accountId, request.body.gameId].forEach((value) => {
+        [request.userId, request.body.gameId].forEach((value) => {
             if (!value) {
-                console.error(`Invalid request received. AccountId: ${request.accountId}, Request: ${request.body}`);
+                console.error(`Invalid request received. UserId: ${request.userId}, Request: ${request.body}`);
                 throw new BadRequestError();
             }
         });

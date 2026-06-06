@@ -8,21 +8,21 @@
         <router-link to="/join-game">Join Game</router-link>
     </nav>
     <p v-else>Please <router-link to="/login">log in</router-link></p>
-    
+
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { getUsernameFromJwtCookie } from '../util/cookie';
+import { getSession } from '@/service/authService';
 
 const signedIn = ref(false);
 const user = ref("");
 
-onMounted(() => {
-    const username = getUsernameFromJwtCookie();
-    if (username !== "") {
+onMounted(async () => {
+    const session = await getSession();
+    if (session) {
         signedIn.value = true;
-        user.value = username;
+        user.value = session.user.user_metadata?.display_name ?? session.user.email ?? "";
     }
 });
 </script>

@@ -10,11 +10,58 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ---
 
-## [2026-06-06] — Add GitHub Actions CI pipeline
+## [2026-06-06] — Supabase Migration (LLD 1)
 
 ### Added
-- `.github/workflows/ci.yml` — Runs lint:check, build, and test on push to main and PRs
-- `package.json` — Added `lint:check` script (eslint without `--fix` for CI use)
+- `src/backend/middleware/authMiddleware.ts` — Supabase JWT verification middleware (HS256, `SUPABASE_JWT_SECRET`); extracts `userId` and `displayName` from JWT claims
+- `src/backend/database/entities/Game.ts` — Redesigned Game entity: UUID PK, JSONB state, version column (optimistic locking), timestamps
+- `src/backend/database/entities/PlayerStats.ts` — New PlayerStats entity for per-user win/loss/score tracking
+- `src/backend/database/index.ts` — Barrel exporting `gameRepo` and `statsRepo` singletons (consumers import from here, never from `PostgresDB` directly)
+- `src/frontend/service/authService.ts` — Supabase JS SDK wrapper: `signUp`, `signIn`, `signOut`, `getSession`, `getAccessToken`
+- `supabase/config.toml` — Supabase local project config (port 54321/54322, email confirmation disabled for dev)
+- `supabase/seed.sql` — Seed template for local development
+- `.env.example` — All required environment variables documented with descriptions
+- `.env.local` — Local development env template (git-ignored)
+- `tests/middleware/authMiddleware.test.ts` — 14 unit tests: missing token, invalid token, wrong secret, expired token, wrong algorithm, anon role rejection, valid token extraction, displayName fallback, next() invocation
+
+### Changed
+- `src/backend/database/database.ts` — Replaced `Database` interface with `GameRepository` + `PlayerStatsRepository` interfaces; removed all auth methods; imports `GameType` from `@shared/engine-types`
+- `src/backend/database/postgres.ts` — Removed all auth methods; updated entity list to `[Game, PlayerStats]`; updated connection config to use Supabase env vars (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`); default port 54322 (Supabase local); `saveGame` uses optimistic locking (transaction + version check)
+- `src/backend/server.ts` — Removed auth routes (`/auth/*`), SSE route (`/event`), `/authNedEcho`; replaced `authNHandler` with `authMiddleware`; removed `cookieParser` middleware
+- `src/backend/util/types.ts` — Renamed `accountId` → `userId`; added `displayName` on Request type
+- `src/backend/api/game/createGame.ts` — Uses `req.userId`, `gameRepo` from barrel, `crypto.randomUUID()` for game ID generation
+- `src/backend/api/game/joinGame.ts` — Uses `req.userId`, `gameRepo` from barrel
+- `src/backend/api/game/getGameState.ts` — Uses `req.userId` from JWT (removed redundant `userId` query param); `gameRepo` from barrel
+- `src/backend/util/serializer.ts` — Takes typed `Game` entity instead of `ObjectLiteral`; fixed state cast to `SerializableGameState`; `accountIds` → `playerIds`
+- `src/shared/model.ts` — Removed all auth interfaces; `accountIds` → `playerIds` on `SerializableGame`; `numPlayers` → `maxPlayers` on `CreateGameRequest`; removed `userId` from `GetGameStateRequest`
+- `src/frontend/main.ts` — Replaced cookie-based auth header with Supabase axios interceptor
+- `src/frontend/routes.ts` — Auth guard uses `getSession()` from Supabase instead of JWT cookie
+- `src/frontend/component/LoginView.vue` — Uses `signIn()` from authService; email-based login
+- `src/frontend/component/SignupView.vue` — Uses `signUp()` from authService; email + displayName fields
+- `src/frontend/component/HomeView.vue` — Uses `getSession()` from authService for auth check
+- `src/frontend/component/CreateGameView.vue` — `numPlayers` → `maxPlayers`
+- `src/frontend/component/game/GameView.vue` — Uses `getSession()` for userId; removed `BatchGetUsername` calls
+- `src/frontend/component/game/GameLobbyView.vue` — Uses `playerIds` from game state; removed SSE and `BatchGetUsername`
+- `src/frontend/tsconfig.json` — Added `"module": "ESNext"`, `"moduleResolution": "bundler"`, `types: ["vite/client"]` to support `import.meta.env`
+- `docker-compose.yml` — Removed standalone `database` service; Supabase local stack provides Postgres
+- `.gitignore` — Added `.env.local` and `supabase/.temp/`
+- `vitest.config.ts` — Added `@` path alias pointing to `src/backend` (required for middleware tests)
+
+### Removed
+- `src/backend/api/auth/getNonce.ts` — Nonce flow eliminated
+- `src/backend/api/auth/createAccount.ts` — Supabase handles account creation
+- `src/backend/api/auth/getAuthToken.ts` — Supabase handles sign-in
+- `src/backend/api/auth/batchGetUsername.ts` — User info comes from Supabase JWT
+- `src/backend/api/event.ts` — SSE handler (replaced by Socket.IO in LLD 3)
+- `src/backend/service/authNService.ts` — Custom JWT signing/verification eliminated
+- `src/backend/middleware/authNHandler.ts` — Replaced by `authMiddleware.ts`
+- `src/backend/database/entities.ts` — Entities moved to `entities/` directory
+- `src/backend/database/subscribers.ts` — Both subscribers reference deleted entities/systems
+- `src/shared/crypto.ts` — AES encrypt/decrypt only used by nonce auth flow
+- `src/frontend/service/authNService.ts` — Replaced by `authService.ts`
+- `src/frontend/util/cookie.ts` — JWT cookie management replaced by Supabase SDK
+- `src/frontend/util/sse.ts` — SSE utility (replaced by Socket.IO in LLD 3)
+- `argon2`, `crypto-js`, `@types/crypto-js`, `cookie-parser`, `@types/cookie-parser` npm packages
 
 ---
 

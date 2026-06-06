@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { defineProps, ref } from 'vue';
-import { AuthNService } from '@/service/authNService';
-import { EventSourceSingleton } from '@/util/sse';
+import { signUp } from '@/service/authService';
 import { useRouter } from 'vue-router';
 
 const authModel = defineProps({
-    username: { type: String, required: true },
+    email: { type: String, required: true },
     password: { type: String, required: true },
+    displayName: { type: String, required: true },
 });
 
 const attemptedLogin = ref(false);
@@ -14,10 +14,7 @@ const errorMessage = ref('');
 const router = useRouter();
 
 async function sendSignup() {
-    AuthNService.signup(authModel.username, authModel.password).then((_jwt : string) => {
-        // open EventSource connection if not already
-        EventSourceSingleton.getInstance();
-        
+    signUp(authModel.email, authModel.password, authModel.displayName).then(() => {
         // redirect to homepage on success
         router.push('/');
     }).catch((error) => {
@@ -65,14 +62,18 @@ form {
     <div class="login-screen">
         <form @submit.prevent="sendSignup">
             <div>
-                <label for="username">Username:</label>
-                <input id="username" type="text" required v-model="authModel.username"/>
+                <label for="display-name">Display Name:</label>
+                <input id="display-name" type="text" required v-model="authModel.displayName"/>
+            </div>
+            <div>
+                <label for="email">Email:</label>
+                <input id="email" type="email" required v-model="authModel.email"/>
             </div>
             <div>
                 <label for="password">Password:</label>
                 <input type="password" required v-model="authModel.password"/>
             </div>
-            <button type="submit">Login</button>
+            <button type="submit">Sign Up</button>
         </form>
         <p id="errorMessage" v-if="attemptedLogin">{{ errorMessage }}</p>
         <p>Existing user? <router-link to="/login">Log in</router-link></p>

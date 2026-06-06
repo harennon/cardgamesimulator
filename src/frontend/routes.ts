@@ -8,7 +8,7 @@ import AboutView from "@/component/AboutView.vue";
 import HelloWorld from "@/component/HelloWorld.vue";
 import HomeView from "@/component/HomeView.vue";
 import GameView from "@/component/game/GameView.vue";
-import { getUsernameFromJwtCookie } from "@/util/cookie";
+import { getSession } from "@/service/authService";
 
 
 const routes: RouteRecordSingleView[] = [
@@ -29,9 +29,10 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to, _from) => {
-    const isAuthenticated = getUsernameFromJwtCookie() !== "";
+    const session = await getSession();
+    const isAuthenticated = session !== null;
     if (!isAuthenticated && to.meta.requiresAuth) {
-        return { 
+        return {
             path: '/login',
             // save the location we were at to come back later
             query: { redirect: to.fullPath },

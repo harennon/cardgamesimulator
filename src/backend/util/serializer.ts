@@ -1,14 +1,13 @@
-import { GameStatus, GameType, SerializableGame } from "@shared/model";
-import { ObjectLiteral } from "typeorm";
+import { SerializableGame, SerializableGameState } from "@shared/model";
+import { Game } from "@/database/entities/Game";
 
-export function serializeGameForPlayer(gameLiteral: ObjectLiteral, _accountId: string): SerializableGame {
+export function serializeGameForPlayer(game: Game, _userId: string): SerializableGame {
     return {
-        gameId: gameLiteral.gameId,
-        gameType: gameLiteral.gameType as GameType,
-        maxPlayers: gameLiteral.maxPlayers,
-        status: gameLiteral.status as GameStatus,
-        accountIds: gameLiteral.accountIds,
-        state: JSON.parse(gameLiteral.state) as SerializableGame, // for now, need to remove sensitive data
+        gameId: game.gameId,
+        gameType: game.gameType,
+        maxPlayers: game.maxPlayers,
+        status: game.status,
+        playerIds: game.playerIds,
+        state: game.state as SerializableGameState,
     };
-
 }

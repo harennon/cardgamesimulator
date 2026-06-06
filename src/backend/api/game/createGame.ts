@@ -1,7 +1,7 @@
 import { type Request, type Response } from '@/util/types'
 import { Handler } from '@/api/handler'
 import { CreateGameRequest, CreateGameResponse } from '@shared/model'
-import { PostgresDB } from '@/database/postgres';
+import { gameRepo } from '@/database';
 import { BadRequestError } from '@/util/errors';
 
 export class CreateGameHandler extends Handler {
@@ -12,7 +12,8 @@ export class CreateGameHandler extends Handler {
 
     public override async post(request: Request<CreateGameRequest>, response: Response<CreateGameResponse>) {
         this.validateRequest(request);
-        const game = await PostgresDB.INSTANCE.createGame(request.body.gameType, request.accountId!, request.body.numPlayers);
+        const gameId = crypto.randomUUID();
+        const game = await gameRepo.createGame(gameId, request.body.gameType, request.userId!, request.body.maxPlayers);
         const createGameResponse: CreateGameResponse = {
             gameId: game.gameId,
             gameType: request.body.gameType,
@@ -21,9 +22,9 @@ export class CreateGameHandler extends Handler {
     }
 
     private validateRequest(request: Request<CreateGameRequest>) {
-        [request.accountId, request.body.gameType, request.body.numPlayers].forEach((value) => {
+        [request.userId, request.body.gameType, request.body.maxPlayers].forEach((value) => {
             if (!value) {
-                console.error(`Invalid request received. AccountId: ${request.accountId}, Request: ${request.body}`);
+                console.error(`Invalid request received. UserId: ${request.userId}, Request: ${request.body}`);
                 throw new BadRequestError();
             }
         });

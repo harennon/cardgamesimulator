@@ -10,10 +10,10 @@
         </div>
 
         <div>
-            <label for="num-players">Number of players: {{ createGameForm.numPlayers }}</label>
-            <input v-model="createGameForm.numPlayers" type="range" id="num-players" min="2" max="10" step="1">
+            <label for="max-players">Number of players: {{ createGameForm.maxPlayers }}</label>
+            <input v-model="createGameForm.maxPlayers" type="range" id="max-players" min="2" max="10" step="1">
         </div>
-        
+
         <div v-if="createGameForm.gameType === 'tonk'">
             <label for="num-decks">Number of decks: {{ createGameForm.numberOfDecks }}</label>
             <input v-model="createGameForm.numberOfDecks" type="range" id="num-decks" min="1" max="4" step="1">
@@ -50,16 +50,16 @@ import { useRouter } from 'vue-router';
 
 const createGameForm = defineProps({
     gameType: { type: String, required: true },
-    numPlayers: { type: Number, required: true, default: 2 },
+    maxPlayers: { type: Number, required: true, default: 2 },
     numberOfDecks: { type: Number, required: false, default: 1 },
 });
 
 const router = useRouter();
 
-async function createGame() {    
+async function createGame() {
     const createGameRequest: CreateGameRequest = {
         gameType: createGameForm.gameType as GameType,
-        numPlayers: createGameForm.numPlayers,
+        maxPlayers: createGameForm.maxPlayers,
         gameOptions: {
             numDecks: createGameForm.numberOfDecks.toString(),
         },
