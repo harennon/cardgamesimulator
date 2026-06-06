@@ -1,20 +1,18 @@
 <script setup lang="ts">
-import { defineProps, ref } from 'vue';
+import { ref } from 'vue';
 import { signUp } from '@/service/authService';
 import { useRouter } from 'vue-router';
 
-const authModel = defineProps({
-    email: { type: String, required: true },
-    password: { type: String, required: true },
-    displayName: { type: String, required: true },
-});
+const email = ref('');
+const password = ref('');
+const displayName = ref('');
 
 const attemptedLogin = ref(false);
 const errorMessage = ref('');
 const router = useRouter();
 
 async function sendSignup() {
-    signUp(authModel.email, authModel.password, authModel.displayName).then(() => {
+    signUp(email.value, password.value, displayName.value).then(() => {
         // redirect to homepage on success
         router.push('/');
     }).catch((error) => {
@@ -63,15 +61,15 @@ form {
         <form @submit.prevent="sendSignup">
             <div>
                 <label for="display-name">Display Name:</label>
-                <input id="display-name" type="text" required v-model="authModel.displayName"/>
+                <input id="display-name" type="text" required v-model="displayName"/>
             </div>
             <div>
                 <label for="email">Email:</label>
-                <input id="email" type="email" required v-model="authModel.email"/>
+                <input id="email" type="email" required v-model="email"/>
             </div>
             <div>
                 <label for="password">Password:</label>
-                <input type="password" required v-model="authModel.password"/>
+                <input type="password" required v-model="password"/>
             </div>
             <button type="submit">Sign Up</button>
         </form>

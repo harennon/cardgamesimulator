@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { defineProps, ref } from 'vue';
+import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { signIn } from '@/service/authService';
 
-const authModel = defineProps({
-    email: { type: String, required: true },
-    password: { type: String, required: true },
-});
+const email = ref('');
+const password = ref('');
 
 const attemptedLogin = ref(false);
 const errorMessage = ref('');
@@ -14,7 +12,7 @@ const route = useRoute();
 const router = useRouter();
 
 async function sendLogin() {
-    signIn(authModel.email, authModel.password).then(() => {
+    signIn(email.value, password.value).then(() => {
         // redirect to previous page
         const redirectedFrom = route.query.redirect;
         if (redirectedFrom !== undefined && typeof redirectedFrom === "string") {
@@ -68,11 +66,11 @@ form {
         <form @submit.prevent="sendLogin">
             <div>
                 <label for="email">Email:</label>
-                <input id="email" type="email" required v-model="authModel.email"/>
+                <input id="email" type="email" required v-model="email"/>
             </div>
             <div>
                 <label for="password">Password:</label>
-                <input type="password" required v-model="authModel.password"/>
+                <input type="password" required v-model="password"/>
             </div>
             <button type="submit">Login</button>
         </form>

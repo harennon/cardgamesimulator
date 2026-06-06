@@ -10,6 +10,21 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ---
 
+## [2026-06-06] — Fix all ESLint errors (lint:check now passes)
+
+### Fixed
+- `eslint.config.mjs` — added `argsIgnorePattern: "^_"` so `_`-prefixed unused parameters are ignored; fixes `handler.ts`, `serveAsset.ts`, `serializer.ts`, `routes.ts`
+- `src/backend/util/errors.ts` — changed `instanceOfErrorWithStatus` parameter from `any` to `unknown` with proper `typeof`/null guards
+- `src/backend/util/types.ts` — changed default generic to `unknown`; added inline eslint-disable for the unavoidable Express `any` in type params
+- `src/shared/model.ts` — replaced empty `interface SerializableGameState {}` with `type SerializableGameState = Record<string, unknown>` to satisfy `no-empty-object-type`
+- `src/frontend/component/LoadGameView.vue` — added placeholder `<div>` to satisfy `vue/valid-template-root` (empty template is invalid)
+- `src/frontend/component/CreateGameView.vue` — replaced `defineProps` + direct prop mutation with local `ref`s; removes `vue/no-mutating-props` violations
+- `src/frontend/component/JoinGameView.vue` — same pattern as CreateGameView
+- `src/frontend/component/LoginView.vue` — same pattern as CreateGameView
+- `src/frontend/component/SignupView.vue` — same pattern as CreateGameView
+
+---
+
 ## [2026-06-06] — Supabase Migration (LLD 1)
 
 ### Added

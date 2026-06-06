@@ -48,4 +48,4 @@ export interface SerializableGame {
     "state": SerializableGameState;
 }
 
-export interface SerializableGameState {}
+export type SerializableGameState = Record<string, unknown>;
