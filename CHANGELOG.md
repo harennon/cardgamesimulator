@@ -10,6 +10,32 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ---
 
+## [2026-06-06] — Fix host display name never stored on game creation
+
+### Fixed
+
+- `createGame` now passes the creator's display name to `gameRepo.createGame`, so the host is no longer shown as "Player 1" at game start
+- `GameRepository.createGame` and `PostgresDB.createGame` updated to accept and persist `creatorDisplayName` in `playerDisplayNames`
+- `joinGame` duplicate-join path now saves the display name if it is missing, so hosts who created games before this fix get their name populated on next join
+
+---
+
+## [2026-06-06] — Fix WebSocket Layer bugs and add unit tests (LLD 3 follow-up)
+
+### Fixed
+
+- `handleGameLeave` in `socketHandler.ts` now checks `!connectionManager.isPlayerConnected()` before emitting `game:playerDisconnected`, preventing false disconnect notifications when a player has multiple tabs open
+- Removed dead `if (!socket.recovered)` empty block from `registerSocketHandlers`
+- Spectator join rejection now always blocks a player from joining their own game as a spectator regardless of game capacity (condition simplified to `game.playerIds.includes(userId)`)
+
+### Added
+
+- `tests/websocket/connectionManager.test.ts` — 16 tests covering addPlayerSocket, removeSocket, isPlayerConnected, multi-tab sockets, getPlayerSockets, spectator tracking
+- `tests/websocket/socketAuth.test.ts` — 12 tests covering missing token, invalid JWT, expired JWT, wrong role, and valid token success path (userId/displayName extraction)
+- `tests/service/gameService.test.ts` — 14 tests covering getGameState (cache hit, DB fallback, null cases), startGame (success, GAME_NOT_FOUND, GAME_ALREADY_STARTED, NOT_HOST, NOT_ENOUGH_PLAYERS), applyAction (valid, invalid, missing state), getPlayerView (success, null, information hiding)
+
+---
+
 ## [2026-06-06] — Implement Big2 Engine (LLD 4)
 
 ### Added

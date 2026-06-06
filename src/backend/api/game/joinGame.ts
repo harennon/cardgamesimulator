@@ -22,8 +22,13 @@ export class JoinGameHandler extends Handler {
 
     const userId = request.userId!;
     const gameId = request.body.gameId;
+    const displayName = request.displayName ?? userId;
 
-    const { game, mutated } = await this.loadAndJoin(gameId, userId);
+    const { game, mutated } = await this.loadAndJoin(
+      gameId,
+      userId,
+      displayName,
+    );
 
     if (mutated) {
       try {
@@ -33,7 +38,7 @@ export class JoinGameHandler extends Handler {
           e instanceof Error &&
           e.name === "OptimisticLockVersionMismatchError"
         ) {
-          const retry = await this.loadAndJoin(gameId, userId);
+          const retry = await this.loadAndJoin(gameId, userId, displayName);
           try {
             await gameRepo.saveGame(retry.game);
           } catch (retryErr: unknown) {
@@ -58,13 +63,21 @@ export class JoinGameHandler extends Handler {
     response.status(200).json(joinGameResponse);
   }
 
-  private async loadAndJoin(gameId: string, userId: string) {
+  private async loadAndJoin(
+    gameId: string,
+    userId: string,
+    displayName: string,
+  ) {
     const game = await gameRepo.getGame(gameId);
     if (game === null) {
       throw new NotFoundError();
     }
 
     if (game.playerIds.includes(userId)) {
+      if (!game.playerDisplayNames[userId]) {
+        game.playerDisplayNames[userId] = displayName;
+        return { game, mutated: true };
+      }
       return { game, mutated: false };
     }
 
@@ -73,6 +86,7 @@ export class JoinGameHandler extends Handler {
     }
 
     game.playerIds.push(userId);
+    game.playerDisplayNames[userId] = displayName;
     return { game, mutated: true };
   }
 

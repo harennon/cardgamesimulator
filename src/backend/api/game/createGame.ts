@@ -21,6 +21,7 @@ export class CreateGameHandler extends Handler {
       request.body.gameType,
       request.userId!,
       request.body.maxPlayers,
+      request.displayName ?? request.userId!,
     );
     const createGameResponse: CreateGameResponse = {
       gameId: game.gameId,
