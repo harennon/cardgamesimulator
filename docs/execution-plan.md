@@ -227,13 +227,13 @@ A `docs/ux-polish.md` can be written when this phase begins.
 
 ## Summary
 
-| Phase | LLDs | Key Milestone |
-|-------|------|---------------|
-| 1. Foundation | 1, 2, 3 | Auth, DB, WebSocket, engine interface — infrastructure ready |
-| 2. Core Game | 4, 5 | Big2 playable via WebSocket, guests can join |
-| 3. Frontend | 6 | Big2 playable in browser |
-| 4. Online Features | 7, 8 | Timer, stats, spectating, reconnection |
-| 5. Polish | — | Animations, mobile, UX improvements |
-| 6. Deployment | 9 | Live online |
+| Phase              | LLDs    | Key Milestone                                                |
+| ------------------ | ------- | ------------------------------------------------------------ |
+| 1. Foundation      | 1, 2, 3 | Auth, DB, WebSocket, engine interface — infrastructure ready |
+| 2. Core Game       | 4, 5    | Big2 playable via WebSocket, guests can join                 |
+| 3. Frontend        | 6       | Big2 playable in browser                                     |
+| 4. Online Features | 7, 8    | Timer, stats, spectating, reconnection                       |
+| 5. Polish          | —       | Animations, mobile, UX improvements                          |
+| 6. Deployment      | 9       | Live online                                                  |
 
 **Total: 9 LLDs, 6 phases.** Each LLD is written just before implementation (not all upfront). Phases are sequential but deployment can be pulled forward once Phase 1 is done.

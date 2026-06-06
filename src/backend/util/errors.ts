@@ -1,74 +1,83 @@
 export interface ErrorWithStatus extends Error {
-    status: number;
-    message: string;
+  status: number;
+  message: string;
 }
 
-export function instanceOfErrorWithStatus(object: unknown): object is ErrorWithStatus {
-    return typeof object === "object" && object !== null && "status" in object && "message" in object;
+export function instanceOfErrorWithStatus(
+  object: unknown,
+): object is ErrorWithStatus {
+  return (
+    typeof object === "object" &&
+    object !== null &&
+    "status" in object &&
+    "message" in object
+  );
 }
 
 export class UnauthorizedError extends Error implements ErrorWithStatus {
-    public readonly status: number = 401;
+  public readonly status: number = 401;
 
-    public static readonly message: string = "Unauthorized Error: No valid credentials found.";
+  public static readonly message: string =
+    "Unauthorized Error: No valid credentials found.";
 
-    constructor() {
-        super(UnauthorizedError.message);
-        Object.setPrototypeOf(this, AccessDeniedError.prototype);
-    }
+  constructor() {
+    super(UnauthorizedError.message);
+    Object.setPrototypeOf(this, UnauthorizedError.prototype);
+  }
 }
 
 export class AccessDeniedError extends Error implements ErrorWithStatus {
-    public readonly status: number = 403;
+  public readonly status: number = 403;
 
-    public static readonly message: string = "Access Denied Error: You do not have access.";
+  public static readonly message: string =
+    "Access Denied Error: You do not have access.";
 
-    constructor() {
-        super(AccessDeniedError.message);
-        Object.setPrototypeOf(this, AccessDeniedError.prototype);
-    }
+  constructor() {
+    super(AccessDeniedError.message);
+    Object.setPrototypeOf(this, AccessDeniedError.prototype);
+  }
 }
 
 export class BadRequestError extends Error implements ErrorWithStatus {
-    public readonly status: number = 400;
+  public readonly status: number = 400;
 
-    public static readonly message: string = "Bad Request";
+  public static readonly message: string = "Bad Request";
 
-    constructor() {
-        super(BadRequestError.message);
-        Object.setPrototypeOf(this, BadRequestError.prototype);
-    }
+  constructor() {
+    super(BadRequestError.message);
+    Object.setPrototypeOf(this, BadRequestError.prototype);
+  }
 }
 
 export class AlreadyExistsError extends Error implements ErrorWithStatus {
-    public readonly status: number = 409;
+  public readonly status: number = 409;
 
-    public static readonly message: string = "Already Exists";
+  public static readonly message: string = "Already Exists";
 
-    constructor() {
-        super(AlreadyExistsError.message);
-        Object.setPrototypeOf(this, AlreadyExistsError.prototype);
-    }
+  constructor() {
+    super(AlreadyExistsError.message);
+    Object.setPrototypeOf(this, AlreadyExistsError.prototype);
+  }
 }
 
 export class InternalServerError extends Error implements ErrorWithStatus {
-    public readonly status: number = 500;
+  public readonly status: number = 500;
 
-    public static readonly message: string = "An unknown error has occurred."
+  public static readonly message: string = "An unknown error has occurred.";
 
-    constructor() {
-        super(InternalServerError.message);
-        Object.setPrototypeOf(this, InternalServerError.prototype);
-    }
+  constructor() {
+    super(InternalServerError.message);
+    Object.setPrototypeOf(this, InternalServerError.prototype);
+  }
 }
 
 export class NotFoundError extends Error implements ErrorWithStatus {
-    public readonly status: number = 404;
+  public readonly status: number = 404;
 
-    public static readonly message: string = "Not Found";
+  public static readonly message: string = "Not Found";
 
-    constructor() {
-        super(NotFoundError.message);
-        Object.setPrototypeOf(this, NotFoundError.prototype);
-    }
+  constructor() {
+    super(NotFoundError.message);
+    Object.setPrototypeOf(this, NotFoundError.prototype);
+  }
 }

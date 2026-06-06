@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { GameEngineFactory } from "../../src/backend/engine/game-engine-factory.js";
-import type { GameEngine, GameEngineConfig } from "../../src/backend/engine/game-engine.js";
+import type {
+  GameEngine,
+  GameEngineConfig,
+} from "../../src/backend/engine/game-engine.js";
 import type {
   GameType,
   InternalGameState,
@@ -17,7 +20,12 @@ import type { PRNG } from "../../src/backend/engine/prng.js";
 function makeMockEngine(gameType: GameType): GameEngine {
   return {
     gameType,
-    initialize(_gameId: string, _players: readonly PlayerInfo[], _config: GameEngineConfig, _prng: PRNG): InternalGameState {
+    initialize(
+      _gameId: string,
+      _players: readonly PlayerInfo[],
+      _config: GameEngineConfig,
+      _prng: PRNG,
+    ): InternalGameState {
       throw new Error("not implemented");
     },
     validateAction(_state: InternalGameState, _action: GameAction): boolean {
@@ -29,13 +37,19 @@ function makeMockEngine(gameType: GameType): GameEngine {
     getPlayerView(_state: InternalGameState, _playerId: PlayerId): PlayerView {
       throw new Error("not implemented");
     },
-    getValidActions(_state: InternalGameState, _playerId: PlayerId): readonly ValidAction[] {
+    getValidActions(
+      _state: InternalGameState,
+      _playerId: PlayerId,
+    ): readonly ValidAction[] {
       return [];
     },
     isGameOver(_state: InternalGameState): boolean {
       return false;
     },
-    getSpectatorView(_state: InternalGameState, _spectatorCount: number): SpectatorView {
+    getSpectatorView(
+      _state: InternalGameState,
+      _spectatorCount: number,
+    ): SpectatorView {
       throw new Error("not implemented");
     },
   };

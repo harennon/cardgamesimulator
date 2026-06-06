@@ -18,14 +18,14 @@ Read this before implementing anything in this project.
 
 Each phase of work is handled by a different persona (defined in `.claude/agents/`). No single agent designs, implements, AND reviews its own work.
 
-| Persona | Role | When |
-|---------|------|------|
-| **CEO** | Strategic decisions, priorities, vision alignment | Deciding what to build, evaluating tradeoffs, changing direction |
-| **Architect** | Writes LLDs (low-level design docs) | Before implementation begins |
-| **Design Reviewer** | Reviews LLDs against principles and HLD | After LLD is written, before implementation |
-| **Implementer** | Writes code and tests against an approved LLD | After LLD is approved |
-| **Code Reviewer** | Reviews implementation for correctness and security | After code is written |
-| **QA** | Validates features against CX doc and user flows | After implementation, before merge |
+| Persona             | Role                                                | When                                                             |
+| ------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| **CEO**             | Strategic decisions, priorities, vision alignment   | Deciding what to build, evaluating tradeoffs, changing direction |
+| **Architect**       | Writes LLDs (low-level design docs)                 | Before implementation begins                                     |
+| **Design Reviewer** | Reviews LLDs against principles and HLD             | After LLD is written, before implementation                      |
+| **Implementer**     | Writes code and tests against an approved LLD       | After LLD is approved                                            |
+| **Code Reviewer**   | Reviews implementation for correctness and security | After code is written                                            |
+| **QA**              | Validates features against CX doc and user flows    | After implementation, before merge                               |
 
 ### How to Invoke Personas
 
@@ -64,14 +64,14 @@ Commit
 
 **What each persona reads and writes:**
 
-| Persona | Reads | Writes |
-|---------|-------|--------|
-| CEO | HLD, CX doc, execution plan, feedback/data | Updates to HLD, CX doc, execution plan |
-| Architect | HLD, execution plan, architecture principles, existing code, **direct upstream LLDs** | `docs/lld/*.md` |
+| Persona         | Reads                                                                                      | Writes                                  |
+| --------------- | ------------------------------------------------------------------------------------------ | --------------------------------------- |
+| CEO             | HLD, CX doc, execution plan, feedback/data                                                 | Updates to HLD, CX doc, execution plan  |
+| Architect       | HLD, execution plan, architecture principles, existing code, **direct upstream LLDs**      | `docs/lld/*.md`                         |
 | Design Reviewer | LLD under review, architecture + testing principles, HLD, CX doc, **direct upstream LLDs** | Verdict (approve/reject with specifics) |
-| Implementer | Approved LLD, DEVELOPMENT.md, existing code | `src/` code, `tests/`, CHANGELOG.md |
-| Code Reviewer | Implementation diff, LLD, architecture + testing principles | Verdict (approve/reject with specifics) |
-| QA | CX doc, running app or implementation code | QA report (pass/fail with specifics) |
+| Implementer     | Approved LLD, DEVELOPMENT.md, existing code                                                | `src/` code, `tests/`, CHANGELOG.md     |
+| Code Reviewer   | Implementation diff, LLD, architecture + testing principles                                | Verdict (approve/reject with specifics) |
+| QA              | CX doc, running app or implementation code                                                 | QA report (pass/fail with specifics)    |
 
 **Direct upstream LLDs** = only the LLDs listed in the "depends on:" field of the execution plan for the current work item. Not transitive — e.g., LLD 6 reads LLDs 3, 4, 5 but not also 1, 2. This keeps context bounded (typically 1–3 docs).
 
@@ -79,19 +79,19 @@ Commit
 
 When a persona encounters something outside their domain, they report it rather than handling it themselves:
 
-| Persona | Escalates to | When |
-|---------|-------------|------|
-| CEO | Architect | Needs technical feasibility check |
-| CEO | Design Reviewer | Needs to know if a decision violates principles |
-| Architect | CEO | CX flow is unclear, or decision requires strategic tradeoff |
-| Design Reviewer | CEO | LLD conflicts with CX doc, or scope question undecided |
-| Implementer | Architect | LLD is ambiguous or seems wrong |
-| Implementer | Code Reviewer | Security concern discovered during implementation |
-| Code Reviewer | Architect | LLD itself is flawed (code correctly implements a bad design) |
-| Code Reviewer | QA | Spots a UX concern that needs CX validation |
-| QA | Implementer | Feature doesn't match CX spec |
-| QA | CEO | CX doc itself seems wrong or incomplete |
-| QA | Code Reviewer | Suspects security/information leakage |
+| Persona         | Escalates to    | When                                                          |
+| --------------- | --------------- | ------------------------------------------------------------- |
+| CEO             | Architect       | Needs technical feasibility check                             |
+| CEO             | Design Reviewer | Needs to know if a decision violates principles               |
+| Architect       | CEO             | CX flow is unclear, or decision requires strategic tradeoff   |
+| Design Reviewer | CEO             | LLD conflicts with CX doc, or scope question undecided        |
+| Implementer     | Architect       | LLD is ambiguous or seems wrong                               |
+| Implementer     | Code Reviewer   | Security concern discovered during implementation             |
+| Code Reviewer   | Architect       | LLD itself is flawed (code correctly implements a bad design) |
+| Code Reviewer   | QA              | Spots a UX concern that needs CX validation                   |
+| QA              | Implementer     | Feature doesn't match CX spec                                 |
+| QA              | CEO             | CX doc itself seems wrong or incomplete                       |
+| QA              | Code Reviewer   | Suspects security/information leakage                         |
 
 In practice: when a persona escalates, they state what they found, who should handle it, and why it's outside their domain. You then invoke the relevant persona to resolve it.
 
@@ -116,6 +116,7 @@ In practice: when a persona escalates, they state what they found, who should ha
 ### Separation of Concerns
 
 No persona does another's job:
+
 - The **CEO** does NOT write LLDs or code — they decide what and why, not how.
 - The **Architect** does NOT write code — they write specifications.
 - The **Implementer** does NOT make design decisions — if the LLD is ambiguous, it goes back to the Architect.
@@ -139,14 +140,14 @@ Every commit must include an update to `CHANGELOG.md`. Add your entry under `[Un
 
 These are non-negotiable. Full rationale in `docs/architecture-principles.md`.
 
-| Rule | What it means |
-|------|---------------|
-| Server-authoritative | ALL game logic on the server. Client renders and sends choices. |
-| Pure engine | Engine functions: `(state, action) → newState`. No I/O, no DB, no network. |
-| Information hiding | `getPlayerView()` physically excludes hidden data. Never send full state to a client. |
-| Injectable randomness | All randomness through a seeded PRNG. Never `Math.random()` in game logic. |
-| In-memory cache | Active games live in memory. DB is for durability, not hot-path reads. |
-| validActions is law | Client enables/disables UI based on `validActions`. Server rejects anything not in the set. |
+| Rule                  | What it means                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------- |
+| Server-authoritative  | ALL game logic on the server. Client renders and sends choices.                             |
+| Pure engine           | Engine functions: `(state, action) → newState`. No I/O, no DB, no network.                  |
+| Information hiding    | `getPlayerView()` physically excludes hidden data. Never send full state to a client.       |
+| Injectable randomness | All randomness through a seeded PRNG. Never `Math.random()` in game logic.                  |
+| In-memory cache       | Active games live in memory. DB is for durability, not hot-path reads.                      |
+| validActions is law   | Client enables/disables UI based on `validActions`. Server rejects anything not in the set. |
 
 ---
 
@@ -154,15 +155,15 @@ These are non-negotiable. Full rationale in `docs/architecture-principles.md`.
 
 Full rationale in `docs/testing-principles.md`.
 
-| Rule | What it means |
-|------|---------------|
-| Pure function tests | Test engine directly — no server, no DB, no WebSocket in engine tests. |
-| Control randomness | Use seeded PRNG or disable shuffle. Tests must be deterministic. |
-| Self-contained tests | Each test creates its own state. No shared `beforeEach` game state. |
-| Direct state manipulation | Use helpers to set preconditions. Don't replay 20 moves to reach a state. |
-| Test invalid actions | Every valid action has a corresponding "rejected when invalid" test. |
-| Invariant checks | Assert: total cards constant, no deadlocks, valid turn player — after every action. |
-| Information leakage tests | Assert `getPlayerView(state, A)` never contains B's hand. |
+| Rule                      | What it means                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| Pure function tests       | Test engine directly — no server, no DB, no WebSocket in engine tests.              |
+| Control randomness        | Use seeded PRNG or disable shuffle. Tests must be deterministic.                    |
+| Self-contained tests      | Each test creates its own state. No shared `beforeEach` game state.                 |
+| Direct state manipulation | Use helpers to set preconditions. Don't replay 20 moves to reach a state.           |
+| Test invalid actions      | Every valid action has a corresponding "rejected when invalid" test.                |
+| Invariant checks          | Assert: total cards constant, no deadlocks, valid turn player — after every action. |
+| Information leakage tests | Assert `getPlayerView(state, A)` never contains B's hand.                           |
 
 ---
 
@@ -194,7 +195,7 @@ tests/               — Test files (mirrors src/ structure by concept)
 - **Path aliases:** `@/*` → `src/*` for cross-module imports
 - **Strict TypeScript:** `strict: true`, `alwaysStrict: true`, no `any` without justification
 - **ESNext + NodeNext:** modern syntax, proper ESM resolution
-- **No comments unless non-obvious:** code should be self-documenting. Comment the *why*, never the *what*.
+- **No comments unless non-obvious:** code should be self-documenting. Comment the _why_, never the _what_.
 - Backend uses TypeORM entities in `src/backend/database/entities.ts`
 - Frontend components live in `src/frontend/component/`
 
@@ -237,10 +238,12 @@ docker compose up
 Copy `.env.example` to `.env` and fill in:
 
 **Current (pre-migration):**
+
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` — database credentials
 - `BACKEND_PORT` — Express server port (default 3000)
 
 **Post-migration (Supabase):**
+
 - `SUPABASE_URL` — local: `http://localhost:54321`, prod: your Supabase project URL
 - `SUPABASE_ANON_KEY` — from Supabase dashboard or `supabase status`
 - `SUPABASE_SERVICE_ROLE_KEY` — for backend-only operations

@@ -25,6 +25,7 @@ A multiplayer card game platform where friends can play preset card games togeth
 ```
 
 **Separation of concerns:**
+
 - **Supabase** owns identity and persistence — auth, database, user management
 - **Express server** owns game logic and real-time communication — engine, WebSocket, game state management
 - **Vue SPA** owns presentation — rendering choices the server provides, sending player selections back
@@ -35,25 +36,25 @@ A multiplayer card game platform where friends can play preset card games togeth
 
 ## Tool Choices
 
-| Concern | Tool | Why |
-|---------|------|-----|
-| Auth | Supabase Auth | Free 50k MAU, eliminates custom auth code, JWT-based |
-| Database | Supabase Postgres | Free 500MB, managed, standard Postgres wire protocol |
-| ORM | TypeORM | Already in place, works with any Postgres host |
-| Backend | Express 5 | Already in place, lightweight, good Socket.IO integration |
-| Real-time | Socket.IO (WebSocket) | Bidirectional, room-based broadcast, reconnection built-in |
-| Frontend | Vue 3 + Vite | Already in place, reactive, good composition API for game state |
-| Containerization | Docker Compose | Local dev parity, easy deployment to any VPS |
+| Concern          | Tool                  | Why                                                             |
+| ---------------- | --------------------- | --------------------------------------------------------------- |
+| Auth             | Supabase Auth         | Free 50k MAU, eliminates custom auth code, JWT-based            |
+| Database         | Supabase Postgres     | Free 500MB, managed, standard Postgres wire protocol            |
+| ORM              | TypeORM               | Already in place, works with any Postgres host                  |
+| Backend          | Express 5             | Already in place, lightweight, good Socket.IO integration       |
+| Real-time        | Socket.IO (WebSocket) | Bidirectional, room-based broadcast, reconnection built-in      |
+| Frontend         | Vue 3 + Vite          | Already in place, reactive, good composition API for game state |
+| Containerization | Docker Compose        | Local dev parity, easy deployment to any VPS                    |
 
 ---
 
 ## Communication Model
 
-| Concern | Transport | Direction |
-|---------|-----------|-----------|
-| Auth (login, signup) | Supabase SDK (HTTPS) | Browser ↔ Supabase |
-| Game management (create, join) | HTTP REST | Browser → Express |
-| Game play (actions, state) | WebSocket | Browser ↔ Express |
+| Concern                        | Transport            | Direction          |
+| ------------------------------ | -------------------- | ------------------ |
+| Auth (login, signup)           | Supabase SDK (HTTPS) | Browser ↔ Supabase |
+| Game management (create, join) | HTTP REST            | Browser → Express  |
+| Game play (actions, state)     | WebSocket            | Browser ↔ Express  |
 
 Auth happens entirely between the browser and Supabase — the Express server only verifies the JWT on incoming requests/connections.
 
@@ -71,9 +72,10 @@ GameEngine (interface)
 ```
 
 **Core properties:**
+
 - **Pure:** `(state, action) → newState`. No side effects. Trivially unit-testable.
 - **State machine:** Each state declares whose turn it is, what actions are valid, and what the next state is after each action. The `validActions` array is the single source of truth for what a player can do.
-- **Information hiding:** The engine maintains full internal state (all hands, deck, etc.) but exposes a `getPlayerView()` function that filters to only what a given player is allowed to see. Hidden information is *absent from the payload*, not hidden in UI.
+- **Information hiding:** The engine maintains full internal state (all hands, deck, etc.) but exposes a `getPlayerView()` function that filters to only what a given player is allowed to see. Hidden information is _absent from the payload_, not hidden in UI.
 - **Controlled randomness:** All randomness (shuffle, draw) flows through an injectable source (seeded PRNG). Tests can make it deterministic. `Math.random()` is never called directly.
 
 Adding a new game requires only a new engine class and a game-specific action panel — no changes to WebSocket layer, database schema, or frontend framework.
@@ -103,14 +105,15 @@ SpectatorView (public only)
 
 ## Local vs Deployment
 
-| Mode | Auth + DB | Express Server | Frontend |
-|------|-----------|----------------|----------|
-| **Local dev** | Supabase local stack (Docker via `supabase start`) | Express + Socket.IO (local) | Vite dev server |
-| **Production** | Supabase cloud (free tier) | Express + Socket.IO (VPS/PaaS) | Built SPA (served by same server or CDN) |
+| Mode           | Auth + DB                                          | Express Server                 | Frontend                                 |
+| -------------- | -------------------------------------------------- | ------------------------------ | ---------------------------------------- |
+| **Local dev**  | Supabase local stack (Docker via `supabase start`) | Express + Socket.IO (local)    | Vite dev server                          |
+| **Production** | Supabase cloud (free tier)                         | Express + Socket.IO (VPS/PaaS) | Built SPA (served by same server or CDN) |
 
 **Isolation principle:** Local dev never touches production Supabase. Same SDK, same API surface, different env vars (`SUPABASE_URL` points to `localhost` in dev, cloud URL in prod).
 
 **Local dev experience:**
+
 - `supabase start` — spins up Postgres + Auth + Studio locally in Docker
 - Express server connects to local Supabase via env vars
 - Can freely create/destroy test data, reset DB, iterate on schema
@@ -124,14 +127,14 @@ SpectatorView (public only)
 
 ## Implementation Phases
 
-| Phase | Scope | Outcome |
-|-------|-------|---------|
-| **1. Foundation** | Migrate auth/DB to Supabase, set up Socket.IO, implement game engine interface | Backend ready for game logic, no more custom auth |
-| **2. Core Game** | Implement Big2 rules + engine, guest access | Playable Big2 via WebSocket, guests can join |
-| **3. Frontend** | Card rendering, board layout, action panel, turn flow | Playable Big2 in the browser |
-| **4. Online Features** | Spectating, turn timer, player stats, reconnection | Full-featured multiplayer experience |
-| **5. Polish** | Animations, mobile layout, game log, rematch, invite UX | Fun and smooth to play |
-| **6. Deployment** | Environment config, TLS, hosting | App live online |
+| Phase                  | Scope                                                                          | Outcome                                           |
+| ---------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------- |
+| **1. Foundation**      | Migrate auth/DB to Supabase, set up Socket.IO, implement game engine interface | Backend ready for game logic, no more custom auth |
+| **2. Core Game**       | Implement Big2 rules + engine, guest access                                    | Playable Big2 via WebSocket, guests can join      |
+| **3. Frontend**        | Card rendering, board layout, action panel, turn flow                          | Playable Big2 in the browser                      |
+| **4. Online Features** | Spectating, turn timer, player stats, reconnection                             | Full-featured multiplayer experience              |
+| **5. Polish**          | Animations, mobile layout, game log, rematch, invite UX                        | Fun and smooth to play                            |
+| **6. Deployment**      | Environment config, TLS, hosting                                               | App live online                                   |
 
 Future: **Tonk** (second game engine + UI, validates extensibility).
 
@@ -152,12 +155,12 @@ See `docs/customer-experience.md` for full flows, wireframes, and edge cases.
 
 ## Design Decisions
 
-| Decision | Choice | Notes |
-|----------|--------|-------|
-| **Scoring persistence** | Yes — track stats | Wins, losses, scoring history per player. Enables profiles/leaderboards. |
-| **Game discovery** | Invite link/code only | No public lobby. Players share a game ID or link with friends. |
-| **Spectating** | Yes | Spectators join as viewers. Receive SpectatorView (public info only, no hands). |
-| **Turn timer** | Yes, configurable | Game creator sets timer. Server auto-passes on timeout. Timer lives in-memory (resets on server restart). |
+| Decision                | Choice                | Notes                                                                                                     |
+| ----------------------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Scoring persistence** | Yes — track stats     | Wins, losses, scoring history per player. Enables profiles/leaderboards.                                  |
+| **Game discovery**      | Invite link/code only | No public lobby. Players share a game ID or link with friends.                                            |
+| **Spectating**          | Yes                   | Spectators join as viewers. Receive SpectatorView (public info only, no hands).                           |
+| **Turn timer**          | Yes, configurable     | Game creator sets timer. Server auto-passes on timeout. Timer lives in-memory (resets on server restart). |
 
 ## Quality Model
 
@@ -177,14 +180,14 @@ See `docs/testing-principles.md` for full guidance.
 
 See `docs/execution-plan.md` for the full execution plan with dependency graph, phasing, and ordering.
 
-| # | Doc | Phase |
-|---|-----|-------|
-| 1 | Supabase Migration | Foundation |
-| 2 | Game Engine Interface | Foundation |
-| 3 | WebSocket Layer | Foundation |
-| 4 | Big2 Rules + Engine | Core Game |
-| 5 | Guest Access | Core Game |
-| 6 | Frontend Game UI | Frontend |
-| 7 | Turn Timer + Stats | Online Features |
-| 8 | Spectating + Reconnection | Online Features |
-| 9 | Deployment | Deployment |
+| #   | Doc                       | Phase           |
+| --- | ------------------------- | --------------- |
+| 1   | Supabase Migration        | Foundation      |
+| 2   | Game Engine Interface     | Foundation      |
+| 3   | WebSocket Layer           | Foundation      |
+| 4   | Big2 Rules + Engine       | Core Game       |
+| 5   | Guest Access              | Core Game       |
+| 6   | Frontend Game UI          | Frontend        |
+| 7   | Turn Timer + Stats        | Online Features |
+| 8   | Spectating + Reconnection | Online Features |
+| 9   | Deployment                | Deployment      |

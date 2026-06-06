@@ -1,7 +1,5 @@
 <template>
-  <p>
-    <strong>Current route = </strong>{{ $route.fullPath }}
-  </p>
+  <p><strong>Current route = </strong>{{ $route.fullPath }}</p>
   <nav>
     <router-link to="/">Home</router-link>
     <router-link to="/about">About Us</router-link>
@@ -22,23 +20,24 @@ main {
   justify-content: center;
   margin-bottom: 10px;
   padding: 10px;
-  background-color: #B7CECE;
+  background-color: #b7cece;
 }
 nav {
   margin: 0;
   display: flex;
   justify-content: left;
   align-items: stretch;
-  background-color: #1C0F13;
+  background-color: #1c0f13;
 
   & > a {
     padding: 8px;
     text-decoration: none;
-    color: #BBBAC6;
+    color: #bbbac6;
     cursor: pointer;
 
-    &:hover, &:focus {
-      background-color: #6E7E85;
+    &:hover,
+    &:focus {
+      background-color: #6e7e85;
     }
   }
 

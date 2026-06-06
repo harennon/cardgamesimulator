@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { SeededPRNG, FixedPRNG, hashSeed, generateSeed } from "../../src/backend/engine/prng.js";
+import {
+  SeededPRNG,
+  FixedPRNG,
+  hashSeed,
+  generateSeed,
+} from "../../src/backend/engine/prng.js";
 
 describe("hashSeed", () => {
   it("returns a number", () => {
@@ -73,7 +78,9 @@ describe("SeededPRNG", () => {
     const input = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const output = prng.shuffle(input);
     expect(output).toHaveLength(input.length);
-    expect(output.sort((a, b) => a - b)).toEqual([...input].sort((a, b) => a - b));
+    expect(output.sort((a, b) => a - b)).toEqual(
+      [...input].sort((a, b) => a - b),
+    );
   });
 
   it("shuffle does not mutate the input array", () => {

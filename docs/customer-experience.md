@@ -17,10 +17,10 @@ Core user flows with key edge cases. ASCII wireframes for primary screens.
 
 ## User Types
 
-| Type | Identity | Capabilities | Persistence |
-|------|----------|--------------|-------------|
-| **Guest** | Temporary display name (chosen by user) | Spectate, join games, play, rematch | None — stats, history, and identity lost on session end |
-| **Registered** | Email + password via Supabase Auth | Everything guests can do + stats, history, host (create) games | Full — stats, game history, persistent identity |
+| Type           | Identity                                | Capabilities                                                   | Persistence                                             |
+| -------------- | --------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------- |
+| **Guest**      | Temporary display name (chosen by user) | Spectate, join games, play, rematch                            | None — stats, history, and identity lost on session end |
+| **Registered** | Email + password via Supabase Auth      | Everything guests can do + stats, history, host (create) games | Full — stats, game history, persistent identity         |
 
 Guests can do almost everything — the only incentives to register are persistent stats/history and the ability to host (create) games. This keeps the barrier to play as low as possible: a friend shares a link, you pick a name, you're in.
 
@@ -31,6 +31,7 @@ Guests can do almost everything — the only incentives to register are persiste
 ### 1. Guest Flow (Join via Invite Link)
 
 **Happy path:**
+
 1. Guest receives invite link from a friend
 2. Clicks link → lands on guest entry screen
 3. Enters a display name (no email/password needed)
@@ -38,6 +39,7 @@ Guests can do almost everything — the only incentives to register are persiste
 5. Plays the game normally — same experience as registered users during gameplay
 
 **Edge cases:**
+
 - Guest refreshes the page → session cookie preserves guest identity for the game in progress
 - Guest closes browser → gone permanently. Seat opens up (or auto-pass if mid-game).
 - Guest wants to register after playing → "Save your stats" prompt on game over screen, sign up preserves the game just played
@@ -69,12 +71,14 @@ Guests can do almost everything — the only incentives to register are persiste
 ### 2. Sign Up / Log In
 
 **Happy path:**
+
 1. User lands on home page (via direct URL or invite link)
 2. If not authenticated → redirect to login screen
 3. User signs up (email + password) or logs in
 4. Redirect to home page (or directly to game if arriving via invite link)
 
 **Edge cases:**
+
 - Invalid credentials → inline error, no page reload
 - Arriving via invite link while unauthenticated → store intended destination, redirect to login, then forward to game after auth
 - Already logged in → skip auth, show home
@@ -84,6 +88,7 @@ Guests can do almost everything — the only incentives to register are persiste
 ### 3. Create a Game
 
 **Happy path:**
+
 1. From home, user clicks "Create Game"
 2. Select game type (Big2)
 3. Configure options (player count: 2–4, turn timer: off / 30s / 60s / 90s)
@@ -91,6 +96,7 @@ Guests can do almost everything — the only incentives to register are persiste
 5. User receives invite link/code to share with friends
 
 **Edge cases:**
+
 - User navigates away before anyone joins → game stays in CREATED state, accessible via link until timeout/cleanup
 
 ```
@@ -116,11 +122,13 @@ Guests can do almost everything — the only incentives to register are persiste
 ### 4. Join a Game
 
 **Happy path:**
+
 1. User receives invite link (e.g., `/game/abc123`) or enters game code manually
 2. If authenticated → join game lobby directly
 3. If not authenticated → login first, then auto-join
 
 **Edge cases:**
+
 - Game is full → error message: "This game is full"
 - Game doesn't exist → error message: "Game not found"
 - Game already in progress → option to spectate (if spectating enabled)
@@ -148,6 +156,7 @@ Guests can do almost everything — the only incentives to register are persiste
 ### 5. Game Lobby (Waiting for Players)
 
 **Happy path:**
+
 1. Host and joined players see lobby screen
 2. Player list shows who's in (with ready indicators)
 3. Host sees "Start Game" button (enabled when minimum players joined)
@@ -155,6 +164,7 @@ Guests can do almost everything — the only incentives to register are persiste
 5. Host clicks "Start Game" → deal cards, transition to game board
 
 **Edge cases:**
+
 - Player disconnects from lobby → removed from player list after timeout, slot reopens
 - Host disconnects → either: transfer host to next player, or lobby persists for host to reconnect
 - Not enough players to start → "Start Game" button disabled with tooltip
@@ -189,6 +199,7 @@ Guests can do almost everything — the only incentives to register are persiste
 ### 6. Gameplay (Big2)
 
 **Happy path:**
+
 1. Cards are dealt — player sees their 13 cards face-up at bottom
 2. Opponents shown as card backs with count
 3. Turn indicator highlights current player
@@ -202,6 +213,7 @@ Guests can do almost everything — the only incentives to register are persiste
 7. Repeat until someone empties their hand → game over
 
 **Edge cases:**
+
 - Turn timer expires → server auto-passes, notification shown ("You ran out of time")
 - Player disconnects mid-game → game pauses (short timeout), then auto-passes for them if they don't reconnect
 - Invalid selection → "Play" button stays disabled (client validates against `validActions` to enable/disable, server rejects if somehow submitted)
@@ -239,6 +251,7 @@ Guests can do almost everything — the only incentives to register are persiste
 ```
 
 **Card selection behavior:**
+
 - Click a card → toggles selection (highlighted/raised)
 - "Play" button enabled only when selected cards form a valid combination that beats the current play
 - "Pass" is always available on your turn
@@ -249,12 +262,14 @@ Guests can do almost everything — the only incentives to register are persiste
 ### 7. Spectating
 
 **Happy path:**
+
 1. User opens invite link to a game that's already in progress
 2. Shown option: "This game is in progress. Watch as spectator?"
 3. Accept → see game board with SpectatorView (card counts, plays, turn order — no hands)
 4. Spectators see a simplified board: center play area + player card counts + game log
 
 **Edge cases:**
+
 - Game ends while spectating → see results screen same as players
 - Spectator count shown to players (e.g., "2 watching")
 
@@ -287,18 +302,21 @@ Guests can do almost everything — the only incentives to register are persiste
 ### 8. Game Over + Post-Game
 
 **Happy path (registered):**
+
 1. A player plays their last card(s) → game immediately ends
 2. All players see results screen: winner announcement, scoring breakdown, final card counts
 3. Options: "Rematch" (same players, new game) or "Back to Home"
 4. Stats updated (wins/losses/score)
 
 **Happy path (guest):**
+
 1. Same results screen as registered users
 2. Below results: "Sign up to save your stats and play again later"
 3. If guest signs up → the game just played is retroactively added to their stats
 4. If guest declines → session ends when they leave, no trace
 
 **Edge cases:**
+
 - Player disconnects before seeing results → stats still updated server-side, results visible on reconnect or from profile
 - Rematch with fewer players (someone left) → returns to lobby with remaining players, new invites possible
 - Guest in rematch → stays as guest, new game starts normally
@@ -331,6 +349,7 @@ Guests can do almost everything — the only incentives to register are persiste
 ### 9. Home / Dashboard
 
 **Happy path:**
+
 1. Authenticated user lands on home page
 2. Sees: create game button, join game input, recent game history, personal stats
 3. Quick actions: Create Game, Join Game, view past results
@@ -359,14 +378,14 @@ Guests can do almost everything — the only incentives to register are persiste
 
 ## Screen Inventory
 
-| Screen | When | Key Elements |
-|--------|------|--------------|
-| Guest Entry | Guest arriving via invite link | Display name input, join button, sign-up nudge |
-| Login/Signup | Unauthenticated (choosing to register) | Email, password, submit, error messages |
-| Home | Authenticated, no active game | Create, join, stats, history |
-| Create Game | Configuring new game (registered only) | Game type, player count, timer, create button |
-| Join Game | Entering code | Code input, join button, error states |
-| Game Lobby | Waiting for players | Player list (guests marked), invite link, start button (host) |
-| Game Board | Active gameplay | Hands, center area, action panel, timer, game log |
-| Spectator View | Watching active game | Card counts, plays, turn indicator, game log |
-| Game Over | Game completed | Winner, scores, rematch/home, sign-up prompt (guests) |
+| Screen         | When                                   | Key Elements                                                  |
+| -------------- | -------------------------------------- | ------------------------------------------------------------- |
+| Guest Entry    | Guest arriving via invite link         | Display name input, join button, sign-up nudge                |
+| Login/Signup   | Unauthenticated (choosing to register) | Email, password, submit, error messages                       |
+| Home           | Authenticated, no active game          | Create, join, stats, history                                  |
+| Create Game    | Configuring new game (registered only) | Game type, player count, timer, create button                 |
+| Join Game      | Entering code                          | Code input, join button, error states                         |
+| Game Lobby     | Waiting for players                    | Player list (guests marked), invite link, start button (host) |
+| Game Board     | Active gameplay                        | Hands, center area, action panel, timer, game log             |
+| Spectator View | Watching active game                   | Card counts, plays, turn indicator, game log                  |
+| Game Over      | Game completed                         | Winner, scores, rematch/home, sign-up prompt (guests)         |

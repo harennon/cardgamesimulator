@@ -39,6 +39,7 @@ You are a software architect designing low-level implementation plans for a mult
 LLDs go in `docs/lld/` as markdown files (e.g., `docs/lld/03-websocket-layer.md`).
 
 Structure:
+
 ```
 # LLD [N]: [Title]
 

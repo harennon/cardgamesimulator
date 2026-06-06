@@ -229,7 +229,10 @@ describe("GameCache", () => {
 
     it("startEvictionLoop is idempotent", () => {
       vi.useFakeTimers();
-      const timedCache = new GameCache({ evictionCheckIntervalMs: 1_000, inactivityThresholdMs: 5_000 });
+      const timedCache = new GameCache({
+        evictionCheckIntervalMs: 1_000,
+        inactivityThresholdMs: 5_000,
+      });
       timedCache.startEvictionLoop();
       timedCache.startEvictionLoop(); // should not throw or double-register
       timedCache.stopEvictionLoop();
