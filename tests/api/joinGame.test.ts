@@ -124,7 +124,7 @@ describe("JoinGameHandler", () => {
   });
 
   describe("capacity rejection", () => {
-    it("throws 400 when game is full", async () => {
+    it("throws 409 when game is full", async () => {
       const game = makeGame({
         playerIds: ["p1", "p2", "p3", "p4"],
         maxPlayers: 4,
@@ -134,7 +134,7 @@ describe("JoinGameHandler", () => {
       const { res } = makeResponse();
       await expect(
         JoinGameHandler.INSTANCE.post(makeRequest("p5", "game-1"), res),
-      ).rejects.toMatchObject({ status: 400 });
+      ).rejects.toMatchObject({ status: 409 });
       expect(mockSaveGame).not.toHaveBeenCalled();
     });
   });

@@ -10,6 +10,37 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ---
 
+## [2026-06-07] — Implement Guest Access (LLD 5)
+
+### Added
+
+- `src/backend/guest/guestToken.ts` — `createGuestToken` and `verifyGuestToken`: HMAC-SHA256 signed guest tokens with format `"guest:" + base64url(guestId.gameId.expiresAt.hmac)`
+- `src/backend/guest/guestSessionStore.ts` — `GuestSessionStore` class: in-memory Map with TTL, `create`, `get`, `delete`, `getByGame`, `startCleanupLoop`, `stopCleanupLoop`. Not a singleton — instantiated in `server.ts` and injected.
+- `src/backend/guest/types.ts` — `GuestSession` interface (server-side session record)
+- `src/shared/guest-types.ts` — Shared request/response types: `CreateGuestSessionRequest`, `CreateGuestSessionResponse`, `ClaimGuestSessionRequest`, `ClaimGuestSessionResponse`
+- `src/backend/api/guest/createSession.ts` — `POST /guest/session` handler: validates game exists (404 if not), validates display name (non-empty, max 20 chars), deduplicates name within game, creates session, returns signed token
+- `src/backend/api/guest/claimSession.ts` — `POST /guest/claim` handler: verifies guest token, swaps `guestId` → `newUserId` in `Game.playerIds` and `Game.playerDisplayNames`, returns `gamesLinked` count
+- `src/frontend/service/guestService.ts` — `createGuestSession`, `restoreGuestSession`, `getGuestToken`, `clearGuestSession`, `claimGuestSession`: cookie-based guest session management with client-side token decode for page refresh
+- `src/frontend/component/GuestEntryView.vue` — Guest entry screen: display name input, Join Game button, Sign in / Sign up links, error display
+- `tests/guest/guestToken.test.ts` — 9 tests: token format, base64url decodability, payload fields, valid decode, tampered HMAC rejected, expired rejected, wrong secret rejected, malformed token rejected
+- `tests/guest/guestSessionStore.test.ts` — 14 tests: create fields, UUID format, uniqueness, get happy path, get null for unknown/expired, delete, getByGame filtering, cleanup loop
+- `tests/guest/authMiddlewareDualPath.test.ts` — 10 tests: Supabase JWT regression, guest token accept/reject paths, evicted session rejection, `registeredOnlyMiddleware` allow/deny
+- `tests/guest/socketAuthDualPath.test.ts` — 5 tests: Supabase JWT regression, guest token accept/reject paths for Socket.IO
+- `tests/api/guest/createSession.test.ts` — 9 tests: happy path (response fields, token verifiable, session stored), deduplication (append suffix, increment until unique), validation (empty name, too long, missing gameId, game not found)
+- `tests/api/guest/claimSession.test.ts` — 7 tests: ID swap, display name move, expired token no-op, game not found no-op, guest not in game no-op, missing/invalid token 400
+
+### Changed
+
+- `src/backend/middleware/authMiddleware.ts` — Refactored to `createAuthMiddleware(guestSessionStore)` factory (dual-path: `"guest:"` prefix → guest path, else Supabase JWT). Kept `authMiddleware` as a backwards-compatible export using a null store. Added `registeredOnlyMiddleware` (throws 403 for guests).
+- `src/backend/websocket/socketAuth.ts` — Refactored to `createSocketAuthMiddleware(guestSessionStore)` factory (same dual-path logic). Kept `socketAuthMiddleware` backwards-compatible export.
+- `src/backend/websocket/types.ts` — Added `isGuest: boolean` to `SocketData`. Updated `SocketAuthPayload` comment to document guest token format.
+- `src/backend/util/types.ts` — Added `isGuest?: boolean` to `Request` type extension.
+- `src/backend/server.ts` — Instantiates `GuestSessionStore`, starts cleanup loop, wires `createAuthMiddleware` and `createSocketAuthMiddleware` with the store. Registers `/guest/session` (no auth) and `/guest/claim` (Supabase JWT + registeredOnly). Adds `registeredOnlyMiddleware` to `POST /createGame`. Calls `stopCleanupLoop()` on close.
+- `src/frontend/routes.ts` — Added `/game/:gameId/join` route for `GuestEntryView`. Changed `/game/:gameId` to `requiresAuth: false`. Route guard redirects unauthenticated users with no guest token to `/game/:gameId/join`.
+- `src/frontend/composables/useSocket.ts` — `connect()` tries `getAccessToken()` first, falls back to `getGuestToken()`.
+
+---
+
 ## [2026-06-06] — Fix host display name never stored on game creation
 
 ### Fixed

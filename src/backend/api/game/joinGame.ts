@@ -82,7 +82,7 @@ export class JoinGameHandler extends Handler {
     }
 
     if (game.playerIds.length >= game.maxPlayers) {
-      throw new BadRequestError();
+      throw new AlreadyExistsError();
     }
 
     game.playerIds.push(userId);

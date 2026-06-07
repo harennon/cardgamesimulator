@@ -5,6 +5,7 @@ import type {
   ServerToClientEvents,
 } from "@shared/socket-events";
 import { getAccessToken } from "@/service/authService";
+import { getGuestToken } from "@/service/guestService";
 
 type TypedClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -19,7 +20,8 @@ export function useSocket() {
       return;
     }
 
-    const token = await getAccessToken();
+    // Try Supabase token first, fall back to guest token
+    const token = (await getAccessToken()) ?? getGuestToken();
     if (!token) {
       error.value = "Not authenticated";
       return;
