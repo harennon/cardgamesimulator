@@ -12,7 +12,9 @@ import AboutView from "@/component/AboutView.vue";
 import HelloWorld from "@/component/HelloWorld.vue";
 import HomeView from "@/component/HomeView.vue";
 import GameView from "@/component/game/GameView.vue";
+import GuestEntryView from "@/component/GuestEntryView.vue";
 import { getSession } from "@/service/authService";
+import { restoreGuestSession } from "@/service/guestService";
 
 const routes: RouteRecordSingleView[] = [
   { path: "/", component: HomeView, meta: { requiresAuth: false } },
@@ -28,9 +30,15 @@ const routes: RouteRecordSingleView[] = [
   { path: "/join-game", component: JoinGameView, meta: { requiresAuth: true } },
   { path: "/load-game", component: LoadGameView, meta: { requiresAuth: true } },
   {
+    path: "/game/:gameId/join",
+    component: GuestEntryView,
+    meta: { requiresAuth: false },
+    props: true,
+  },
+  {
     path: "/game/:gameId",
     component: GameView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: false },
     props: true,
   },
 ];
@@ -41,13 +49,25 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to, _from) => {
-  const session = await getSession();
-  const isAuthenticated = session !== null;
-  if (!isAuthenticated && to.meta.requiresAuth) {
-    return {
-      path: "/login",
-      // save the location we were at to come back later
-      query: { redirect: to.fullPath },
-    };
+  if (to.meta.requiresAuth) {
+    const session = await getSession();
+    if (!session) {
+      return { path: "/login", query: { redirect: to.fullPath } };
+    }
+    return;
+  }
+
+  // For /game/:gameId: allow Supabase sessions and guest sessions; redirect others to join
+  if (to.path.match(/^\/game\/[^/]+$/)) {
+    const session = await getSession();
+    if (session) return; // registered user — allow through
+
+    // Try to restore guest session from cookie
+    const gameId = to.params.gameId as string;
+    const guestSession = restoreGuestSession();
+    if (guestSession && guestSession.gameId === gameId) return; // guest session for THIS game — allow through
+
+    // No valid session for this game — redirect to guest entry screen
+    return { path: `/game/${gameId}/join` };
   }
 });

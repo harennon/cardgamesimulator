@@ -11,23 +11,30 @@ import { EchoHandler } from "@/api/echo";
 import { ServeAppHandler } from "@/api/serveApp";
 import { PostgresDB } from "@/database/postgres";
 import { errorHandler } from "@/middleware/errorHandler";
-import { authMiddleware } from "@/middleware/authMiddleware";
+import {
+  createAuthMiddleware,
+  registeredOnlyMiddleware,
+} from "@/middleware/authMiddleware";
 import { CreateGameHandler } from "@/api/game/createGame";
 import { JoinGameHandler } from "@/api/game/joinGame";
 import { GetGameStateHandler } from "@/api/game/getGameState";
 import { createSocketServer, type TypedServer } from "@/websocket/socketServer";
-import { socketAuthMiddleware } from "@/websocket/socketAuth";
+import { createSocketAuthMiddleware } from "@/websocket/socketAuth";
 import { registerSocketHandlers } from "@/websocket/socketHandler";
 import { ConnectionManager } from "@/websocket/connectionManager";
 import { GameService } from "@/service/gameService";
 import { GameCache } from "@/engine/game-cache";
 import { engineFactory } from "@/engine/game-engine-factory";
 import { gameRepo } from "@/database";
+import { GuestSessionStore } from "@/guest/guestSessionStore";
+import { createSessionRouter } from "@/api/guest/createSession";
+import { createClaimRouter } from "@/api/guest/claimSession";
 
 export class Server {
   private readonly app: Express;
   private readonly server: https.Server | http.Server;
   private readonly io: TypedServer;
+  private readonly guestSessionStore: GuestSessionStore;
 
   constructor() {
     this.app = express();
@@ -40,6 +47,11 @@ export class Server {
       morgan(":method :url :status :res[content-length] - :response-time ms"),
     );
 
+    // Set up guest session store and auth middleware (dependency injection)
+    this.guestSessionStore = new GuestSessionStore();
+    this.guestSessionStore.startCleanupLoop();
+    const authMiddleware = createAuthMiddleware(this.guestSessionStore);
+
     // register api handlers
     new Map<string, Handler>([
       ["/", ServeAppHandler.INSTANCE],
@@ -47,13 +59,36 @@ export class Server {
     ]).forEach((handler: Handler, path: string) => {
       this.app.use(path, handler.router);
     });
+
+    // Guest routes (no auth — createSession creates the auth)
+    this.app.use(
+      "/guest/session",
+      createSessionRouter(this.guestSessionStore, gameRepo),
+    );
+
+    // Guest claim route (requires Supabase JWT — registered users only)
+    this.app.use(
+      "/guest/claim",
+      authMiddleware,
+      registeredOnlyMiddleware,
+      createClaimRouter(gameRepo),
+    );
+
     new Map<string, Handler>([
-      ["/createGame", CreateGameHandler.INSTANCE],
       ["/joinGame", JoinGameHandler.INSTANCE],
       ["/getGameState", GetGameStateHandler.INSTANCE],
     ]).forEach((handler: Handler, path: string) => {
       this.app.use(path, authMiddleware, handler.router);
     });
+
+    // createGame requires a registered (non-guest) user
+    this.app.use(
+      "/createGame",
+      authMiddleware,
+      registeredOnlyMiddleware,
+      CreateGameHandler.INSTANCE.router,
+    );
+
     // register error middleware
     this.app.use(errorHandler);
 
@@ -62,7 +97,7 @@ export class Server {
 
     // Socket.IO setup
     this.io = createSocketServer(this.server);
-    this.io.use(socketAuthMiddleware);
+    this.io.use(createSocketAuthMiddleware(this.guestSessionStore));
 
     const gameCache = new GameCache();
     gameCache.startEvictionLoop();
@@ -84,6 +119,7 @@ export class Server {
   public close(force: boolean, callback: (force: boolean) => void) {
     // callback function to close dependencies
     callback(force);
+    this.guestSessionStore.stopCleanupLoop();
     this.server.close();
   }
 
