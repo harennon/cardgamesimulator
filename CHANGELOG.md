@@ -16,6 +16,7 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- `src/backend/middleware/authMiddleware.ts` — updated Supabase JWT verification to support ES256 tokens signed with an ECDSA key; fetches and caches the public key from `${SUPABASE_URL}/auth/v1/.well-known/jwks.json` at startup, falls back to HS256 with the shared secret when `SUPABASE_URL` is not set; guest tokens are unaffected
 - `src/frontend/component/game/GameLobbyView.vue` — removed dead `socket: TypedClientSocket | null` prop and its unused `TypedClientSocket` import; the prop was never passed from `GameView.vue` and never used inside the component
 - `src/frontend/component/game-ui/GameCard.vue` — added `.card__corner` element (top-left rank + suit labels) matching the approved mockup; added `interactive?: boolean` prop used for `cursor: pointer` styling
 - `src/frontend/component/game/GameBoard.vue` — replaced flat `var(--felt)` background with radial gradient, SVG dot-pattern texture overlay (`::before`), and 12px wood-grain rim border-image (`::after`); changed to `position: fixed; inset: 0` to escape the `#app` width constraint

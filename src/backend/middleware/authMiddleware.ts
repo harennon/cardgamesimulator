@@ -1,4 +1,6 @@
 import jwt from "jsonwebtoken";
+import { createPublicKey } from "crypto";
+import type { KeyObject } from "crypto";
 import { Request, Response, Next } from "@/util/types";
 import { AccessDeniedError, UnauthorizedError } from "@/util/errors";
 import { verifyGuestToken } from "@/guest/guestToken";
@@ -22,6 +24,47 @@ export interface SupabaseJWTPayload {
   };
 }
 
+// Cached EC public key fetched from Supabase JWKS endpoint.
+// null = not yet fetched or SUPABASE_URL not configured (fall back to HS256).
+let cachedJwksKey: KeyObject | null = null;
+
+async function fetchJwksKey(supabaseUrl: string): Promise<void> {
+  try {
+    const url = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      return;
+    }
+    const body = (await response.json()) as { keys?: unknown[] };
+    const keys = body.keys;
+    if (!Array.isArray(keys) || keys.length === 0) {
+      return;
+    }
+    // Use the first EC key (kty === "EC").
+    const ecKey = keys.find(
+      (k): k is object =>
+        typeof k === "object" &&
+        k !== null &&
+        (k as Record<string, unknown>)["kty"] === "EC",
+    );
+    if (!ecKey) {
+      return;
+    }
+    cachedJwksKey = createPublicKey({
+      key: ecKey as unknown as import("crypto").JsonWebKey,
+      format: "jwk",
+    });
+  } catch {
+    // Non-fatal: fall back to HS256 verification if JWKS fetch fails.
+  }
+}
+
+// Kick off JWKS fetch at startup if SUPABASE_URL is configured.
+const supabaseUrl = process.env.SUPABASE_URL;
+if (supabaseUrl) {
+  void fetchJwksKey(supabaseUrl);
+}
+
 /**
  * Creates the dual-path auth middleware.
  * Takes GuestSessionStore as a parameter (dependency injection for testability).
@@ -31,6 +74,9 @@ export interface SupabaseJWTPayload {
  *
  * Both paths set req.userId and req.displayName.
  * Adds req.isGuest (boolean) for route-level permission checks.
+ *
+ * Supabase JWT verification: tries ES256 with the cached JWKS public key first,
+ * then falls back to HS256 with the shared secret (for local/dev deployments).
  */
 export function createAuthMiddleware(
   guestSessionStore: GuestSessionStore,
@@ -69,9 +115,17 @@ export function createAuthMiddleware(
 
     let decoded: SupabaseJWTPayload;
     try {
-      decoded = jwt.verify(token, jwtSecret as string, {
-        algorithms: ["HS256"],
-      }) as unknown as SupabaseJWTPayload;
+      if (cachedJwksKey !== null) {
+        // Prefer ES256 verification with the JWKS public key.
+        decoded = jwt.verify(token, cachedJwksKey, {
+          algorithms: ["ES256"],
+        }) as unknown as SupabaseJWTPayload;
+      } else {
+        // Fall back to HS256 with shared secret (local dev / no SUPABASE_URL).
+        decoded = jwt.verify(token, jwtSecret as string, {
+          algorithms: ["HS256"],
+        }) as unknown as SupabaseJWTPayload;
+      }
     } catch {
       throw new UnauthorizedError();
     }
