@@ -8,6 +8,22 @@ import {
   NotFoundError,
 } from "@/util/errors";
 
+function deduplicateDisplayName(
+  requested: string,
+  existingNames: string[],
+): string {
+  if (!existingNames.includes(requested)) {
+    return requested;
+  }
+  let suffix = 2;
+  let candidate = `${requested} ${suffix}`;
+  while (existingNames.includes(candidate)) {
+    suffix++;
+    candidate = `${requested} ${suffix}`;
+  }
+  return candidate;
+}
+
 export class JoinGameHandler extends Handler {
   public static INSTANCE: JoinGameHandler = new JoinGameHandler();
   private constructor() {
@@ -75,7 +91,11 @@ export class JoinGameHandler extends Handler {
 
     if (game.playerIds.includes(userId)) {
       if (!game.playerDisplayNames[userId]) {
-        game.playerDisplayNames[userId] = displayName;
+        const existingNames = Object.values(game.playerDisplayNames);
+        game.playerDisplayNames[userId] = deduplicateDisplayName(
+          displayName,
+          existingNames,
+        );
         return { game, mutated: true };
       }
       return { game, mutated: false };
@@ -85,8 +105,12 @@ export class JoinGameHandler extends Handler {
       throw new AlreadyExistsError();
     }
 
+    const existingNames = Object.values(game.playerDisplayNames);
     game.playerIds.push(userId);
-    game.playerDisplayNames[userId] = displayName;
+    game.playerDisplayNames[userId] = deduplicateDisplayName(
+      displayName,
+      existingNames,
+    );
     return { game, mutated: true };
   }
 

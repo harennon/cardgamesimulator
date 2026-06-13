@@ -7,7 +7,10 @@ import type {
 import { getAccessToken } from "@/service/authService";
 import { getGuestToken } from "@/service/guestService";
 
-type TypedClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+export type TypedClientSocket = Socket<
+  ServerToClientEvents,
+  ClientToServerEvents
+>;
 
 export function useSocket() {
   const socket = ref<TypedClientSocket | null>(null);

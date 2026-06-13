@@ -44,6 +44,7 @@ export interface SerializableGame {
   gameType: GameType;
   maxPlayers: number;
   playerIds: string[];
+  playerDisplayNames: Record<string, string>;
   status: GameStatus;
   state: SerializableGameState;
 }

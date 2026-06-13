@@ -1,13 +1,5 @@
-import type { Card } from "@shared/engine-types";
-
-/** Discriminated union of valid Big2 hand types */
-export type HandType =
-  | { kind: "single"; card: Card }
-  | { kind: "pair"; rank: string; highCard: Card }
-  | { kind: "straight"; highCard: Card }
-  | { kind: "fullHouse"; tripleRank: string; highCard: Card }
-  | { kind: "fourOfAKind"; quadRank: string; highCard: Card }
-  | { kind: "straightFlush"; highCard: Card };
+import type { HandType } from "@shared/big2-types";
+export type { HandType };
 
 /**
  * Five-card hand type hierarchy. Higher index beats lower index regardless of card values.
