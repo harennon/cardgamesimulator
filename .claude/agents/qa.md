@@ -43,6 +43,16 @@ For each feature, check against:
 - Do error states show the specified messages?
 - Are guests and registered users handled as specified?
 
+### 1b. Visual Design Compliance (Frontend features)
+
+When validating UI implementations, compare against the approved design mockups in `design-mockups/`. The chosen direction is `direction-a-revised.html` ("The Club" felt-table aesthetic with DM Sans typography). Check:
+- Does the color palette match (deep greens, warm golds, mahogany browns, aged cream)?
+- Does the typography match (DM Sans for UI, Libre Baskerville for card ranks)?
+- Does the card selection affordance match (raise + gold border/glow)?
+- Does the layout structure match (opponents top, play area center, hand bottom, log right)?
+- Does the turn indicator match (gold pill with pulse animation)?
+- Are interactive states consistent (hover, selected, disabled)?
+
 ### 2. Interaction Principles
 
 - **Zero friction:** Can a guest join via link without signing up?
