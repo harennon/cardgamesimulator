@@ -20,7 +20,7 @@ services:
   backend:
     image: express-backend
     env_file:
-      - .env.local
+      - .env
     build:
       context: .
       dockerfile: ./src/backend/Dockerfile
