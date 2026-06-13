@@ -66,6 +66,15 @@ if (supabaseUrl) {
 }
 
 /**
+ * Returns the cached JWKS public key, or null if not yet fetched.
+ * Shared by authMiddleware (HTTP) and socketAuth (WebSocket) to avoid
+ * duplicating the JWKS fetch logic.
+ */
+export function getCachedJwksKey(): KeyObject | null {
+  return cachedJwksKey;
+}
+
+/**
  * Creates the dual-path auth middleware.
  * Takes GuestSessionStore as a parameter (dependency injection for testability).
  *

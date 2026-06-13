@@ -10,6 +10,22 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- `tests/integration/` — Integration test suite (LLD 6.5): 13 tests covering auth JWT verification, game CRUD REST flows, and full WebSocket game play. Boots a real server against local Supabase; exercises ES256 JWT verification end-to-end
+- `tests/integration/helpers/supabaseUser.ts` — creates real Supabase users and returns ES256 JWTs via GoTrue signUp flow
+- `tests/integration/helpers/testServer.ts` — boots a fully-wired Express + Socket.IO server on an ephemeral port; waits for JWKS key to be cached before returning
+- `tests/integration/helpers/socketClient.ts` — typed Socket.IO client factory for WebSocket test connections
+- `tests/integration/helpers/guestUser.ts` — creates guest sessions via POST /guest/session
+- `tests/integration/helpers/setupEnv.ts` — Vitest setupFile that sets integration env vars before any module imports
+- `vitest.integration.config.ts` — separate Vitest config for integration tests (30s timeout, single worker, setupFiles)
+- `docker-compose.test.yml` — backend + Supabase only (for CI parity checks)
+- `.github/workflows/ci.yml` — added `integration-tests` job that starts Supabase via `supabase/setup-cli` and runs `npm run test:integration`
+- `package.json` — added `test:integration` and `test:all` scripts
+
+### Fixed
+
+- `src/backend/websocket/socketAuth.ts` — added ES256 verification path (mirrors HTTP auth middleware); was previously HS256-only, causing WebSocket connections with real Supabase-issued ES256 tokens to fail; uses `getCachedJwksKey()` from `authMiddleware.ts` to avoid duplicating JWKS fetch logic
+- `src/backend/middleware/authMiddleware.ts` — exported `getCachedJwksKey()` to allow `socketAuth.ts` to share the cached JWKS public key
+
 - `tests/frontend/useCardSelection.test.ts` — 16 tests for `useCardSelection`: initial state, toggle (select, deselect, multi-select, isolation), `selectedCards` ordering and reactivity, out-of-range filtering, `clearSelection`, and `selectionCount` sequencing
 - `tests/frontend/useGameState.test.ts` — 14 tests for `useGameState`: initial state, `bind` registers listener, state/status/initialized updates from `game:state` events, sequential event updates, `unbind` removes listener and stops processing, safety of calling `unbind` before/multiple times, readonly enforcement
 - `tests/frontend/useGameActions.test.ts` — 28 tests for `useGameActions`: initial state, pre-bind rejection for all three actions, post-unbind rejection, `startGame`/`playCards`/`pass` emit correct events, success/failure responses, actionError fallback messages, error clearing, actionPending reset
