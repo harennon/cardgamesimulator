@@ -4,8 +4,14 @@ services:
     build:
       context: .
       dockerfile: ./src/frontend/Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     depends_on:
       - backend
+    environment:
+      - BACKEND_PORT=3000
     ports:
       - "80:80"
     networks:
@@ -14,7 +20,7 @@ services:
   backend:
     image: express-backend
     env_file:
-      - .env.local
+      - .env
     build:
       context: .
       dockerfile: ./src/backend/Dockerfile
@@ -22,8 +28,10 @@ services:
       - "3000:3000"
     networks:
       - app
-    # Note: backend connects to Supabase Postgres via DB_HOST env var
-    # For local: host.docker.internal or the Supabase container network
+      - supabase
 
 networks:
   app:
+  supabase:
+    name: supabase_network_cardgamesimulator
+    external: true

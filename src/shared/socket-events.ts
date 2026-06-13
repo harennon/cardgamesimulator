@@ -45,7 +45,11 @@ export interface GameLeavePayload {
 
 export interface GameActionPayload {
   gameId: string;
-  action: GameAction;
+  // GameAction is the base type. Game-specific actions (e.g. Big2PlayCardsAction)
+  // extend it with additional fields (e.g. `cards`). Using an intersection with
+  // Record<string, unknown> allows those extra fields while preserving the base
+  // type constraint that the server needs for safe playerId override.
+  action: GameAction & Record<string, unknown>;
 }
 
 export interface GameActionResponse {

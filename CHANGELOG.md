@@ -8,6 +8,23 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Added
+
+- `tests/frontend/useCardSelection.test.ts` — 16 tests for `useCardSelection`: initial state, toggle (select, deselect, multi-select, isolation), `selectedCards` ordering and reactivity, out-of-range filtering, `clearSelection`, and `selectionCount` sequencing
+- `tests/frontend/useGameState.test.ts` — 14 tests for `useGameState`: initial state, `bind` registers listener, state/status/initialized updates from `game:state` events, sequential event updates, `unbind` removes listener and stops processing, safety of calling `unbind` before/multiple times, readonly enforcement
+- `tests/frontend/useGameActions.test.ts` — 28 tests for `useGameActions`: initial state, pre-bind rejection for all three actions, post-unbind rejection, `startGame`/`playCards`/`pass` emit correct events, success/failure responses, actionError fallback messages, error clearing, actionPending reset
+
+### Fixed
+
+- `src/backend/middleware/authMiddleware.ts` — updated Supabase JWT verification to support ES256 tokens signed with an ECDSA key; fetches and caches the public key from `${SUPABASE_URL}/auth/v1/.well-known/jwks.json` at startup, falls back to HS256 with the shared secret when `SUPABASE_URL` is not set; guest tokens are unaffected
+- `src/frontend/component/game/GameLobbyView.vue` — removed dead `socket: TypedClientSocket | null` prop and its unused `TypedClientSocket` import; the prop was never passed from `GameView.vue` and never used inside the component
+- `src/frontend/component/game-ui/GameCard.vue` — added `.card__corner` element (top-left rank + suit labels) matching the approved mockup; added `interactive?: boolean` prop used for `cursor: pointer` styling
+- `src/frontend/component/game/GameBoard.vue` — replaced flat `var(--felt)` background with radial gradient, SVG dot-pattern texture overlay (`::before`), and 12px wood-grain rim border-image (`::after`); changed to `position: fixed; inset: 0` to escape the `#app` width constraint
+- `src/frontend/component/game-ui/PlayArea.vue` — added `@keyframes glow` pulsing box-shadow animation on the turn banner when it is the current player's turn
+- `src/frontend/component/game-ui/OpponentRow.vue` — added `@keyframes pulse` scale/opacity animation on the active opponent dot; removed unused `index` variable from `v-for`
+- `src/frontend/index.html` — removed `#app { width: 80%; margin: auto; }` which constrained the game board width
+- `src/backend/api/game/joinGame.ts` — added `deduplicateDisplayName` function; new players are assigned a deduplicated display name (e.g. "Alex" → "Alex 2") if their requested name already exists in the game
+
 ---
 
 ## [2026-06-07] — Implement Guest Access (LLD 5)

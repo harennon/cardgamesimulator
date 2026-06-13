@@ -1,0 +1,19 @@
+:root {
+  --felt: #1a4a2e;
+  --felt-light: #256b42;
+  --table-rim: #2d1810;
+  --table-rim-light: #4a2c1e;
+  --card-face: #faf3e8;
+  --card-shadow: rgba(0, 0, 0, 0.5);
+  --gold-accent: #c9a84c;
+  --gold-glow: rgba(201, 168, 76, 0.3);
+  --red-suit: #8b1a1a;
+  --black-suit: #1a1a1a;
+  --text-primary: #e8dcc8;
+  --text-muted: #8a7e6e;
+  --bg-dark: #0d0d0d;
+  --panel-bg: rgba(20, 12, 8, 0.85);
+
+  --font-ui: "DM Sans", sans-serif;
+  --font-card: "Libre Baskerville", serif;
+}

@@ -8,7 +8,7 @@ function bootstrap() {
   createApp(App).use(router).mount("#app");
 }
 
-export const axiosInstance: AxiosInstance = axios.create({ baseURL: "/api" });
+export const axiosInstance: AxiosInstance = axios.create({});
 
 axiosInstance.interceptors.request.use(async (config) => {
   const token = await getAccessToken();

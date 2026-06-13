@@ -190,6 +190,56 @@ describe("JoinGameHandler", () => {
     });
   });
 
+  describe("display name deduplication", () => {
+    it("keeps requested name when no conflict exists", async () => {
+      const game = makeGame({ playerIds: ["player-1"] });
+      mockGetGame.mockResolvedValue(game);
+
+      const { res } = makeResponse();
+      const req = makeRequest("player-2", "game-1");
+      req.displayName = "Alice";
+      await JoinGameHandler.INSTANCE.post(req, res);
+
+      expect(mockSaveGame.mock.calls[0][0].playerDisplayNames["player-2"]).toBe(
+        "Alice",
+      );
+    });
+
+    it("appends ' 2' when name already exists in game", async () => {
+      const game = makeGame({
+        playerIds: ["player-1"],
+        playerDisplayNames: { "player-1": "Alice" },
+      });
+      mockGetGame.mockResolvedValue(game);
+
+      const { res } = makeResponse();
+      const req = makeRequest("player-2", "game-1");
+      req.displayName = "Alice";
+      await JoinGameHandler.INSTANCE.post(req, res);
+
+      expect(mockSaveGame.mock.calls[0][0].playerDisplayNames["player-2"]).toBe(
+        "Alice 2",
+      );
+    });
+
+    it("increments suffix until unique when multiple conflicts exist", async () => {
+      const game = makeGame({
+        playerIds: ["player-1"],
+        playerDisplayNames: { "player-1": "Alice", "player-x": "Alice 2" },
+      });
+      mockGetGame.mockResolvedValue(game);
+
+      const { res } = makeResponse();
+      const req = makeRequest("player-2", "game-1");
+      req.displayName = "Alice";
+      await JoinGameHandler.INSTANCE.post(req, res);
+
+      expect(mockSaveGame.mock.calls[0][0].playerDisplayNames["player-2"]).toBe(
+        "Alice 3",
+      );
+    });
+  });
+
   describe("validation", () => {
     it("throws 400 when userId is missing", async () => {
       const { res } = makeResponse();
