@@ -1,4 +1,4 @@
-import { ref, readonly, onUnmounted } from "vue";
+import { ref, shallowRef, readonly, onUnmounted } from "vue";
 import { io, Socket } from "socket.io-client";
 import type {
   ClientToServerEvents,
@@ -13,7 +13,7 @@ export type TypedClientSocket = Socket<
 >;
 
 export function useSocket() {
-  const socket = ref<TypedClientSocket | null>(null);
+  const socket = shallowRef<TypedClientSocket | null>(null);
   const connected = ref(false);
   const error = ref<string | null>(null);
 
@@ -65,7 +65,7 @@ export function useSocket() {
   });
 
   return {
-    socket: readonly(socket),
+    socket,
     connected: readonly(connected),
     error: readonly(error),
     connect,
