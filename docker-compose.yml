@@ -17,8 +17,6 @@ services:
     image: express-backend
     env_file:
       - .env.local
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     build:
       context: .
       dockerfile: ./src/backend/Dockerfile
@@ -26,6 +24,10 @@ services:
       - "3000:3000"
     networks:
       - app
+      - supabase
 
 networks:
   app:
+  supabase:
+    name: supabase_network_cardgamesimulator
+    external: true
