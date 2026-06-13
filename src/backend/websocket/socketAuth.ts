@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import type { TypedSocket } from "./socketServer.js";
 import type { SupabaseJWTPayload } from "@/middleware/authMiddleware";
+import { getCachedJwksKey } from "@/middleware/authMiddleware";
 import { verifyGuestToken } from "@/guest/guestToken";
 import type { GuestSessionStore } from "@/guest/guestSessionStore";
 
@@ -55,9 +56,19 @@ export function createSocketAuthMiddleware(
     }
 
     try {
-      const decoded = jwt.verify(token, jwtSecret as string, {
-        algorithms: ["HS256"],
-      }) as unknown as SupabaseJWTPayload;
+      let decoded: SupabaseJWTPayload;
+      const jwksKey = getCachedJwksKey();
+      if (jwksKey !== null) {
+        // Prefer ES256 verification with the JWKS public key.
+        decoded = jwt.verify(token, jwksKey, {
+          algorithms: ["ES256"],
+        }) as unknown as SupabaseJWTPayload;
+      } else {
+        // Fall back to HS256 with shared secret (local dev / no SUPABASE_URL).
+        decoded = jwt.verify(token, jwtSecret as string, {
+          algorithms: ["HS256"],
+        }) as unknown as SupabaseJWTPayload;
+      }
 
       if (decoded.role !== "authenticated") {
         next(new Error("UNAUTHORIZED: Invalid role"));
