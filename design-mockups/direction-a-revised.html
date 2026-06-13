@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Big2 — Direction A Revised: Felt Table + DM Sans</title>
+    <style>
+      /*
+  DIRECTION A REVISED: "THE CLUB" with modern typography
+  =======================================================
+  Dark, moody card room aesthetic from Direction A — deep green felt table,
+  warm amber lighting, rich wood tones. Cards have a physical, tactile quality.
+
+  Typography change: Replaced Playfair Display + JetBrains Mono with
+  DM Sans (UI text) + Libre Baskerville (card ranks) from Direction B.
+  DM Sans brings geometric roundedness and warmth to labels/buttons/log,
+  while Libre Baskerville gives card ranks elegant serif weight.
+
+  Palette (unchanged from Direction A):
+    --felt: #1a4a2e (deep green felt)
+    --table-rim: #2d1810 (mahogany)
+    --card-face: #faf3e8 (aged cream)
+    --gold-accent: #c9a84c (warm gold for turn indicator)
+    --red-suit: #8b1a1a (deep crimson)
+    --black-suit: #1a1a1a
+    --text-primary: #e8dcc8 (warm ivory)
+    --text-muted: #8a7e6e
+*/
+
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: var(--bg-dark);
+        font-family: "DM Sans", sans-serif;
+        color: var(--text-primary);
+        overflow: hidden;
+      }
+
+      .game-board {
+        width: 100vw;
+        height: 100vh;
+        display: grid;
+        grid-template-rows: 80px 1fr 220px 64px;
+        grid-template-columns: 1fr 280px;
+        grid-template-areas:
+          "opponents opponents"
+          "table log"
+          "hand log"
+          "actions actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        position: relative;
+      }
+
+      /* Felt texture overlay */
+      .game-board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* Wood rim border */
+      .game-board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        pointer-events: none;
+        z-index: 100;
+      }
+
+      .game-board > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* === OPPONENTS === */
+      .opponents {
+        grid-area: opponents;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 80px;
+        padding: 12px 40px;
+      }
+
+      .opponent {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        position: relative;
+      }
+
+      .opponent.active .opponent-name {
+        color: var(--gold-accent);
+        text-shadow: 0 0 12px var(--gold-glow);
+      }
+
+      .opponent.active::before {
+        content: "";
+        position: absolute;
+        top: -4px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 8px;
+        height: 8px;
+        background: var(--gold-accent);
+        border-radius: 50%;
+        box-shadow: 0 0 8px var(--gold-accent);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: translateX(-50%) scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: translateX(-50%) scale(1.3);
+        }
+      }
+
+      .opponent-name {
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        transition:
+          color 0.3s,
+          text-shadow 0.3s;
+      }
+
+      .opponent-cards {
+        display: flex;
+        gap: 0;
+      }
+
+      .card-back {
+        width: 28px;
+        height: 40px;
+        background: linear-gradient(135deg, #8b1a1a, #5c1010);
+        border: 1px solid #3a0808;
+        border-radius: 3px;
+        margin-left: -14px;
+        box-shadow: 1px 2px 4px var(--card-shadow);
+        position: relative;
+      }
+
+      .card-back:first-child {
+        margin-left: 0;
+      }
+
+      .card-back::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 2px;
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 2px,
+          rgba(201, 168, 76, 0.05) 2px,
+          rgba(201, 168, 76, 0.05) 4px
+        );
+      }
+
+      .opponent-count {
+        font-family: "DM Sans", sans-serif;
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      /* === CENTER TABLE === */
+      .table-center {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+      }
+
+      .last-play-label {
+        font-family: "DM Sans", sans-serif;
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text-muted);
+      }
+
+      .last-play-cards {
+        display: flex;
+        gap: 8px;
+      }
+
+      .last-play-player {
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+      .turn-indicator {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 24px;
+        background: rgba(201, 168, 76, 0.1);
+        border: 1px solid var(--gold-accent);
+        border-radius: 4px;
+        animation: glow 2s ease-in-out infinite;
+      }
+
+      @keyframes glow {
+        0%,
+        100% {
+          box-shadow: 0 0 8px var(--gold-glow);
+        }
+        50% {
+          box-shadow:
+            0 0 20px var(--gold-glow),
+            0 0 40px rgba(201, 168, 76, 0.1);
+        }
+      }
+
+      .turn-indicator span {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--gold-accent);
+      }
+
+      .timer {
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        color: var(--gold-accent);
+      }
+
+      /* === CARDS (shared) === */
+      .card {
+        width: 64px;
+        height: 90px;
+        background: var(--card-face);
+        border-radius: 5px;
+        border: 1px solid #d4c9b8;
+        box-shadow: 2px 3px 8px var(--card-shadow);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease;
+        user-select: none;
+      }
+
+      .card .rank {
+        font-family: "Libre Baskerville", serif;
+        font-weight: 700;
+        font-size: 22px;
+        line-height: 1;
+      }
+
+      .card .suit-symbol {
+        font-size: 24px;
+        line-height: 1;
+        margin-top: 2px;
+      }
+
+      .card .corner {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+      }
+
+      .card .corner .rank {
+        font-size: 11px;
+      }
+
+      .card .corner .suit-symbol {
+        font-size: 10px;
+        margin-top: -2px;
+      }
+
+      .card.red .rank,
+      .card.red .suit-symbol {
+        color: var(--red-suit);
+      }
+      .card.black .rank,
+      .card.black .suit-symbol {
+        color: var(--black-suit);
+      }
+
+      /* === PLAYER HAND === */
+      .hand-area {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        padding-bottom: 8px;
+      }
+
+      .hand-label {
+        font-family: "DM Sans", sans-serif;
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+
+      .hand-cards {
+        display: flex;
+        justify-content: center;
+        padding: 0 20px;
+      }
+
+      .hand-cards .card {
+        margin-left: -20px;
+        transition:
+          transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+          box-shadow 0.2s ease;
+      }
+
+      .hand-cards .card:first-child {
+        margin-left: 0;
+      }
+
+      .hand-cards .card:hover {
+        transform: translateY(-8px);
+        box-shadow: 3px 6px 16px var(--card-shadow);
+        z-index: 10;
+      }
+
+      .hand-cards .card.selected {
+        transform: translateY(-20px);
+        box-shadow:
+          0 8px 24px rgba(201, 168, 76, 0.3),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+        z-index: 10;
+      }
+
+      .hand-cards .card.selected::after {
+        content: "";
+        position: absolute;
+        inset: -3px;
+        border: 2px solid var(--gold-accent);
+        border-radius: 7px;
+        pointer-events: none;
+      }
+
+      /* === GAME LOG === */
+      .game-log {
+        grid-area: log;
+        background: var(--panel-bg);
+        border-left: 1px solid rgba(201, 168, 76, 0.15);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .log-title {
+        font-family: "DM Sans", sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(201, 168, 76, 0.1);
+      }
+
+      .log-entries {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .log-entry {
+        font-family: "DM Sans", sans-serif;
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.4;
+        padding: 4px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .log-entry .player-name {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .log-entry .action-pass {
+        color: #6b5e4e;
+        font-style: italic;
+      }
+
+      .log-entry .action-play {
+        color: var(--gold-accent);
+      }
+
+      /* === ACTION PANEL === */
+      .action-panel {
+        grid-area: actions;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 16px;
+        background: var(--panel-bg);
+        border-top: 1px solid rgba(201, 168, 76, 0.15);
+      }
+
+      .btn {
+        font-family: "DM Sans", sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 10px 32px;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .btn-play {
+        background: linear-gradient(180deg, #c9a84c, #a08030);
+        color: #1a1008;
+        box-shadow:
+          0 2px 8px rgba(201, 168, 76, 0.3),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+
+      .btn-play:hover {
+        background: linear-gradient(180deg, #d4b85c, #b89040);
+        box-shadow:
+          0 4px 16px rgba(201, 168, 76, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        transform: translateY(-1px);
+      }
+
+      .btn-play:disabled {
+        background: #4a4030;
+        color: #6a5a40;
+        box-shadow: none;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn-pass {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid rgba(138, 126, 110, 0.4);
+      }
+
+      .btn-pass:hover {
+        border-color: var(--text-muted);
+        color: var(--text-primary);
+      }
+
+      /* Scrollbar styling */
+      .log-entries::-webkit-scrollbar {
+        width: 4px;
+      }
+      .log-entries::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .log-entries::-webkit-scrollbar-thumb {
+        background: rgba(201, 168, 76, 0.2);
+        border-radius: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-board">
+      <!-- Opponents -->
+      <div class="opponents">
+        <div class="opponent">
+          <div class="opponent-cards">
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+          </div>
+          <span class="opponent-name">Bob</span>
+          <span class="opponent-count">9 cards</span>
+        </div>
+
+        <div class="opponent active">
+          <div class="opponent-cards">
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+          </div>
+          <span class="opponent-name">Charlie</span>
+          <span class="opponent-count">11 cards</span>
+        </div>
+
+        <div class="opponent">
+          <div class="opponent-cards">
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+          </div>
+          <span class="opponent-name">Dave</span>
+          <span class="opponent-count">8 cards</span>
+        </div>
+      </div>
+
+      <!-- Center play area -->
+      <div class="table-center">
+        <span class="last-play-label">Last Play</span>
+        <div class="last-play-cards">
+          <div class="card black">
+            <div class="corner">
+              <span class="rank">7</span
+              ><span class="suit-symbol">&spades;</span>
+            </div>
+            <span class="rank">7</span>
+            <span class="suit-symbol">&spades;</span>
+          </div>
+          <div class="card red">
+            <div class="corner">
+              <span class="rank">7</span
+              ><span class="suit-symbol">&hearts;</span>
+            </div>
+            <span class="rank">7</span>
+            <span class="suit-symbol">&hearts;</span>
+          </div>
+        </div>
+        <span class="last-play-player">Bob &mdash; Pair</span>
+
+        <div class="turn-indicator">
+          <span>Your Turn</span>
+          <span class="timer">0:42</span>
+        </div>
+      </div>
+
+      <!-- Player hand -->
+      <div class="hand-area">
+        <span class="hand-label">Your Hand &mdash; 13 cards</span>
+        <div class="hand-cards">
+          <div class="card black" data-idx="0">
+            <div class="corner">
+              <span class="rank">3</span
+              ><span class="suit-symbol">&clubs;</span>
+            </div>
+            <span class="rank">3</span><span class="suit-symbol">&clubs;</span>
+          </div>
+          <div class="card red" data-idx="1">
+            <div class="corner">
+              <span class="rank">4</span
+              ><span class="suit-symbol">&diams;</span>
+            </div>
+            <span class="rank">4</span><span class="suit-symbol">&diams;</span>
+          </div>
+          <div class="card red" data-idx="2">
+            <div class="corner">
+              <span class="rank">5</span
+              ><span class="suit-symbol">&hearts;</span>
+            </div>
+            <span class="rank">5</span><span class="suit-symbol">&hearts;</span>
+          </div>
+          <div class="card black selected" data-idx="3">
+            <div class="corner">
+              <span class="rank">5</span
+              ><span class="suit-symbol">&spades;</span>
+            </div>
+            <span class="rank">5</span><span class="suit-symbol">&spades;</span>
+          </div>
+          <div class="card red selected" data-idx="4">
+            <div class="corner">
+              <span class="rank">5</span
+              ><span class="suit-symbol">&diams;</span>
+            </div>
+            <span class="rank">5</span><span class="suit-symbol">&diams;</span>
+          </div>
+          <div class="card red" data-idx="5">
+            <div class="corner">
+              <span class="rank">7</span
+              ><span class="suit-symbol">&diams;</span>
+            </div>
+            <span class="rank">7</span><span class="suit-symbol">&diams;</span>
+          </div>
+          <div class="card black" data-idx="6">
+            <div class="corner">
+              <span class="rank">9</span
+              ><span class="suit-symbol">&clubs;</span>
+            </div>
+            <span class="rank">9</span><span class="suit-symbol">&clubs;</span>
+          </div>
+          <div class="card red" data-idx="7">
+            <div class="corner">
+              <span class="rank">J</span
+              ><span class="suit-symbol">&hearts;</span>
+            </div>
+            <span class="rank">J</span><span class="suit-symbol">&hearts;</span>
+          </div>
+          <div class="card black" data-idx="8">
+            <div class="corner">
+              <span class="rank">Q</span
+              ><span class="suit-symbol">&spades;</span>
+            </div>
+            <span class="rank">Q</span><span class="suit-symbol">&spades;</span>
+          </div>
+          <div class="card red" data-idx="9">
+            <div class="corner">
+              <span class="rank">K</span
+              ><span class="suit-symbol">&diams;</span>
+            </div>
+            <span class="rank">K</span><span class="suit-symbol">&diams;</span>
+          </div>
+          <div class="card black" data-idx="10">
+            <div class="corner">
+              <span class="rank">K</span
+              ><span class="suit-symbol">&spades;</span>
+            </div>
+            <span class="rank">K</span><span class="suit-symbol">&spades;</span>
+          </div>
+          <div class="card black" data-idx="11">
+            <div class="corner">
+              <span class="rank">A</span
+              ><span class="suit-symbol">&clubs;</span>
+            </div>
+            <span class="rank">A</span><span class="suit-symbol">&clubs;</span>
+          </div>
+          <div class="card black" data-idx="12">
+            <div class="corner">
+              <span class="rank">2</span
+              ><span class="suit-symbol">&spades;</span>
+            </div>
+            <span class="rank">2</span><span class="suit-symbol">&spades;</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game log -->
+      <div class="game-log">
+        <div class="log-title">Game Log</div>
+        <div class="log-entries">
+          <div class="log-entry">
+            <span class="player-name">Alice</span>
+            <span class="action-play">played Straight 3-4-5-6-7</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Bob</span>
+            <span class="action-play">played Pair 7&spades; 7&hearts;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Charlie</span>
+            <span class="action-pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Dave</span>
+            <span class="action-pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Alice</span>
+            <span class="action-play">played 9&diams;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Bob</span>
+            <span class="action-play">played J&clubs;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Charlie</span>
+            <span class="action-play">played K&hearts;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Dave</span>
+            <span class="action-pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Alice</span>
+            <span class="action-pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Bob</span>
+            <span class="action-play">played Pair 7&spades; 7&hearts;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Charlie</span>
+            <span class="action-pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Dave</span>
+            <span class="action-pass">passed</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="action-panel">
+        <button class="btn btn-play">Play</button>
+        <button class="btn btn-pass">Pass</button>
+      </div>
+    </div>
+
+    <script>
+      // Card selection interaction
+      document.querySelectorAll(".hand-cards .card").forEach((card) => {
+        card.addEventListener("click", () => {
+          card.classList.toggle("selected");
+          updatePlayButton();
+        });
+      });
+
+      function updatePlayButton() {
+        const selected = document.querySelectorAll(
+          ".hand-cards .card.selected",
+        );
+        const playBtn = document.querySelector(".btn-play");
+        // Simulate: enable Play if exactly 1 or 2 cards selected (pair/single)
+        if (selected.length === 1 || selected.length === 2) {
+          playBtn.disabled = false;
+        } else {
+          playBtn.disabled = true;
+        }
+      }
+
+      // Initialize with the pre-selected pair
+      updatePlayButton();
+    </script>
+  </body>
+</html>

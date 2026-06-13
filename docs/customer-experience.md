@@ -205,7 +205,7 @@ Guests can do almost everything — the only incentives to register are persiste
 3. Turn indicator highlights current player
 4. On your turn:
    - Select card(s) from hand (click to toggle selection)
-   - Action panel shows valid options: "Play" (enabled if selection is a valid combo that beats current) or "Pass"
+   - Action panel shows valid options: "Play" (enabled when cards are selected) or "Pass"
    - Click "Play" → cards move to center, turn advances
    - Click "Pass" → turn advances
 5. When not your turn: hand is visible but actions disabled, watch others play
@@ -216,7 +216,7 @@ Guests can do almost everything — the only incentives to register are persiste
 
 - Turn timer expires → server auto-passes, notification shown ("You ran out of time")
 - Player disconnects mid-game → game pauses (short timeout), then auto-passes for them if they don't reconnect
-- Invalid selection → "Play" button stays disabled (client validates against `validActions` to enable/disable, server rejects if somehow submitted)
+- Invalid combo submitted → server rejects with error message shown inline; selection preserved so user can adjust
 - Reconnection → player rejoins, receives current game state, continues from where they were
 
 ```
@@ -253,9 +253,10 @@ Guests can do almost everything — the only incentives to register are persiste
 **Card selection behavior:**
 
 - Click a card → toggles selection (highlighted/raised)
-- "Play" button enabled only when selected cards form a valid combination that beats the current play
+- "Play" button enabled when it is your turn and at least one card is selected (server-authoritative: the client does NOT validate whether the combo beats the current play — invalid combos are rejected by the server with an inline error message, e.g., "Invalid combination" or "Does not beat current play")
 - "Pass" is always available on your turn
 - When leading a new trick (after everyone else passed), any valid combination is playable
+- Client-side combo preview (showing whether selected cards form a valid hand before submitting) is a Phase 5 polish candidate
 
 ---
 

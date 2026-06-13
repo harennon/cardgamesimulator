@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Big2 — Direction B: Clean Modern</title>
+    <style>
+      /*
+  DIRECTION B: "CLEAN GEOMETRY"
+  ==============================
+  Light, airy, contemporary. White/near-white backgrounds with precise
+  geometric card shapes. Soft shadows, generous whitespace, crisp typography.
+  Cards are flat-design with strong color blocking for suits. The board
+  uses a radial arrangement — opponents arrayed in an arc above center.
+
+  Palette:
+    --bg: #f5f2ed (warm off-white)
+    --surface: #ffffff
+    --border: #e2ddd5
+    --accent: #2563eb (vivid blue for turn/active)
+    --accent-soft: rgba(37, 99, 235, 0.08)
+    --hearts: #dc2626
+    --diamonds: #dc2626
+    --clubs: #18181b
+    --spades: #18181b
+    --text: #1c1917
+    --text-secondary: #78716c
+    --success: #16a34a
+
+  Typography: DM Sans (geometric sans) for UI, Libre Baskerville for card ranks
+*/
+
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --bg: #f5f2ed;
+        --surface: #ffffff;
+        --border: #e2ddd5;
+        --accent: #2563eb;
+        --accent-soft: rgba(37, 99, 235, 0.08);
+        --accent-border: rgba(37, 99, 235, 0.3);
+        --hearts: #dc2626;
+        --diamonds: #dc2626;
+        --clubs: #18181b;
+        --spades: #18181b;
+        --text: #1c1917;
+        --text-secondary: #78716c;
+        --text-tertiary: #a8a29e;
+        --success: #16a34a;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+        --radius: 12px;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: var(--bg);
+        font-family: "DM Sans", sans-serif;
+        color: var(--text);
+        overflow: hidden;
+      }
+
+      .game-board {
+        width: 100vw;
+        height: 100vh;
+        display: grid;
+        grid-template-rows: auto 1fr auto auto;
+        grid-template-columns: 1fr 260px;
+        grid-template-areas:
+          "opponents opponents"
+          "table log"
+          "hand log"
+          "actions actions";
+        gap: 0;
+        padding: 20px;
+      }
+
+      /* === OPPONENTS === */
+      .opponents {
+        grid-area: opponents;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 48px;
+        padding: 0 0 16px;
+      }
+
+      .opponent {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        transition: all 0.2s ease;
+      }
+
+      .opponent.active {
+        border-color: var(--accent-border);
+        background: var(--accent-soft);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .opponent-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .opponent.active .opponent-avatar {
+        background: var(--accent);
+        color: white;
+      }
+
+      .opponent-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .opponent-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .opponent-count {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .opponent-cards-mini {
+        display: flex;
+        margin-left: 8px;
+      }
+
+      .mini-card {
+        width: 16px;
+        height: 22px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        margin-left: -8px;
+      }
+
+      .mini-card:first-child {
+        margin-left: 0;
+      }
+
+      /* === TABLE CENTER === */
+      .table-center {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+      }
+
+      .center-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 32px 48px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: var(--shadow-md);
+      }
+
+      .last-play-label {
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-tertiary);
+      }
+
+      .last-play-cards {
+        display: flex;
+        gap: 8px;
+      }
+
+      .last-play-info {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+
+      .last-play-info strong {
+        color: var(--text);
+      }
+
+      .turn-banner {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 28px;
+        background: var(--accent);
+        color: white;
+        border-radius: 100px;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+      }
+
+      .turn-banner .label {
+        font-weight: 700;
+        font-size: 14px;
+      }
+
+      .turn-banner .timer {
+        font-size: 14px;
+        opacity: 0.8;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* === CARDS === */
+      .card {
+        width: 58px;
+        height: 82px;
+        background: var(--surface);
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        cursor: pointer;
+        transition:
+          transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+          border-color 0.15s,
+          box-shadow 0.15s;
+        user-select: none;
+        position: relative;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .card .rank {
+        font-family: "Libre Baskerville", serif;
+        font-weight: 700;
+        font-size: 20px;
+        line-height: 1;
+      }
+
+      .card .suit-symbol {
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .card.red .rank,
+      .card.red .suit-symbol {
+        color: var(--hearts);
+      }
+      .card.black .rank,
+      .card.black .suit-symbol {
+        color: var(--clubs);
+      }
+
+      /* === HAND === */
+      .hand-area {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        padding-bottom: 12px;
+      }
+
+      .hand-label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+      }
+
+      .hand-cards {
+        display: flex;
+        justify-content: center;
+      }
+
+      .hand-cards .card {
+        margin-left: -16px;
+      }
+
+      .hand-cards .card:first-child {
+        margin-left: 0;
+      }
+
+      .hand-cards .card:hover {
+        transform: translateY(-10px) scale(1.04);
+        box-shadow: var(--shadow-lg);
+        z-index: 10;
+        border-color: var(--text-tertiary);
+      }
+
+      .hand-cards .card.selected {
+        transform: translateY(-22px) scale(1.04);
+        border-color: var(--accent);
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.2);
+        z-index: 10;
+      }
+
+      .hand-cards .card.selected::before {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 6px;
+        height: 6px;
+        background: var(--accent);
+        border-radius: 50%;
+      }
+
+      /* === GAME LOG === */
+      .game-log {
+        grid-area: log;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-left: 16px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .log-title {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .log-entries {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .log-entry {
+        font-size: 12px;
+        color: var(--text-secondary);
+        padding: 6px 8px;
+        border-radius: 6px;
+        line-height: 1.4;
+      }
+
+      .log-entry:nth-child(odd) {
+        background: var(--bg);
+      }
+
+      .log-entry .player-name {
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .log-entry .cards-played {
+        color: var(--accent);
+        font-weight: 500;
+      }
+
+      .log-entry .pass {
+        color: var(--text-tertiary);
+        font-style: italic;
+      }
+
+      /* === ACTION PANEL === */
+      .action-panel {
+        grid-area: actions;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 0 0;
+      }
+
+      .btn {
+        font-family: "DM Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        padding: 12px 40px;
+        border: none;
+        border-radius: 100px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .btn-play {
+        background: var(--accent);
+        color: white;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+      }
+
+      .btn-play:hover {
+        background: #1d4ed8;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+        transform: translateY(-1px);
+      }
+
+      .btn-play:disabled {
+        background: var(--border);
+        color: var(--text-tertiary);
+        box-shadow: none;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn-pass {
+        background: transparent;
+        color: var(--text-secondary);
+        border: 2px solid var(--border);
+      }
+
+      .btn-pass:hover {
+        border-color: var(--text-secondary);
+        color: var(--text);
+      }
+
+      /* Scrollbar */
+      .log-entries::-webkit-scrollbar {
+        width: 4px;
+      }
+      .log-entries::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .log-entries::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-board">
+      <!-- Opponents -->
+      <div class="opponents">
+        <div class="opponent">
+          <div class="opponent-avatar">B</div>
+          <div class="opponent-info">
+            <span class="opponent-name">Bob</span>
+            <span class="opponent-count">9 cards remaining</span>
+          </div>
+          <div class="opponent-cards-mini">
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+          </div>
+        </div>
+
+        <div class="opponent active">
+          <div class="opponent-avatar">C</div>
+          <div class="opponent-info">
+            <span class="opponent-name">Charlie</span>
+            <span class="opponent-count">11 cards remaining</span>
+          </div>
+          <div class="opponent-cards-mini">
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+          </div>
+        </div>
+
+        <div class="opponent">
+          <div class="opponent-avatar">D</div>
+          <div class="opponent-info">
+            <span class="opponent-name">Dave</span>
+            <span class="opponent-count">8 cards remaining</span>
+          </div>
+          <div class="opponent-cards-mini">
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+            <div class="mini-card"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center -->
+      <div class="table-center">
+        <div class="center-area">
+          <span class="last-play-label">Last Play</span>
+          <div class="last-play-cards">
+            <div class="card black">
+              <span class="rank">7</span>
+              <span class="suit-symbol">&spades;</span>
+            </div>
+            <div class="card red">
+              <span class="rank">7</span>
+              <span class="suit-symbol">&hearts;</span>
+            </div>
+          </div>
+          <span class="last-play-info"><strong>Bob</strong> played a Pair</span>
+        </div>
+
+        <div class="turn-banner">
+          <span class="label">Your Turn</span>
+          <span class="timer">0:42</span>
+        </div>
+      </div>
+
+      <!-- Hand -->
+      <div class="hand-area">
+        <span class="hand-label">Your Hand (13 cards)</span>
+        <div class="hand-cards">
+          <div class="card black">
+            <span class="rank">3</span><span class="suit-symbol">&clubs;</span>
+          </div>
+          <div class="card red">
+            <span class="rank">4</span><span class="suit-symbol">&diams;</span>
+          </div>
+          <div class="card red">
+            <span class="rank">5</span><span class="suit-symbol">&hearts;</span>
+          </div>
+          <div class="card black selected">
+            <span class="rank">5</span><span class="suit-symbol">&spades;</span>
+          </div>
+          <div class="card red selected">
+            <span class="rank">5</span><span class="suit-symbol">&diams;</span>
+          </div>
+          <div class="card red">
+            <span class="rank">7</span><span class="suit-symbol">&diams;</span>
+          </div>
+          <div class="card black">
+            <span class="rank">9</span><span class="suit-symbol">&clubs;</span>
+          </div>
+          <div class="card red">
+            <span class="rank">J</span><span class="suit-symbol">&hearts;</span>
+          </div>
+          <div class="card black">
+            <span class="rank">Q</span><span class="suit-symbol">&spades;</span>
+          </div>
+          <div class="card red">
+            <span class="rank">K</span><span class="suit-symbol">&diams;</span>
+          </div>
+          <div class="card black">
+            <span class="rank">K</span><span class="suit-symbol">&spades;</span>
+          </div>
+          <div class="card black">
+            <span class="rank">A</span><span class="suit-symbol">&clubs;</span>
+          </div>
+          <div class="card black">
+            <span class="rank">2</span><span class="suit-symbol">&spades;</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="game-log">
+        <div class="log-title">History</div>
+        <div class="log-entries">
+          <div class="log-entry">
+            <span class="player-name">Alice</span> played
+            <span class="cards-played">Straight 3-7</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Bob</span> played
+            <span class="cards-played">Pair 7&spades; 7&hearts;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Charlie</span>
+            <span class="pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Dave</span>
+            <span class="pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Alice</span> played
+            <span class="cards-played">9&diams;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Bob</span> played
+            <span class="cards-played">J&clubs;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Charlie</span> played
+            <span class="cards-played">K&hearts;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Dave</span>
+            <span class="pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Alice</span>
+            <span class="pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Bob</span> played
+            <span class="cards-played">Pair 7&spades; 7&hearts;</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Charlie</span>
+            <span class="pass">passed</span>
+          </div>
+          <div class="log-entry">
+            <span class="player-name">Dave</span>
+            <span class="pass">passed</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="action-panel">
+        <button class="btn btn-play">Play Selected</button>
+        <button class="btn btn-pass">Pass</button>
+      </div>
+    </div>
+
+    <script>
+      document.querySelectorAll(".hand-cards .card").forEach((card) => {
+        card.addEventListener("click", () => {
+          card.classList.toggle("selected");
+          updatePlayButton();
+        });
+      });
+
+      function updatePlayButton() {
+        const selected = document.querySelectorAll(
+          ".hand-cards .card.selected",
+        );
+        const playBtn = document.querySelector(".btn-play");
+        playBtn.disabled = selected.length === 0 || selected.length > 5;
+      }
+
+      updatePlayButton();
+    </script>
+  </body>
+</html>
