@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import { axiosInstance } from "@/main";
+import { axiosInstance } from "@/service/http";
 import { createGuestSession } from "@/service/guestService";
 import type { JoinGameRequest, JoinGameResponse } from "@shared/model";
 
@@ -53,7 +53,7 @@ async function joinGame() {
 </script>
 
 <template>
-  <div class="guest-entry">
+  <div class="guest-entry" data-testid="guest-entry">
     <h2>Join as Guest</h2>
     <form @submit.prevent="joinGame">
       <div>
@@ -66,10 +66,16 @@ async function joinGame() {
           required
           placeholder="Enter your name"
           :disabled="loading"
+          data-testid="guest-name-input"
         />
       </div>
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-      <button type="submit" :disabled="loading" class="btn-primary">
+      <button
+        type="submit"
+        :disabled="loading"
+        class="btn-primary"
+        data-testid="guest-join-button"
+      >
         {{ loading ? "Joining..." : "Join Game" }}
       </button>
     </form>

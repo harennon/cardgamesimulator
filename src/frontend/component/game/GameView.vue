@@ -46,7 +46,7 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { PlayerInfo } from "@shared/engine-types";
-import { axiosInstance } from "@/main";
+import { axiosInstance } from "@/service/http";
 import type { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
 import type { AxiosResponse } from "axios";
 import { useSocket } from "@/composables/useSocket";

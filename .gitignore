@@ -12,3 +12,10 @@ node_modules/
 
 # Supabase local stack temp files
 supabase/.temp/
+
+# Playwright auth state (contains session tokens — never commit)
+e2e/.auth/
+
+# Playwright output (report + traces)
+playwright-report/
+test-results/

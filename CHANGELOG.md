@@ -10,6 +10,17 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- `playwright.config.ts` — E2E test infrastructure (LLD 6.6): Playwright config targeting Chromium with `webServer` auto-start for backend (`node build/backend/index.js`) and Vite dev server; serial execution (`workers: 1`) for multiplayer test isolation; global setup project for auth fixture creation
+- `e2e/global-setup.ts` — Creates 4 test users via Supabase admin SDK, signs them in programmatically, writes session tokens to `e2e/.auth/playerN.json` storage state files (no browser opened during setup)
+- `e2e/helpers/game-helpers.ts` — Page interaction helpers: `createGame`, `joinAsGuest`, `joinAsRegistered`, `waitForGameBoard`
+- `e2e/helpers/wait-for-app.ts` — Health check polling utility that polls `/echo` until backend is ready
+- `e2e/example.spec.ts` — Smoke tests: authenticated home page load and guest entry screen render
+- `vite.config.js` — Added `server.proxy` for `/api` and `/socket.io` routing to backend on port 3000 (replaces nginx for E2E runs)
+- `package.json` — Added `test:e2e`, `test:e2e:ui`, and `test:e2e:debug` scripts
+- `.gitignore` — Added `e2e/.auth/` to prevent session token files from being committed
+- `.github/workflows/ci.yml` — Added `e2e-tests` job: starts Supabase, exports env vars, installs Chromium, builds, runs Playwright
+- `data-testid` attributes added to 17 elements across 7 frontend components: `LoginView.vue` (email-input, password-input, login-button), `HomeView.vue` (create-game-link, join-game-link, welcome-message), `CreateGameView.vue` (game-type-select, max-players-input, submit-create-game), `GuestEntryView.vue` (guest-entry, guest-name-input, guest-join-button), `GameLobbyView.vue` (game-lobby, start-game-button, copy-invite-button), `GameBoard.vue` (game-board), `GameOverView.vue` (game-over)
+
 - `tests/integration/` — Integration test suite (LLD 6.5): 13 tests covering auth JWT verification, game CRUD REST flows, and full WebSocket game play. Boots a real server against local Supabase; exercises ES256 JWT verification end-to-end
 - `tests/integration/helpers/supabaseUser.ts` — creates real Supabase users and returns ES256 JWTs via GoTrue signUp flow
 - `tests/integration/helpers/testServer.ts` — boots a fully-wired Express + Socket.IO server on an ephemeral port; waits for JWKS key to be cached before returning

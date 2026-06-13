@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { axiosInstance } from "@/main";
+import { axiosInstance } from "@/service/http";
 import type {
   CreateGuestSessionRequest,
   CreateGuestSessionResponse,

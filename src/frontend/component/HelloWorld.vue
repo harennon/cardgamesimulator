@@ -2,7 +2,7 @@
 import { ref } from "vue";
 
 import { EchoRequest, EchoResponse } from "@shared/model";
-import { axiosInstance } from "@/main";
+import { axiosInstance } from "@/service/http";
 
 const echo = ref("");
 const echoResponse = ref("");
