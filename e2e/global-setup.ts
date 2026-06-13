@@ -47,13 +47,22 @@ setup("create test users and save auth state", async () => {
   for (let i = 0; i < TEST_USERS.length; i++) {
     const user = TEST_USERS[i]!;
 
-    // Create user via admin API (idempotent — ignores "already registered" errors)
-    await adminClient.auth.admin.createUser({
+    // Create user via admin API (idempotent — ignores "already exists" errors)
+    const { error: createError } = await adminClient.auth.admin.createUser({
       email: user.email,
       password: user.password,
-      email_confirm: true, // Skip email confirmation
+      email_confirm: true,
       user_metadata: { display_name: user.name },
     });
+
+    if (
+      createError &&
+      !createError.message.includes("already been registered")
+    ) {
+      throw new Error(
+        `Failed to create test user ${user.email}: ${createError.message}`,
+      );
+    }
 
     // Sign in to get session tokens
     const { data, error } = await anonClient.auth.signInWithPassword({
