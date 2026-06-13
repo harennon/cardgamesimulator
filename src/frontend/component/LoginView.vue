@@ -71,13 +71,24 @@ form {
     <form @submit.prevent="sendLogin">
       <div>
         <label for="email">Email:</label>
-        <input id="email" type="email" required v-model="email" />
+        <input
+          id="email"
+          type="email"
+          required
+          v-model="email"
+          data-testid="email-input"
+        />
       </div>
       <div>
         <label for="password">Password:</label>
-        <input type="password" required v-model="password" />
+        <input
+          type="password"
+          required
+          v-model="password"
+          data-testid="password-input"
+        />
       </div>
-      <button type="submit">Login</button>
+      <button type="submit" data-testid="login-button">Login</button>
     </form>
     <p id="errorMessage" v-if="attemptedLogin">{{ errorMessage }}</p>
     <p>New user? <router-link to="/signup">Register Now</router-link></p>

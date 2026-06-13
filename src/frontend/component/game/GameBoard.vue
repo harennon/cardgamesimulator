@@ -1,5 +1,5 @@
 <template>
-  <div class="game-board">
+  <div class="game-board" data-testid="game-board">
     <div class="game-board__opponents">
       <OpponentRow
         :players="gameState.players"

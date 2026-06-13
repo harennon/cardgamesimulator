@@ -1,5 +1,5 @@
 <template>
-  <div class="game-over">
+  <div class="game-over" data-testid="game-over">
     <div class="game-over__panel">
       <h1 class="game-over__winner">{{ winner }} wins!</h1>
 

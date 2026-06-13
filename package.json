@@ -19,6 +19,9 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:all": "npm test && npm run test:integration",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
+    "test:e2e:debug": "npx playwright test --debug",
     "lint:check": "eslint src --ext ts --ext vue",
     "lint:fix": "eslint --fix src --ext ts --ext vue",
     "postinstall": "git config core.hooksPath .githooks"
@@ -35,6 +38,7 @@
   "homepage": "https://github.com/harennon/cardgamesimulator#readme",
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@playwright/test": "^1.60.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.9",

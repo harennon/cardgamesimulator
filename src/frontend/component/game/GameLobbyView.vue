@@ -1,5 +1,5 @@
 <template>
-  <div class="lobby">
+  <div class="lobby" data-testid="game-lobby">
     <div class="lobby__panel">
       <h2 class="lobby__title">Game Lobby</h2>
 
@@ -28,6 +28,7 @@
           class="lobby__btn lobby__btn--start"
           :disabled="!canStart || actionPending"
           @click="onStart"
+          data-testid="start-game-button"
         >
           Start Game
         </button>
@@ -35,7 +36,11 @@
       </div>
 
       <div class="lobby__invite">
-        <button class="lobby__btn lobby__btn--copy" @click="copyInviteLink">
+        <button
+          class="lobby__btn lobby__btn--copy"
+          @click="copyInviteLink"
+          data-testid="copy-invite-button"
+        >
           Copy Invite Link
         </button>
         <span v-if="copied" class="lobby__copied">Copied!</span>

@@ -33,7 +33,7 @@ form {
 </style>
 
 <script setup lang="ts">
-import { axiosInstance } from "@/main";
+import { axiosInstance } from "@/service/http";
 import { JoinGameRequest, JoinGameResponse } from "@shared/model";
 import { ref } from "vue";
 import { useRouter } from "vue-router";

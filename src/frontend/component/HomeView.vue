@@ -1,11 +1,15 @@
 <template>
   <h2>This is the Homepage</h2>
   <br />
-  <p v-if="signedIn">Welcome {{ user }}</p>
+  <p v-if="signedIn" data-testid="welcome-message">Welcome {{ user }}</p>
   <nav v-if="signedIn">
-    <router-link to="/create-game">Create Game</router-link>
+    <router-link to="/create-game" data-testid="create-game-link"
+      >Create Game</router-link
+    >
     <router-link to="/load-game">Load Game</router-link>
-    <router-link to="/join-game">Join Game</router-link>
+    <router-link to="/join-game" data-testid="join-game-link"
+      >Join Game</router-link
+    >
   </nav>
   <p v-else>Please <router-link to="/login">log in</router-link></p>
 </template>

@@ -3,7 +3,12 @@
   <form @submit.prevent="createGame">
     <div>
       <label for="game-type">Game Type:</label>
-      <select v-model="gameType" id="game-type" required>
+      <select
+        v-model="gameType"
+        id="game-type"
+        required
+        data-testid="game-type-select"
+      >
         <option disabled selected value>Please select game type</option>
         <option value="big2">Big 2</option>
         <option value="tonk">Tonk</option>
@@ -19,6 +24,7 @@
         min="2"
         :max="gameType === 'big2' ? 4 : 10"
         step="1"
+        data-testid="max-players-input"
       />
     </div>
 
@@ -34,7 +40,7 @@
       />
     </div>
 
-    <input type="submit" />
+    <input type="submit" data-testid="submit-create-game" />
   </form>
 </template>
 
@@ -58,7 +64,7 @@ form {
 </style>
 
 <script setup lang="ts">
-import { axiosInstance } from "@/main";
+import { axiosInstance } from "@/service/http";
 import { CreateGameRequest, CreateGameResponse, GameType } from "@shared/model";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
