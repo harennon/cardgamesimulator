@@ -17,7 +17,8 @@ Phase 2: Core Game
   └── LLD 5: Guest Access (depends on: Supabase Migration for auth model)
 
 Phase 3: Frontend
-  └── LLD 6: Frontend Game UI (depends on: WebSocket Layer, Big2 Engine, Guest Access)
+  ├── LLD 6: Frontend Game UI (depends on: WebSocket Layer, Big2 Engine, Guest Access)
+  └── LLD 6.5: Integration Test Suite (depends on: all of Phase 1-3)
 
 Phase 4: Online Features
   ├── LLD 7: Turn Timer + Stats (depends on: Big2 Engine)
@@ -152,6 +153,22 @@ The game UI. After this phase, Big2 is playable in the browser.
 
 ---
 
+### LLD 6.5: Integration Test Suite
+
+**Scope:** Backend integration tests that verify cross-layer behavior against real Supabase.
+
+- Vitest + supertest + socket.io-client test infrastructure
+- Docker Compose test environment (backend + Supabase, no frontend)
+- Test helpers: Supabase user creation, JWT retrieval, authenticated socket connections
+- Critical flow tests: auth (ES256 JWT), game CRUD, WebSocket game play, guest flow
+- GitHub Actions workflow (boots Supabase, runs integration tests)
+- Convention for Phase 4+ LLDs to add integration tests
+
+**Depends on:** All of Phase 1-3 (needs working auth, engine, WebSocket, and guest access)
+**Outputs:** ~13 integration tests catching cross-layer bugs, CI pipeline running them on every PR
+
+---
+
 ## Phase 4: Online Features
 
 Features that make it a full multiplayer experience.
@@ -227,13 +244,13 @@ A `docs/ux-polish.md` can be written when this phase begins.
 
 ## Summary
 
-| Phase              | LLDs    | Key Milestone                                                |
-| ------------------ | ------- | ------------------------------------------------------------ |
-| 1. Foundation      | 1, 2, 3 | Auth, DB, WebSocket, engine interface — infrastructure ready |
-| 2. Core Game       | 4, 5    | Big2 playable via WebSocket, guests can join                 |
-| 3. Frontend        | 6       | Big2 playable in browser                                     |
-| 4. Online Features | 7, 8    | Timer, stats, spectating, reconnection                       |
-| 5. Polish          | —       | Animations, mobile, UX improvements                          |
-| 6. Deployment      | 9       | Live online                                                  |
+| Phase              | LLDs      | Key Milestone                                                |
+| ------------------ | --------- | ------------------------------------------------------------ |
+| 1. Foundation      | 1, 2, 3   | Auth, DB, WebSocket, engine interface — infrastructure ready |
+| 2. Core Game       | 4, 5      | Big2 playable via WebSocket, guests can join                 |
+| 3. Frontend        | 6, 6.5    | Big2 playable in browser + integration test safety net       |
+| 4. Online Features | 7, 8      | Timer, stats, spectating, reconnection                       |
+| 5. Polish          | —         | Animations, mobile, UX improvements                          |
+| 6. Deployment      | 9         | Live online                                                  |
 
-**Total: 9 LLDs, 6 phases.** Each LLD is written just before implementation (not all upfront). Phases are sequential but deployment can be pulled forward once Phase 1 is done.
+**Total: 10 LLDs, 6 phases.** Each LLD is written just before implementation (not all upfront). Phases are sequential but deployment can be pulled forward once Phase 1 is done.
