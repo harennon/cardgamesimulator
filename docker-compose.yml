@@ -6,6 +6,8 @@ services:
       dockerfile: ./src/frontend/Dockerfile
     depends_on:
       - backend
+    environment:
+      - BACKEND_PORT=3000
     ports:
       - "80:80"
     networks:
@@ -22,8 +24,9 @@ services:
       - "3000:3000"
     networks:
       - app
-    # Note: backend connects to Supabase Postgres via DB_HOST env var
-    # For local: host.docker.internal or the Supabase container network
+      - supabase_network_cardgamesimulator
 
 networks:
   app:
+  supabase_network_cardgamesimulator:
+    external: true

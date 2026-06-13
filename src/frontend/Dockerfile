@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 
 # install dependencies first
 COPY ["package.json", "package-lock.json", "./"]
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # build project
 COPY . .
