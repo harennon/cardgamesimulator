@@ -5,6 +5,7 @@
       <label for="game-type">Game Type:</label>
       <select v-model="gameType" id="game-type" required>
         <option disabled selected value>Please select game type</option>
+        <option value="big2">Big 2</option>
         <option value="tonk">Tonk</option>
       </select>
     </div>
@@ -16,7 +17,7 @@
         type="range"
         id="max-players"
         min="2"
-        max="10"
+        :max="gameType === 'big2' ? 4 : 10"
         step="1"
       />
     </div>
