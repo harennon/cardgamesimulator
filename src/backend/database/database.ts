@@ -9,6 +9,7 @@ export interface GameRepository {
     creatorId: string,
     maxPlayers: number,
     creatorDisplayName: string,
+    turnTimerSeconds: number | null,
   ): Promise<Game>;
   getGame(gameId: string): Promise<Game | null>;
   saveGame(game: Game): Promise<Game>; // throws OptimisticLockVersionMismatchError on version conflict
@@ -16,7 +17,18 @@ export interface GameRepository {
 // Note: `createGame` takes gameId as a parameter (caller generates UUID via `crypto.randomUUID()`).
 // This allows the REST handler to generate the ID and use it for in-memory cache registration (LLD 2) in the same call.
 
+export interface StatsDelta {
+  gamesPlayed: number; // always 1
+  gamesWon: number; // 1 or 0
+  gamesLost: number; // 1 or 0
+  totalScore: number; // placement score from the game
+}
+
 export interface PlayerStatsRepository {
   getStats(userId: string): Promise<PlayerStats | null>;
-  upsertStats(stats: PlayerStats): Promise<PlayerStats>;
+  /**
+   * Atomically increment stats for a player. Creates the row if it doesn't exist.
+   * Uses SQL ON CONFLICT DO UPDATE to avoid read-modify-write races.
+   */
+  incrementStats(userId: string, delta: StatsDelta): Promise<void>;
 }

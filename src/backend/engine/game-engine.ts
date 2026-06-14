@@ -100,6 +100,17 @@ export interface GameEngine {
   isGameOver(state: InternalGameState): boolean;
 
   /**
+   * Determine the automatic action to take when the turn timer expires.
+   *
+   * Contract:
+   * - Returns a valid GameAction for the current player
+   * - For Big2: returns "pass" when passing is legal, otherwise plays the lowest valid card(s)
+   * - Returns null if the game is not in a state where auto-action applies (completed, not started)
+   * - Pure derivation — must not modify state
+   */
+  getAutoTimeoutAction(state: InternalGameState): GameAction | null;
+
+  /**
    * Derive the spectator view from current state.
    *
    * Contract:

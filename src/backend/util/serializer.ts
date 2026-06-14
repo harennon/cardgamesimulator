@@ -13,5 +13,6 @@ export function serializeGameForPlayer(
     playerIds: game.playerIds,
     playerDisplayNames: game.playerDisplayNames,
     state: game.state as SerializableGameState,
+    turnTimerSeconds: game.turnTimerSeconds,
   };
 }

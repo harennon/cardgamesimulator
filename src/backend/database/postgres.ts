@@ -1,6 +1,10 @@
 import { DataSource } from "typeorm";
 
-import { GameRepository, PlayerStatsRepository } from "@/database/database";
+import {
+  GameRepository,
+  PlayerStatsRepository,
+  StatsDelta,
+} from "@/database/database";
 import { Game } from "@/database/entities/Game";
 import type { GameType } from "@shared/engine-types";
 import { PlayerStats } from "@/database/entities/PlayerStats";
@@ -33,6 +37,7 @@ export class PostgresDB implements GameRepository, PlayerStatsRepository {
     creatorId: string,
     maxPlayers: number,
     creatorDisplayName: string,
+    turnTimerSeconds: number | null,
   ): Promise<Game> {
     const game = new Game();
     game.gameId = gameId;
@@ -41,6 +46,7 @@ export class PostgresDB implements GameRepository, PlayerStatsRepository {
     game.playerDisplayNames = { [creatorId]: creatorDisplayName };
     game.maxPlayers = maxPlayers;
     game.status = "CREATED";
+    game.turnTimerSeconds = turnTimerSeconds;
     return this.dataSource!.getRepository(Game).save(game);
   }
 
@@ -62,7 +68,26 @@ export class PostgresDB implements GameRepository, PlayerStatsRepository {
     return this.dataSource!.getRepository(PlayerStats).findOneBy({ userId });
   }
 
-  public async upsertStats(stats: PlayerStats): Promise<PlayerStats> {
-    return this.dataSource!.getRepository(PlayerStats).save(stats);
+  public async incrementStats(
+    userId: string,
+    delta: StatsDelta,
+  ): Promise<void> {
+    await this.dataSource!.query(
+      `INSERT INTO player_stats ("userId", "gamesPlayed", "gamesWon", "gamesLost", "totalScore", "lastPlayedAt")
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT ("userId") DO UPDATE SET
+         "gamesPlayed" = player_stats."gamesPlayed" + $2,
+         "gamesWon" = player_stats."gamesWon" + $3,
+         "gamesLost" = player_stats."gamesLost" + $4,
+         "totalScore" = player_stats."totalScore" + $5,
+         "lastPlayedAt" = NOW()`,
+      [
+        userId,
+        delta.gamesPlayed,
+        delta.gamesWon,
+        delta.gamesLost,
+        delta.totalScore,
+      ],
+    );
   }
 }

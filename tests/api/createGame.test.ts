@@ -23,13 +23,15 @@ const mockCreateGame =
       creatorId: string,
       maxPlayers: number,
       creatorDisplayName: string,
+      turnTimerSeconds: number | null,
     ) => Promise<Game>
   >();
 
 vi.mock("@/database", () => ({
   gameRepo: {
-    createGame: (...args: [string, string, string, number, string]) =>
-      mockCreateGame(...args),
+    createGame: (
+      ...args: [string, string, string, number, string, number | null]
+    ) => mockCreateGame(...args),
   },
 }));
 

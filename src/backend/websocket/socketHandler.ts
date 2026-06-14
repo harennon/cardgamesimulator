@@ -11,7 +11,9 @@ import type {
   GameStartPayload,
   GameStartResponse,
   GameLeavePayload,
+  TimerExpiredPayload,
 } from "@shared/socket-events";
+import type { TurnTimerService } from "@/timer/turnTimerService";
 
 function injectConnectionStatus<
   T extends { players: readonly PlayerPublicInfo[] },
@@ -28,6 +30,7 @@ async function broadcastGameState(
   gameId: string,
   gameService: GameService,
   connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
 ): Promise<void> {
   const state = await gameService.getGameState(gameId);
   if (!state) return;
@@ -35,20 +38,21 @@ async function broadcastGameState(
   const engine = engineFactory.getEngine(state.gameType);
   const playerSockets = connectionManager.getPlayerSockets(gameId);
   const spectatorCount = connectionManager.getSpectatorCount(gameId);
+  const turnDeadline = turnTimerService.getDeadline(gameId);
 
   for (const { playerId, socket } of playerSockets) {
     const view = engine.getPlayerView(state, playerId);
-    socket.emit(
-      "game:state",
-      injectConnectionStatus(view, gameId, connectionManager),
-    );
+    socket.emit("game:state", {
+      ...injectConnectionStatus(view, gameId, connectionManager),
+      turnDeadline,
+    });
   }
 
   const spectatorView = engine.getSpectatorView(state, spectatorCount);
-  io.to(`spectators:${gameId}`).emit(
-    "game:spectatorState",
-    injectConnectionStatus(spectatorView, gameId, connectionManager),
-  );
+  io.to(`spectators:${gameId}`).emit("game:spectatorState", {
+    ...injectConnectionStatus(spectatorView, gameId, connectionManager),
+    turnDeadline,
+  });
 }
 
 async function handleGameJoin(
@@ -58,6 +62,7 @@ async function handleGameJoin(
   ack: (response: GameJoinResponse) => void,
   gameService: GameService,
   connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
 ): Promise<void> {
   const { gameId, role } = payload;
   const { userId, displayName } = socket.data;
@@ -100,10 +105,11 @@ async function handleGameJoin(
       // IN_PROGRESS or COMPLETED: send current game state
       const view = await gameService.getPlayerView(gameId, userId);
       if (view) {
-        socket.emit(
-          "game:state",
-          injectConnectionStatus(view, gameId, connectionManager),
-        );
+        const turnDeadline = turnTimerService.getDeadline(gameId);
+        socket.emit("game:state", {
+          ...injectConnectionStatus(view, gameId, connectionManager),
+          turnDeadline,
+        });
       }
 
       if (game.status === "IN_PROGRESS") {
@@ -133,10 +139,11 @@ async function handleGameJoin(
         spectatorCount,
       );
       if (spectatorView) {
-        socket.emit(
-          "game:spectatorState",
-          injectConnectionStatus(spectatorView, gameId, connectionManager),
-        );
+        const turnDeadline = turnTimerService.getDeadline(gameId);
+        socket.emit("game:spectatorState", {
+          ...injectConnectionStatus(spectatorView, gameId, connectionManager),
+          turnDeadline,
+        });
       }
     }
 
@@ -151,6 +158,7 @@ async function handleGameStart(
   ack: (response: GameStartResponse) => void,
   gameService: GameService,
   connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
 ): Promise<void> {
   const { gameId } = payload;
   const { userId } = socket.data;
@@ -163,11 +171,26 @@ async function handleGameStart(
   try {
     await gameService.startGame(gameId, userId);
 
+    // Register and start timer after game starts
+    const game = await gameService.getGame(gameId);
+    if (game?.turnTimerSeconds != null) {
+      turnTimerService.registerGame(gameId, {
+        turnTimerSeconds: game.turnTimerSeconds,
+      });
+      turnTimerService.startTurn(gameId, true);
+    }
+
     // Broadcast game:started to all players in the room
     io.to(`game:${gameId}`).emit("game:started");
 
     // Then broadcast each player's individual state
-    await broadcastGameState(io, gameId, gameService, connectionManager);
+    await broadcastGameState(
+      io,
+      gameId,
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
 
     ack({ success: true });
   } catch (err: unknown) {
@@ -183,6 +206,7 @@ async function handleGameAction(
   ack: (response: GameActionResponse) => void,
   gameService: GameService,
   connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
 ): Promise<void> {
   const { gameId, action } = payload;
   const { userId } = socket.data;
@@ -197,7 +221,21 @@ async function handleGameAction(
 
   try {
     await gameService.applyAction(gameId, safeAction);
-    await broadcastGameState(io, gameId, gameService, connectionManager);
+
+    const newState = await gameService.getGameState(gameId);
+    if (newState?.status === "COMPLETED") {
+      turnTimerService.unregisterGame(gameId);
+    } else if (turnTimerService.hasTimer(gameId)) {
+      turnTimerService.startTurn(gameId, false);
+    }
+
+    await broadcastGameState(
+      io,
+      gameId,
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
     ack({ success: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "INVALID_ACTION";
@@ -267,10 +305,57 @@ async function handleDisconnect(
   }
 }
 
+export async function handleTimerExpired(
+  io: TypedServer,
+  gameId: string,
+  gameService: GameService,
+  connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
+): Promise<void> {
+  const state = await gameService.getGameState(gameId);
+  if (!state || state.status !== "IN_PROGRESS") return;
+
+  const engine = engineFactory.getEngine(state.gameType);
+  const autoAction = engine.getAutoTimeoutAction(state);
+  if (!autoAction) return;
+
+  try {
+    await gameService.applyAction(gameId, autoAction);
+  } catch (err: unknown) {
+    // If applyAction throws (e.g., concurrent player action already advanced the turn),
+    // return silently. The concurrent action's handler already restarted the timer.
+    console.warn("Timer auto-action failed (likely concurrent action):", err);
+    return;
+  }
+
+  const timerExpiredPayload: TimerExpiredPayload = {
+    gameId,
+    playerId: autoAction.playerId,
+    action: autoAction.type as "pass" | "playCards",
+  };
+  io.to(`game:${gameId}`).emit("game:timerExpired", timerExpiredPayload);
+
+  const newState = await gameService.getGameState(gameId);
+  if (newState?.status === "COMPLETED") {
+    turnTimerService.unregisterGame(gameId);
+  } else {
+    turnTimerService.startTurn(gameId, false);
+  }
+
+  await broadcastGameState(
+    io,
+    gameId,
+    gameService,
+    connectionManager,
+    turnTimerService,
+  );
+}
+
 export function registerSocketHandlers(
   io: TypedServer,
   gameService: GameService,
   connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
 ): void {
   io.on("connection", (socket) => {
     socket.on("game:join", (payload, ack) => {
@@ -281,6 +366,7 @@ export function registerSocketHandlers(
         ack,
         gameService,
         connectionManager,
+        turnTimerService,
       ).catch((err: unknown) => {
         console.error("game:join error", err);
         ack({ success: false, error: "INTERNAL_ERROR" });
@@ -295,6 +381,7 @@ export function registerSocketHandlers(
         ack,
         gameService,
         connectionManager,
+        turnTimerService,
       ).catch((err: unknown) => {
         console.error("game:start error", err);
         ack({ success: false, error: "INTERNAL_ERROR" });
@@ -309,9 +396,10 @@ export function registerSocketHandlers(
         ack,
         gameService,
         connectionManager,
+        turnTimerService,
       ).catch((err: unknown) => {
         console.error("game:action error", err);
-        ack({ success: false, error: "INTERNAL_ERROR" });
+        ack({ success: false, error: "INVALID_ACTION" });
       });
     });
 
