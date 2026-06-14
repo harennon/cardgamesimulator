@@ -1,56 +1,112 @@
-<template>
-  <h2>This is the Homepage</h2>
-  <br />
-  <p v-if="signedIn" data-testid="welcome-message">Welcome {{ user }}</p>
-  <nav v-if="signedIn">
-    <router-link to="/create-game" data-testid="create-game-link"
-      >Create Game</router-link
-    >
-    <router-link to="/load-game">Load Game</router-link>
-    <router-link to="/join-game" data-testid="join-game-link"
-      >Join Game</router-link
-    >
-  </nav>
-  <p v-else>Please <router-link to="/login">log in</router-link></p>
-</template>
-
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { getSession } from "@/service/authService";
 
 const signedIn = ref(false);
-const user = ref("");
+const displayName = ref("");
 
 onMounted(async () => {
   const session = await getSession();
   if (session) {
     signedIn.value = true;
-    user.value =
+    displayName.value =
       session.user.user_metadata?.display_name ?? session.user.email ?? "";
   }
 });
 </script>
 
-<style lang="css" scoped>
-nav {
-  margin: 0;
+<template>
+  <div class="flow-page">
+    <div class="home">
+      <h1 class="home__title" data-testid="home-title">Card Game Simulator</h1>
+
+      <p v-if="signedIn" class="home__subtitle" data-testid="welcome-message">
+        Welcome back, {{ displayName }}
+      </p>
+
+      <div v-if="signedIn" class="home__actions">
+        <router-link
+          to="/create-game"
+          class="btn-primary home__btn"
+          data-testid="create-game-link"
+        >
+          Create Game
+        </router-link>
+        <router-link
+          to="/join-game"
+          class="btn-secondary home__btn"
+          data-testid="join-game-link"
+        >
+          Join Game
+        </router-link>
+      </div>
+
+      <div v-else class="home__auth-prompt">
+        <p class="home__description">
+          Play Big2 with friends. Create an account to host games, or join via
+          an invite link as a guest.
+        </p>
+        <router-link to="/login" class="btn-primary home__btn">
+          Log In
+        </router-link>
+        <router-link to="/signup" class="btn-secondary home__btn">
+          Sign Up
+        </router-link>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.home {
+  text-align: center;
+  max-width: 500px;
+}
+
+.home__title {
+  font-family: var(--font-ui);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--gold-accent);
+  margin: 0 0 8px;
+}
+
+.home__subtitle {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin: 0 0 32px;
+}
+
+.home__description {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.home__actions {
   display: flex;
-  width: 50%;
-  justify-content: space-evenly;
-  align-items: stretch;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+}
 
-  & > a {
-    margin: 0 5%;
-    padding: 8px;
-    text-decoration: none;
-    color: #bbbac6;
-    background-color: #274472;
-    cursor: pointer;
+.home__btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}
 
-    &:hover,
-    &:focus {
-      background-color: #6e7e85;
-    }
-  }
+.home__auth-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  max-width: 300px;
+  margin: 0 auto;
 }
 </style>

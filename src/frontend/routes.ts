@@ -4,7 +4,6 @@ import {
   RouteRecordSingleView,
 } from "vue-router";
 import CreateGameView from "@/component/CreateGameView.vue";
-import LoadGameView from "@/component/LoadGameView.vue";
 import JoinGameView from "@/component/JoinGameView.vue";
 import LoginView from "@/component/LoginView.vue";
 import SignupView from "@/component/SignupView.vue";
@@ -28,7 +27,6 @@ const routes: RouteRecordSingleView[] = [
     meta: { requiresAuth: true },
   },
   { path: "/join-game", component: JoinGameView, meta: { requiresAuth: true } },
-  { path: "/load-game", component: LoadGameView, meta: { requiresAuth: true } },
   {
     path: "/game/:gameId/join",
     component: GuestEntryView,

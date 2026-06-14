@@ -1,6 +1,39 @@
 import { type Page, expect } from "@playwright/test";
 
 /**
+ * Logs in via the login form UI. Use when testing the login flow itself.
+ * For tests that just need an authenticated session, use storageState instead.
+ */
+export async function loginViaUI(
+  page: Page,
+  email: string,
+  password: string,
+): Promise<void> {
+  await page.goto("/login");
+  await page.fill('[data-testid="email-input"]', email);
+  await page.fill('[data-testid="password-input"]', password);
+  await page.click('[data-testid="login-button"]');
+  await page.waitForURL("/");
+}
+
+/**
+ * Signs up via the signup form UI.
+ */
+export async function signupViaUI(
+  page: Page,
+  displayName: string,
+  email: string,
+  password: string,
+): Promise<void> {
+  await page.goto("/signup");
+  await page.fill('[data-testid="signup-display-name"]', displayName);
+  await page.fill('[data-testid="signup-email"]', email);
+  await page.fill('[data-testid="signup-password"]', password);
+  await page.click('[data-testid="signup-button"]');
+  await page.waitForURL("/");
+}
+
+/**
  * Creates a new game as the logged-in user and returns the game ID.
  */
 export async function createGame(

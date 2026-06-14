@@ -5,92 +5,84 @@ import { signIn } from "@/service/authService";
 
 const email = ref("");
 const password = ref("");
-
-const attemptedLogin = ref(false);
+const loading = ref(false);
 const errorMessage = ref("");
 const route = useRoute();
 const router = useRouter();
 
 async function sendLogin() {
-  signIn(email.value, password.value)
-    .then(() => {
-      // redirect to previous page
-      const redirectedFrom = route.query.redirect;
-      if (redirectedFrom !== undefined && typeof redirectedFrom === "string") {
-        console.log("Redirecting to previous page");
-        router.push(redirectedFrom);
-      } else {
-        // redirect to homepage otherwise
-        router.push("/");
-      }
-    })
-    .catch((error) => {
-      console.error(error);
-      if (error.response) {
-        errorMessage.value = `Failed to sign in because of error ${error.response.data}`;
-      } else {
-        errorMessage.value = `Failed to login`;
-      }
-    })
-    .finally(() => {
-      attemptedLogin.value = true;
-    });
+  loading.value = true;
+  errorMessage.value = "";
+  try {
+    await signIn(email.value, password.value);
+    const redirectedFrom = route.query.redirect;
+    if (redirectedFrom !== undefined && typeof redirectedFrom === "string") {
+      router.push(redirectedFrom);
+    } else {
+      router.push("/");
+    }
+  } catch (error: unknown) {
+    const e = error as { message?: string };
+    errorMessage.value = e.message ?? "Failed to log in.";
+  } finally {
+    loading.value = false;
+  }
 }
 </script>
 
-<style lang="css" scoped>
-#errorMessage {
-  color: red;
-}
-.login-screen {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-form {
-  display: block;
-  @media only screen and (min-width: 750px) {
-    width: 300px;
-  }
-
-  & > div {
-    margin: 10px 0;
-    display: flex;
-    justify-content: space-between;
-  }
-
-  label {
-    margin: 5px;
-  }
-}
-</style>
-
 <template>
-  <div class="login-screen">
-    <form @submit.prevent="sendLogin">
-      <div>
-        <label for="email">Email:</label>
+  <div class="flow-page">
+    <form class="form-card" @submit.prevent="sendLogin">
+      <h2 class="form-card__title">Log In</h2>
+
+      <div class="form-card__field">
+        <label class="form-card__label" for="email">Email</label>
         <input
+          class="form-card__input"
           id="email"
           type="email"
           required
           v-model="email"
           data-testid="email-input"
+          placeholder="you@example.com"
         />
       </div>
-      <div>
-        <label for="password">Password:</label>
+
+      <div class="form-card__field">
+        <label class="form-card__label" for="password">Password</label>
         <input
+          class="form-card__input"
+          id="password"
           type="password"
           required
           v-model="password"
           data-testid="password-input"
         />
       </div>
-      <button type="submit" data-testid="login-button">Login</button>
+
+      <p v-if="errorMessage" class="form-card__error" data-testid="login-error">
+        {{ errorMessage }}
+      </p>
+
+      <button
+        type="submit"
+        class="btn-primary"
+        :disabled="loading"
+        data-testid="login-button"
+      >
+        {{ loading ? "Signing in..." : "Log In" }}
+      </button>
+
+      <p class="form-card__footer">
+        New here?
+        <router-link to="/signup" data-testid="login-signup-link"
+          >Create an account</router-link
+        >
+      </p>
+      <p class="form-card__footer">
+        Just want to play?
+        <router-link to="/">Join as guest via invite link</router-link>
+      </p>
     </form>
-    <p id="errorMessage" v-if="attemptedLogin">{{ errorMessage }}</p>
-    <p>New user? <router-link to="/signup">Register Now</router-link></p>
   </div>
 </template>
