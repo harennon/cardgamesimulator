@@ -43,6 +43,8 @@ Multiplayer card game simulator — hosts preset card games (Big2 first, Tonk la
 
 Follow the workflow: **ceo → architect → design-reviewer → implementer → code-reviewer → qa**. Never do routable work inline.
 
+**Frontend UI workflow:** For any LLD that changes visual UI, the `frontend-architect` must produce HTML mockups (served on port 8090) for user review **before** the LLD is finalized. The user approves the visual direction first, then the LLD is written to match, then implementation follows. Do not skip the mockup step and go straight to LLD text specs.
+
 ## Commit Requirements
 
 Update `CHANGELOG.md` only for major milestones (LLD implementations, significant features). Not required for every commit.

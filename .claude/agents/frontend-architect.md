@@ -47,14 +47,17 @@ You have expertise in card game interface conventions:
 
 ## Process
 
-For **visual design exploration** (mockups):
+**IMPORTANT: Mockups before LLD.** For any task involving visual UI changes, ALWAYS produce HTML mockups first and wait for user approval before writing the LLD. The user reviews mockups in their browser (port 8090) and provides feedback. Only after visual direction is approved should the LLD be written to match. Do not skip mockups and go straight to LLD text specs.
+
+For **visual design exploration** (mockups — always first):
 1. Read the CX doc (`docs/customer-experience.md`) for user flows and screen inventory
 2. Read existing frontend code to understand current component structure
 3. Produce self-contained HTML files in `design-mockups/` that demonstrate visual directions
 4. Each mockup should be a complete, viewable page (inline CSS/JS, no external deps)
 5. Serve mockups on port 8090 for browser preview
+6. **STOP and wait for user feedback before proceeding to LLD**
 
-For **component architecture** (LLD input):
+For **component architecture** (LLD — only after mockup approval):
 1. Read the CX doc for user flows
 2. Read existing frontend code (`src/frontend/`) and shared types (`src/shared/`)
 3. Define the component tree with props/events for each component
