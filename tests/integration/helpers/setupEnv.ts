@@ -1,9 +1,13 @@
 /**
  * Vitest setupFile for integration tests.
  * Runs in each worker process before any test file is imported.
- * Sets env var defaults so module-level code in authMiddleware and socketAuth
- * can read SUPABASE_JWT_SECRET without throwing at import time.
+ * Loads .env from project root, then sets defaults for anything still missing.
  */
+import { config } from "dotenv";
+import { resolve } from "node:path";
+
+config({ path: resolve(__dirname, "../../../.env") });
+
 process.env.SUPABASE_URL ??= "http://localhost:54321";
 process.env.DB_HOST ??= "localhost";
 process.env.DB_PORT ??= "54322";
