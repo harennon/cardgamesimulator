@@ -141,8 +141,13 @@ onMounted(async () => {
     }));
 
     restStatus.value = game.status;
-  } catch {
-    joinError.value = "Game not found.";
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } }).response?.status;
+    if (status === 401) {
+      joinError.value = "Not authorized. Please log in or join as a guest.";
+    } else {
+      joinError.value = "Game not found.";
+    }
     return;
   }
 
