@@ -21,6 +21,9 @@ services:
     image: express-backend
     env_file:
       - .env
+    environment:
+      - SUPABASE_URL=http://supabase_kong_cardgamesimulator:8000
+      - DB_HOST=supabase_db_cardgamesimulator
     build:
       context: .
       dockerfile: ./src/backend/Dockerfile

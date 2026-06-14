@@ -12,6 +12,7 @@ export default defineConfig({
   plugins: [vue(), vueDevTools()],
   publicDir: false,
   root: "src/frontend",
+  envDir: resolve(__dirname, "."),
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src/frontend"),
@@ -28,6 +29,7 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:3000",
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
       },
       "/socket.io": {
         target: "http://localhost:3000",

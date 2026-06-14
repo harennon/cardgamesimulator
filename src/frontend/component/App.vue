@@ -1,48 +1,131 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { type Session } from "@supabase/supabase-js";
+import { getSession, signOut, supabase } from "@/service/authService";
+
+const router = useRouter();
+const route = useRoute();
+const isAuthenticated = ref(false);
+const displayName = ref("");
+
+const showNav = computed(() => !route.path.match(/^\/game\/[^/]+$/));
+
+onMounted(async () => {
+  const session = await getSession();
+  updateAuthState(session);
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    updateAuthState(session);
+  });
+});
+
+function updateAuthState(session: Session | null) {
+  isAuthenticated.value = !!session;
+  displayName.value =
+    session?.user?.user_metadata?.display_name ?? session?.user?.email ?? "";
+}
+
+async function logout() {
+  await signOut();
+  router.push("/login");
+}
+</script>
+
 <template>
-  <p><strong>Current route = </strong>{{ $route.fullPath }}</p>
-  <nav>
-    <router-link to="/">Home</router-link>
-    <router-link to="/about">About Us</router-link>
-    <router-link to="/non-existent-path">Broken Link</router-link>
-    <router-link to="/login" class="nav-right">Log in</router-link>
-    <router-link to="/signup">Sign up</router-link>
-  </nav>
-  <main class="main-container">
+  <div class="app-shell">
+    <nav v-if="showNav" class="app-nav" data-testid="app-nav">
+      <router-link to="/" class="app-nav__logo" data-testid="app-nav-logo">
+        Card Game Simulator
+      </router-link>
+      <div class="app-nav__links">
+        <template v-if="isAuthenticated">
+          <span class="app-nav__user" data-testid="app-nav-user">{{
+            displayName
+          }}</span>
+          <button
+            class="app-nav__logout"
+            @click="logout"
+            data-testid="logout-button"
+          >
+            Log out
+          </button>
+        </template>
+        <template v-else>
+          <router-link to="/login">Log in</router-link>
+          <router-link to="/signup">Sign up</router-link>
+        </template>
+      </div>
+    </nav>
     <router-view />
-  </main>
+  </div>
 </template>
+
 <style scoped>
-main {
-  margin: 0;
+.app-shell {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 10px;
-  padding: 10px;
-  background-color: #b7cece;
+  background: var(--bg-dark);
 }
-nav {
-  margin: 0;
+
+.app-nav {
   display: flex;
-  justify-content: left;
-  align-items: stretch;
-  background-color: #1c0f13;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: rgba(20, 12, 8, 0.95);
+  border-bottom: 1px solid var(--table-rim-light);
+}
 
-  & > a {
-    padding: 8px;
-    text-decoration: none;
-    color: #bbbac6;
-    cursor: pointer;
+.app-nav__logo {
+  font-family: var(--font-ui);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--gold-accent);
+  text-decoration: none;
+}
 
-    &:hover,
-    &:focus {
-      background-color: #6e7e85;
-    }
-  }
+.app-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 
-  & > .nav-right {
-    margin-left: auto;
-  }
+.app-nav__user {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.app-nav__logout {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1px solid var(--text-muted);
+  border-radius: 4px;
+  padding: 4px 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.app-nav__logout:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.app-nav__links a {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  padding: 4px 8px;
+}
+
+.app-nav__links a:hover {
+  color: var(--gold-accent);
 }
 </style>

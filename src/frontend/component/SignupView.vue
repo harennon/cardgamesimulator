@@ -12,13 +12,14 @@ import {
 const email = ref("");
 const password = ref("");
 const displayName = ref("");
-
-const attemptedLogin = ref(false);
+const loading = ref(false);
 const errorMessage = ref("");
 const router = useRouter();
 const route = useRoute();
 
 async function sendSignup() {
+  loading.value = true;
+  errorMessage.value = "";
   try {
     await signUp(email.value, password.value, displayName.value);
 
@@ -35,64 +36,82 @@ async function sendSignup() {
     const redirect = (route.query.redirect as string) || "/";
     router.push(redirect);
   } catch (error: unknown) {
-    const e = error as { response?: { data?: string } };
-    if (e.response) {
-      errorMessage.value = `Failed to sign up because of error ${e.response.data}`;
-    } else {
-      errorMessage.value = `Failed to sign up`;
-    }
+    const e = error as { message?: string; response?: { data?: string } };
+    errorMessage.value =
+      e.message ?? e.response?.data ?? "Failed to create account.";
   } finally {
-    attemptedLogin.value = true;
+    loading.value = false;
   }
 }
 </script>
 
-<style lang="css" scoped>
-#errorMessage {
-  color: red;
-}
-.login-screen {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-form {
-  display: block;
-  @media only screen and (min-width: 750px) {
-    width: 300px;
-  }
-
-  & > div {
-    margin: 10px 0;
-    display: flex;
-    justify-content: space-between;
-  }
-
-  label {
-    margin: 5px;
-  }
-}
-</style>
-
 <template>
-  <div class="login-screen">
-    <form @submit.prevent="sendSignup">
-      <div>
-        <label for="display-name">Display Name:</label>
-        <input id="display-name" type="text" required v-model="displayName" />
+  <div class="flow-page">
+    <form class="form-card" @submit.prevent="sendSignup">
+      <h2 class="form-card__title">Create Account</h2>
+
+      <div class="form-card__field">
+        <label class="form-card__label" for="display-name">Display Name</label>
+        <input
+          class="form-card__input"
+          id="display-name"
+          type="text"
+          required
+          v-model="displayName"
+          data-testid="signup-display-name"
+          maxlength="20"
+          placeholder="Your in-game name"
+        />
       </div>
-      <div>
-        <label for="email">Email:</label>
-        <input id="email" type="email" required v-model="email" />
+
+      <div class="form-card__field">
+        <label class="form-card__label" for="email">Email</label>
+        <input
+          class="form-card__input"
+          id="email"
+          type="email"
+          required
+          v-model="email"
+          data-testid="signup-email"
+          placeholder="you@example.com"
+        />
       </div>
-      <div>
-        <label for="password">Password:</label>
-        <input type="password" required v-model="password" />
+
+      <div class="form-card__field">
+        <label class="form-card__label" for="password">Password</label>
+        <input
+          class="form-card__input"
+          id="password"
+          type="password"
+          required
+          v-model="password"
+          data-testid="signup-password"
+          minlength="6"
+          placeholder="Min 6 characters"
+        />
       </div>
-      <button type="submit">Sign Up</button>
+
+      <p
+        v-if="errorMessage"
+        class="form-card__error"
+        data-testid="signup-error"
+      >
+        {{ errorMessage }}
+      </p>
+
+      <button
+        type="submit"
+        class="btn-primary"
+        :disabled="loading"
+        data-testid="signup-button"
+      >
+        {{ loading ? "Creating account..." : "Sign Up" }}
+      </button>
+
+      <p class="form-card__footer">
+        Already have an account?
+        <router-link to="/login">Log in</router-link>
+      </p>
     </form>
-    <p id="errorMessage" v-if="attemptedLogin">{{ errorMessage }}</p>
-    <p>Existing user? <router-link to="/login">Log in</router-link></p>
   </div>
 </template>

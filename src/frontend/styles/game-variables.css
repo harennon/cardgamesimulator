@@ -16,4 +16,36 @@
 
   --font-ui: "DM Sans", sans-serif;
   --font-card: "Libre Baskerville", serif;
+
+  /* Form & input tokens */
+  --input-bg: rgba(45, 24, 16, 0.5);
+  --input-border: var(--table-rim-light);
+  --input-border-focus: var(--gold-accent);
+  --input-text: var(--text-primary);
+  --input-placeholder: var(--text-muted);
+  --input-radius: 6px;
+
+  /* Button tokens */
+  --btn-primary-bg: var(--gold-accent);
+  --btn-primary-text: #1a0f06;
+  --btn-primary-hover: #d4b45a;
+  --btn-secondary-bg: transparent;
+  --btn-secondary-border: var(--text-muted);
+  --btn-secondary-text: var(--text-primary);
+  --btn-radius: 6px;
+  --btn-disabled-opacity: 0.4;
+
+  /* Layout tokens */
+  --page-max-width: 420px;
+  --card-panel-bg: var(--panel-bg);
+  --card-panel-border: var(--table-rim-light);
+  --card-panel-radius: 12px;
+  --card-panel-padding: 40px 48px;
+
+  /* Error state */
+  --error-text: #e05555;
+
+  /* Link */
+  --link-color: var(--gold-accent);
+  --link-hover: #d4b45a;
 }

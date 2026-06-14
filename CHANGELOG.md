@@ -10,6 +10,27 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- `src/frontend/styles/flows.css` — Shared CSS classes for pre-game flow screens: `.flow-page`, `.form-card`, `.btn-primary`, `.btn-secondary`, and supporting element classes (LLD 6.7)
+- `e2e/flows.spec.ts` — 15 E2E Playwright tests for pre-game flows: login (3 tests), signup (2), home page (2), create game (3), join game (2), navigation/app shell (3) (LLD 6.7)
+- `loginViaUI` and `signupViaUI` helper functions in `e2e/helpers/game-helpers.ts` (LLD 6.7)
+
+### Changed
+
+- `src/frontend/styles/game-variables.css` — Extended with form/input/button/layout/error/link CSS custom property tokens (LLD 6.7)
+- `src/frontend/index.html` — Body background changed from `#e2e2e2` to `#0d0d0d` to prevent light-flash on initial page load (LLD 6.7)
+- `src/frontend/main.ts` — Globally imports `game-variables.css` and `flows.css` (LLD 6.7)
+- `src/frontend/component/App.vue` — Rewritten: dark-themed auth-aware nav bar showing user display name and logout button when authenticated; nav hidden on `/game/:gameId` routes; removed debug route display and dead links (LLD 6.7)
+- `src/frontend/component/LoginView.vue` — Restyled with `.flow-page`/`.form-card` pattern; added `loading` state, improved error handling using Supabase error messages, new `data-testid` attributes (LLD 6.7)
+- `src/frontend/component/SignupView.vue` — Restyled with `.flow-page`/`.form-card` pattern; added `loading` state, `minlength`/`maxlength` constraints, new `data-testid` attributes; preserved guest-session-claiming logic (LLD 6.7)
+- `src/frontend/component/HomeView.vue` — Restyled with branded hero layout; shows Create/Join actions for authenticated users and login/signup prompt for unauthenticated users; removed "Load Game" link (LLD 6.7)
+- `src/frontend/component/CreateGameView.vue` — Restyled with `.flow-page`/`.form-card` pattern; removed Tonk option and `numberOfDecks` field; added `loading` state and error display; submit disabled until game type selected (LLD 6.7)
+- `src/frontend/component/JoinGameView.vue` — Restyled with `.flow-page`/`.form-card` pattern; added `loading` state; submit disabled when input is empty; new `data-testid` attributes (LLD 6.7)
+- `src/frontend/routes.ts` — Removed `LoadGameView` route (LLD 6.7)
+
+### Removed
+
+- `src/frontend/component/LoadGameView.vue` — Dead code with no CX flow; removed per LLD 6.7
+
 - `playwright.config.ts` — E2E test infrastructure (LLD 6.6): Playwright config targeting Chromium with `webServer` auto-start for backend (`node build/backend/index.js`) and Vite dev server; serial execution (`workers: 1`) for multiplayer test isolation; global setup project for auth fixture creation
 - `e2e/global-setup.ts` — Creates 4 test users via Supabase admin SDK, signs them in programmatically, writes session tokens to `e2e/.auth/playerN.json` storage state files (no browser opened during setup)
 - `e2e/helpers/game-helpers.ts` — Page interaction helpers: `createGame`, `joinAsGuest`, `joinAsRegistered`, `waitForGameBoard`
