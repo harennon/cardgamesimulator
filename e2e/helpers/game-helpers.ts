@@ -78,39 +78,6 @@ export async function joinGameViaApi(
 }
 
 /**
- * Logs in via the login form UI. Use when testing the login flow itself.
- * For tests that just need an authenticated session, use storageState instead.
- */
-export async function loginViaUI(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/login");
-  await page.fill('[data-testid="email-input"]', email);
-  await page.fill('[data-testid="password-input"]', password);
-  await page.click('[data-testid="login-button"]');
-  await page.waitForURL("/");
-}
-
-/**
- * Signs up via the signup form UI.
- */
-export async function signupViaUI(
-  page: Page,
-  displayName: string,
-  email: string,
-  password: string,
-): Promise<void> {
-  await page.goto("/signup");
-  await page.fill('[data-testid="signup-display-name"]', displayName);
-  await page.fill('[data-testid="signup-email"]', email);
-  await page.fill('[data-testid="signup-password"]', password);
-  await page.click('[data-testid="signup-button"]');
-  await page.waitForURL("/");
-}
-
-/**
  * Creates a new game as the logged-in user and returns the game ID.
  */
 export async function createGame(
@@ -150,25 +117,4 @@ export async function joinAsGuest(
   await page.click('[data-testid="guest-join-button"]');
   // Wait for lobby to appear
   await expect(page.locator('[data-testid="game-lobby"]')).toBeVisible();
-}
-
-/**
- * Joins an existing game as a registered (already logged-in) user.
- */
-export async function joinAsRegistered(
-  page: Page,
-  gameId: string,
-): Promise<void> {
-  await page.goto(`/game/${gameId}`);
-  // Registered user sees the lobby directly (auto-join)
-  await expect(page.locator('[data-testid="game-lobby"]')).toBeVisible();
-}
-
-/**
- * Waits for the game board to appear (game has started).
- */
-export async function waitForGameBoard(page: Page): Promise<void> {
-  await expect(page.locator('[data-testid="game-board"]')).toBeVisible({
-    timeout: 10_000,
-  });
 }

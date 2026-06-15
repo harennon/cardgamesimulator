@@ -41,8 +41,6 @@ export function compareCards(a: Card, b: Card): number {
   return suitValue(a.suit) - suitValue(b.suit);
 }
 
-export const THREE_OF_CLUBS: Card = { rank: "3", suit: "clubs" };
-
 // Full 52-card deck ordered by suit then rank (generated once, immutable)
 export const FULL_DECK: readonly Card[] = SUIT_ORDER.flatMap((suit) =>
   RANK_ORDER.map((rank) => ({ suit, rank })),
