@@ -60,7 +60,7 @@ test.describe("Game over screen", () => {
   // Skip: guest WebSocket auth via injected cookie is unreliable in CI.
   // The guest token restoration + socket handshake requires the full browser
   // guest-entry flow to set up state correctly. Will address with guest UI polish.
-  test.skip("guest sees sign-up nudge on game over screen", async ({
+  test("guest sees sign-up nudge on game over screen", async ({
     browser,
     request,
   }) => {
@@ -70,96 +70,43 @@ test.describe("Game over screen", () => {
       maxPlayers: 2,
     });
 
-    // Create a guest session via REST API to get the guestId and token
-    const guestRes = await request.post("http://localhost:3000/guest/session", {
-      data: { gameId, displayName: "GuestCarol" },
-    });
-    const guestData = (await guestRes.json()) as {
-      guestId: string;
-      token: string;
+    // Use the real guest join UI flow (same pattern as guest-flow.spec.ts)
+    // This properly creates the session cookie via the frontend's normal flow
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto(`/game/${gameId}/join`);
+    await guestPage.fill('[data-testid="guest-name-input"]', "GuestCarol");
+    await guestPage.click('[data-testid="guest-join-button"]');
+    await expect(guestPage.locator('[data-testid="game-lobby"]')).toBeVisible();
+
+    // Read the guest ID from the game state via REST (the guest is now in playerIds)
+    const stateRes = await request.get(
+      `http://localhost:3000/getGameState?gameId=${gameId}`,
+      { headers: { Authorization: `Bearer ${host.accessToken}` } },
+    );
+    const gameState = (await stateRes.json()) as {
+      gameState: { playerIds: string[] };
     };
+    const guestId = gameState.gameState.playerIds.find(
+      (id) => id !== host.userId,
+    )!;
 
-    // Join the game as the guest via REST
-    await joinGameViaApi(request, gameId, guestData.token);
-
+    // Seed the game as COMPLETED
     await seedCompletedGame(request, {
       gameId,
       players: [
         { id: host.userId, displayName: "Player1" },
-        { id: guestData.guestId, displayName: "GuestCarol" },
+        { id: guestId, displayName: "GuestCarol" },
       ],
       winner: host.userId,
       scores: [
         { playerId: host.userId, score: 5 },
-        { playerId: guestData.guestId, score: 0 },
+        { playerId: guestId, score: 0 },
       ],
     });
 
-    // Create a guest browser context and set the cookie via page.evaluate
-    const guestContext = await browser.newContext();
-    const guestPage = await guestContext.newPage();
-
-    // Capture console logs from the browser for debugging
-    guestPage.on("console", (msg) => {
-      console.log(`[browser ${msg.type()}] ${msg.text()}`);
-    });
-
-    // Navigate to root first to establish origin, then set cookie via JS
-    await guestPage.goto("/");
-    await guestPage.evaluate((token) => {
-      const expires = new Date(Date.now() + 4 * 60 * 60 * 1000).toUTCString();
-      document.cookie = `guestSession=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Strict`;
-    }, guestData.token);
-
-    // Diagnostic: verify cookie, decode, and match
-    const diag = await guestPage.evaluate((expectedGameId) => {
-      const cookie = document.cookie;
-      const prefix = "guestSession=";
-      let token: string | null = null;
-      for (const part of cookie.split(";")) {
-        const trimmed = part.trim();
-        if (trimmed.startsWith(prefix)) {
-          token = decodeURIComponent(trimmed.slice(prefix.length));
-          break;
-        }
-      }
-      if (!token) return { error: "cookie not found", cookie };
-      if (!token.startsWith("guest:"))
-        return { error: "no guest: prefix", token: token.slice(0, 50) };
-
-      try {
-        const encoded = token.slice(6);
-        const decoded = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
-        const lastDot = decoded.lastIndexOf(".");
-        if (lastDot === -1)
-          return { error: "no dot in decoded", decoded: decoded.slice(0, 80) };
-        const payload = decoded.slice(0, lastDot);
-        const parts = payload.split(".");
-        if (parts.length !== 3)
-          return { error: `expected 3 parts, got ${parts.length}`, parts };
-        const [guestId, gameId, expiresAtStr] = parts;
-        const expiresAt = parseInt(expiresAtStr!, 10);
-        const gameIdMatches = gameId === expectedGameId;
-        const isExpired = Date.now() > expiresAt;
-        return {
-          guestId,
-          gameId,
-          expiresAt,
-          gameIdMatches,
-          isExpired,
-          expectedGameId,
-        };
-      } catch (e) {
-        return { error: `decode failed: ${e}` };
-      }
-    }, gameId);
-    console.log("[DIAG] Guest cookie decode:", JSON.stringify(diag, null, 2));
-
+    // Reload the page — the guest cookie is already set by the join flow
     await guestPage.goto(`/game/${gameId}`);
-
-    // Diagnostic: what page did we end up on?
-    console.log("[DIAG] Final URL:", guestPage.url());
-
     await expect(guestPage.locator('[data-testid="game-over"]')).toBeVisible({
       timeout: 10_000,
     });
