@@ -599,4 +599,48 @@ describe("Reconnection and disconnect handling", () => {
       sockets.forEach(disconnectSocket);
     }
   });
+
+  // Test 13
+  it("disconnect from COMPLETED game does not trigger abandonment", async () => {
+    const { sockets, gameId, initialStates } = await setup2PlayerGame(
+      ctx,
+      "CompletedDisconnect",
+    );
+    try {
+      const currentPlayerIdx = initialStates[0]!.currentPlayerIndex;
+
+      // Play game to completion via timers
+      for (let i = 0; i < 2; i++) {
+        sockets[i]!.on("game:state", () => {});
+      }
+
+      let turnCount = 0;
+      const MAX_TURNS = 200;
+      while (turnCount < MAX_TURNS) {
+        const statePromise = new Promise<EnrichedPlayerView>((resolve) => {
+          sockets[currentPlayerIdx]!.once("game:state", (s) => resolve(s));
+        });
+        const fired = ctx.timerProvider.fireAll();
+        if (fired === 0) break;
+        const state = await statePromise;
+        if (state.status === "COMPLETED") break;
+        turnCount++;
+      }
+
+      // Game is now COMPLETED — disconnect a player
+      const playerIds = initialStates[0]!.players.map((p) => p.playerId);
+      sockets[0]!.disconnect();
+      await new Promise((r) => setTimeout(r, 50));
+
+      // No abandonment should be triggered for a completed game
+      expect(ctx.connectionManager.isAbandoned(gameId, playerIds[0]!)).toBe(
+        false,
+      );
+      expect(ctx.connectionManager.isAbandoned(gameId, playerIds[1]!)).toBe(
+        false,
+      );
+    } finally {
+      sockets.forEach(disconnectSocket);
+    }
+  });
 });

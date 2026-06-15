@@ -139,6 +139,16 @@ export class Server {
       connectionManager,
       turnTimerService,
     );
+
+    // Seed endpoint — only loaded in test environments
+    if (process.env.NODE_ENV === "test") {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createSeedStateRouter } = require("./api/test/seedState.js");
+      this.app.use(
+        "/test/seed-state",
+        createSeedStateRouter(gameCache, gameRepo),
+      );
+    }
   }
 
   public async start() {

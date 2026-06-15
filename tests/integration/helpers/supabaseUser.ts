@@ -53,35 +53,3 @@ export async function createTestUser(displayName?: string): Promise<TestUser> {
     displayName: resolvedDisplayName,
   };
 }
-
-/**
- * Signs in an existing user and returns a fresh JWT.
- */
-export async function signInTestUser(
-  email: string,
-  password: string,
-): Promise<TestUser> {
-  const client = makeClient();
-
-  const { data, error } = await client.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.session) {
-    throw new Error(
-      `Failed to sign in test user: ${error?.message ?? "no session returned"}`,
-    );
-  }
-
-  const displayName =
-    (data.user?.user_metadata?.display_name as string | undefined) ??
-    data.user!.email!;
-
-  return {
-    id: data.user!.id,
-    email,
-    accessToken: data.session.access_token,
-    displayName,
-  };
-}

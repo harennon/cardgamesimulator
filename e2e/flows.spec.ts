@@ -146,6 +146,28 @@ test.describe("Create Game flow", () => {
     await context.close();
   });
 
+  test("turn timer selector defaults to 60s and is changeable", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      storageState: "e2e/.auth/player1.json",
+    });
+    const page = await context.newPage();
+
+    await page.goto("/create-game");
+    const timerSelect = page.locator('[data-testid="turn-timer-select"]');
+    await expect(timerSelect).toBeVisible();
+    await expect(timerSelect).toHaveValue("60");
+
+    await timerSelect.selectOption("30");
+    await expect(timerSelect).toHaveValue("30");
+
+    await timerSelect.selectOption("90");
+    await expect(timerSelect).toHaveValue("90");
+
+    await context.close();
+  });
+
   test("submit is disabled without game type selection", async ({
     browser,
   }) => {

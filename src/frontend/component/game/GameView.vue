@@ -173,14 +173,18 @@ onMounted(async () => {
     );
   });
 
+  // Bind listeners BEFORE emitting game:join so we don't miss the initial game:state
+  // event (server emits it before the ack for IN_PROGRESS/COMPLETED games).
+  bindState(s);
+  bindActions(s);
+
   s.emit("game:join", { gameId: props.gameId, role: "player" }, (response) => {
     if (!response.success) {
       joinError.value = response.error ?? "Failed to join game.";
+      unbindState();
+      unbindActions();
       return;
     }
-
-    bindState(s);
-    bindActions(s);
 
     isHost.value =
       currentPlayerId !== "" &&
