@@ -67,35 +67,44 @@ test.describe("Game over screen", () => {
       maxPlayers: 2,
     });
 
-    // Create a guest browser context and have them join via UI
-    const guestContext = await browser.newContext();
-    const guestPage = await guestContext.newPage();
-    await guestPage.goto(`/game/${gameId}/join`);
-    await guestPage.fill('[data-testid="guest-name-input"]', "GuestCarol");
-    await guestPage.click('[data-testid="guest-join-button"]');
-    await expect(guestPage.locator('[data-testid="game-lobby"]')).toBeVisible();
+    // Create a guest session via REST API to get the guestId and token
+    const guestRes = await request.post("http://localhost:3000/guest/session", {
+      data: { gameId, displayName: "GuestCarol" },
+    });
+    const guestData = (await guestRes.json()) as {
+      guestId: string;
+      token: string;
+    };
 
-    // Read the guest session cookie to get the guestId
-    const cookies = await guestContext.cookies();
-    const guestCookie = cookies.find((c) => c.name === "guestSession");
-    // If no cookie, fall back to a placeholder — the nudge test only needs
-    // the seeded state to have a non-registered player
-    const guestId = guestCookie?.value ?? "guest-placeholder-id";
+    // Join the game as the guest via REST
+    await joinGameViaApi(request, gameId, guestData.token);
 
     await seedCompletedGame(request, {
       gameId,
       players: [
         { id: host.userId, displayName: "Player1" },
-        { id: guestId, displayName: "GuestCarol" },
+        { id: guestData.guestId, displayName: "GuestCarol" },
       ],
       winner: host.userId,
       scores: [
         { playerId: host.userId, score: 5 },
-        { playerId: guestId, score: 0 },
+        { playerId: guestData.guestId, score: 0 },
       ],
     });
 
-    // Guest navigates to the game page — their browser has the guest cookie
+    // Create a guest browser context with the guest token stored in cookie
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+    // Set the guest cookie so the frontend recognizes this as a guest session
+    await guestContext.addCookies([
+      {
+        name: "guestSession",
+        value: encodeURIComponent(guestData.token),
+        domain: "localhost",
+        path: "/",
+      },
+    ]);
+
     await guestPage.goto(`/game/${gameId}`);
     await expect(guestPage.locator('[data-testid="game-over"]')).toBeVisible({
       timeout: 10_000,
