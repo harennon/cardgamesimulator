@@ -66,13 +66,32 @@ export interface GameStartResponse {
   error?: string;
 }
 
+/** PlayerView enriched with timer deadline for WebSocket emission. */
+export interface EnrichedPlayerView extends PlayerView {
+  readonly turnDeadline: number | null; // epoch ms, or null if no timer
+}
+
+/** SpectatorView enriched with timer deadline for WebSocket emission. */
+export interface EnrichedSpectatorView extends SpectatorView {
+  readonly turnDeadline: number | null;
+}
+
+export interface TimerExpiredPayload {
+  gameId: string;
+  playerId: string; // the player whose turn was auto-acted
+  action: "pass" | "playCards"; // what was auto-played
+}
+
 /** Events the server emits to clients */
 export interface ServerToClientEvents {
   /** Full game state update for a player (filtered to their view). */
-  "game:state": (view: PlayerView) => void;
+  "game:state": (view: EnrichedPlayerView) => void;
 
   /** Full game state update for a spectator. */
-  "game:spectatorState": (view: SpectatorView) => void;
+  "game:spectatorState": (view: EnrichedSpectatorView) => void;
+
+  /** Emitted when the turn timer expires and an auto-action was applied. */
+  "game:timerExpired": (payload: TimerExpiredPayload) => void;
 
   /** A player joined the lobby (pre-game). */
   "lobby:playerJoined": (payload: LobbyPlayerJoinedPayload) => void;

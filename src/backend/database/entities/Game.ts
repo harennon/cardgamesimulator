@@ -32,6 +32,9 @@ export class Game {
   @Column({ type: "jsonb", default: "{}" })
   state: Record<string, unknown> = {};
 
+  @Column({ type: "int", nullable: true, default: null })
+  turnTimerSeconds: number | null = null;
+
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date = new Date();
 

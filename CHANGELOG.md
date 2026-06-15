@@ -10,6 +10,46 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- `src/backend/timer/timerProvider.ts` — `TimerProvider` interface and `TimerHandle` type (LLD 7a)
+- `src/backend/timer/realTimerProvider.ts` — `RealTimerProvider`: production implementation using `setTimeout`/`clearTimeout`; `cancelAll()` for server shutdown (LLD 7a)
+- `src/backend/timer/fakeTimerProvider.ts` — `FakeTimerProvider`: test double with manual `fire(id)`, `fireAll()`, `pendingCount`, `lastScheduledId` (LLD 7a)
+- `src/backend/timer/turnTimerService.ts` — `TurnTimerService`: manages per-game turn timers; `registerGame`, `startTurn` (1x/2x duration for first turn), `cancelTimer`, `unregisterGame`, `getDeadline`, `hasTimer` (LLD 7a)
+- `tests/timer/turnTimerService.test.ts` — 13 unit tests for `TurnTimerService`: timer scheduling, 2x first-turn duration, cancellation, expiry callback, unregister, deadline accuracy, independent timers per game (LLD 7a)
+- `tests/engine/big2/autoTimeout.test.ts` — 13 unit tests for `Big2Engine.getAutoTimeoutAction`: pass on normal turn, playCards on first play and free play, null for COMPLETED/CREATED/invalid index, action validity invariant (LLD 7a)
+- `tests/integration/turn-timer.test.ts` — 12 integration tests: game creation with timer stored/validated, null/non-null `turnDeadline` in state events, 2x first-turn deadline, deadline updates after action, timer expiry auto-passes via `FakeTimerProvider`, `game:timerExpired` event emitted, timer restarts after action, timer cancelled on game completion (LLD 7a)
+
+### Changed
+
+- `src/backend/engine/game-engine.ts` — Added `getAutoTimeoutAction(state): GameAction | null` to `GameEngine` interface (LLD 7a)
+- `src/backend/engine/big2/big2-engine.ts` — Implemented `getAutoTimeoutAction`: returns `pass` when legal, otherwise plays lowest card as single (first play / free play) (LLD 7a)
+- `src/shared/model.ts` — Added `turnTimerSeconds?: number | null` to `CreateGameRequest`; added `turnTimerSeconds: number | null` to `SerializableGame` (LLD 7a)
+- `src/shared/socket-events.ts` — Added `EnrichedPlayerView`, `EnrichedSpectatorView` (extends views with `turnDeadline: number | null`), `TimerExpiredPayload`, and `game:timerExpired` event to `ServerToClientEvents`; updated `game:state` and `game:spectatorState` to use enriched types (LLD 7a)
+- `src/backend/database/entities/Game.ts` — Added nullable `turnTimerSeconds: number | null` column (LLD 7a)
+- `src/backend/database/database.ts` — Added `turnTimerSeconds: number | null` parameter to `GameRepository.createGame` (LLD 7a)
+- `src/backend/database/postgres.ts` — Passes `turnTimerSeconds` in `createGame` (LLD 7a)
+- `src/backend/api/game/createGame.ts` — Validates `turnTimerSeconds` (must be null, 30, 60, or 90); passes to `gameRepo.createGame` (LLD 7a)
+- `src/backend/util/serializer.ts` — Includes `turnTimerSeconds` in `serializeGameForPlayer` output (LLD 7a)
+- `src/backend/websocket/socketHandler.ts` — Integrates `TurnTimerService`: register/start on game start, restart on action, unregister on completion; enriches all `game:state` and `game:spectatorState` emissions with `turnDeadline`; added exported `handleTimerExpired` function (LLD 7a)
+- `src/backend/server.ts` — Instantiates `RealTimerProvider` and `TurnTimerService`, wires timer expiry callback, passes `TurnTimerService` to `registerSocketHandlers`, calls `timerProvider.cancelAll()` on close (LLD 7a)
+- `tests/integration/helpers/testServer.ts` — Wires `FakeTimerProvider` and `TurnTimerService` into test server; exposes `timerProvider` and `turnTimerService` on `TestServerContext` (LLD 7a)
+- `tests/service/gameService.test.ts` — Added `getAutoTimeoutAction` mock to `makeEngine` helper (LLD 7a)
+- `tests/api/createGame.test.ts` — Updated `mockCreateGame` signature to include `turnTimerSeconds` parameter (LLD 7a)
+
+- `src/backend/service/statsService.ts` — `StatsService` orchestrates stat recording on game completion; filters out guest players via `GuestSessionStore`; fire-and-forget per-player `incrementStats` calls with per-player error isolation (LLD 7b)
+- `src/backend/api/stats/getStats.ts` — `GET /stats` handler returns authenticated user's stats with computed `winRate`; guests receive zeroed stats (LLD 7b)
+- `tests/service/statsService.test.ts` — 8 unit tests for `StatsService`: guest filtering, winner/loser deltas, score extraction, early-return on non-COMPLETED, error isolation (LLD 7b)
+- `tests/integration/player-stats.test.ts` — 7 integration tests: zeroed stats for new users, 401 without auth, guest zeroed stats, gamesPlayed incremented after game, winner/loser counts, guest excluded from DB after game, atomic concurrent upserts, winRate formula (LLD 7b)
+
+### Changed
+
+- `src/shared/model.ts` — Added `GetStatsResponse` interface (LLD 7b)
+- `src/backend/database/database.ts` — Replaced `upsertStats` with atomic `incrementStats(userId, delta)` on `PlayerStatsRepository`; added `StatsDelta` interface (LLD 7b)
+- `src/backend/database/postgres.ts` — Implemented `incrementStats` using raw SQL `INSERT ... ON CONFLICT DO UPDATE SET col = col + $n` (LLD 7b)
+- `src/backend/service/gameService.ts` — Added `statsService` constructor parameter; fires `statsService.recordGameCompletion` (fire-and-forget) when game transitions to COMPLETED (LLD 7b)
+- `src/backend/server.ts` — Instantiates `StatsService`, passes it to `GameService`, registers `/stats` route with `authMiddleware` (LLD 7b)
+- `tests/integration/helpers/testServer.ts` — Wired `StatsService` into `GameService` construction, added `/stats` route registration (LLD 7b)
+- `tests/service/gameService.test.ts` — Updated all `GameService` instantiations to pass a mock `StatsService` (LLD 7b)
+
 - `src/frontend/styles/flows.css` — Shared CSS classes for pre-game flow screens: `.flow-page`, `.form-card`, `.btn-primary`, `.btn-secondary`, and supporting element classes (LLD 6.7)
 - `e2e/flows.spec.ts` — 15 E2E Playwright tests for pre-game flows: login (3 tests), signup (2), home page (2), create game (3), join game (2), navigation/app shell (3) (LLD 6.7)
 - `loginViaUI` and `signupViaUI` helper functions in `e2e/helpers/game-helpers.ts` (LLD 6.7)

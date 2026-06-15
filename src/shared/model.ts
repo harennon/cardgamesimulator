@@ -14,6 +14,7 @@ export interface CreateGameRequest {
   gameType: GameType;
   maxPlayers: number;
   gameOptions: { [key: string]: string };
+  turnTimerSeconds?: number | null; // null, 30, 60, or 90
 }
 
 export interface CreateGameResponse {
@@ -47,6 +48,17 @@ export interface SerializableGame {
   playerDisplayNames: Record<string, string>;
   status: GameStatus;
   state: SerializableGameState;
+  turnTimerSeconds: number | null; // null means no timer
 }
 
 export type SerializableGameState = Record<string, unknown>;
+
+export interface GetStatsResponse {
+  userId: string;
+  gamesPlayed: number;
+  gamesWon: number;
+  gamesLost: number;
+  totalScore: number;
+  winRate: number; // computed: gamesWon / gamesPlayed (0 if no games)
+  lastPlayedAt: string | null; // ISO 8601 timestamp, null if never played
+}

@@ -173,6 +173,30 @@ export class Big2Engine implements GameEngine {
     return state.status === "COMPLETED";
   }
 
+  getAutoTimeoutAction(state: InternalGameState): GameAction | null {
+    if (state.status !== "IN_PROGRESS") return null;
+    if (state.currentPlayerIndex < 0) return null;
+
+    const playerId = state.players[state.currentPlayerIndex]!.playerId;
+    const big2State = state.gameSpecificState as Big2State;
+
+    if (!big2State.isFirstPlayOfGame && !big2State.isFreePlay) {
+      return { type: "pass", playerId };
+    }
+
+    const hand = big2State.hands[state.currentPlayerIndex] ?? [];
+    const sorted = [...hand].sort(compareCards);
+    const lowestCard = sorted[0];
+    if (!lowestCard) return null;
+
+    const playAction: Big2PlayCardsAction = {
+      type: "playCards",
+      playerId,
+      cards: [lowestCard],
+    };
+    return playAction;
+  }
+
   getSpectatorView(
     state: InternalGameState,
     spectatorCount: number,

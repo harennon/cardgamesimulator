@@ -20,21 +20,29 @@ import { JoinGameHandler } from "@/api/game/joinGame";
 import { GetGameStateHandler } from "@/api/game/getGameState";
 import { createSocketServer, type TypedServer } from "@/websocket/socketServer";
 import { createSocketAuthMiddleware } from "@/websocket/socketAuth";
-import { registerSocketHandlers } from "@/websocket/socketHandler";
+import {
+  registerSocketHandlers,
+  handleTimerExpired,
+} from "@/websocket/socketHandler";
 import { ConnectionManager } from "@/websocket/connectionManager";
 import { GameService } from "@/service/gameService";
+import { StatsService } from "@/service/statsService";
 import { GameCache } from "@/engine/game-cache";
 import { engineFactory } from "@/engine/game-engine-factory";
-import { gameRepo } from "@/database";
+import { gameRepo, statsRepo } from "@/database";
 import { GuestSessionStore } from "@/guest/guestSessionStore";
 import { createSessionRouter } from "@/api/guest/createSession";
 import { createClaimRouter } from "@/api/guest/claimSession";
+import { GetStatsHandler } from "@/api/stats/getStats";
+import { RealTimerProvider } from "@/timer/realTimerProvider";
+import { TurnTimerService } from "@/timer/turnTimerService";
 
 export class Server {
   private readonly app: Express;
   private readonly server: https.Server | http.Server;
   private readonly io: TypedServer;
   private readonly guestSessionStore: GuestSessionStore;
+  private readonly timerProvider: RealTimerProvider;
 
   constructor() {
     this.app = express();
@@ -89,6 +97,9 @@ export class Server {
       CreateGameHandler.INSTANCE.router,
     );
 
+    // Stats route (auth required, guests allowed — returns zeroed stats)
+    this.app.use("/stats", authMiddleware, GetStatsHandler.INSTANCE.router);
+
     // register error middleware
     this.app.use(errorHandler);
 
@@ -101,9 +112,33 @@ export class Server {
 
     const gameCache = new GameCache();
     gameCache.startEvictionLoop();
-    const gameService = new GameService(gameCache, engineFactory, gameRepo);
+    const statsService = new StatsService(statsRepo, this.guestSessionStore);
+    const gameService = new GameService(
+      gameCache,
+      engineFactory,
+      gameRepo,
+      statsService,
+    );
     const connectionManager = new ConnectionManager();
-    registerSocketHandlers(this.io, gameService, connectionManager);
+    this.timerProvider = new RealTimerProvider();
+    const turnTimerService = new TurnTimerService(
+      this.timerProvider,
+      (gameId) => {
+        handleTimerExpired(
+          this.io,
+          gameId,
+          gameService,
+          connectionManager,
+          turnTimerService,
+        ).catch((err: unknown) => console.error("Timer expired error", err));
+      },
+    );
+    registerSocketHandlers(
+      this.io,
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
   }
 
   public async start() {
@@ -120,6 +155,7 @@ export class Server {
     // callback function to close dependencies
     callback(force);
     this.guestSessionStore.stopCleanupLoop();
+    this.timerProvider.cancelAll();
     this.server.close();
   }
 

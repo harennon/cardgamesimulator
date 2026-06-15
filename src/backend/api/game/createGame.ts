@@ -4,6 +4,13 @@ import { CreateGameRequest, CreateGameResponse } from "@shared/model";
 import { gameRepo } from "@/database";
 import { BadRequestError } from "@/util/errors";
 
+const VALID_TIMER_VALUES: ReadonlySet<number | null> = new Set([
+  null,
+  30,
+  60,
+  90,
+]);
+
 export class CreateGameHandler extends Handler {
   public static INSTANCE: CreateGameHandler = new CreateGameHandler();
   private constructor() {
@@ -15,6 +22,10 @@ export class CreateGameHandler extends Handler {
     response: Response<CreateGameResponse>,
   ) {
     this.validateRequest(request);
+    const turnTimerSeconds = request.body.turnTimerSeconds ?? null;
+    if (!VALID_TIMER_VALUES.has(turnTimerSeconds)) {
+      throw new BadRequestError();
+    }
     const gameId = crypto.randomUUID();
     const game = await gameRepo.createGame(
       gameId,
@@ -22,6 +33,7 @@ export class CreateGameHandler extends Handler {
       request.userId!,
       request.body.maxPlayers,
       request.displayName ?? request.userId!,
+      turnTimerSeconds,
     );
     const createGameResponse: CreateGameResponse = {
       gameId: game.gameId,

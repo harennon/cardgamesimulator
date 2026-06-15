@@ -19,21 +19,30 @@ import {
   type TypedServer,
 } from "../../../src/backend/websocket/socketServer.js";
 import { createSocketAuthMiddleware } from "../../../src/backend/websocket/socketAuth.js";
-import { registerSocketHandlers } from "../../../src/backend/websocket/socketHandler.js";
+import {
+  registerSocketHandlers,
+  handleTimerExpired,
+} from "../../../src/backend/websocket/socketHandler.js";
 import { ConnectionManager } from "../../../src/backend/websocket/connectionManager.js";
 import { GameService } from "../../../src/backend/service/gameService.js";
+import { StatsService } from "../../../src/backend/service/statsService.js";
 import { GameCache } from "../../../src/backend/engine/game-cache.js";
 import { engineFactory } from "../../../src/backend/engine/game-engine-factory.js";
 import { GuestSessionStore } from "../../../src/backend/guest/guestSessionStore.js";
 import { createSessionRouter } from "../../../src/backend/api/guest/createSession.js";
 import { createClaimRouter } from "../../../src/backend/api/guest/claimSession.js";
 import { getCachedJwksKey } from "../../../src/backend/middleware/authMiddleware.js";
+import { GetStatsHandler } from "../../../src/backend/api/stats/getStats.js";
+import { FakeTimerProvider } from "../../../src/backend/timer/fakeTimerProvider.js";
+import { TurnTimerService } from "../../../src/backend/timer/turnTimerService.js";
 
 export interface TestServerContext {
   app: Express;
   httpServer: http.Server;
   io: TypedServer;
   baseUrl: string;
+  timerProvider: FakeTimerProvider;
+  turnTimerService: TurnTimerService;
   close: () => Promise<void>;
 }
 
@@ -50,8 +59,11 @@ async function ensureDbInitialized(): Promise<void> {
  * Boots a fully-wired server (Express + Socket.IO + DB) on an ephemeral port.
  * Uses the same wiring as the production Server class but exposes internals for testing.
  * Each call returns a new server instance; the DB connection is shared across instances.
+ * Optionally accepts a TimerProvider override (defaults to FakeTimerProvider for test control).
  */
-export async function createTestServer(): Promise<TestServerContext> {
+export async function createTestServer(
+  timerProviderOverride?: FakeTimerProvider,
+): Promise<TestServerContext> {
   const jwtSecret = process.env.SUPABASE_JWT_SECRET;
   if (!jwtSecret) {
     throw new Error(
@@ -103,6 +115,9 @@ export async function createTestServer(): Promise<TestServerContext> {
     CreateGameHandler.INSTANCE.router,
   );
 
+  // Stats route (auth required, guests allowed)
+  app.use("/stats", authMiddleware, GetStatsHandler.INSTANCE.router);
+
   app.use(errorHandler);
 
   const httpServer = http.createServer(app);
@@ -111,13 +126,25 @@ export async function createTestServer(): Promise<TestServerContext> {
 
   const gameCache = new GameCache();
   gameCache.startEvictionLoop();
+  const statsService = new StatsService(PostgresDB.INSTANCE, guestSessionStore);
   const gameService = new GameService(
     gameCache,
     engineFactory,
     PostgresDB.INSTANCE,
+    statsService,
   );
   const connectionManager = new ConnectionManager();
-  registerSocketHandlers(io, gameService, connectionManager);
+  const timerProvider = timerProviderOverride ?? new FakeTimerProvider();
+  const turnTimerService = new TurnTimerService(timerProvider, (gameId) => {
+    handleTimerExpired(
+      io,
+      gameId,
+      gameService,
+      connectionManager,
+      turnTimerService,
+    ).catch((err: unknown) => console.error("Timer expired error:", err));
+  });
+  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
 
   // Initialize DB (idempotent across test files in the same process)
   await ensureDbInitialized();
@@ -152,5 +179,13 @@ export async function createTestServer(): Promise<TestServerContext> {
     });
   };
 
-  return { app, httpServer, io, baseUrl, close };
+  return {
+    app,
+    httpServer,
+    io,
+    baseUrl,
+    timerProvider,
+    turnTimerService,
+    close,
+  };
 }

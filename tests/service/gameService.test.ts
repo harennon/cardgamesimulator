@@ -4,6 +4,7 @@ import { GameCache } from "../../src/backend/engine/game-cache.js";
 import type { GameEngineFactory } from "../../src/backend/engine/game-engine-factory.js";
 import type { GameRepository } from "../../src/backend/database/database.js";
 import type { GameEngine } from "../../src/backend/engine/game-engine.js";
+import type { StatsService } from "../../src/backend/service/statsService.js";
 import type {
   InternalGameState,
   PlayerView,
@@ -115,6 +116,7 @@ function makeEngine(overrides: Partial<GameEngine> = {}): GameEngine {
       .mockReturnValue(makePlayerView("game-1", "player-a")),
     getValidActions: vi.fn().mockReturnValue([]),
     isGameOver: vi.fn().mockReturnValue(false),
+    getAutoTimeoutAction: vi.fn().mockReturnValue(null),
     getSpectatorView: vi.fn().mockReturnValue(makeSpectatorView("game-1")),
     ...overrides,
   } as unknown as GameEngine;
@@ -138,6 +140,12 @@ function makeGameRepo(overrides: Partial<GameRepository> = {}): GameRepository {
   };
 }
 
+function makeStatsService(): StatsService {
+  return {
+    recordGameCompletion: vi.fn().mockResolvedValue(undefined),
+  } as unknown as StatsService;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -151,7 +159,7 @@ describe("GameService", () => {
 
       const repo = makeGameRepo();
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       const result = await service.getGameState("game-1");
 
@@ -170,7 +178,7 @@ describe("GameService", () => {
 
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       const result = await service.getGameState("game-1");
 
@@ -186,7 +194,7 @@ describe("GameService", () => {
       const cache = new GameCache();
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(null) });
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       const result = await service.getGameState("nonexistent");
 
@@ -199,7 +207,7 @@ describe("GameService", () => {
       const game = makeGame({ status: "CREATED", state: {} });
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       const result = await service.getGameState("game-1");
 
@@ -218,7 +226,7 @@ describe("GameService", () => {
       const factory = makeEngineFactory(engine);
       const game = makeGame({ playerIds: ["player-a", "player-b"] });
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       const result = await service.startGame("game-1", "player-a");
 
@@ -233,7 +241,7 @@ describe("GameService", () => {
       const cache = new GameCache();
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(null) });
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       await expect(service.startGame("missing", "player-a")).rejects.toThrow(
         "GAME_NOT_FOUND",
@@ -246,7 +254,7 @@ describe("GameService", () => {
       const game = makeGame({ status: "IN_PROGRESS" });
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       await expect(service.startGame("game-1", "player-a")).rejects.toThrow(
         "GAME_ALREADY_STARTED",
@@ -259,7 +267,7 @@ describe("GameService", () => {
       const game = makeGame({ playerIds: ["player-a", "player-b"] });
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       await expect(service.startGame("game-1", "player-b")).rejects.toThrow(
         "NOT_HOST",
@@ -272,7 +280,7 @@ describe("GameService", () => {
       const game = makeGame({ playerIds: ["player-a"] });
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       await expect(service.startGame("game-1", "player-a")).rejects.toThrow(
         "NOT_ENOUGH_PLAYERS",
@@ -294,7 +302,7 @@ describe("GameService", () => {
       const factory = makeEngineFactory(engine);
       const game = makeGame({ status: "IN_PROGRESS" });
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       const result = await service.applyAction("game-1", {
         type: "pass",
@@ -321,7 +329,7 @@ describe("GameService", () => {
       });
       const factory = makeEngineFactory(engine);
       const repo = makeGameRepo();
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       await expect(
         service.applyAction("game-1", { type: "pass", playerId: "player-b" }),
@@ -337,11 +345,74 @@ describe("GameService", () => {
       const cache = new GameCache();
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(null) });
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       await expect(
         service.applyAction("missing", { type: "pass", playerId: "player-a" }),
       ).rejects.toThrow("GAME_NOT_FOUND");
+      cache.stopEvictionLoop();
+    });
+
+    it("calls statsService.recordGameCompletion when game transitions to COMPLETED", async () => {
+      const cache = new GameCache();
+      const state = makeState("game-1");
+      cache.set("game-1", state);
+
+      const completedState = makeState("game-1", {
+        status: "COMPLETED",
+        version: 2,
+        winner: "player-a",
+        scores: [
+          { playerId: "player-a", score: 39 },
+          { playerId: "player-b", score: -39 },
+        ],
+      });
+      const engine = makeEngine({
+        applyAction: vi
+          .fn()
+          .mockReturnValue({ success: true, newState: completedState }),
+      });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({ status: "IN_PROGRESS" });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const statsService = makeStatsService();
+      const service = new GameService(cache, factory, repo, statsService);
+
+      await service.applyAction("game-1", {
+        type: "playCards",
+        playerId: "player-a",
+      });
+
+      expect(statsService.recordGameCompletion).toHaveBeenCalledWith(
+        completedState,
+      );
+      cache.stopEvictionLoop();
+    });
+
+    it("does not call statsService.recordGameCompletion for non-COMPLETED transitions", async () => {
+      const cache = new GameCache();
+      const state = makeState("game-1");
+      cache.set("game-1", state);
+
+      const newState = makeState("game-1", {
+        version: 2,
+        status: "IN_PROGRESS",
+      });
+      const engine = makeEngine({
+        applyAction: vi.fn().mockReturnValue({ success: true, newState }),
+      });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({ status: "IN_PROGRESS" });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const statsService = makeStatsService();
+      const service = new GameService(cache, factory, repo, statsService);
+
+      await service.applyAction("game-1", {
+        type: "pass",
+        playerId: "player-a",
+      });
+
+      expect(statsService.recordGameCompletion).not.toHaveBeenCalled();
       cache.stopEvictionLoop();
     });
   });
@@ -358,7 +429,7 @@ describe("GameService", () => {
       });
       const factory = makeEngineFactory(engine);
       const repo = makeGameRepo();
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       const result = await service.getPlayerView("game-1", "player-a");
 
@@ -371,7 +442,7 @@ describe("GameService", () => {
       const cache = new GameCache();
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(null) });
       const factory = makeEngineFactory(makeEngine());
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       const result = await service.getPlayerView("missing", "player-a");
 
@@ -391,7 +462,7 @@ describe("GameService", () => {
       });
       const factory = makeEngineFactory(engine);
       const repo = makeGameRepo();
-      const service = new GameService(cache, factory, repo);
+      const service = new GameService(cache, factory, repo, makeStatsService());
 
       const result = await service.getPlayerView("game-1", "player-a");
 

@@ -10,12 +10,14 @@ import type { GameEngineFactory } from "@/engine/game-engine-factory";
 import type { GameRepository } from "@/database/database";
 import type { Game } from "@/database/entities/Game";
 import { SeededPRNG } from "@/engine/prng";
+import type { StatsService } from "@/service/statsService";
 
 export class GameService {
   constructor(
     private readonly cache: GameCache,
     private readonly engineFactory: GameEngineFactory,
     private readonly gameRepo: GameRepository,
+    private readonly statsService: StatsService,
   ) {}
 
   /**
@@ -118,6 +120,12 @@ export class GameService {
       game.state = result.newState as unknown as Record<string, unknown>;
       if (result.newState.status === "COMPLETED") {
         game.status = "COMPLETED";
+        // Fire-and-forget: don't block game state persistence on stats
+        this.statsService
+          .recordGameCompletion(result.newState)
+          .catch((err: unknown) =>
+            console.error("Stats recording failed:", err),
+          );
       }
       await this.gameRepo.saveGame(game);
       this.cache.markClean(gameId);
