@@ -139,6 +139,16 @@ export class Server {
       connectionManager,
       turnTimerService,
     );
+
+    // Seed endpoint — only loaded in test environments (dynamic import prevents bundling in prod)
+    if (process.env.NODE_ENV === "test") {
+      import("./api/test/seedState.js").then(({ createSeedStateRouter }) => {
+        this.app.use(
+          "/test/seed-state",
+          createSeedStateRouter(gameCache, gameRepo),
+        );
+      });
+    }
   }
 
   public async start() {

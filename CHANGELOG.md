@@ -10,6 +10,22 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- `tests/helpers/seedState.ts` — `buildGameState()` and `buildCompletedState()` helpers for constructing deterministic `InternalGameState` fixtures in tests (LLD test-coverage-gaps)
+- `tests/helpers/seedState.test.ts` — 9 unit tests covering state construction invariants, deterministic hands, COMPLETED validation, custom hands (LLD test-coverage-gaps)
+- `src/backend/api/test/seedState.ts` — `POST /test/seed-state` endpoint; seeds game cache and DB atomically; returns 403 when `NODE_ENV !== "test"`, 404 when game not found (LLD test-coverage-gaps)
+- `tests/integration/game-validation.test.ts` — 7 integration tests: invalid card combo rejected via WebSocket ack, card not in hand rejected, joinGame 409 when full, game:start NOT_ENOUGH_PLAYERS with 1 player, joinGame 409 on IN_PROGRESS full game, seed endpoint succeeds in test env, seed endpoint 404 for non-existent game (LLD test-coverage-gaps)
+- `tests/integration/scoring.test.ts` — 2 integration tests: 4-player placement scoring [5,3,1,0], 2-player scoring [5,0] (LLD test-coverage-gaps)
+- `e2e/helpers/seed-helpers.ts` — `seedGameState()` and `seedCompletedGame()` Playwright helpers for seeding game state via REST before E2E navigation (LLD test-coverage-gaps)
+- `e2e/game-over.spec.ts` — 3 E2E tests: game-over renders with scores/winner, guest sees sign-up nudge, registered user does not see nudge (LLD test-coverage-gaps)
+- `e2e/lobby.spec.ts` — 2 E2E tests: start button disabled with 1 player, copy invite link shows Copied! feedback (LLD test-coverage-gaps)
+- `e2e/join-game.spec.ts` — 1 E2E test: joining a full game shows error message (LLD test-coverage-gaps)
+
+### Changed
+
+- `tests/integration/helpers/testServer.ts` — `TestServerContext` now exposes `gameCache` and `gameService`; seed endpoint registered unconditionally (always available in integration test server) (LLD test-coverage-gaps)
+- `e2e/helpers/game-helpers.ts` — added `readStoredAuth()`, `createGameViaApi()`, `joinGameViaApi()` for REST-based game setup in E2E tests without browser interaction (LLD test-coverage-gaps)
+- `src/backend/server.ts` — seed endpoint conditionally registered via dynamic import when `NODE_ENV=test` (LLD test-coverage-gaps)
+
 - `tests/integration/reconnection.test.ts` — 12 integration tests for LLD 8b simplified reconnection: disconnect/reconnect events, `isConnected` status in state, turn-timer-expiry-marks-abandoned, auto-pass chaining through abandoned players, reconnect clears abandoned, multiple abandoned players, lobby disconnect, multi-tab, null timer rejected, game completion cleanup (LLD 8b rewrite)
 
 ### Changed

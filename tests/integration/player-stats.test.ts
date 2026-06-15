@@ -571,6 +571,49 @@ describe("Player stats integration", () => {
     expect(body.winRate).toBe(expectedWinRate);
   });
 
+  it("totalScore matches Big2 placement scoring after game completion", async () => {
+    const users = await Promise.all([
+      createTestUser("TotalScoreP1"),
+      createTestUser("TotalScoreP2"),
+      createTestUser("TotalScoreP3"),
+      createTestUser("TotalScoreP4"),
+    ]);
+
+    const createRes = await request(ctx.app)
+      .post("/createGame")
+      .set("Authorization", `Bearer ${users[0]!.accessToken}`)
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
+    expect(createRes.status).toBe(200);
+    const gameId = createRes.body.gameId as string;
+
+    for (let i = 1; i < 4; i++) {
+      await request(ctx.app)
+        .post("/joinGame")
+        .set("Authorization", `Bearer ${users[i]!.accessToken}`)
+        .send({ gameId });
+    }
+
+    await playGameToCompletion(ctx, users, gameId);
+
+    // Wait for fire-and-forget stats to settle
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Fetch stats for all players and verify totalScore sums to 5+3+1+0 = 9
+    let totalScoreSum = 0;
+    for (const user of users) {
+      const res = await request(ctx.app)
+        .get("/stats")
+        .set("Authorization", `Bearer ${user.accessToken}`);
+      expect(res.status).toBe(200);
+      const body = res.body as GetStatsResponse;
+      // Each player's totalScore must be one of the placement values
+      expect([0, 1, 3, 5]).toContain(body.totalScore);
+      totalScoreSum += body.totalScore;
+    }
+    // Across all 4 players the scores must sum to 5+3+1+0 = 9
+    expect(totalScoreSum).toBe(9);
+  });
+
   it("incrementStats is atomic — concurrent upserts both succeed and values are summed", async () => {
     // Direct repository-level test using PostgresDB.INSTANCE (already initialized by testServer)
     const { PostgresDB } =

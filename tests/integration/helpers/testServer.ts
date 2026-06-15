@@ -35,6 +35,7 @@ import { getCachedJwksKey } from "../../../src/backend/middleware/authMiddleware
 import { GetStatsHandler } from "../../../src/backend/api/stats/getStats.js";
 import { FakeTimerProvider } from "../../../src/backend/timer/fakeTimerProvider.js";
 import { TurnTimerService } from "../../../src/backend/timer/turnTimerService.js";
+import { createSeedStateRouter } from "../../../src/backend/api/test/seedState.js";
 
 export interface TestServerContext {
   app: Express;
@@ -44,6 +45,8 @@ export interface TestServerContext {
   timerProvider: FakeTimerProvider;
   turnTimerService: TurnTimerService;
   connectionManager: ConnectionManager;
+  gameCache: GameCache;
+  gameService: GameService;
   close: () => Promise<void>;
 }
 
@@ -119,8 +122,6 @@ export async function createTestServer(
   // Stats route (auth required, guests allowed)
   app.use("/stats", authMiddleware, GetStatsHandler.INSTANCE.router);
 
-  app.use(errorHandler);
-
   const httpServer = http.createServer(app);
   const io = createSocketServer(httpServer);
   io.use(createSocketAuthMiddleware(guestSessionStore));
@@ -134,6 +135,14 @@ export async function createTestServer(
     PostgresDB.INSTANCE,
     statsService,
   );
+
+  // Seed endpoint (test-only) — registered after gameCache/gameService are created
+  app.use(
+    "/test/seed-state",
+    createSeedStateRouter(gameCache, PostgresDB.INSTANCE),
+  );
+
+  app.use(errorHandler);
   const connectionManager = new ConnectionManager();
   const timerProvider = timerProviderOverride ?? new FakeTimerProvider();
   const turnTimerService = new TurnTimerService(timerProvider, (gameId) => {
@@ -189,6 +198,8 @@ export async function createTestServer(
     timerProvider,
     turnTimerService,
     connectionManager,
+    gameCache,
+    gameService,
     close,
   };
 }
