@@ -10,6 +10,15 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- `src/shared/socket-events.ts` — `SpectatorCountPayload` interface and `game:spectatorCount` event in `ServerToClientEvents` (LLD 8a)
+- `src/backend/websocket/connectionManager.ts` — `isSpectator(socketId)` and `getSpectatorGameId(socketId)` methods (LLD 8a)
+- `tests/websocket/connectionManager.test.ts` — 4 new unit tests for `isSpectator` and `getSpectatorGameId` behaviour (LLD 8a)
+- `tests/integration/spectating.test.ts` — 14 integration tests covering spectator join/leave, state broadcasts, action guards, CREATED rejection, completion, and timer events (LLD 8a)
+
+### Changed
+
+- `src/backend/websocket/socketHandler.ts` — (1) Added `emitSpectatorCount` helper; (2) Spectator join now rejects CREATED games with `SPECTATING_NOT_AVAILABLE` and emits `game:spectatorCount` to players on join; (3) `handleGameAction` and `handleGameStart` guard against spectators with `SPECTATOR_CANNOT_ACT`; (4) `handleGameLeave` detects spectator via `getSpectatorGameId` before `removeSocket` and emits updated count; (5) `handleDisconnect` emits `game:spectatorCount` on spectator disconnect; (6) `handleTimerExpired` extends `game:timerExpired` to the spectator room (LLD 8a)
+
 - `src/backend/timer/timerProvider.ts` — `TimerProvider` interface and `TimerHandle` type (LLD 7a)
 - `src/backend/timer/realTimerProvider.ts` — `RealTimerProvider`: production implementation using `setTimeout`/`clearTimeout`; `cancelAll()` for server shutdown (LLD 7a)
 - `src/backend/timer/fakeTimerProvider.ts` — `FakeTimerProvider`: test double with manual `fire(id)`, `fireAll()`, `pendingCount`, `lastScheduledId` (LLD 7a)
