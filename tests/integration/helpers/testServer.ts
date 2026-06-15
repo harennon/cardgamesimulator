@@ -33,6 +33,7 @@ import { createSessionRouter } from "../../../src/backend/api/guest/createSessio
 import { createClaimRouter } from "../../../src/backend/api/guest/claimSession.js";
 import { getCachedJwksKey } from "../../../src/backend/middleware/authMiddleware.js";
 import { GetStatsHandler } from "../../../src/backend/api/stats/getStats.js";
+import { FeedbackHandler } from "../../../src/backend/api/feedback/submitFeedback.js";
 import { FakeTimerProvider } from "../../../src/backend/timer/fakeTimerProvider.js";
 import { TurnTimerService } from "../../../src/backend/timer/turnTimerService.js";
 import { createSeedStateRouter } from "../../../src/backend/api/test/seedState.js";
@@ -121,6 +122,9 @@ export async function createTestServer(
 
   // Stats route (auth required, guests allowed)
   app.use("/stats", authMiddleware, GetStatsHandler.INSTANCE.router);
+
+  // Feedback route (auth required, guests allowed)
+  app.use("/feedback", authMiddleware, FeedbackHandler.INSTANCE.router);
 
   const httpServer = http.createServer(app);
   const io = createSocketServer(httpServer);

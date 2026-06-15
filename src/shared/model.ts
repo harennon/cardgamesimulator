@@ -62,3 +62,19 @@ export interface GetStatsResponse {
   winRate: number; // computed: gamesWon / gamesPlayed (0 if no games)
   lastPlayedAt: string | null; // ISO 8601 timestamp, null if never played
 }
+
+export type FeedbackCategory =
+  | "bug"
+  | "confusing-ux"
+  | "feature-request"
+  | "other";
+
+export interface SubmitFeedbackRequest {
+  category: FeedbackCategory;
+  description: string; // 1-500 characters, required
+}
+
+export interface SubmitFeedbackResponse {
+  id: string;
+  createdAt: string; // ISO 8601
+}

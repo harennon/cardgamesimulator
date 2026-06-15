@@ -267,6 +267,9 @@ describe("Spectating integration", () => {
 
   afterAll(async () => {
     await ctx.close();
+    // Allow in-flight async callbacks (timer expiry handlers) to settle
+    // before the worker tears down, preventing EnvironmentTeardownError.
+    await new Promise((r) => setTimeout(r, 200));
   });
 
   it("spectator joins IN_PROGRESS game and receives game:spectatorState", async () => {

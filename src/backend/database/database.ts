@@ -1,5 +1,6 @@
 import { Game } from "@/database/entities/Game";
 import { PlayerStats } from "@/database/entities/PlayerStats";
+import { Feedback } from "@/database/entities/Feedback";
 import type { GameType } from "@shared/engine-types";
 
 export interface GameRepository {
@@ -31,4 +32,9 @@ export interface PlayerStatsRepository {
    * Uses SQL ON CONFLICT DO UPDATE to avoid read-modify-write races.
    */
   incrementStats(userId: string, delta: StatsDelta): Promise<void>;
+}
+
+export interface FeedbackRepository {
+  createFeedback(feedback: Feedback): Promise<Feedback>;
+  getAllFeedback(): Promise<Feedback[]>;
 }

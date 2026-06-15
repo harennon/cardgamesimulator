@@ -3,13 +3,17 @@ import { DataSource } from "typeorm";
 import {
   GameRepository,
   PlayerStatsRepository,
+  FeedbackRepository,
   StatsDelta,
 } from "@/database/database";
 import { Game } from "@/database/entities/Game";
 import type { GameType } from "@shared/engine-types";
 import { PlayerStats } from "@/database/entities/PlayerStats";
+import { Feedback } from "@/database/entities/Feedback";
 
-export class PostgresDB implements GameRepository, PlayerStatsRepository {
+export class PostgresDB
+  implements GameRepository, PlayerStatsRepository, FeedbackRepository
+{
   public static readonly INSTANCE = new PostgresDB();
   private dataSource: DataSource | undefined;
 
@@ -25,9 +29,9 @@ export class PostgresDB implements GameRepository, PlayerStatsRepository {
       username: process.env.DB_USER || "postgres",
       password: process.env.DB_PASSWORD || "postgres",
       database: process.env.DB_NAME || "postgres",
-      entities: [Game, PlayerStats],
+      entities: [Game, PlayerStats, Feedback],
       synchronize: process.env.NODE_ENV !== "production",
-      logging: process.env.NODE_ENV !== "production" ? "all" : ["error"],
+      logging: process.env.NODE_ENV === "development" ? "all" : ["error"],
     }).initialize();
   }
 
@@ -89,5 +93,15 @@ export class PostgresDB implements GameRepository, PlayerStatsRepository {
         delta.totalScore,
       ],
     );
+  }
+
+  public async createFeedback(feedback: Feedback): Promise<Feedback> {
+    return this.dataSource!.getRepository(Feedback).save(feedback);
+  }
+
+  public async getAllFeedback(): Promise<Feedback[]> {
+    return this.dataSource!.getRepository(Feedback).find({
+      order: { createdAt: "DESC" },
+    });
   }
 }

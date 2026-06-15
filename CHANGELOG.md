@@ -10,6 +10,20 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 9: Feedback Widget** — in-app feedback mechanism for playtesters
+  - `src/shared/model.ts` — `FeedbackCategory`, `SubmitFeedbackRequest`, `SubmitFeedbackResponse` types
+  - `src/backend/database/entities/Feedback.ts` — TypeORM entity with `id`, `category`, `description`, `metadata` (jsonb), `userId`, `createdAt` columns
+  - `src/backend/database/database.ts` — `FeedbackRepository` interface (`createFeedback`)
+  - `src/backend/database/postgres.ts` — `createFeedback` implementation; `Feedback` entity added to DataSource
+  - `src/backend/database/index.ts` — `feedbackRepo` export
+  - `src/backend/service/feedbackService.ts` — `FeedbackService` with category/description validation; `ValidationError` class
+  - `src/backend/api/feedback/submitFeedback.ts` — `POST /feedback` handler; 201 on success, 400 on validation errors
+  - `src/backend/server.ts` — `/feedback` route registered with `authMiddleware` (guests + registered)
+  - `src/frontend/component/FeedbackWidget.vue` — floating button (bottom-right), modal with category/description form, "Thanks!" toast; auto-captures route/browser/viewport metadata
+  - `src/frontend/component/App.vue` — `FeedbackWidget` mounted globally
+  - `tests/service/feedbackService.test.ts` — 13 unit tests covering all 4 categories, empty/whitespace/over-500 description, invalid category, trim, metadata passthrough, null userId, return value
+  - `tests/integration/feedback.test.ts` — 7 integration tests: registered user 201, guest user 201, empty description 400, invalid category 400, unauthenticated 401, metadata stored correctly, description trimmed
+
 - `tests/helpers/seedState.ts` — `buildGameState()` and `buildCompletedState()` helpers for constructing deterministic `InternalGameState` fixtures in tests (LLD test-coverage-gaps)
 - `tests/helpers/seedState.test.ts` — 9 unit tests covering state construction invariants, deterministic hands, COMPLETED validation, custom hands (LLD test-coverage-gaps)
 - `src/backend/api/test/seedState.ts` — `POST /test/seed-state` endpoint; seeds game cache and DB atomically; returns 403 when `NODE_ENV !== "test"`, 404 when game not found (LLD test-coverage-gaps)

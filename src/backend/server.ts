@@ -34,6 +34,7 @@ import { GuestSessionStore } from "@/guest/guestSessionStore";
 import { createSessionRouter } from "@/api/guest/createSession";
 import { createClaimRouter } from "@/api/guest/claimSession";
 import { GetStatsHandler } from "@/api/stats/getStats";
+import { FeedbackHandler } from "@/api/feedback/submitFeedback";
 import { RealTimerProvider } from "@/timer/realTimerProvider";
 import { TurnTimerService } from "@/timer/turnTimerService";
 
@@ -99,6 +100,9 @@ export class Server {
 
     // Stats route (auth required, guests allowed — returns zeroed stats)
     this.app.use("/stats", authMiddleware, GetStatsHandler.INSTANCE.router);
+
+    // Feedback route (auth required, guests allowed for POST; admin-only for GET)
+    this.app.use("/feedback", authMiddleware, FeedbackHandler.INSTANCE.router);
 
     // register error middleware
     this.app.use(errorHandler);
