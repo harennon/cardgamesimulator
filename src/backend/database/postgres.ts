@@ -31,7 +31,7 @@ export class PostgresDB
       database: process.env.DB_NAME || "postgres",
       entities: [Game, PlayerStats, Feedback],
       synchronize: process.env.NODE_ENV !== "production",
-      logging: process.env.NODE_ENV !== "production" ? "all" : ["error"],
+      logging: process.env.NODE_ENV === "development" ? "all" : ["error"],
     }).initialize();
   }
 
