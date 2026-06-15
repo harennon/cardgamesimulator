@@ -83,7 +83,7 @@ describe("Turn Timer integration", () => {
       expect(stateRes.body.gameState.turnTimerSeconds).toBe(60);
     });
 
-    it("stores null turnTimerSeconds when no timer specified", async () => {
+    it("rejects game creation when no timer specified", async () => {
       const user = await createTestUser("TimerCreatorB");
 
       const createRes = await request(ctx.app)
@@ -91,15 +91,7 @@ describe("Turn Timer integration", () => {
         .set("Authorization", `Bearer ${user.accessToken}`)
         .send({ gameType: "big2", maxPlayers: 4 });
 
-      expect(createRes.status).toBe(200);
-      const gameId = createRes.body.gameId as string;
-
-      const stateRes = await request(ctx.app)
-        .get(`/getGameState?gameId=${gameId}`)
-        .set("Authorization", `Bearer ${user.accessToken}`);
-
-      expect(stateRes.status).toBe(200);
-      expect(stateRes.body.gameState.turnTimerSeconds).toBeNull();
+      expect(createRes.status).toBe(400);
     });
 
     it("rejects invalid turnTimerSeconds (e.g. 45)", async () => {
@@ -147,7 +139,7 @@ describe("Turn Timer integration", () => {
       await ctx.close();
     });
 
-    it("emits null turnDeadline when game has no timer", async () => {
+    it("emits non-null turnDeadline after game start with timer", async () => {
       const [userA, userB] = await Promise.all([
         createTestUser("NullDeadlineA"),
         createTestUser("NullDeadlineB"),
@@ -156,8 +148,9 @@ describe("Turn Timer integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${userA!.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 2 });
+        .send({ gameType: "big2", maxPlayers: 2, turnTimerSeconds: 30 });
 
+      expect(createRes.status).toBe(200);
       const gameId = createRes.body.gameId as string;
 
       await request(ctx.app)
@@ -175,7 +168,7 @@ describe("Turn Timer integration", () => {
         const initialStates = await startGame(sockets, gameId);
 
         for (const state of initialStates) {
-          expect(state.turnDeadline).toBeNull();
+          expect(state.turnDeadline).not.toBeNull();
         }
       } finally {
         sockets.forEach(disconnectSocket);

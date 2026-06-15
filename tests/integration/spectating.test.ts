@@ -121,7 +121,7 @@ async function setupInProgressGame(ctx: TestServerContext): Promise<{
   const createRes = await request(ctx.app)
     .post("/createGame")
     .set("Authorization", `Bearer ${userA!.accessToken}`)
-    .send({ gameType: "big2", maxPlayers: 2 });
+    .send({ gameType: "big2", maxPlayers: 2, turnTimerSeconds: 30 });
 
   const gameId = createRes.body.gameId as string;
 
@@ -498,7 +498,7 @@ describe("Spectating integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${userA.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 2 });
+      .send({ gameType: "big2", maxPlayers: 2, turnTimerSeconds: 30 });
 
     const gameId = createRes.body.gameId as string;
 
@@ -600,7 +600,7 @@ describe("Spectating integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${userA!.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 2 });
+      .send({ gameType: "big2", maxPlayers: 2, turnTimerSeconds: 30 });
 
     const gameId = createRes.body.gameId as string;
 
@@ -655,7 +655,7 @@ describe("Spectating integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${userA!.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 2 });
+      .send({ gameType: "big2", maxPlayers: 2, turnTimerSeconds: 30 });
 
     const gameId = createRes.body.gameId as string;
 

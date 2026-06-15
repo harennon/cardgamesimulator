@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 
 const gameType = ref("");
 const maxPlayers = ref(2);
+const turnTimerSeconds = ref<30 | 60 | 90>(60);
 const loading = ref(false);
 const errorMessage = ref("");
 
@@ -19,6 +20,7 @@ async function createGame() {
       gameType: gameType.value as GameType,
       maxPlayers: maxPlayers.value,
       gameOptions: {},
+      turnTimerSeconds: turnTimerSeconds.value,
     };
     const createGameResponse = await axiosInstance.post<CreateGameResponse>(
       "/api/createGame",
@@ -67,6 +69,20 @@ async function createGame() {
           step="1"
           data-testid="max-players-input"
         />
+      </div>
+
+      <div class="form-card__field">
+        <label class="form-card__label" for="turn-timer">Turn Timer</label>
+        <select
+          class="form-card__input"
+          v-model="turnTimerSeconds"
+          id="turn-timer"
+          data-testid="turn-timer-select"
+        >
+          <option :value="30">30 seconds</option>
+          <option :value="60">60 seconds</option>
+          <option :value="90">90 seconds</option>
+        </select>
       </div>
 
       <p

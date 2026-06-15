@@ -258,7 +258,7 @@ describe("Player stats integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${host.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
     expect(createRes.status).toBe(200);
     const gameId = createRes.body.gameId as string;
 
@@ -288,7 +288,7 @@ describe("Player stats integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${users[0]!.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
     expect(createRes.status).toBe(200);
     const gameId = createRes.body.gameId as string;
 
@@ -324,7 +324,7 @@ describe("Player stats integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${users[0]!.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
     expect(createRes.status).toBe(200);
     const gameId = createRes.body.gameId as string;
 
@@ -367,7 +367,7 @@ describe("Player stats integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${users[0]!.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
     expect(createRes.status).toBe(200);
     const gameId = createRes.body.gameId as string;
 
@@ -540,7 +540,7 @@ describe("Player stats integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${targetUser.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       expect(createRes.status).toBe(200);
       const gameId = createRes.body.gameId as string;
 

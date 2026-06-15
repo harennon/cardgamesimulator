@@ -45,11 +45,12 @@ function makeRequest(
   gameType: string,
   maxPlayers: number,
   displayName?: string,
+  turnTimerSeconds?: number,
 ) {
   return {
     userId,
     displayName,
-    body: { gameType, maxPlayers },
+    body: { gameType, maxPlayers, turnTimerSeconds },
     headers: {},
   } as unknown as Parameters<(typeof CreateGameHandler.INSTANCE)["post"]>[0];
 }
@@ -81,7 +82,7 @@ describe("CreateGameHandler", () => {
 
       const { res, data } = makeResponse();
       await CreateGameHandler.INSTANCE.post(
-        makeRequest("user-1", "big2", 4, "Alice"),
+        makeRequest("user-1", "big2", 4, "Alice", 30),
         res,
       );
 
@@ -95,7 +96,7 @@ describe("CreateGameHandler", () => {
 
       const { res } = makeResponse();
       await CreateGameHandler.INSTANCE.post(
-        makeRequest("user-1", "big2", 4, "Alice"),
+        makeRequest("user-1", "big2", 4, "Alice", 60),
         res,
       );
 
@@ -112,7 +113,7 @@ describe("CreateGameHandler", () => {
 
       const { res } = makeResponse();
       await CreateGameHandler.INSTANCE.post(
-        makeRequest("user-1", "big2", 4, undefined),
+        makeRequest("user-1", "big2", 4, undefined, 90),
         res,
       );
 
@@ -130,6 +131,7 @@ describe("CreateGameHandler", () => {
         "big2",
         4,
         "Alice",
+        30,
       );
       req.userId = undefined;
       await expect(
@@ -140,14 +142,50 @@ describe("CreateGameHandler", () => {
     it("throws 400 when gameType is missing", async () => {
       const { res } = makeResponse();
       await expect(
-        CreateGameHandler.INSTANCE.post(makeRequest("user-1", "", 4), res),
+        CreateGameHandler.INSTANCE.post(
+          makeRequest("user-1", "", 4, undefined, 30),
+          res,
+        ),
       ).rejects.toMatchObject({ status: 400 });
     });
 
     it("throws 400 when maxPlayers is missing", async () => {
       const { res } = makeResponse();
       await expect(
-        CreateGameHandler.INSTANCE.post(makeRequest("user-1", "big2", 0), res),
+        CreateGameHandler.INSTANCE.post(
+          makeRequest("user-1", "big2", 0, undefined, 30),
+          res,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("throws 400 when turnTimerSeconds is null", async () => {
+      const { res } = makeResponse();
+      const req = makeRequest("user-1", "big2", 4, "Alice");
+      // explicitly set null
+      (req.body as Record<string, unknown>).turnTimerSeconds = null;
+      await expect(
+        CreateGameHandler.INSTANCE.post(req, res),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("throws 400 when turnTimerSeconds is omitted", async () => {
+      const { res } = makeResponse();
+      await expect(
+        CreateGameHandler.INSTANCE.post(
+          makeRequest("user-1", "big2", 4, "Alice"),
+          res,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("throws 400 when turnTimerSeconds is an invalid value (e.g. 45)", async () => {
+      const { res } = makeResponse();
+      await expect(
+        CreateGameHandler.INSTANCE.post(
+          makeRequest("user-1", "big2", 4, "Alice", 45),
+          res,
+        ),
       ).rejects.toMatchObject({ status: 400 });
     });
   });

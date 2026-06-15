@@ -144,6 +144,44 @@ describe("ConnectionManager", () => {
     });
   });
 
+  describe("markAbandoned / clearAbandoned / isAbandoned / clearGameAbandoned", () => {
+    it("isAbandoned returns false by default", () => {
+      const cm = new ConnectionManager();
+      expect(cm.isAbandoned("game-1", "player-a")).toBe(false);
+    });
+
+    it("markAbandoned makes isAbandoned return true", () => {
+      const cm = new ConnectionManager();
+      cm.markAbandoned("game-1", "player-a");
+      expect(cm.isAbandoned("game-1", "player-a")).toBe(true);
+    });
+
+    it("clearAbandoned clears the flag", () => {
+      const cm = new ConnectionManager();
+      cm.markAbandoned("game-1", "player-a");
+      cm.clearAbandoned("game-1", "player-a");
+      expect(cm.isAbandoned("game-1", "player-a")).toBe(false);
+    });
+
+    it("clearGameAbandoned clears all abandoned players for a game", () => {
+      const cm = new ConnectionManager();
+      cm.markAbandoned("game-1", "player-a");
+      cm.markAbandoned("game-1", "player-b");
+      cm.clearGameAbandoned("game-1");
+      expect(cm.isAbandoned("game-1", "player-a")).toBe(false);
+      expect(cm.isAbandoned("game-1", "player-b")).toBe(false);
+    });
+
+    it("clearGameAbandoned does not affect other games", () => {
+      const cm = new ConnectionManager();
+      cm.markAbandoned("game-1", "player-a");
+      cm.markAbandoned("game-2", "player-a");
+      cm.clearGameAbandoned("game-1");
+      expect(cm.isAbandoned("game-1", "player-a")).toBe(false);
+      expect(cm.isAbandoned("game-2", "player-a")).toBe(true);
+    });
+  });
+
   describe("isSpectator / getSpectatorGameId", () => {
     it("isSpectator returns true for a registered spectator socket", () => {
       const cm = new ConnectionManager();

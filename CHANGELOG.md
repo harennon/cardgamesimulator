@@ -10,6 +10,27 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- `tests/integration/reconnection.test.ts` — 12 integration tests for LLD 8b simplified reconnection: disconnect/reconnect events, `isConnected` status in state, turn-timer-expiry-marks-abandoned, auto-pass chaining through abandoned players, reconnect clears abandoned, multiple abandoned players, lobby disconnect, multi-tab, null timer rejected, game completion cleanup (LLD 8b rewrite)
+
+### Changed
+
+- `src/backend/websocket/connectionManager.ts` — added `abandonedPlayers` map with `markAbandoned`, `clearAbandoned`, `isAbandoned`, `clearGameAbandoned` methods (LLD 8b)
+- `src/backend/websocket/socketHandler.ts` — replaced `DisconnectTimerService`-based grace period with turn-timer-driven abandonment: `autoPlayAbandoned` loop (renamed from `autoPassAbandoned`); `handleTimerExpired` marks disconnected player abandoned after auto-pass; `handleGameJoin` calls `clearAbandoned` on reconnect; `handleDisconnect`/`handleGameLeave` emit disconnect events without grace period timer; removed `handleGracePeriodExpired`; `registerSocketHandlers` no longer takes `DisconnectTimerService` parameter; game completion calls `clearGameAbandoned` (LLD 8b)
+- `src/backend/api/game/createGame.ts` — `turnTimerSeconds` now required; null or missing value returns 400; valid values remain 30/60/90 (LLD 8b)
+- `src/shared/model.ts` — `CreateGameRequest.turnTimerSeconds` type changed from `number | null | undefined` to `30 | 60 | 90` (required) (LLD 8b)
+- `src/backend/server.ts` — removed `DisconnectTimerService` instantiation and `handleGracePeriodExpired` callback; simplified `registerSocketHandlers` and `handleTimerExpired` calls (LLD 8b)
+- `src/frontend/component/CreateGameView.vue` — added turn timer selector (30/60/90s, default 60s); `turnTimerSeconds` included in create game request (LLD 8b)
+- `tests/integration/helpers/testServer.ts` — removed `DisconnectTimerService`; `TestServerContext` now exposes `connectionManager` instead of `disconnectTimerService` (LLD 8b)
+- `tests/websocket/connectionManager.test.ts` — 5 new unit tests for `markAbandoned`, `clearAbandoned`, `isAbandoned`, `clearGameAbandoned`, isolation (LLD 8b)
+- `tests/api/createGame.test.ts` — updated for required `turnTimerSeconds`; added tests for null, missing, and invalid timer rejection (LLD 8b)
+- `tests/integration/turn-timer.test.ts` — updated: "stores null turnTimerSeconds" replaced with "rejects game creation when no timer specified"; "emits null turnDeadline" replaced with equivalent test using required timer (LLD 8b)
+- `tests/integration/game-crud.test.ts`, `websocket-game.test.ts`, `player-stats.test.ts`, `spectating.test.ts`, `auth.test.ts`, `guest-flow.test.ts` — all game creation calls updated to include `turnTimerSeconds: 30` (LLD 8b)
+
+### Removed
+
+- `src/backend/websocket/disconnectTimerService.ts` — eliminated; turn timer serves as the grace period (LLD 8b)
+- `tests/websocket/disconnectTimerService.test.ts` — eliminated with the service (LLD 8b)
+
 - `src/shared/socket-events.ts` — `SpectatorCountPayload` interface and `game:spectatorCount` event in `ServerToClientEvents` (LLD 8a)
 - `src/backend/websocket/connectionManager.ts` — `isSpectator(socketId)` and `getSpectatorGameId(socketId)` methods (LLD 8a)
 - `tests/websocket/connectionManager.test.ts` — 4 new unit tests for `isSpectator` and `getSpectatorGameId` behaviour (LLD 8a)

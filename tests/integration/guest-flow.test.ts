@@ -106,7 +106,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       expect(createRes.status).toBe(200);
       const gameId = createRes.body.gameId as string;
 
@@ -135,7 +135,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const res = await request(ctx.app)
@@ -150,7 +150,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const res = await request(ctx.app)
@@ -165,7 +165,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guest1 = await createTestGuest(ctx.app, gameId, "Player");
@@ -189,7 +189,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       expect(createRes.status).toBe(200);
       const gameId = createRes.body.gameId as string;
 
@@ -209,7 +209,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guest = await createTestGuest(ctx.app, gameId, "JoinStateGuest");
@@ -238,13 +238,13 @@ describe("Guest flow integration", () => {
       const createResA = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameIdA = createResA.body.gameId as string;
 
       const createResB = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameIdB = createResB.body.gameId as string;
 
       const guest = await createTestGuest(ctx.app, gameIdA, "CrossGameGuest");
@@ -264,7 +264,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guest = await createTestGuest(ctx.app, gameId, "GuestCreator");
@@ -272,7 +272,7 @@ describe("Guest flow integration", () => {
       const res = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${guest.token}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
 
       expect(res.status).toBe(403);
     });
@@ -285,7 +285,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guest = await createTestGuest(ctx.app, gameId, "GetStateGuest");
@@ -312,7 +312,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       // Join 3 guests
@@ -352,7 +352,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guest = await createTestGuest(ctx.app, gameId, "WsConnGuest");
@@ -371,7 +371,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guests = await Promise.all([
@@ -438,7 +438,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const expiredToken = createExpiredGuestToken(randomUUID(), gameId);
@@ -465,7 +465,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guest = await createTestGuest(ctx.app, gameId, "TamperedGuest");
@@ -500,7 +500,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guests = await Promise.all([
@@ -658,7 +658,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guests = await Promise.all([
@@ -783,7 +783,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const res = await request(ctx.app).post("/joinGame").send({ gameId });
@@ -796,7 +796,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const res = await request(ctx.app)
@@ -812,7 +812,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       // Create a valid token for a guestId that has no corresponding session in the store
@@ -842,7 +842,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${hostA.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guest = await createTestGuest(ctx.app, gameId, "ClaimGuest");
@@ -878,7 +878,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const expiredToken = createExpiredGuestToken(randomUUID(), gameId);
@@ -900,7 +900,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       // Create session but do NOT join
@@ -923,7 +923,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guest = await createTestGuest(ctx.app, gameId, "GuestSelfClaim");
@@ -951,7 +951,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       expect(createRes.status).toBe(200);
       const gameId = createRes.body.gameId as string;
 
@@ -1159,7 +1159,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       const guest = await createTestGuest(ctx.app, gameId, "RejoinGuest");
@@ -1194,7 +1194,7 @@ describe("Guest flow integration", () => {
       const createRes = await request(ctx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${host.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 4 });
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
       const gameId = createRes.body.gameId as string;
 
       // Original session

@@ -4,12 +4,7 @@ import { CreateGameRequest, CreateGameResponse } from "@shared/model";
 import { gameRepo } from "@/database";
 import { BadRequestError } from "@/util/errors";
 
-const VALID_TIMER_VALUES: ReadonlySet<number | null> = new Set([
-  null,
-  30,
-  60,
-  90,
-]);
+const VALID_TIMER_VALUES: ReadonlySet<number> = new Set([30, 60, 90]);
 
 export class CreateGameHandler extends Handler {
   public static INSTANCE: CreateGameHandler = new CreateGameHandler();
@@ -22,8 +17,8 @@ export class CreateGameHandler extends Handler {
     response: Response<CreateGameResponse>,
   ) {
     this.validateRequest(request);
-    const turnTimerSeconds = request.body.turnTimerSeconds ?? null;
-    if (!VALID_TIMER_VALUES.has(turnTimerSeconds)) {
+    const turnTimerSeconds = request.body.turnTimerSeconds;
+    if (turnTimerSeconds == null || !VALID_TIMER_VALUES.has(turnTimerSeconds)) {
       throw new BadRequestError();
     }
     const gameId = crypto.randomUUID();

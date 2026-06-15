@@ -24,7 +24,7 @@ describe("Game CRUD integration", () => {
     const res = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${user.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
 
     expect(res.status).toBe(200);
     expect(typeof res.body.gameId).toBe("string");
@@ -38,7 +38,7 @@ describe("Game CRUD integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${userA.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
 
     expect(createRes.status).toBe(200);
     const gameId = createRes.body.gameId as string;
@@ -58,7 +58,7 @@ describe("Game CRUD integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${host.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
 
     expect(createRes.status).toBe(200);
     const gameId = createRes.body.gameId as string;
@@ -81,7 +81,7 @@ describe("Game CRUD integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${host.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
 
     const gameId = createRes.body.gameId as string;
     const guest = await createTestGuest(ctx.app, gameId, "GuestWhoCreates");
@@ -89,7 +89,7 @@ describe("Game CRUD integration", () => {
     const res = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${guest.token}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
 
     expect(res.status).toBe(403);
   });
@@ -101,7 +101,7 @@ describe("Game CRUD integration", () => {
     const createRes = await request(ctx.app)
       .post("/createGame")
       .set("Authorization", `Bearer ${userA.accessToken}`)
-      .send({ gameType: "big2", maxPlayers: 4 });
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
 
     expect(createRes.status).toBe(200);
     const gameId = createRes.body.gameId as string;
