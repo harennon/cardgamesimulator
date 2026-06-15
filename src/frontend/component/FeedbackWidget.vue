@@ -69,6 +69,7 @@ async function submit() {
       v-if="!isOpen"
       class="feedback-widget__trigger"
       aria-label="Send feedback"
+      data-testid="feedback-trigger"
       @click="openModal"
     >
       Feedback
@@ -79,12 +80,16 @@ async function submit() {
       class="feedback-widget__overlay"
       @click.self="closeModal"
     >
-      <div class="feedback-widget__modal">
+      <div class="feedback-widget__modal" data-testid="feedback-modal">
         <h3 class="feedback-widget__title">Send Feedback</h3>
 
         <label class="feedback-widget__label">
           Category
-          <select v-model="category" class="feedback-widget__select">
+          <select
+            v-model="category"
+            class="feedback-widget__select"
+            data-testid="feedback-category"
+          >
             <option value="bug">Bug</option>
             <option value="confusing-ux">Confusing UX</option>
             <option value="feature-request">Feature Request</option>
@@ -97,6 +102,7 @@ async function submit() {
           <textarea
             v-model="description"
             class="feedback-widget__textarea"
+            data-testid="feedback-description"
             maxlength="500"
             placeholder="Describe what happened..."
             rows="4"
@@ -120,6 +126,7 @@ async function submit() {
           </button>
           <button
             class="feedback-widget__btn feedback-widget__btn--submit"
+            data-testid="feedback-submit"
             :disabled="submitting || description.trim().length === 0"
             @click="submit"
           >
@@ -129,7 +136,11 @@ async function submit() {
       </div>
     </div>
 
-    <div v-if="showToast" class="feedback-widget__toast">
+    <div
+      v-if="showToast"
+      class="feedback-widget__toast"
+      data-testid="feedback-toast"
+    >
       Thanks for your feedback!
     </div>
   </div>
