@@ -45,7 +45,7 @@ async function submit() {
   errorMessage.value = "";
 
   try {
-    await axiosInstance.post<SubmitFeedbackResponse>("/feedback", {
+    await axiosInstance.post<SubmitFeedbackResponse>("/api/feedback", {
       category: category.value,
       description: description.value,
       metadata: buildMetadata(),
