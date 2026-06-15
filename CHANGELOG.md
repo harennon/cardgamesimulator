@@ -10,6 +10,16 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- `src/backend/websocket/disconnectTimerService.ts` — `DisconnectTimerService`: grace period timer management and abandonment tracking; `startGracePeriod`, `cancelGracePeriod`, `isAbandoned`, `unregisterGame`; `DISCONNECT_GRACE_PERIOD_MS = 30s` constant (LLD 8b)
+- `tests/websocket/disconnectTimerService.test.ts` — 24 unit tests for `DisconnectTimerService`: timer scheduling, idempotency, cancel, abandoned flag, callback invocation, `unregisterGame` isolation (LLD 8b)
+- `tests/integration/reconnection.test.ts` — 15 integration tests: disconnect event emission, `isConnected: false/true` in state, grace period start/cancel on disconnect/reconnect, `game:playerReconnected` event, grace expiry marks abandoned, auto-pass on abandoned player's turn, immediate auto-pass on grace expiry with current-turn player, reconnect clears abandoned, no grace period in lobby, multiple-tabs stay connected, no-timer game auto-pass, flapping player grace period restart (LLD 8b)
+
+### Changed
+
+- `src/backend/websocket/socketHandler.ts` — added `autoPassAbandoned` loop; `handleGracePeriodExpired` exported function; `handleDisconnect` starts grace period for IN_PROGRESS games and broadcasts state; `handleGameJoin` cancels grace period on reconnect and broadcasts state; `handleGameStart` starts grace period for any player already disconnected; `handleGameAction` checks abandoned next player and skips turn timer; `handleTimerExpired` chains `autoPassAbandoned` after expiry; `handleGameLeave` starts grace period for IN_PROGRESS games; all functions accept `DisconnectTimerService` parameter; game completion calls `disconnectTimerService.unregisterGame` (LLD 8b)
+- `src/backend/server.ts` — instantiates `DisconnectTimerService` with `timerProvider` and grace expiry callback; passes to `registerSocketHandlers` and `handleTimerExpired` (LLD 8b)
+- `tests/integration/helpers/testServer.ts` — wires `DisconnectTimerService` with `FakeTimerProvider`; exposes `disconnectTimerService` on `TestServerContext` (LLD 8b)
+
 - `src/shared/socket-events.ts` — `SpectatorCountPayload` interface and `game:spectatorCount` event in `ServerToClientEvents` (LLD 8a)
 - `src/backend/websocket/connectionManager.ts` — `isSpectator(socketId)` and `getSpectatorGameId(socketId)` methods (LLD 8a)
 - `tests/websocket/connectionManager.test.ts` — 4 new unit tests for `isSpectator` and `getSpectatorGameId` behaviour (LLD 8a)

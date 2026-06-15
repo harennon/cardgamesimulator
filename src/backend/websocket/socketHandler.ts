@@ -14,6 +14,7 @@ import type {
   TimerExpiredPayload,
 } from "@shared/socket-events";
 import type { TurnTimerService } from "@/timer/turnTimerService";
+import type { DisconnectTimerService } from "./disconnectTimerService.js";
 
 function emitSpectatorCount(
   io: TypedServer,
@@ -64,6 +65,74 @@ async function broadcastGameState(
   });
 }
 
+/**
+ * After a state change, if the new current player is abandoned, auto-pass immediately.
+ * Loops until a non-abandoned player's turn or game completion.
+ */
+async function autoPassAbandoned(
+  io: TypedServer,
+  gameId: string,
+  gameService: GameService,
+  connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
+  disconnectTimerService: DisconnectTimerService,
+): Promise<void> {
+  const state = await gameService.getGameState(gameId);
+  // Loop bounded by player count to prevent infinite loops
+  const maxIterations = state?.players.length ?? 4;
+
+  for (let i = 0; i < maxIterations; i++) {
+    const currentState = await gameService.getGameState(gameId);
+    if (!currentState || currentState.status !== "IN_PROGRESS") return;
+
+    const currentPlayer = currentState.players[currentState.currentPlayerIndex];
+    if (
+      !currentPlayer ||
+      !disconnectTimerService.isAbandoned(gameId, currentPlayer.playerId)
+    ) {
+      // Current player is connected or in grace period — start their turn timer
+      // Only restart if we actually auto-passed at least once (callers may have already started it)
+      if (i > 0 && turnTimerService.hasTimer(gameId)) {
+        turnTimerService.startTurn(gameId, false);
+      }
+      return;
+    }
+
+    const engine = engineFactory.getEngine(currentState.gameType);
+    const autoAction = engine.getAutoTimeoutAction(currentState);
+    if (!autoAction) return;
+
+    try {
+      await gameService.applyAction(gameId, autoAction);
+    } catch {
+      return; // Concurrent action already advanced the turn
+    }
+
+    const newState = await gameService.getGameState(gameId);
+    if (newState?.status === "COMPLETED") {
+      turnTimerService.unregisterGame(gameId);
+      disconnectTimerService.unregisterGame(gameId);
+      await broadcastGameState(
+        io,
+        gameId,
+        gameService,
+        connectionManager,
+        turnTimerService,
+      );
+      return;
+    }
+
+    await broadcastGameState(
+      io,
+      gameId,
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+    // Loop continues to check the next player
+  }
+}
+
 async function handleGameJoin(
   socket: TypedSocket,
   io: TypedServer,
@@ -72,6 +141,7 @@ async function handleGameJoin(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  disconnectTimerService: DisconnectTimerService,
 ): Promise<void> {
   const { gameId, role } = payload;
   const { userId, displayName } = socket.data;
@@ -111,6 +181,11 @@ async function handleGameJoin(
       });
       ack({ success: true });
     } else {
+      // Cancel grace period on reconnect (clears abandoned flag too)
+      if (game.status === "IN_PROGRESS") {
+        disconnectTimerService.cancelGracePeriod(gameId, userId);
+      }
+
       // IN_PROGRESS or COMPLETED: send current game state
       const view = await gameService.getPlayerView(gameId, userId);
       if (view) {
@@ -126,6 +201,14 @@ async function handleGameJoin(
           playerId: userId,
           displayName,
         });
+        // Broadcast updated connection status (isConnected flips to true)
+        await broadcastGameState(
+          io,
+          gameId,
+          gameService,
+          connectionManager,
+          turnTimerService,
+        );
       }
 
       ack({ success: true });
@@ -174,6 +257,7 @@ async function handleGameStart(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  disconnectTimerService: DisconnectTimerService,
 ): Promise<void> {
   const { gameId } = payload;
   const { userId } = socket.data;
@@ -198,6 +282,15 @@ async function handleGameStart(
         turnTimerSeconds: game.turnTimerSeconds,
       });
       turnTimerService.startTurn(gameId, true);
+    }
+
+    // Start grace period for any player who was in lobby but is now disconnected
+    if (game) {
+      for (const pid of game.playerIds) {
+        if (!connectionManager.isPlayerConnected(gameId, pid)) {
+          disconnectTimerService.startGracePeriod(gameId, pid);
+        }
+      }
     }
 
     // Broadcast game:started to all players in the room
@@ -227,6 +320,7 @@ async function handleGameAction(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  disconnectTimerService: DisconnectTimerService,
 ): Promise<void> {
   const { gameId, action } = payload;
   const { userId } = socket.data;
@@ -250,7 +344,47 @@ async function handleGameAction(
     const newState = await gameService.getGameState(gameId);
     if (newState?.status === "COMPLETED") {
       turnTimerService.unregisterGame(gameId);
-    } else if (turnTimerService.hasTimer(gameId)) {
+      disconnectTimerService.unregisterGame(gameId);
+      await broadcastGameState(
+        io,
+        gameId,
+        gameService,
+        connectionManager,
+        turnTimerService,
+      );
+      ack({ success: true });
+      return;
+    }
+
+    // Check if the next current player is abandoned — if so, skip turn timer and auto-pass
+    if (newState) {
+      const nextPlayer = newState.players[newState.currentPlayerIndex];
+      if (
+        nextPlayer &&
+        disconnectTimerService.isAbandoned(gameId, nextPlayer.playerId)
+      ) {
+        // Don't start timer for abandoned player
+        await broadcastGameState(
+          io,
+          gameId,
+          gameService,
+          connectionManager,
+          turnTimerService,
+        );
+        await autoPassAbandoned(
+          io,
+          gameId,
+          gameService,
+          connectionManager,
+          turnTimerService,
+          disconnectTimerService,
+        );
+        ack({ success: true });
+        return;
+      }
+    }
+
+    if (turnTimerService.hasTimer(gameId)) {
       turnTimerService.startTurn(gameId, false);
     }
 
@@ -274,6 +408,8 @@ async function handleGameLeave(
   payload: GameLeavePayload,
   connectionManager: ConnectionManager,
   gameService: GameService,
+  disconnectTimerService: DisconnectTimerService,
+  turnTimerService: TurnTimerService,
 ): Promise<void> {
   const { gameId } = payload;
   const { userId, displayName } = socket.data;
@@ -297,6 +433,19 @@ async function handleGameLeave(
         playerId: userId,
         playerCount: game.playerIds.length,
       });
+    } else if (game && game.status === "IN_PROGRESS") {
+      io.to(`game:${gameId}`).emit("game:playerDisconnected", {
+        playerId: userId,
+        displayName,
+      });
+      disconnectTimerService.startGracePeriod(gameId, userId);
+      await broadcastGameState(
+        io,
+        gameId,
+        gameService,
+        connectionManager,
+        turnTimerService,
+      );
     } else {
       io.to(`game:${gameId}`).emit("game:playerDisconnected", {
         playerId: userId,
@@ -311,6 +460,8 @@ async function handleDisconnect(
   io: TypedServer,
   connectionManager: ConnectionManager,
   gameService: GameService,
+  turnTimerService: TurnTimerService,
+  disconnectTimerService: DisconnectTimerService,
 ): Promise<void> {
   const meta = connectionManager.removeSocket(socket.id);
   if (!meta) return;
@@ -334,6 +485,21 @@ async function handleDisconnect(
         playerId,
         playerCount: game.playerIds.length,
       });
+    } else if (game && game.status === "IN_PROGRESS") {
+      io.to(`game:${gameId}`).emit("game:playerDisconnected", {
+        playerId,
+        displayName,
+      });
+      // Start grace period for IN_PROGRESS games
+      disconnectTimerService.startGracePeriod(gameId, playerId);
+      // Broadcast updated connection status (isConnected flips to false)
+      await broadcastGameState(
+        io,
+        gameId,
+        gameService,
+        connectionManager,
+        turnTimerService,
+      );
     } else {
       io.to(`game:${gameId}`).emit("game:playerDisconnected", {
         playerId,
@@ -343,12 +509,41 @@ async function handleDisconnect(
   }
 }
 
+export async function handleGracePeriodExpired(
+  io: TypedServer,
+  gameId: string,
+  playerId: string,
+  gameService: GameService,
+  connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
+  disconnectTimerService: DisconnectTimerService,
+): Promise<void> {
+  const state = await gameService.getGameState(gameId);
+  if (!state || state.status !== "IN_PROGRESS") return;
+
+  const currentPlayer = state.players[state.currentPlayerIndex];
+  if (currentPlayer?.playerId === playerId) {
+    // It's the abandoned player's turn — cancel turn timer and auto-pass immediately
+    turnTimerService.cancelTimer(gameId);
+    await autoPassAbandoned(
+      io,
+      gameId,
+      gameService,
+      connectionManager,
+      turnTimerService,
+      disconnectTimerService,
+    );
+  }
+  // If not their turn, nothing to do — auto-pass fires when their turn arrives
+}
+
 export async function handleTimerExpired(
   io: TypedServer,
   gameId: string,
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  disconnectTimerService: DisconnectTimerService,
 ): Promise<void> {
   const state = await gameService.getGameState(gameId);
   if (!state || state.status !== "IN_PROGRESS") return;
@@ -378,8 +573,17 @@ export async function handleTimerExpired(
   const newState = await gameService.getGameState(gameId);
   if (newState?.status === "COMPLETED") {
     turnTimerService.unregisterGame(gameId);
-  } else {
-    turnTimerService.startTurn(gameId, false);
+    disconnectTimerService.unregisterGame(gameId);
+  } else if (newState) {
+    const nextPlayer = newState.players[newState.currentPlayerIndex];
+    if (
+      nextPlayer &&
+      disconnectTimerService.isAbandoned(gameId, nextPlayer.playerId)
+    ) {
+      // Skip timer — autoPassAbandoned will handle this player and start timer for the next connected one
+    } else {
+      turnTimerService.startTurn(gameId, false);
+    }
   }
 
   await broadcastGameState(
@@ -389,6 +593,16 @@ export async function handleTimerExpired(
     connectionManager,
     turnTimerService,
   );
+
+  // After timer-based auto-pass, check if the next player is also abandoned
+  await autoPassAbandoned(
+    io,
+    gameId,
+    gameService,
+    connectionManager,
+    turnTimerService,
+    disconnectTimerService,
+  );
 }
 
 export function registerSocketHandlers(
@@ -396,6 +610,7 @@ export function registerSocketHandlers(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  disconnectTimerService: DisconnectTimerService,
 ): void {
   io.on("connection", (socket) => {
     socket.on("game:join", (payload, ack) => {
@@ -407,6 +622,7 @@ export function registerSocketHandlers(
         gameService,
         connectionManager,
         turnTimerService,
+        disconnectTimerService,
       ).catch((err: unknown) => {
         console.error("game:join error", err);
         ack({ success: false, error: "INTERNAL_ERROR" });
@@ -422,6 +638,7 @@ export function registerSocketHandlers(
         gameService,
         connectionManager,
         turnTimerService,
+        disconnectTimerService,
       ).catch((err: unknown) => {
         console.error("game:start error", err);
         ack({ success: false, error: "INTERNAL_ERROR" });
@@ -437,6 +654,7 @@ export function registerSocketHandlers(
         gameService,
         connectionManager,
         turnTimerService,
+        disconnectTimerService,
       ).catch((err: unknown) => {
         console.error("game:action error", err);
         ack({ success: false, error: "INVALID_ACTION" });
@@ -450,17 +668,24 @@ export function registerSocketHandlers(
         payload,
         connectionManager,
         gameService,
+        disconnectTimerService,
+        turnTimerService,
       ).catch((err: unknown) => {
         console.error("game:leave error", err);
       });
     });
 
     socket.on("disconnect", () => {
-      handleDisconnect(socket, io, connectionManager, gameService).catch(
-        (err: unknown) => {
-          console.error("disconnect error", err);
-        },
-      );
+      handleDisconnect(
+        socket,
+        io,
+        connectionManager,
+        gameService,
+        turnTimerService,
+        disconnectTimerService,
+      ).catch((err: unknown) => {
+        console.error("disconnect error", err);
+      });
     });
   });
 }
