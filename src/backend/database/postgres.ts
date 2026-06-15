@@ -98,4 +98,10 @@ export class PostgresDB
   public async createFeedback(feedback: Feedback): Promise<Feedback> {
     return this.dataSource!.getRepository(Feedback).save(feedback);
   }
+
+  public async getAllFeedback(): Promise<Feedback[]> {
+    return this.dataSource!.getRepository(Feedback).find({
+      order: { createdAt: "DESC" },
+    });
+  }
 }

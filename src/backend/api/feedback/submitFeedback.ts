@@ -7,13 +7,42 @@ import type {
 import { FeedbackService, ValidationError } from "@/service/feedbackService";
 import { feedbackRepo } from "@/database";
 
-export class SubmitFeedbackHandler extends Handler {
-  public static INSTANCE: SubmitFeedbackHandler = new SubmitFeedbackHandler();
+function getAdminIds(): Set<string> {
+  return new Set(
+    (process.env.FEEDBACK_ADMIN_IDS ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
+  );
+}
+
+export class FeedbackHandler extends Handler {
+  public static INSTANCE: FeedbackHandler = new FeedbackHandler();
   private readonly feedbackService: FeedbackService;
 
   private constructor() {
     super();
     this.feedbackService = new FeedbackService(feedbackRepo);
+  }
+
+  public override async get(request: Request, response: Response) {
+    const userId = request.userId;
+    if (!userId || !getAdminIds().has(userId)) {
+      response.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const feedback = await feedbackRepo.getAllFeedback();
+    response.status(200).json(
+      feedback.map((f) => ({
+        id: f.id,
+        category: f.category,
+        description: f.description,
+        metadata: f.metadata,
+        userId: f.userId,
+        createdAt: f.createdAt.toISOString(),
+      })),
+    );
   }
 
   public override async post(

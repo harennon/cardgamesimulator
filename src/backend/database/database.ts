@@ -36,4 +36,5 @@ export interface PlayerStatsRepository {
 
 export interface FeedbackRepository {
   createFeedback(feedback: Feedback): Promise<Feedback>;
+  getAllFeedback(): Promise<Feedback[]>;
 }

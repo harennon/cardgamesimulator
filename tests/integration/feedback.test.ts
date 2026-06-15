@@ -152,4 +152,56 @@ describe("Feedback endpoint integration", () => {
     expect(stored).not.toBeNull();
     expect(stored!.description).toBe("trimmed content");
   });
+
+  // GET /feedback (admin-only)
+
+  it("GET /feedback returns 403 for non-admin user", async () => {
+    const user = await createTestUser("FeedbackNonAdmin");
+
+    const res = await request(ctx.app)
+      .get("/feedback")
+      .set("Authorization", `Bearer ${user.accessToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  it("GET /feedback returns 401 without auth", async () => {
+    const res = await request(ctx.app).get("/feedback");
+
+    expect(res.status).toBe(401);
+  });
+
+  it("GET /feedback returns feedback list for admin user", async () => {
+    const admin = await createTestUser("FeedbackAdmin");
+
+    // Submit feedback first
+    await request(ctx.app)
+      .post("/feedback")
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ category: "bug", description: "Admin test feedback" });
+
+    // Set admin ID env var (handler reads it per-request)
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
+    try {
+      const res = await request(ctx.app)
+        .get("/feedback")
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      const items = res.body as Array<{
+        id: string;
+        category: string;
+        description: string;
+        createdAt: string;
+      }>;
+      expect(items.length).toBeGreaterThan(0);
+      const found = items.find((f) => f.description === "Admin test feedback");
+      expect(found).toBeDefined();
+      expect(found!.category).toBe("bug");
+      expect(found!.createdAt).toBeDefined();
+    } finally {
+      delete process.env.FEEDBACK_ADMIN_IDS;
+    }
+  });
 });
