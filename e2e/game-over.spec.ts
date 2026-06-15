@@ -96,9 +96,13 @@ test.describe("Game over screen", () => {
     });
 
     // Create a guest browser context and set the cookie via page.evaluate
-    // (addCookies with domain "localhost" can be unreliable with SameSite)
     const guestContext = await browser.newContext();
     const guestPage = await guestContext.newPage();
+
+    // Capture console logs from the browser for debugging
+    guestPage.on("console", (msg) => {
+      console.log(`[browser ${msg.type()}] ${msg.text()}`);
+    });
 
     // Navigate to root first to establish origin, then set cookie via JS
     await guestPage.goto("/");
@@ -107,7 +111,55 @@ test.describe("Game over screen", () => {
       document.cookie = `guestSession=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Strict`;
     }, guestData.token);
 
+    // Diagnostic: verify cookie, decode, and match
+    const diag = await guestPage.evaluate((expectedGameId) => {
+      const cookie = document.cookie;
+      const prefix = "guestSession=";
+      let token: string | null = null;
+      for (const part of cookie.split(";")) {
+        const trimmed = part.trim();
+        if (trimmed.startsWith(prefix)) {
+          token = decodeURIComponent(trimmed.slice(prefix.length));
+          break;
+        }
+      }
+      if (!token) return { error: "cookie not found", cookie };
+      if (!token.startsWith("guest:"))
+        return { error: "no guest: prefix", token: token.slice(0, 50) };
+
+      try {
+        const encoded = token.slice(6);
+        const decoded = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
+        const lastDot = decoded.lastIndexOf(".");
+        if (lastDot === -1)
+          return { error: "no dot in decoded", decoded: decoded.slice(0, 80) };
+        const payload = decoded.slice(0, lastDot);
+        const parts = payload.split(".");
+        if (parts.length !== 3)
+          return { error: `expected 3 parts, got ${parts.length}`, parts };
+        const [guestId, gameId, expiresAtStr] = parts;
+        const expiresAt = parseInt(expiresAtStr!, 10);
+        const gameIdMatches = gameId === expectedGameId;
+        const isExpired = Date.now() > expiresAt;
+        return {
+          guestId,
+          gameId,
+          expiresAt,
+          gameIdMatches,
+          isExpired,
+          expectedGameId,
+        };
+      } catch (e) {
+        return { error: `decode failed: ${e}` };
+      }
+    }, gameId);
+    console.log("[DIAG] Guest cookie decode:", JSON.stringify(diag, null, 2));
+
     await guestPage.goto(`/game/${gameId}`);
+
+    // Diagnostic: what page did we end up on?
+    console.log("[DIAG] Final URL:", guestPage.url());
+
     await expect(guestPage.locator('[data-testid="game-over"]')).toBeVisible({
       timeout: 10_000,
     });
