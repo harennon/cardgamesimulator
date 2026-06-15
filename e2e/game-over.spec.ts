@@ -95,18 +95,17 @@ test.describe("Game over screen", () => {
       ],
     });
 
-    // Create a guest browser context with the guest token stored in cookie
+    // Create a guest browser context and set the cookie via page.evaluate
+    // (addCookies with domain "localhost" can be unreliable with SameSite)
     const guestContext = await browser.newContext();
     const guestPage = await guestContext.newPage();
-    // Set the guest cookie so the frontend recognizes this as a guest session
-    await guestContext.addCookies([
-      {
-        name: "guestSession",
-        value: encodeURIComponent(guestData.token),
-        domain: "localhost",
-        path: "/",
-      },
-    ]);
+
+    // Navigate to root first to establish origin, then set cookie via JS
+    await guestPage.goto("/");
+    await guestPage.evaluate((token) => {
+      const expires = new Date(Date.now() + 4 * 60 * 60 * 1000).toUTCString();
+      document.cookie = `guestSession=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Strict`;
+    }, guestData.token);
 
     await guestPage.goto(`/game/${gameId}`);
     await expect(guestPage.locator('[data-testid="game-over"]')).toBeVisible({
