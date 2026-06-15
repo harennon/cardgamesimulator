@@ -23,7 +23,6 @@ import { createSocketAuthMiddleware } from "@/websocket/socketAuth";
 import {
   registerSocketHandlers,
   handleTimerExpired,
-  handleGracePeriodExpired,
 } from "@/websocket/socketHandler";
 import { ConnectionManager } from "@/websocket/connectionManager";
 import { GameService } from "@/service/gameService";
@@ -37,7 +36,6 @@ import { createClaimRouter } from "@/api/guest/claimSession";
 import { GetStatsHandler } from "@/api/stats/getStats";
 import { RealTimerProvider } from "@/timer/realTimerProvider";
 import { TurnTimerService } from "@/timer/turnTimerService";
-import { DisconnectTimerService } from "@/websocket/disconnectTimerService";
 
 export class Server {
   private readonly app: Express;
@@ -123,12 +121,6 @@ export class Server {
     );
     const connectionManager = new ConnectionManager();
     this.timerProvider = new RealTimerProvider();
-    // Forward reference: turnTimerService and disconnectTimerService reference each other
-    // via callbacks. The let declaration here is intentional — the variable is assigned
-    // once on the next statement but must be declared as let so the closure in the
-    // TurnTimerService callback can capture the binding before the const initializer runs.
-    // eslint-disable-next-line prefer-const
-    let disconnectTimerService: DisconnectTimerService;
     const turnTimerService = new TurnTimerService(
       this.timerProvider,
       (gameId) => {
@@ -138,24 +130,7 @@ export class Server {
           gameService,
           connectionManager,
           turnTimerService,
-          disconnectTimerService,
         ).catch((err: unknown) => console.error("Timer expired error", err));
-      },
-    );
-    disconnectTimerService = new DisconnectTimerService(
-      this.timerProvider,
-      (gameId, playerId) => {
-        handleGracePeriodExpired(
-          this.io,
-          gameId,
-          playerId,
-          gameService,
-          connectionManager,
-          turnTimerService,
-          disconnectTimerService,
-        ).catch((err: unknown) =>
-          console.error("Grace period expired error", err),
-        );
       },
     );
     registerSocketHandlers(
@@ -163,7 +138,6 @@ export class Server {
       gameService,
       connectionManager,
       turnTimerService,
-      disconnectTimerService,
     );
   }
 

@@ -22,9 +22,7 @@ import { createSocketAuthMiddleware } from "../../../src/backend/websocket/socke
 import {
   registerSocketHandlers,
   handleTimerExpired,
-  handleGracePeriodExpired,
 } from "../../../src/backend/websocket/socketHandler.js";
-import { DisconnectTimerService } from "../../../src/backend/websocket/disconnectTimerService.js";
 import { ConnectionManager } from "../../../src/backend/websocket/connectionManager.js";
 import { GameService } from "../../../src/backend/service/gameService.js";
 import { StatsService } from "../../../src/backend/service/statsService.js";
@@ -45,7 +43,7 @@ export interface TestServerContext {
   baseUrl: string;
   timerProvider: FakeTimerProvider;
   turnTimerService: TurnTimerService;
-  disconnectTimerService: DisconnectTimerService;
+  connectionManager: ConnectionManager;
   close: () => Promise<void>;
 }
 
@@ -138,9 +136,6 @@ export async function createTestServer(
   );
   const connectionManager = new ConnectionManager();
   const timerProvider = timerProviderOverride ?? new FakeTimerProvider();
-  // Forward reference: turnTimerService and disconnectTimerService reference each other
-  // via callbacks, so we use let + late assignment to break the circular dependency.
-  let disconnectTimerService: DisconnectTimerService;
   const turnTimerService = new TurnTimerService(timerProvider, (gameId) => {
     handleTimerExpired(
       io,
@@ -148,32 +143,9 @@ export async function createTestServer(
       gameService,
       connectionManager,
       turnTimerService,
-      disconnectTimerService,
     ).catch((err: unknown) => console.error("Timer expired error:", err));
   });
-  disconnectTimerService = new DisconnectTimerService(
-    timerProvider,
-    (gameId, playerId) => {
-      handleGracePeriodExpired(
-        io,
-        gameId,
-        playerId,
-        gameService,
-        connectionManager,
-        turnTimerService,
-        disconnectTimerService,
-      ).catch((err: unknown) =>
-        console.error("Grace period expired error:", err),
-      );
-    },
-  );
-  registerSocketHandlers(
-    io,
-    gameService,
-    connectionManager,
-    turnTimerService,
-    disconnectTimerService,
-  );
+  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
 
   // Initialize DB (idempotent across test files in the same process)
   await ensureDbInitialized();
@@ -215,7 +187,7 @@ export async function createTestServer(
     baseUrl,
     timerProvider,
     turnTimerService,
-    disconnectTimerService,
+    connectionManager,
     close,
   };
 }

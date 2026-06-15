@@ -14,7 +14,7 @@ export interface CreateGameRequest {
   gameType: GameType;
   maxPlayers: number;
   gameOptions: { [key: string]: string };
-  turnTimerSeconds?: number | null; // null, 30, 60, or 90
+  turnTimerSeconds: 30 | 60 | 90;
 }
 
 export interface CreateGameResponse {

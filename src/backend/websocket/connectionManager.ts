@@ -21,6 +21,8 @@ export class ConnectionManager {
   private readonly spectatorSockets: Map<string, Set<string>> = new Map();
   // socketId -> gameId (reverse lookup for spectator disconnect)
   private readonly spectatorSocketMeta: Map<string, string> = new Map();
+  // gameId -> Set<playerId> (players whose turn timer expired while disconnected)
+  private readonly abandonedPlayers: Map<string, Set<PlayerId>> = new Map();
 
   /** Register a player socket for a game. */
   addPlayerSocket(
@@ -153,5 +155,28 @@ export class ConnectionManager {
     return Array.from(gamePlayers.keys()).filter(
       (playerId) => (gamePlayers.get(playerId)?.size ?? 0) > 0,
     );
+  }
+
+  /** Mark a player as abandoned (turn timer expired while disconnected). */
+  markAbandoned(gameId: string, playerId: PlayerId): void {
+    if (!this.abandonedPlayers.has(gameId)) {
+      this.abandonedPlayers.set(gameId, new Set());
+    }
+    this.abandonedPlayers.get(gameId)!.add(playerId);
+  }
+
+  /** Clear abandoned status (player reconnected). */
+  clearAbandoned(gameId: string, playerId: PlayerId): void {
+    this.abandonedPlayers.get(gameId)?.delete(playerId);
+  }
+
+  /** Check if a player is abandoned. */
+  isAbandoned(gameId: string, playerId: PlayerId): boolean {
+    return this.abandonedPlayers.get(gameId)?.has(playerId) ?? false;
+  }
+
+  /** Clean up abandoned state for a game. */
+  clearGameAbandoned(gameId: string): void {
+    this.abandonedPlayers.delete(gameId);
   }
 }
