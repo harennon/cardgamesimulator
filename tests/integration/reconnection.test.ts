@@ -251,15 +251,24 @@ describe("Reconnection and disconnect handling", () => {
 
       expect(ctx.connectionManager.isAbandoned(gameId, userA.id)).toBe(false);
 
-      // Fire all timers — the turn timer for the current player will expire
-      // If userA is the current player, their timer fires and marks them abandoned.
-      // If userB is the current player, fire their timer first, then userA becomes current.
+      // Fire timer and wait for the state broadcast to confirm processing completed
+      const waitForState = () =>
+        new Promise<void>((resolve) => {
+          sockets[1]!.once("game:state", () => resolve());
+        });
+
+      // Fire all timers — the turn timer for the current player will expire.
+      // Wait for game:state broadcast to confirm the async handler completed.
+      let statePromise = waitForState();
       ctx.timerProvider.fireAll();
-      await new Promise((r) => setTimeout(r, 50));
+      await statePromise;
 
       // Fire again in case userA was not first-turn player
-      ctx.timerProvider.fireAll();
-      await new Promise((r) => setTimeout(r, 50));
+      if (!ctx.connectionManager.isAbandoned(gameId, userA.id)) {
+        statePromise = waitForState();
+        ctx.timerProvider.fireAll();
+        await statePromise;
+      }
 
       expect(ctx.connectionManager.isAbandoned(gameId, userA.id)).toBe(true);
     } finally {
@@ -274,36 +283,33 @@ describe("Reconnection and disconnect handling", () => {
       "AutoPassAbandoned",
     );
     try {
-      // Disconnect the non-current player to set up the scenario
       const currentPlayerIdx = initialStates[0]!.currentPlayerIndex;
       const otherIdx = 1 - currentPlayerIdx;
 
       await disconnectAndWait(sockets[otherIdx]!, sockets[currentPlayerIdx]!);
 
-      // Fire the current player's timer — auto-passes them, advances to the disconnected player
-      // That disconnected player's timer then fires, marks them abandoned
-      // But wait — we need the disconnected player to be on their turn AND have their timer expire
-      // to become abandoned. Let's fire the turn timer for the current player first.
       const versionBefore = initialStates[0]!.version;
 
-      const statePromise = new Promise<EnrichedPlayerView>((resolve) => {
+      // Fire turn timer for current player — advances turn to disconnected player.
+      // Wait for state broadcast confirming the timer expiry was processed.
+      let statePromise = new Promise<EnrichedPlayerView>((resolve) => {
+        sockets[currentPlayerIdx]!.once("game:state", resolve);
+      });
+      ctx.timerProvider.fireAll();
+      await statePromise;
+
+      // Fire again — disconnected player's timer expires, marks abandoned, turn advances back.
+      // The second fire + autoPlayAbandoned should produce version > versionBefore + 1.
+      const finalStatePromise = new Promise<EnrichedPlayerView>((resolve) => {
         sockets[currentPlayerIdx]!.on("game:state", (state) => {
-          // Wait for version that shows we advanced past the abandoned player too
           if (state.version > versionBefore + 1) {
             resolve(state);
           }
         });
       });
-
-      // Fire turn timer (current player expires → abandoned player gets turn)
-      // Then fire again (abandoned player's timer expires → marks abandoned → back to current)
       ctx.timerProvider.fireAll();
-      await new Promise((r) => setTimeout(r, 50));
-      ctx.timerProvider.fireAll();
-      await new Promise((r) => setTimeout(r, 50));
+      const finalState = await finalStatePromise;
 
-      const finalState = await statePromise;
-      // Version advanced by more than 1 — the abandoned player was auto-passed
       expect(finalState.version).toBeGreaterThan(versionBefore + 1);
     } finally {
       sockets.forEach(disconnectSocket);
@@ -319,11 +325,20 @@ describe("Reconnection and disconnect handling", () => {
     try {
       await disconnectAndWait(sockets[0]!, sockets[1]!);
 
-      // Fire timers until userA is marked abandoned
+      // Fire timers until userA is marked abandoned — wait for state broadcasts
+      let statePromise = new Promise<void>((resolve) => {
+        sockets[1]!.once("game:state", () => resolve());
+      });
       ctx.timerProvider.fireAll();
-      await new Promise((r) => setTimeout(r, 50));
-      ctx.timerProvider.fireAll();
-      await new Promise((r) => setTimeout(r, 50));
+      await statePromise;
+
+      if (!ctx.connectionManager.isAbandoned(gameId, userA.id)) {
+        statePromise = new Promise<void>((resolve) => {
+          sockets[1]!.once("game:state", () => resolve());
+        });
+        ctx.timerProvider.fireAll();
+        await statePromise;
+      }
 
       expect(ctx.connectionManager.isAbandoned(gameId, userA.id)).toBe(true);
 
