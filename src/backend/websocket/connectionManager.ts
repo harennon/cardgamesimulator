@@ -54,9 +54,7 @@ export class ConnectionManager {
   /**
    * Remove a socket. Returns the gameId, playerId, and role if the socket was registered.
    */
-  removeSocket(
-    socketId: string,
-  ): {
+  removeSocket(socketId: string): {
     gameId: string;
     playerId: PlayerId;
     role: "player" | "spectator";
@@ -126,6 +124,18 @@ export class ConnectionManager {
   /** Get the number of spectators connected to a game. */
   getSpectatorCount(gameId: string): number {
     return this.spectatorSockets.get(gameId)?.size ?? 0;
+  }
+
+  /** Check if a socket is registered as a spectator for any game. */
+  isSpectator(socketId: string): boolean {
+    return this.spectatorSocketMeta.has(socketId);
+  }
+
+  /** Get the gameId a spectator socket is watching. Returns null if not a spectator.
+   *  Used in handleGameLeave to resolve the actual game being spectated
+   *  (prevents mismatched-gameId bugs if payload contains wrong gameId). */
+  getSpectatorGameId(socketId: string): string | null {
+    return this.spectatorSocketMeta.get(socketId) ?? null;
   }
 
   /** Check if a player has any active connections to a game. */

@@ -143,4 +143,36 @@ describe("ConnectionManager", () => {
       expect(cm.getSpectatorCount("game-1")).toBe(1);
     });
   });
+
+  describe("isSpectator / getSpectatorGameId", () => {
+    it("isSpectator returns true for a registered spectator socket", () => {
+      const cm = new ConnectionManager();
+      cm.addSpectatorSocket("game-1", makeSocket("spec-1"));
+      expect(cm.isSpectator("spec-1")).toBe(true);
+    });
+
+    it("isSpectator returns false for a player socket", () => {
+      const cm = new ConnectionManager();
+      cm.addPlayerSocket("game-1", "player-a", makeSocket("sock-1"));
+      expect(cm.isSpectator("sock-1")).toBe(false);
+    });
+
+    it("isSpectator returns false after the spectator socket is removed", () => {
+      const cm = new ConnectionManager();
+      cm.addSpectatorSocket("game-1", makeSocket("spec-1"));
+      cm.removeSocket("spec-1");
+      expect(cm.isSpectator("spec-1")).toBe(false);
+    });
+
+    it("getSpectatorGameId returns the correct gameId before removal and null after", () => {
+      const cm = new ConnectionManager();
+      cm.addSpectatorSocket("game-1", makeSocket("spec-1"));
+      cm.addSpectatorSocket("game-1", makeSocket("spec-2"));
+      expect(cm.getSpectatorGameId("spec-1")).toBe("game-1");
+      cm.removeSocket("spec-1");
+      expect(cm.getSpectatorGameId("spec-1")).toBeNull();
+      // spec-2 count decrements correctly: from 2 to 1
+      expect(cm.getSpectatorCount("game-1")).toBe(1);
+    });
+  });
 });

@@ -15,6 +15,15 @@ import type {
 } from "@shared/socket-events";
 import type { TurnTimerService } from "@/timer/turnTimerService";
 
+function emitSpectatorCount(
+  io: TypedServer,
+  gameId: string,
+  connectionManager: ConnectionManager,
+): void {
+  const count = connectionManager.getSpectatorCount(gameId);
+  io.to(`game:${gameId}`).emit("game:spectatorCount", { gameId, count });
+}
+
 function injectConnectionStatus<
   T extends { players: readonly PlayerPublicInfo[] },
 >(view: T, gameId: string, connectionManager: ConnectionManager): T {
@@ -129,23 +138,29 @@ async function handleGameJoin(
       return;
     }
 
+    // Reject spectating a game that hasn't started yet — nothing to watch
+    if (game.status === "CREATED") {
+      ack({ success: false, error: "SPECTATING_NOT_AVAILABLE" });
+      return;
+    }
+
     connectionManager.addSpectatorSocket(gameId, socket);
     await socket.join(`spectators:${gameId}`);
 
-    if (game.status !== "CREATED") {
-      const spectatorCount = connectionManager.getSpectatorCount(gameId);
-      const spectatorView = await gameService.getSpectatorView(
-        gameId,
-        spectatorCount,
-      );
-      if (spectatorView) {
-        const turnDeadline = turnTimerService.getDeadline(gameId);
-        socket.emit("game:spectatorState", {
-          ...injectConnectionStatus(spectatorView, gameId, connectionManager),
-          turnDeadline,
-        });
-      }
+    const spectatorCount = connectionManager.getSpectatorCount(gameId);
+    const spectatorView = await gameService.getSpectatorView(
+      gameId,
+      spectatorCount,
+    );
+    if (spectatorView) {
+      const turnDeadline = turnTimerService.getDeadline(gameId);
+      socket.emit("game:spectatorState", {
+        ...injectConnectionStatus(spectatorView, gameId, connectionManager),
+        turnDeadline,
+      });
     }
+
+    emitSpectatorCount(io, gameId, connectionManager);
 
     ack({ success: true });
   }
@@ -165,6 +180,11 @@ async function handleGameStart(
 
   if (!gameId) {
     ack({ success: false, error: "gameId is required" });
+    return;
+  }
+
+  if (connectionManager.isSpectator(socket.id)) {
+    ack({ success: false, error: "SPECTATOR_CANNOT_ACT" });
     return;
   }
 
@@ -216,6 +236,11 @@ async function handleGameAction(
     return;
   }
 
+  if (connectionManager.isSpectator(socket.id)) {
+    ack({ success: false, error: "SPECTATOR_CANNOT_ACT" });
+    return;
+  }
+
   // Override client-supplied playerId with authenticated userId (anti-spoofing)
   const safeAction = { ...action, playerId: userId };
 
@@ -253,8 +278,16 @@ async function handleGameLeave(
   const { gameId } = payload;
   const { userId, displayName } = socket.data;
 
+  // Must check spectator status BEFORE removeSocket (which deletes the metadata)
+  const spectatorGameId = connectionManager.getSpectatorGameId(socket.id);
+  if (spectatorGameId) {
+    socket.leave(`spectators:${spectatorGameId}`);
+    connectionManager.removeSocket(socket.id);
+    emitSpectatorCount(io, spectatorGameId, connectionManager);
+    return;
+  }
+
   socket.leave(`game:${gameId}`);
-  socket.leave(`spectators:${gameId}`);
   connectionManager.removeSocket(socket.id);
 
   if (!connectionManager.isPlayerConnected(gameId, userId)) {
@@ -283,6 +316,11 @@ async function handleDisconnect(
   if (!meta) return;
 
   const { gameId, playerId, role } = meta;
+
+  if (role === "spectator") {
+    emitSpectatorCount(io, gameId, connectionManager);
+    return;
+  }
 
   if (
     role === "player" &&
@@ -333,7 +371,9 @@ export async function handleTimerExpired(
     playerId: autoAction.playerId,
     action: autoAction.type as "pass" | "playCards",
   };
-  io.to(`game:${gameId}`).emit("game:timerExpired", timerExpiredPayload);
+  io.to(`game:${gameId}`)
+    .to(`spectators:${gameId}`)
+    .emit("game:timerExpired", timerExpiredPayload);
 
   const newState = await gameService.getGameState(gameId);
   if (newState?.status === "COMPLETED") {

@@ -82,6 +82,11 @@ export interface TimerExpiredPayload {
   action: "pass" | "playCards"; // what was auto-played
 }
 
+export interface SpectatorCountPayload {
+  gameId: string;
+  count: number;
+}
+
 /** Events the server emits to clients */
 export interface ServerToClientEvents {
   /** Full game state update for a player (filtered to their view). */
@@ -92,6 +97,9 @@ export interface ServerToClientEvents {
 
   /** Emitted when the turn timer expires and an auto-action was applied. */
   "game:timerExpired": (payload: TimerExpiredPayload) => void;
+
+  /** Spectator count changed (emitted to players when a spectator joins/leaves). */
+  "game:spectatorCount": (payload: SpectatorCountPayload) => void;
 
   /** A player joined the lobby (pre-game). */
   "lobby:playerJoined": (payload: LobbyPlayerJoinedPayload) => void;

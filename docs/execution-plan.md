@@ -21,14 +21,19 @@ Phase 3: Frontend
   └── LLD 6.5: Integration Test Suite (depends on: all of Phase 1-3)
 
 Phase 4: Online Features
-  ├── LLD 7: Turn Timer + Stats (depends on: Big2 Engine)
-  └── LLD 8: Spectating + Reconnection (depends on: WebSocket Layer)
+  ├── LLD 7a: Turn Timer (depends on: Big2 Engine)
+  ├── LLD 7b: Player Stats (depends on: Big2 Engine, Turn Timer)
+  ├── LLD 8a: Spectating (depends on: WebSocket Layer)
+  └── LLD 8b: Reconnection + Disconnect Handling (depends on: WebSocket Layer, Turn Timer)
 
-Phase 5: Polish
-  └── (No LLD — driven by CX doc and playtesting)
+Phase 5A: Playtest Readiness
+  ├── LLD 9: Feedback Widget (depends on: Frontend Game UI)
+  └── LLD 10: Deployment (independent — can start anytime after Phase 1)
 
-Phase 6: Deployment
-  └── LLD 9: Deployment (independent — can start anytime after Phase 1)
+Phase 5B: Polish
+  ├── LLD 11: Mobile Layout (depends on: Frontend Game UI)
+  ├── LLD 12: Rematch + Invite UX (depends on: WebSocket Layer)
+  └── LLD 13: Animations + Polish (depends on: Frontend Game UI)
 ```
 
 ---
@@ -173,59 +178,90 @@ The game UI. After this phase, Big2 is playable in the browser.
 
 Features that make it a full multiplayer experience.
 
-### LLD 7: Turn Timer + Stats
+### LLD 7a: Turn Timer
 
-**Scope:** Server-side turn timer and persistent player statistics.
+**Scope:** Server-side turn timer with auto-play on expiry.
 
 - Timer: in-memory countdown per active game, starts on turn begin, auto-pass on expiry
 - Timer configuration: set at game creation (off / 30s / 60s / 90s)
-- Timer broadcast: include remaining time in `PlayerView` state updates
-- PlayerStats entity: games played, won, lost, total score, last played timestamp
-- Stats update trigger: on game completion, update all players' stats
-- Guest-to-registered conversion: apply pending game result to new account
-- Home dashboard: display stats and recent game history
+- Timer broadcast: include `turnDeadline` (absolute timestamp) in PlayerView via socket enrichment
+- Injectable TimerProvider interface (RealTimerProvider for production, FakeTimerProvider for tests)
+- TurnTimerService: register/start/cancel per game, 2x duration for first turn
+- `getAutoTimeoutAction` on GameEngine interface (returns valid action for timed-out player)
 
 **Depends on:** LLD 4 (Big2 engine must exist for timer to auto-pass)
-**Outputs:** Timer visible in UI, stats tracked and displayed
+**Outputs:** Timer visible in UI, auto-play on expiry
 
 ---
 
-### LLD 8: Spectating + Reconnection
+### LLD 7b: Player Stats
 
-**Scope:** Non-player viewing and robust connection handling.
+**Scope:** Persistent player statistics recorded on game completion.
+
+- PlayerStats entity: games played, won, lost, total score, last played timestamp
+- Atomic `incrementStats` via SQL `ON CONFLICT DO UPDATE SET col = col + $n`
+- StatsService: fire-and-forget recording on game completion, guest filtering
+- `GET /stats` endpoint: returns stats + computed winRate for authenticated user
+- Stats recorded when game transitions to COMPLETED (covers both player action and timer auto-play)
+
+**Depends on:** LLD 4 (Big2 engine), LLD 7a (timer auto-play triggers completion)
+**Outputs:** Stats tracked and queryable via REST
+
+---
+
+### LLD 8a: Spectating
+
+**Scope:** Non-player viewing of in-progress games.
 
 - Spectator WebSocket role: join room as viewer, receive SpectatorView only
 - Spectator entry: arrive at in-progress game → offered spectator mode
 - Spectator count broadcast to players ("2 watching")
-- Reconnection: on WebSocket reconnect, server sends full current state
-- Disconnect handling: short grace period (30s), then auto-pass per turn until reconnect or game end
-- Mid-game player departure: if a player leaves permanently, auto-pass their turns for remainder of game
+- Spectator room management (separate from player rooms, no action permissions)
+- Spectator receives turnDeadline enrichment (consistent with players)
 
 **Depends on:** LLD 3 (WebSocket layer)
-**Outputs:** Spectating works, disconnects handled gracefully
+**Outputs:** Spectators can watch live games without participating
 
 ---
 
-## Phase 5: Polish
+### LLD 8b: Reconnection + Disconnect Handling
 
-No LLD — driven by playtesting and the CX doc. Work includes:
+**Scope:** Robust connection handling for players who drop or leave.
 
-- Card animations (deal, draw, play transitions)
-- Game log panel (recent actions in sidebar)
-- Mobile-responsive layout
-- Invite UX (copy link button, native share on mobile)
-- Rematch flow (same players, new game with one click)
-- Toast notifications (player joined, timer warning, connection status)
-- Loading/transition states
-- Sound effects (optional)
+- Reconnection: on WebSocket reconnect, server sends full current state
+- Disconnect detection: track connected/disconnected status per player via ConnectionManager
+- Grace period: short window (30s) before treating disconnect as abandonment
+- Auto-pass on disconnect: if it's a disconnected player's turn and grace period expires, auto-pass using timer infrastructure
+- Mid-game permanent departure: auto-pass their turns for remainder of game
+- Connection status broadcast: other players see who is connected/disconnected
 
-A `docs/ux-polish.md` can be written when this phase begins.
+**Depends on:** LLD 3 (WebSocket layer), LLD 7a (reuses timer/auto-play infrastructure for disconnect auto-pass)
+**Outputs:** Disconnects handled gracefully, reconnecting players rejoin seamlessly
 
 ---
 
-## Phase 6: Deployment
+## Phase 5A: Playtest Readiness
 
-### LLD 9: Deployment
+Get the app into real users' hands with a feedback loop.
+
+---
+
+### LLD 9: Feedback Widget
+
+**Scope:** In-app feedback mechanism for playtesters.
+
+- Floating "Feedback" button (always visible during gameplay)
+- Modal with: category dropdown (Bug / Confusing UX / Feature Request / Other), free-text description
+- Auto-captures: current route, game status, user type (guest/registered), browser/viewport
+- `POST /feedback` endpoint stores submissions in Supabase `feedback` table
+- No admin UI for v1 — query Supabase dashboard directly to read feedback
+
+**Depends on:** LLD 6 (Frontend Game UI)
+**Outputs:** Playtesters can submit structured feedback from within the app
+
+---
+
+### LLD 10: Deployment
 
 **Scope:** Get the app running online.
 
@@ -237,20 +273,65 @@ A `docs/ux-polish.md` can be written when this phase begins.
 - Monitoring basics (health check endpoint, error logging)
 
 **Depends on:** Phase 1 (foundation must be stable)
-**Can start:** Anytime after Phase 1. Can run in parallel with Phases 2–5.
+**Can start:** Anytime after Phase 1. Can run in parallel with Phases 2–5A.
 **Outputs:** App accessible at a public URL
+
+---
+
+## Phase 5B: Polish
+
+Driven by playtesting feedback. Order determined by what playtesters report as most impactful.
+
+### LLD 11: Mobile Layout
+
+**Scope:** Responsive game board for mobile devices.
+
+- Touch-friendly card selection and actions
+- Viewport handling (safe areas, orientation)
+- Responsive breakpoints for game board, lobby, and stats screens
+
+**Depends on:** LLD 6 (Frontend Game UI)
+**Outputs:** Playable on mobile browsers
+
+---
+
+### LLD 12: Rematch + Invite UX
+
+**Scope:** Streamline multi-game sessions and player invitations.
+
+- Rematch flow: same players, new game with one click from game-over screen
+- Copy link button for game invites
+- Native share on mobile (Web Share API)
+
+**Depends on:** LLD 3 (WebSocket layer)
+**Outputs:** Frictionless replay and sharing
+
+---
+
+### LLD 13: Animations + Polish
+
+**Scope:** Visual feedback and UI delight.
+
+- Card animations (deal, play transitions)
+- Toast notifications (player joined, timer warning, connection status)
+- Loading/transition states between screens
+- Game log panel (recent actions in sidebar)
+- Sound effects (optional)
+
+**Depends on:** LLD 6 (Frontend Game UI)
+**Outputs:** Polished, responsive game feel
 
 ---
 
 ## Summary
 
-| Phase              | LLDs      | Key Milestone                                                |
-| ------------------ | --------- | ------------------------------------------------------------ |
-| 1. Foundation      | 1, 2, 3   | Auth, DB, WebSocket, engine interface — infrastructure ready |
-| 2. Core Game       | 4, 5      | Big2 playable via WebSocket, guests can join                 |
-| 3. Frontend        | 6, 6.5    | Big2 playable in browser + integration test safety net       |
-| 4. Online Features | 7, 8      | Timer, stats, spectating, reconnection                       |
-| 5. Polish          | —         | Animations, mobile, UX improvements                          |
-| 6. Deployment      | 9         | Live online                                                  |
+| Phase                  | LLDs           | Key Milestone                                              |
+| ---------------------- | -------------- | ---------------------------------------------------------- |
+| 1. Foundation          | 1, 2, 3        | Auth, DB, WebSocket, engine interface — infrastructure ready |
+| 2. Core Game           | 4, 5           | Big2 playable via WebSocket, guests can join               |
+| 3. Frontend            | 6, 6.5–6.8    | Big2 playable in browser + test safety net                 |
+| 4. Online Features     | 7a, 7b, 8a, 8b | Timer, stats, spectating, reconnection                     |
+| 5A. Playtest Readiness | 9, 10          | Feedback widget, deployment — live app                     |
+| 5B. Polish             | 11, 12, 13     | Mobile, rematch, animations — driven by playtester feedback |
 
-**Total: 10 LLDs, 6 phases.** Each LLD is written just before implementation (not all upfront). Phases are sequential but deployment can be pulled forward once Phase 1 is done.
+**Total: 16 LLDs, 6 phases.** Each LLD is written just before implementation (not all upfront). Phase 4 completes the full multiplayer experience. Phase 5A ships the app live with a feedback loop. Phase 5B is prioritized by playtest feedback.
