@@ -171,6 +171,7 @@ export async function createTestServer(
   const close = (): Promise<void> => {
     guestSessionStore.stopCleanupLoop();
     gameCache.stopEvictionLoop();
+    timerProvider.cancelAll();
     io.disconnectSockets(true);
     return new Promise<void>((resolve, reject) => {
       httpServer.close((err) => {

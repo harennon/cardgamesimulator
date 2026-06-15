@@ -32,6 +32,11 @@ export class FakeTimerProvider implements TimerProvider {
     return entries.length;
   }
 
+  /** Cancel all pending timers without firing them. */
+  cancelAll(): void {
+    this.pending.clear();
+  }
+
   /** Get the number of pending timers. */
   get pendingCount(): number {
     return this.pending.size;
