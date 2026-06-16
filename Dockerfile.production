@@ -31,7 +31,7 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/build ./build
 
 # Copy nginx config as a template (envsubst fills in $PORT at runtime)
-COPY nginx/production.conf /etc/nginx/conf.d/production.conf.template
+COPY nginx/production.conf /etc/nginx/http.d/production.conf.template
 
 # Copy and make entrypoint executable
 COPY docker-entrypoint.sh /docker-entrypoint.sh

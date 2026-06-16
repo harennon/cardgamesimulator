@@ -5,7 +5,7 @@ set -e
 export PORT="${PORT:-8080}"
 
 # Substitute $PORT in nginx config and write to the active config location
-envsubst '${PORT}' < /etc/nginx/conf.d/production.conf.template > /etc/nginx/conf.d/default.conf
+envsubst '${PORT}' < /etc/nginx/http.d/production.conf.template > /etc/nginx/http.d/default.conf
 
 # Start nginx in the background
 nginx -g "daemon off;" &
