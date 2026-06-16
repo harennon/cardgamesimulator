@@ -77,10 +77,13 @@ export class Server {
     });
 
     // register api handlers
-    new Map<string, Handler>([
-      ["/", ServeAppHandler.INSTANCE],
+    const handlers = new Map<string, Handler>([
       ["/echo", EchoHandler.INSTANCE],
-    ]).forEach((handler: Handler, path: string) => {
+    ]);
+    if (process.env.NODE_ENV !== "production") {
+      handlers.set("/", ServeAppHandler.INSTANCE);
+    }
+    handlers.forEach((handler: Handler, path: string) => {
       this.app.use(path, handler.router);
     });
 
