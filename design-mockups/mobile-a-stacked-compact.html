@@ -343,8 +343,15 @@
       .player-hand {
         display: flex;
         align-items: flex-end;
-        justify-content: center;
-        padding: 4px 0;
+        padding: 4px 12px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+        scrollbar-width: none;
+      }
+
+      .player-hand::-webkit-scrollbar {
+        display: none;
       }
 
       .player-hand .card--hand {
@@ -412,17 +419,22 @@
         top: 60px;
         right: 8px;
         z-index: 200;
-        width: 28px;
-        height: 28px;
+        width: 44px;
+        height: 44px;
         border-radius: 50%;
         background: var(--panel-bg);
-        border: 1px solid var(--text-muted);
-        color: var(--text-muted);
-        font-size: 0.7rem;
+        border: 1.5px solid var(--text-muted);
+        color: var(--text-primary);
+        font-size: 1rem;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
+      }
+
+      .log-toggle:active {
+        background: rgba(201, 168, 76, 0.2);
+        border-color: var(--gold-accent);
       }
 
       /* ========== FRAME INFO ========== */

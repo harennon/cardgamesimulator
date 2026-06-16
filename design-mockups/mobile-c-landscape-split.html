@@ -221,6 +221,44 @@
         color: var(--text-muted);
       }
 
+      /* Recent plays history (compact, below table cards) */
+      .play-area__history {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-top: 6px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.2);
+        max-width: 260px;
+      }
+
+      .play-area__history-title {
+        font-family: var(--font-ui);
+        font-size: 0.55rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .history-entry {
+        font-family: var(--font-ui);
+        font-size: 0.6rem;
+        color: var(--text-primary);
+        opacity: 0.7;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .history-entry__name {
+        color: var(--text-muted);
+      }
+
+      .history-entry:first-of-type {
+        opacity: 1;
+      }
+
       /* ========== CARDS ========== */
       .card {
         position: relative;
@@ -525,6 +563,21 @@
           </div>
         </div>
         <div class="play-area__meta">played by Bob</div>
+        <div class="play-area__history">
+          <span class="play-area__history-title">Recent</span>
+          <div class="history-entry">
+            <span class="history-entry__name">Bob</span>
+            <span>Pair 7♠ 7♥</span>
+          </div>
+          <div class="history-entry">
+            <span class="history-entry__name">You</span>
+            <span>Single K♠</span>
+          </div>
+          <div class="history-entry">
+            <span class="history-entry__name">Charlie</span>
+            <span>Pass</span>
+          </div>
+        </div>
       </div>
 
       <!-- Player Hand — Two Rows in Portrait -->

@@ -74,6 +74,8 @@
           #0f2e1c 100%
         );
         overflow: hidden;
+        /* Allow child scroll containers to work on iOS */
+        -webkit-overflow-scrolling: touch;
       }
 
       /* Felt texture */
@@ -384,11 +386,15 @@
 
       /* Scrollable hand */
       .player-hand-scroll {
-        overflow-x: auto;
+        overflow-x: scroll;
         overflow-y: visible;
         -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
         padding: 4px 12px 12px;
         scrollbar-width: none;
+        /* Ensure this container scrolls independently of parent */
+        position: relative;
+        z-index: 2;
       }
 
       .player-hand-scroll::-webkit-scrollbar {
@@ -399,7 +405,7 @@
         display: flex;
         align-items: flex-end;
         padding-top: 16px; /* room for selected card to rise */
-        min-width: min-content;
+        width: max-content;
       }
 
       .player-hand .card--hand {
