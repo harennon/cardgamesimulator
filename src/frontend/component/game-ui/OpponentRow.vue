@@ -156,4 +156,38 @@ function isActive(originalIndex: number): boolean {
     transform: scale(1.3);
   }
 }
+
+@media (max-width: 767px) {
+  .opponent-row {
+    gap: 2px;
+    padding: 6px 8px;
+    border-bottom-width: 1.5px;
+  }
+
+  .opponent {
+    flex-direction: row;
+    padding: 4px 10px;
+    border-radius: 16px;
+    border-width: 1.5px;
+  }
+
+  .opponent__cards {
+    display: none;
+  }
+
+  .opponent__name {
+    font-size: 0.72rem;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .opponent__count {
+    font-size: 0.65rem;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1px 5px;
+    border-radius: 8px;
+  }
+}
 </style>

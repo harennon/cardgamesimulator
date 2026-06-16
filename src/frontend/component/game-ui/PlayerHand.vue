@@ -43,7 +43,7 @@ const emit = defineEmits<{
 }
 
 .player-hand__card {
-  margin-left: -20px;
+  margin-left: var(--card-overlap);
   cursor: default;
 }
 
@@ -56,12 +56,26 @@ const emit = defineEmits<{
 }
 
 .player-hand__card--interactive:hover {
-  transform: translateY(-8px);
+  transform: translateY(var(--card-hover-lift));
 }
 
 .player-hand__card--interactive.player-hand__card:global(
     .card--selected
   ):hover {
-  transform: translateY(-24px);
+  transform: translateY(var(--card-selected-hover-lift));
+}
+
+@media (max-width: 767px) {
+  .player-hand {
+    width: 100%;
+    padding: 20px 12px 4px;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    scrollbar-width: none;
+  }
+
+  .player-hand::-webkit-scrollbar {
+    display: none;
+  }
 }
 </style>

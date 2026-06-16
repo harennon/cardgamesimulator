@@ -1,5 +1,9 @@
 <template>
-  <div class="game-board" data-testid="game-board">
+  <div
+    class="game-board"
+    :class="{ 'game-board--mobile': isMobile }"
+    data-testid="game-board"
+  >
     <div class="game-board__opponents">
       <OpponentRow
         :players="gameState.players"
@@ -18,6 +22,9 @@
     </div>
 
     <div class="game-board__hand">
+      <div class="game-board__hand-label">
+        Your hand ({{ gameState.you.hand.length }})
+      </div>
       <div v-if="isFinished" class="game-board__finished">
         Finished — waiting for others.
       </div>
@@ -46,10 +53,37 @@
       />
     </div>
   </div>
+
+  <!-- Mobile log drawer (teleported to body to escape fixed game-board stacking context) -->
+  <Teleport to="body">
+    <div
+      v-if="isMobile"
+      class="log-drawer"
+      :class="{ 'log-drawer--open': logDrawerOpen }"
+    >
+      <div class="log-drawer__header">
+        <span>Game Log</span>
+        <button class="log-drawer__close" @click="logDrawerOpen = false">
+          &times;
+        </button>
+      </div>
+      <GameLog :entries="big2State?.playHistory ?? []" />
+    </div>
+  </Teleport>
+
+  <!-- Log toggle button (mobile only, fixed position) -->
+  <button
+    v-if="isMobile"
+    class="log-toggle"
+    aria-label="Open game log"
+    @click="logDrawerOpen = !logDrawerOpen"
+  >
+    &#9776;
+  </button>
 </template>
 
 <script lang="ts" setup>
-import { computed } from "vue";
+import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import type { PlayerView } from "@shared/engine-types";
 import type { Big2PublicState } from "@shared/big2-types";
 import OpponentRow from "@/component/game-ui/OpponentRow.vue";
@@ -113,6 +147,35 @@ function onPlay(): void {
 function onPass(): void {
   emit("pass");
 }
+
+const isMobile = ref(false);
+const logDrawerOpen = ref(false);
+
+const mql = window.matchMedia("(max-width: 767px)");
+const handleMediaChange = (e: MediaQueryListEvent) => {
+  isMobile.value = e.matches;
+};
+
+onMounted(() => {
+  isMobile.value = mql.matches;
+  mql.addEventListener("change", handleMediaChange);
+});
+
+onUnmounted(() => {
+  mql.removeEventListener("change", handleMediaChange);
+});
+
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key === "Escape") logDrawerOpen.value = false;
+}
+
+watch(logDrawerOpen, (open) => {
+  if (open) {
+    document.addEventListener("keydown", onKeydown);
+  } else {
+    document.removeEventListener("keydown", onKeydown);
+  }
+});
 </script>
 
 <style scoped>
@@ -200,5 +263,132 @@ function onPass(): void {
 
 .game-board__actions {
   grid-area: actions;
+}
+
+.game-board__hand-label {
+  font-family: var(--font-ui);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding-left: 12px;
+  margin-bottom: 2px;
+}
+
+@media (max-width: 767px) {
+  .game-board--mobile {
+    grid-template-rows: var(--mobile-opponent-height) 1fr var(
+        --mobile-hand-height
+      ) var(--mobile-actions-height);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "opponents"
+      "table"
+      "hand"
+      "actions";
+    overflow: clip;
+  }
+
+  .game-board--mobile::after {
+    border-width: var(--mobile-rim-width);
+  }
+
+  .game-board--mobile > * {
+    min-width: 0;
+  }
+
+  .game-board--mobile .game-board__log {
+    display: none;
+  }
+
+  .game-board--mobile .game-board__hand {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+</style>
+
+<style>
+.log-toggle {
+  position: fixed;
+  top: 60px;
+  right: 8px;
+  z-index: 200;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--panel-bg);
+  border: 1.5px solid var(--text-muted);
+  color: var(--text-primary);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.log-toggle:active {
+  background: rgba(201, 168, 76, 0.2);
+  border-color: var(--gold-accent);
+}
+
+.log-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 280px;
+  height: 100%;
+  z-index: 300;
+  background: var(--panel-bg);
+  border-left: 1.5px solid var(--table-rim-light);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(8px);
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+}
+
+.log-drawer--open {
+  transform: translateX(0);
+}
+
+.log-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--table-rim-light);
+}
+
+.log-drawer__close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opponent__dot {
+    animation: none;
+  }
+
+  .log-drawer {
+    transition: none;
+  }
+
+  .turn-banner {
+    animation: none;
+  }
 }
 </style>
