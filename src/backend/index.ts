@@ -13,6 +13,10 @@ const onCloseSignal = (server: Server, force: boolean) => {
   }
 };
 
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+});
+
 try {
   const server = new Server();
   server.start();
