@@ -20,6 +20,18 @@ export type TypedSocket = Socket<
   SocketData
 >;
 
+const MAX_CONNECTIONS = 1000;
+
+let connectionCapRejections = 0;
+
+export function getConnectionMetrics(io: TypedServer) {
+  return {
+    current: io.engine.clientsCount,
+    max: MAX_CONNECTIONS,
+    rejections: connectionCapRejections,
+  };
+}
+
 export function createSocketServer(
   httpServer: HttpServer | https.Server,
 ): TypedServer {
@@ -33,6 +45,17 @@ export function createSocketServer(
     connectionStateRecovery: {
       maxDisconnectionDuration: 30_000,
     },
+  });
+
+  io.use((socket, next) => {
+    if (io.engine.clientsCount >= MAX_CONNECTIONS) {
+      connectionCapRejections++;
+      console.warn(
+        `Connection rejected: cap reached (${io.engine.clientsCount}/${MAX_CONNECTIONS})`,
+      );
+      return next(new Error("SERVER_FULL"));
+    }
+    next();
   });
 
   return io;
