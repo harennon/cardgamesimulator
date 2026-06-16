@@ -320,15 +320,16 @@
         grid-area: hand;
         display: flex;
         flex-direction: column;
-        align-items: center;
         justify-content: center;
-        padding: 4px 8px 0;
+        padding: 4px 0 0;
         background: linear-gradient(
           180deg,
           rgba(37, 107, 66, 0.3) 0%,
           rgba(37, 107, 66, 0.6) 100%
         );
         border-top: 1.5px solid var(--table-rim-light);
+        min-width: 0;
+        overflow: hidden;
       }
 
       .hand-label {
@@ -348,6 +349,7 @@
         -webkit-overflow-scrolling: touch;
         touch-action: pan-x;
         scrollbar-width: none;
+        width: 100%;
       }
 
       .player-hand::-webkit-scrollbar {

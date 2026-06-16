@@ -338,6 +338,8 @@
         );
         border-top: 1.5px solid var(--table-rim-light);
         padding-bottom: env(safe-area-inset-bottom, 0px);
+        min-width: 0;
+        overflow: hidden;
       }
 
       /* Floating action buttons above hand */
@@ -384,15 +386,13 @@
 
       /* Scrollable hand */
       .player-hand-scroll {
-        overflow-x: scroll;
+        overflow-x: auto;
         overflow-y: visible;
         -webkit-overflow-scrolling: touch;
         touch-action: pan-x;
         padding: 4px 12px 12px;
         scrollbar-width: none;
-        /* Ensure this container scrolls independently of parent */
-        position: relative;
-        z-index: 2;
+        width: 100%;
       }
 
       .player-hand-scroll::-webkit-scrollbar {
