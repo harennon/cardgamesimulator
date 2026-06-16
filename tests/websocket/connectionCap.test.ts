@@ -80,7 +80,7 @@ describe("connection cap middleware", () => {
     expect(errors[0]!.message).toBe("SERVER_FULL");
   });
 
-  it("increments rejection counter on each rejection", () => {
+  it("tracks rejections in rolling window", () => {
     clientsCount = 1000;
     const fakeHttpServer = {} as never;
     const io = createSocketServer(fakeHttpServer);
@@ -90,7 +90,7 @@ describe("connection cap middleware", () => {
     capMiddleware({}, () => {});
 
     const metrics = getConnectionMetrics(io);
-    expect(metrics.rejections).toBe(2);
+    expect(metrics.rejectionsLastMinute).toBe(2);
     expect(metrics.current).toBe(1000);
     expect(metrics.max).toBe(1000);
   });
@@ -104,7 +104,7 @@ describe("connection cap middleware", () => {
     capMiddleware({}, () => {});
 
     const metrics = getConnectionMetrics(io);
-    expect(metrics.rejections).toBe(0);
+    expect(metrics.rejectionsLastMinute).toBe(0);
     expect(metrics.current).toBe(10);
   });
 });

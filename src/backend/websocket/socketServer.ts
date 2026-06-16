@@ -21,14 +21,22 @@ export type TypedSocket = Socket<
 >;
 
 const MAX_CONNECTIONS = 1000;
+const REJECTION_WINDOW_MS = 60_000;
 
-let connectionCapRejections = 0;
+const rejectionTimestamps: number[] = [];
 
 export function getConnectionMetrics(io: TypedServer) {
+  const now = Date.now();
+  while (
+    rejectionTimestamps.length > 0 &&
+    rejectionTimestamps[0]! < now - REJECTION_WINDOW_MS
+  ) {
+    rejectionTimestamps.shift();
+  }
   return {
     current: io.engine.clientsCount,
     max: MAX_CONNECTIONS,
-    rejections: connectionCapRejections,
+    rejectionsLastMinute: rejectionTimestamps.length,
   };
 }
 
@@ -49,7 +57,7 @@ export function createSocketServer(
 
   io.use((socket, next) => {
     if (io.engine.clientsCount >= MAX_CONNECTIONS) {
-      connectionCapRejections++;
+      rejectionTimestamps.push(Date.now());
       console.warn(
         `Connection rejected: cap reached (${io.engine.clientsCount}/${MAX_CONNECTIONS})`,
       );
