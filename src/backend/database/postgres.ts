@@ -32,6 +32,10 @@ export class PostgresDB
       entities: [Game, PlayerStats, Feedback],
       synchronize: process.env.NODE_ENV !== "production",
       logging: process.env.NODE_ENV === "development" ? "all" : ["error"],
+      ssl:
+        process.env.NODE_ENV === "production"
+          ? { rejectUnauthorized: false }
+          : false,
     }).initialize();
   }
 

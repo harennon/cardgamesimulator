@@ -1,6 +1,7 @@
 import * as https from "https";
 import * as http from "http";
 import * as fs from "fs";
+import * as path from "path";
 import express, { type Express } from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -118,6 +119,16 @@ export class Server {
     // Feedback route (auth required, guests allowed for POST; admin-only for GET)
     this.app.use("/feedback", authMiddleware, FeedbackHandler.INSTANCE.router);
 
+    // Production static file serving — after all API routes, before error handler
+    if (process.env.NODE_ENV === "production") {
+      const frontendPath = path.resolve(__dirname, "../frontend");
+      this.app.use(express.static(frontendPath));
+      // SPA fallback — serve index.html for any unmatched route
+      this.app.get("/{*path}", (_req, res) => {
+        res.sendFile(path.resolve(frontendPath, "index.html"));
+      });
+    }
+
     // register error middleware
     this.app.use(errorHandler);
 
@@ -174,7 +185,7 @@ export class Server {
     await PostgresDB.INSTANCE.initialize();
 
     // start server
-    const port = process.env.BACKEND_PORT || 3000;
+    const port = process.env.PORT || process.env.BACKEND_PORT || 3000;
     console.log(`Listening on port ${port}`);
     this.server.listen(port);
   }
