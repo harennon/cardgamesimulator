@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>
+      Mobile Big2 — Direction C: Landscape-Optimized with Portrait Fallback
+    </title>
+    <style>
+      /*
+  DIRECTION C: LANDSCAPE-FIRST WITH PORTRAIT ADAPTATION
+
+  Strategy: Designed primarily for landscape phone orientation (the natural
+  way many people hold phones for games). In landscape, the layout echoes
+  desktop: opponents left, play area center, hand bottom, actions right.
+  In portrait, it gracefully degrades to a compact stacked layout.
+
+  Key innovations:
+  - Encourages landscape via a subtle orientation hint
+  - In landscape (~667x375): side panels for opponents + actions, wide hand
+  - In portrait (~375x667): falls back to stacked like Direction A but
+    with a two-row card layout (7 + 6 cards) instead of tiny overlap
+  - Cards stay at a readable 44x62px in both orientations
+*/
+
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        background: #0d0d0d;
+      }
+
+      /* ========== PORTRAIT LAYOUT (default, mobile-first) ========== */
+      .game-board {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        grid-template-rows: 44px 1fr 170px 52px;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand"
+          "actions";
+        background: radial-gradient(
+          ellipse 90% 70% at 50% 40%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        overflow: hidden;
+      }
+
+      /* Felt texture */
+      .game-board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .game-board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 3px solid var(--table-rim);
+        pointer-events: none;
+        z-index: 100;
+      }
+
+      .game-board > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ========== OPPONENTS ========== */
+      .opponents {
+        grid-area: opponents;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: var(--table-rim);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+
+      .opponent {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 8px;
+        border-radius: 12px;
+        border: 1.5px solid transparent;
+      }
+
+      .opponent--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      .opponent__name {
+        font-family: var(--font-ui);
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .opponent__count {
+        font-family: var(--font-ui);
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        background: rgba(0, 0, 0, 0.3);
+        padding: 1px 5px;
+        border-radius: 6px;
+      }
+
+      .opponent__dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 4px var(--gold-accent);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.4);
+        }
+      }
+
+      /* ========== PLAY AREA ========== */
+      .play-area {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px;
+      }
+
+      .turn-banner {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        padding: 3px 14px;
+        border-radius: 14px;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--gold-accent);
+        animation: glow 2s ease-in-out infinite;
+      }
+
+      @keyframes glow {
+        0%,
+        100% {
+          box-shadow: 0 0 6px var(--gold-glow);
+        }
+        50% {
+          box-shadow: 0 0 16px var(--gold-glow);
+        }
+      }
+
+      .play-area__label {
+        font-family: var(--font-ui);
+        font-size: 0.6rem;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .play-area__cards {
+        display: flex;
+        gap: 3px;
+      }
+
+      .play-area__meta {
+        font-family: var(--font-ui);
+        font-size: 0.6rem;
+        color: var(--text-muted);
+      }
+
+      /* ========== CARDS ========== */
+      .card {
+        position: relative;
+        border-radius: 5px;
+        border: 1.2px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 1px 2px 6px var(--card-shadow);
+        flex-shrink: 0;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      .card--table {
+        width: 46px;
+        height: 65px;
+        font-size: 0.82rem;
+      }
+
+      .card--hand {
+        width: 44px;
+        height: 62px;
+        font-size: 0.78rem;
+      }
+
+      .card__corner {
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card__corner-rank {
+        font-size: 9px;
+        line-height: 1;
+      }
+
+      .card__corner-suit {
+        font-size: 8px;
+        line-height: 1;
+        margin-top: -1px;
+      }
+
+      .card__rank {
+        line-height: 1;
+      }
+      .card__suit {
+        line-height: 1;
+        font-size: 1.1em;
+      }
+
+      .card.red .card__rank,
+      .card.red .card__suit,
+      .card.red .card__corner-rank,
+      .card.red .card__corner-suit {
+        color: var(--red-suit);
+      }
+
+      .card.black .card__rank,
+      .card.black .card__suit,
+      .card.black .card__corner-rank,
+      .card.black .card__corner-suit {
+        color: var(--black-suit);
+      }
+
+      .card--selected {
+        transform: translateY(-12px);
+        box-shadow:
+          0 6px 14px var(--gold-glow),
+          2px 4px 10px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* ========== PLAYER HAND — TWO ROW LAYOUT ========== */
+      .player-hand-zone {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 6px 8px 4px;
+        background: linear-gradient(
+          180deg,
+          transparent 0%,
+          rgba(37, 107, 66, 0.3) 100%
+        );
+        border-top: 1.5px solid var(--table-rim-light);
+      }
+
+      .hand-row {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+
+      .hand-row .card--hand {
+        margin-left: -10px;
+        cursor: pointer;
+      }
+
+      .hand-row .card--hand:first-child {
+        margin-left: 0;
+      }
+
+      .hand-row--top {
+        margin-bottom: -6px;
+        z-index: 1;
+      }
+
+      .hand-row--bottom {
+        z-index: 2;
+      }
+
+      /* ========== ACTIONS ========== */
+      .actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 0 16px;
+        background: var(--table-rim);
+        border-top: 1.5px solid var(--table-rim-light);
+      }
+
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 8px 24px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      .btn--play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .btn--play:active {
+        background: #d4b45a;
+        box-shadow: 0 4px 16px var(--gold-glow);
+      }
+
+      .btn--pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+
+      .btn--pass:active {
+        border-color: var(--text-primary);
+      }
+
+      /* ========== LANDSCAPE LAYOUT ========== */
+      @media (orientation: landscape) and (max-height: 500px) {
+        .game-board {
+          grid-template-rows: 36px 1fr 110px;
+          grid-template-columns: 1fr 80px;
+          grid-template-areas:
+            "opponents actions"
+            "table     actions"
+            "hand      actions";
+        }
+
+        .opponents {
+          justify-content: flex-start;
+          gap: 8px;
+          padding: 0 12px;
+        }
+
+        .play-area {
+          padding: 4px;
+          gap: 4px;
+        }
+
+        .turn-banner {
+          font-size: 0.7rem;
+          padding: 2px 10px;
+        }
+
+        .card--table {
+          width: 40px;
+          height: 56px;
+          font-size: 0.72rem;
+        }
+
+        .player-hand-zone {
+          flex-direction: row;
+          padding: 4px 8px;
+        }
+
+        .hand-row--top {
+          margin-bottom: 0;
+          margin-right: -6px;
+        }
+
+        .hand-row .card--hand {
+          width: 38px;
+          height: 54px;
+          font-size: 0.68rem;
+          margin-left: -10px;
+        }
+
+        .card--selected {
+          transform: translateY(-10px);
+        }
+
+        .actions {
+          flex-direction: column;
+          gap: 8px;
+          padding: 8px;
+          border-top: none;
+          border-left: 1.5px solid var(--table-rim-light);
+        }
+
+        .btn {
+          font-size: 0.72rem;
+          padding: 8px 12px;
+          width: 100%;
+          text-align: center;
+        }
+      }
+
+      /* ========== ORIENTATION HINT ========== */
+      .orientation-hint {
+        position: fixed;
+        bottom: 8px;
+        right: 8px;
+        z-index: 200;
+        font-family: var(--font-ui);
+        font-size: 0.55rem;
+        color: var(--text-muted);
+        background: var(--panel-bg);
+        padding: 3px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(138, 126, 110, 0.2);
+        opacity: 0.7;
+      }
+
+      @media (orientation: landscape) {
+        .orientation-hint {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-board">
+      <!-- Opponents -->
+      <div class="opponents">
+        <div class="opponent opponent--active">
+          <span class="opponent__dot"></span>
+          <span class="opponent__name">Bob</span>
+          <span class="opponent__count">9</span>
+        </div>
+        <div class="opponent">
+          <span class="opponent__name">Charlie</span>
+          <span class="opponent__count">11</span>
+        </div>
+        <div class="opponent">
+          <span class="opponent__name">Dave</span>
+          <span class="opponent__count">8</span>
+        </div>
+      </div>
+
+      <!-- Play Area -->
+      <div class="play-area">
+        <div class="turn-banner">Your Turn</div>
+        <div class="play-area__label">Pair</div>
+        <div class="play-area__cards">
+          <div class="card card--table black">
+            <div class="card__corner">
+              <span class="card__corner-rank">7</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">7</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+          <div class="card card--table red">
+            <div class="card__corner">
+              <span class="card__corner-rank">7</span
+              ><span class="card__corner-suit">&#9829;</span>
+            </div>
+            <span class="card__rank">7</span
+            ><span class="card__suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="play-area__meta">played by Bob</div>
+      </div>
+
+      <!-- Player Hand — Two Rows in Portrait -->
+      <div class="player-hand-zone">
+        <!-- Row 1: cards 1-7 -->
+        <div class="hand-row hand-row--top">
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">3</span
+              ><span class="card__corner-suit">&#9827;</span>
+            </div>
+            <span class="card__rank">3</span
+            ><span class="card__suit">&#9827;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">4</span
+              ><span class="card__corner-suit">&#9830;</span>
+            </div>
+            <span class="card__rank">4</span
+            ><span class="card__suit">&#9830;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">5</span
+              ><span class="card__corner-suit">&#9829;</span>
+            </div>
+            <span class="card__rank">5</span
+            ><span class="card__suit">&#9829;</span>
+          </div>
+          <div class="card card--hand black card--selected">
+            <div class="card__corner">
+              <span class="card__corner-rank">5</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">5</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+          <div class="card card--hand red card--selected">
+            <div class="card__corner">
+              <span class="card__corner-rank">7</span
+              ><span class="card__corner-suit">&#9830;</span>
+            </div>
+            <span class="card__rank">7</span
+            ><span class="card__suit">&#9830;</span>
+          </div>
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">9</span
+              ><span class="card__corner-suit">&#9827;</span>
+            </div>
+            <span class="card__rank">9</span
+            ><span class="card__suit">&#9827;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">J</span
+              ><span class="card__corner-suit">&#9829;</span>
+            </div>
+            <span class="card__rank">J</span
+            ><span class="card__suit">&#9829;</span>
+          </div>
+        </div>
+        <!-- Row 2: cards 8-13 -->
+        <div class="hand-row hand-row--bottom">
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">Q</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">Q</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">K</span
+              ><span class="card__corner-suit">&#9830;</span>
+            </div>
+            <span class="card__rank">K</span
+            ><span class="card__suit">&#9830;</span>
+          </div>
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">K</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">K</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">A</span
+              ><span class="card__corner-suit">&#9827;</span>
+            </div>
+            <span class="card__rank">A</span
+            ><span class="card__suit">&#9827;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">A</span
+              ><span class="card__corner-suit">&#9829;</span>
+            </div>
+            <span class="card__rank">A</span
+            ><span class="card__suit">&#9829;</span>
+          </div>
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">2</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">2</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button class="btn btn--pass">Pass</button>
+        <button class="btn btn--play">Play</button>
+      </div>
+    </div>
+
+    <div class="orientation-hint">Rotate for best experience</div>
+  </body>
+</html>

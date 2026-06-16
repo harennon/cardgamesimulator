@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mobile Big2 — Design Directions</title>
+    <style>
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: #0d0d0d;
+        color: #e8dcc8;
+        padding: 24px;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1.4rem;
+        margin-bottom: 8px;
+        color: #c9a84c;
+      }
+      p {
+        font-size: 0.85rem;
+        color: #8a7e6e;
+        margin-bottom: 24px;
+      }
+      .card {
+        display: block;
+        background: rgba(20, 12, 8, 0.85);
+        border: 1px solid #4a2c1e;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        text-decoration: none;
+        color: #e8dcc8;
+        transition: border-color 0.2s;
+      }
+      .card:hover {
+        border-color: #c9a84c;
+      }
+      .card h2 {
+        font-size: 1rem;
+        margin-bottom: 4px;
+      }
+      .card p {
+        color: #8a7e6e;
+        font-size: 0.75rem;
+        margin: 0;
+      }
+      .tip {
+        margin-top: 24px;
+        padding: 12px;
+        background: rgba(201, 168, 76, 0.08);
+        border: 1px solid rgba(201, 168, 76, 0.2);
+        border-radius: 6px;
+        font-size: 0.72rem;
+        color: #8a7e6e;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Mobile Big2 Layout Mockups</h1>
+    <p>
+      Three distinct approaches to making the game board work on phones (375px
+      wide). View each at phone width using your browser's responsive mode or on
+      an actual device.
+    </p>
+
+    <a class="card" href="mobile-a-stacked-compact.html">
+      <h2>A: Stacked Compact</h2>
+      <p>
+        Everything fits on screen without scrolling. Opponents as thin strip,
+        cards at 44x62px with -14px overlap, game log hidden behind drawer
+        toggle. Minimal: just the essentials.
+      </p>
+    </a>
+
+    <a class="card" href="mobile-b-arc-hand.html">
+      <h2>B: Scrollable Hand with Floating Actions</h2>
+      <p>
+        Prioritizes card readability. Larger cards (48x68px) in a horizontally
+        scrollable hand. Action buttons float above the hand for immediate
+        access. Avatar-based opponent bar.
+      </p>
+    </a>
+
+    <a class="card" href="mobile-c-landscape-split.html">
+      <h2>C: Landscape-Optimized (Two-Row Portrait)</h2>
+      <p>
+        Designed for landscape play with portrait fallback. In portrait, cards
+        split into two rows (7+6) to avoid overlap. In landscape, actions move
+        to a side panel. Orientation hint included.
+      </p>
+    </a>
+
+    <div class="tip">
+      <strong>Viewing tip:</strong> Open each link in Chrome DevTools responsive
+      mode set to 375x667 (iPhone SE) to see the portrait layout. For Direction
+      C, also try 667x375 to see the landscape adaptation.
+    </div>
+  </body>
+</html>
