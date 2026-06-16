@@ -206,9 +206,11 @@ export class Server {
       };
       return https.createServer(options, app);
     } else {
-      console.log(
-        "Please set up valid certificates to create an HTTPS server.",
-      );
+      if (process.env.NODE_ENV !== "production") {
+        console.log(
+          "Please set up valid certificates to create an HTTPS server.",
+        );
+      }
       return http.createServer(app);
     }
   }

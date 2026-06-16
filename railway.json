@@ -11,7 +11,7 @@
     "healthcheckPath": "/health",
     "sleepApplication": false,
     "useLegacyStacker": false,
-    "ipv6EgressEnabled": false,
+    "ipv6EgressEnabled": true,
     "multiRegionConfig": {
       "sfo": {
         "numReplicas": 1
