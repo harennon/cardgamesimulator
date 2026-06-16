@@ -18,7 +18,11 @@ import {
 import { CreateGameHandler } from "@/api/game/createGame";
 import { JoinGameHandler } from "@/api/game/joinGame";
 import { GetGameStateHandler } from "@/api/game/getGameState";
-import { createSocketServer, type TypedServer } from "@/websocket/socketServer";
+import {
+  createSocketServer,
+  getConnectionMetrics,
+  type TypedServer,
+} from "@/websocket/socketServer";
 import { createSocketAuthMiddleware } from "@/websocket/socketAuth";
 import {
   registerSocketHandlers,
@@ -60,6 +64,16 @@ export class Server {
     this.guestSessionStore = new GuestSessionStore();
     this.guestSessionStore.startCleanupLoop();
     const authMiddleware = createAuthMiddleware(this.guestSessionStore);
+
+    // Health endpoint — no auth, used by Railway + monitoring
+    this.app.get("/health", (_req, res) => {
+      const connections = getConnectionMetrics(this.io);
+      res.status(200).json({
+        status: "ok",
+        uptime: process.uptime(),
+        connections,
+      });
+    });
 
     // register api handlers
     new Map<string, Handler>([

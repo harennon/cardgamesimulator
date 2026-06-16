@@ -20,6 +20,26 @@ export type TypedSocket = Socket<
   SocketData
 >;
 
+const MAX_CONNECTIONS = 1000;
+const REJECTION_WINDOW_MS = 60_000;
+
+const rejectionTimestamps: number[] = [];
+
+export function getConnectionMetrics(io: TypedServer) {
+  const now = Date.now();
+  while (
+    rejectionTimestamps.length > 0 &&
+    rejectionTimestamps[0]! < now - REJECTION_WINDOW_MS
+  ) {
+    rejectionTimestamps.shift();
+  }
+  return {
+    current: io.engine.clientsCount,
+    max: MAX_CONNECTIONS,
+    rejectionsLastMinute: rejectionTimestamps.length,
+  };
+}
+
 export function createSocketServer(
   httpServer: HttpServer | https.Server,
 ): TypedServer {
@@ -33,6 +53,17 @@ export function createSocketServer(
     connectionStateRecovery: {
       maxDisconnectionDuration: 30_000,
     },
+  });
+
+  io.use((socket, next) => {
+    if (io.engine.clientsCount >= MAX_CONNECTIONS) {
+      rejectionTimestamps.push(Date.now());
+      console.warn(
+        `Connection rejected: cap reached (${io.engine.clientsCount}/${MAX_CONNECTIONS})`,
+      );
+      return next(new Error("SERVER_FULL"));
+    }
+    next();
   });
 
   return io;

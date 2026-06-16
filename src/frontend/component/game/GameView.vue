@@ -44,7 +44,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import type { PlayerInfo } from "@shared/engine-types";
 import { axiosInstance } from "@/service/http";
 import type { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
@@ -63,7 +63,11 @@ const props = defineProps<{
   gameId: string;
 }>();
 
-const { socket, connect, disconnect } = useSocket();
+const { socket, error: socketError, connect, disconnect } = useSocket();
+
+watch(socketError, (err) => {
+  if (err) joinError.value = err;
+});
 const {
   gameState,
   status,

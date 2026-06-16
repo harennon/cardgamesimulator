@@ -47,7 +47,12 @@ export function useSocket() {
       connected.value = false;
     });
     s.on("connect_error", (err) => {
-      error.value = err.message;
+      if (err.message === "SERVER_FULL") {
+        error.value = "Server is at capacity. Please try again shortly.";
+        s.disconnect();
+      } else {
+        error.value = err.message;
+      }
       connected.value = false;
     });
 
