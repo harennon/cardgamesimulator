@@ -54,7 +54,12 @@ export class Server {
     // add middleware
     this.app.use(express.json());
     this.app.use(helmet());
-    this.app.use(cors({ origin: "http://frontend:80" }));
+    this.app.use(
+      cors({
+        origin: process.env.CORS_ORIGIN || "http://frontend:80",
+        credentials: true,
+      }),
+    );
     this.app.use(morgan(":method :url", { immediate: true }));
     this.app.use(
       morgan(":method :url :status :res[content-length] - :response-time ms"),
