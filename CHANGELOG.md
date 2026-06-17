@@ -10,6 +10,54 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 12: Supabase SDK Migration** — replaced TypeORM with `@supabase/supabase-js` for all DB operations; added Row-Level Security
+  - `supabase/migrations/001_create_tables.sql` — snake_case schema for `games`, `player_stats`, `feedback` tables with indexes
+  - `supabase/migrations/002_enable_rls.sql` — RLS enabled on all three tables; policies restrict direct PostgREST access (service-role bypasses automatically)
+  - `supabase/migrations/003_increment_stats_rpc.sql` — `increment_player_stats` stored procedure for atomic upsert; restricted to `service_role`
+  - `src/backend/database/supabaseDb.ts` — `SupabaseDB` class implementing all three repository interfaces via Supabase JS SDK; synchronous `initialize()` validates env vars; snake_case→camelCase mappers; optimistic locking via `WHERE version = $n`
+  - `src/backend/util/errors.ts` — added `OptimisticLockError` (status 409) replacing TypeORM's `OptimisticLockVersionMismatchError`
+  - `src/backend/database/index.ts` — barrel now exports `SupabaseDB.INSTANCE` instead of `PostgresDB.INSTANCE`
+  - `src/backend/server.ts` — `SupabaseDB.INSTANCE.initialize()` (sync, no await); removed `PostgresDB` import
+  - `src/backend/api/game/joinGame.ts` — optimistic lock catch uses `instanceof OptimisticLockError`
+  - `src/backend/database/entities/Game.ts`, `PlayerStats.ts`, `Feedback.ts` — removed all TypeORM decorators; plain classes
+  - `src/backend/tsconfig.json` — removed `experimentalDecorators` and `emitDecoratorMetadata`
+  - `package.json` — removed `typeorm`, `reflect-metadata`, `pg`, `pg-protocol`
+  - `tests/database/supabaseDb.test.ts` — 11 unit tests: mapper correctness, optimistic lock error, env validation, `OptimisticLockError` class contract
+  - Deleted `src/backend/database/postgres.ts`
+
+### Fixed
+
+- **LLD 12 code review**: removed fragile `error.message.includes("0 rows")` fallback from `saveGame` — `PGRST116` error code check alone is sufficient per PostgREST docs
+- **LLD 12 code review**: reduced `as unknown as` casting in `supabaseDb.test.ts` — extracted `makeTestInstance()` helper and call public methods directly on typed `db` variable
+- **LLD 12 code review**: added `tests/integration/rls.test.ts` — RLS and security integration tests (integration tests 4–6 and security tests 1–3 from LLD section 10); verifies SELECT isolation, UPDATE blocking, stats isolation, anon INSERT rejection, RPC access restriction
+
+### Changed
+
+- **LLD 11: Mobile Layout (Stacked Compact)** — responsive game board for viewports below 767px
+  - `src/frontend/styles/game-variables.css` — card sizing tokens (`--card-hand-width`, `--card-hand-height`, `--card-overlap`, `--card-selected-lift`, `--card-hover-lift`, `--card-selected-hover-lift`), mobile layout tokens, `@media (max-width: 767px)` override block for smaller card sizes, `prefers-reduced-motion` block
+  - `src/frontend/component/game-ui/GameCard.vue` — `.card--medium` and `.card--large` use `var(--card-hand-width/height)` instead of hardcoded 64×90px; `.card--selected` uses `var(--card-selected-lift)` instead of hardcoded -20px
+  - `src/frontend/component/game-ui/PlayerHand.vue` — `.player-hand__card` uses `var(--card-overlap)` and `var(--card-hover-lift/selected-hover-lift)`; mobile media query adds `width: 100%`, 20px top padding for selected card overflow, touch scroll, hidden scrollbar
+  - `src/frontend/component/game/GameBoard.vue` — `isMobile` + `logDrawerOpen` refs with full matchMedia lifecycle and Escape key handler; `game-board--mobile` class binding; stacked single-column grid override (`overflow: clip`); hand label showing card count; log drawer via `<Teleport to="body">` with slide-in transform animation; hamburger toggle button (mobile only); unscoped styles for drawer and toggle
+  - `src/frontend/component/game-ui/OpponentRow.vue` — mobile media query hides card-back visuals, switches to horizontal pill layout with truncated names
+  - `src/frontend/component/game-ui/ActionPanel.vue` — mobile media query locks row to 56px height, sets button font to 0.85rem
+  - `tests/frontend/gameBoardMobile.test.ts` — 14 unit tests covering isMobile ref, logDrawerOpen toggle, Escape key handler, matchMedia listener cleanup
+  - `e2e/mobile-layout.spec.ts` — 7 E2E tests: mobile class present at 375x667, log panel hidden, toggle visible, drawer opens on click, Escape closes drawer, hand scrollable with 13 cards, desktop regression (no mobile class at 1024x768)
+
+- **nginx reverse proxy in production container** — dev/prod parity by running nginx in front of Express inside the Railway container
+  - `nginx/production.conf` — nginx config template: listens on `$PORT`, serves static files from `/app/build/frontend/`, SPA fallback, proxies `/api/`, `/health`, `/socket.io/` to Express on localhost:3000
+  - `docker-entrypoint.sh` — shell entrypoint: substitutes `$PORT` via envsubst, starts nginx and node concurrently, exits container if either process dies so Railway restarts it
+  - `Dockerfile.production` — installs nginx + gettext (envsubst), copies config template and entrypoint, uses `/docker-entrypoint.sh` as CMD
+  - `src/backend/server.ts` — removed production static file serving block (nginx handles it now); Express port now uses `BACKEND_PORT || 3000` (not `PORT` which Railway injects to nginx)
+
+- **LLD 10: Deployment** — production deployment configuration for Railway
+  - `src/backend/server.ts` — production static file serving (`build/frontend/`) with SPA fallback after all API routes; PORT env var checked before BACKEND_PORT (Railway injects PORT)
+  - `src/backend/database/postgres.ts` — SSL enabled for Supabase Postgres connection in production (`rejectUnauthorized: false`)
+  - `src/backend/index.ts` — `unhandledRejection` handler logs to stderr to prevent silent crashes
+  - `Dockerfile.production` — multi-stage Docker image: builder stage compiles frontend + backend with VITE_* build ARGs; runtime stage uses node:22.14-alpine, non-root user, prod-only deps, HEALTHCHECK via wget
+  - `.github/workflows/ci.yml` — deploy job added: runs after all test jobs pass on push to main; installs Railway CLI and runs `railway up`
+  - `tests/api/deployment.test.ts` — 3 unit tests: health endpoint shape, static middleware registered when production, static middleware absent when non-production
+  - `tests/fixtures/mock-frontend/index.html` — minimal HTML fixture for static serving tests
+
 - **LLD 9: Feedback Widget** — in-app feedback mechanism for playtesters
   - `src/shared/model.ts` — `FeedbackCategory`, `SubmitFeedbackRequest`, `SubmitFeedbackResponse` types
   - `src/backend/database/entities/Feedback.ts` — TypeORM entity with `id`, `category`, `description`, `metadata` (jsonb), `userId`, `createdAt` columns

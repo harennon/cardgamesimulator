@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
-import WebSocket from "ws";
 import { getSupabaseUrl, getSupabaseAnonKey } from "./env.js";
 
 export interface TestUser {
@@ -10,13 +9,8 @@ export interface TestUser {
   displayName: string;
 }
 
-// Supabase JS client requires a WebSocket implementation in Node.js < 22.
 function makeClient() {
-  return createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
-    realtime: {
-      transport: WebSocket as unknown as typeof globalThis.WebSocket,
-    },
-  });
+  return createClient(getSupabaseUrl(), getSupabaseAnonKey());
 }
 
 /**

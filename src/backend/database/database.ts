@@ -13,7 +13,7 @@ export interface GameRepository {
     turnTimerSeconds: number | null,
   ): Promise<Game>;
   getGame(gameId: string): Promise<Game | null>;
-  saveGame(game: Game): Promise<Game>; // throws OptimisticLockVersionMismatchError on version conflict
+  saveGame(game: Game): Promise<Game>; // throws OptimisticLockError on version conflict
 }
 // Note: `createGame` takes gameId as a parameter (caller generates UUID via `crypto.randomUUID()`).
 // This allows the REST handler to generate the ID and use it for in-memory cache registration (LLD 2) in the same call.

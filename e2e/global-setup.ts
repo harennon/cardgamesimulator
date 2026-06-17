@@ -1,6 +1,5 @@
 import { test as setup } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import ws from "ws";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -31,13 +30,11 @@ setup("create test users and save auth state", async () => {
   // Admin client for user creation (uses service_role key)
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
-    realtime: { transport: ws },
   });
 
   // Anon client for sign-in (mimics what the app does)
   const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
-    realtime: { transport: ws },
   });
 
   // Ensure .auth directory exists

@@ -5,7 +5,7 @@ import cors from "cors";
 import { Handler } from "../../../src/backend/api/handler.js";
 import { EchoHandler } from "../../../src/backend/api/echo.js";
 import { ServeAppHandler } from "../../../src/backend/api/serveApp.js";
-import { PostgresDB } from "../../../src/backend/database/postgres.js";
+import { SupabaseDB } from "../../../src/backend/database/supabaseDb.js";
 import { errorHandler } from "../../../src/backend/middleware/errorHandler.js";
 import {
   createAuthMiddleware,
@@ -54,9 +54,9 @@ export interface TestServerContext {
 // Shared DB instance across test files — initialized only once per process.
 let dbInitialized = false;
 
-async function ensureDbInitialized(): Promise<void> {
+function ensureDbInitialized(): void {
   if (dbInitialized) return;
-  await PostgresDB.INSTANCE.initialize();
+  SupabaseDB.INSTANCE.initialize();
   dbInitialized = true;
 }
 
@@ -95,7 +95,7 @@ export async function createTestServer(
   // Guest session creation (no auth required)
   app.use(
     "/guest/session",
-    createSessionRouter(guestSessionStore, PostgresDB.INSTANCE),
+    createSessionRouter(guestSessionStore, SupabaseDB.INSTANCE),
   );
 
   // Guest claim (registered users only)
@@ -103,7 +103,7 @@ export async function createTestServer(
     "/guest/claim",
     authMiddleware,
     registeredOnlyMiddleware,
-    createClaimRouter(PostgresDB.INSTANCE),
+    createClaimRouter(SupabaseDB.INSTANCE),
   );
 
   new Map<string, Handler>([
@@ -132,18 +132,18 @@ export async function createTestServer(
 
   const gameCache = new GameCache();
   gameCache.startEvictionLoop();
-  const statsService = new StatsService(PostgresDB.INSTANCE, guestSessionStore);
+  const statsService = new StatsService(SupabaseDB.INSTANCE, guestSessionStore);
   const gameService = new GameService(
     gameCache,
     engineFactory,
-    PostgresDB.INSTANCE,
+    SupabaseDB.INSTANCE,
     statsService,
   );
 
   // Seed endpoint (test-only) — registered after gameCache/gameService are created
   app.use(
     "/test/seed-state",
-    createSeedStateRouter(gameCache, PostgresDB.INSTANCE),
+    createSeedStateRouter(gameCache, SupabaseDB.INSTANCE),
   );
 
   app.use(errorHandler);
@@ -161,7 +161,7 @@ export async function createTestServer(
   registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
 
   // Initialize DB (idempotent across test files in the same process)
-  await ensureDbInitialized();
+  ensureDbInitialized();
 
   // Start on ephemeral port
   await new Promise<void>((resolve) => httpServer.listen(0, resolve));

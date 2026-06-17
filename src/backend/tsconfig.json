@@ -3,8 +3,6 @@
     "baseUrl": "./",
     "outDir": "../../build",
     "paths": { "@/*": ["./*"], "@shared/*": ["../shared/*"] },
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "plugins": [{ "transform": "typescript-transform-paths" }]
   },
   "extends": "../../tsconfig.json",
