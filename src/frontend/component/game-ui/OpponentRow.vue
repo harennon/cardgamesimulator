@@ -190,4 +190,10 @@ function isActive(originalIndex: number): boolean {
     border-radius: 8px;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .opponent__turn-indicator {
+    animation: none;
+  }
+}
 </style>

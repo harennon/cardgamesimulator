@@ -277,9 +277,9 @@ watch(logDrawerOpen, (open) => {
 
 @media (max-width: 767px) {
   .game-board--mobile {
-    grid-template-rows: var(--mobile-opponent-height) 1fr var(
-        --mobile-hand-height
-      ) var(--mobile-actions-height);
+    grid-template-rows:
+      var(--mobile-opponent-height) 1fr var(--mobile-hand-height)
+      var(--mobile-actions-height);
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       "opponents"
@@ -379,16 +379,8 @@ watch(logDrawerOpen, (open) => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .opponent__dot {
-    animation: none;
-  }
-
   .log-drawer {
     transition: none;
-  }
-
-  .turn-banner {
-    animation: none;
   }
 }
 </style>

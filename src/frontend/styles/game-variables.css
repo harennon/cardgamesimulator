@@ -78,9 +78,3 @@
     --card-selected-hover-lift: -14px;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --drawer-transition: none;
-  }
-}
