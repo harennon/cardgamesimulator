@@ -147,4 +147,10 @@ const lastPlayDisplayName = computed(() => {
   font-style: italic;
   text-align: center;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .play-area__turn-banner--mine {
+    animation: none;
+  }
+}
 </style>

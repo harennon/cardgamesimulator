@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Mobile Big2 — Direction A: Stacked Compact</title>
+    <style>
+      /*
+  DIRECTION A: STACKED COMPACT
+
+  Strategy: Vertical stack with compressed zones.
+  - Opponents as a thin horizontal strip (names + card counts only, no card-back visuals)
+  - Play area takes the flexible middle
+  - Hand uses smaller cards (44x62px) with tight -14px overlap
+  - Action buttons pinned directly below the hand
+  - No game log visible (accessible via drawer)
+  - All critical info visible without scrolling on 375px x 667px (iPhone SE)
+*/
+
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        background: #0d0d0d;
+      }
+
+      .game-board {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        grid-template-rows: 52px 1fr 160px 56px;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand"
+          "actions";
+        background: radial-gradient(
+          ellipse 90% 70% at 50% 45%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        overflow: clip;
+      }
+
+      /* Felt texture */
+      .game-board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* Thin rim instead of thick border */
+      .game-board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 4px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        pointer-events: none;
+        z-index: 100;
+      }
+
+      .game-board > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ========== OPPONENTS STRIP ========== */
+      .opponents {
+        grid-area: opponents;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 6px 8px;
+        background: var(--table-rim);
+        border-bottom: 1.5px solid var(--table-rim-light);
+      }
+
+      .opponent {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 16px;
+        border: 1.5px solid transparent;
+        transition: all 0.2s ease;
+      }
+
+      .opponent--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.1);
+      }
+
+      .opponent__name {
+        font-family: var(--font-ui);
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        max-width: 60px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .opponent__count {
+        font-family: var(--font-ui);
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        background: rgba(0, 0, 0, 0.3);
+        padding: 1px 5px;
+        border-radius: 8px;
+        min-width: 18px;
+        text-align: center;
+      }
+
+      .opponent__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 6px var(--gold-accent);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.4);
+        }
+      }
+
+      /* ========== PLAY AREA ========== */
+      .play-area {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px;
+      }
+
+      .turn-banner {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--gold-accent);
+        padding: 3px 14px;
+        border-radius: 16px;
+        background: var(--panel-bg);
+        border: 1px solid var(--gold-accent);
+        animation: glow 2s ease-in-out infinite;
+      }
+
+      @keyframes glow {
+        0%,
+        100% {
+          box-shadow: 0 0 6px var(--gold-glow);
+        }
+        50% {
+          box-shadow:
+            0 0 16px var(--gold-glow),
+            0 0 30px rgba(201, 168, 76, 0.1);
+        }
+      }
+
+      .play-area__label {
+        font-family: var(--font-ui);
+        font-size: 0.65rem;
+        font-weight: 500;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .play-area__cards {
+        display: flex;
+        gap: 3px;
+      }
+
+      .play-area__played-by {
+        font-family: var(--font-ui);
+        font-size: 0.65rem;
+        color: var(--text-muted);
+      }
+
+      /* ========== CARDS ========== */
+      .card {
+        position: relative;
+        border-radius: 5px;
+        border: 1.2px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 1px 2px 6px var(--card-shadow);
+        flex-shrink: 0;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      .card--play {
+        width: 48px;
+        height: 68px;
+        font-size: 0.85rem;
+      }
+
+      .card--hand {
+        width: 52px;
+        height: 73px;
+        font-size: 0.9rem;
+      }
+
+      .card__corner {
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card__corner-rank {
+        font-size: 9px;
+        line-height: 1;
+      }
+
+      .card__corner-suit {
+        font-size: 8px;
+        line-height: 1;
+        margin-top: -1px;
+      }
+
+      .card__rank {
+        line-height: 1;
+      }
+
+      .card__suit {
+        line-height: 1;
+        font-size: 1.1em;
+      }
+
+      .card.red .card__rank,
+      .card.red .card__suit,
+      .card.red .card__corner-rank,
+      .card.red .card__corner-suit {
+        color: var(--red-suit);
+      }
+
+      .card.black .card__rank,
+      .card.black .card__suit,
+      .card.black .card__corner-rank,
+      .card.black .card__corner-suit {
+        color: var(--black-suit);
+      }
+
+      .card--selected {
+        transform: translateY(-14px);
+        box-shadow:
+          0 6px 16px var(--gold-glow),
+          2px 4px 12px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* ========== PLAYER HAND ========== */
+      .player-hand-zone {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 0;
+        background: linear-gradient(
+          180deg,
+          rgba(37, 107, 66, 0.3) 0%,
+          rgba(37, 107, 66, 0.6) 100%
+        );
+        border-top: 1.5px solid var(--table-rim-light);
+        min-width: 0;
+      }
+
+      .hand-label {
+        font-family: var(--font-ui);
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 2px;
+        padding-left: 12px;
+      }
+
+      .player-hand {
+        display: flex;
+        align-items: flex-end;
+        padding: 20px 12px 4px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+        scrollbar-width: none;
+        width: 100%;
+      }
+
+      .player-hand::-webkit-scrollbar {
+        display: none;
+      }
+
+      .player-hand .card--hand {
+        margin-left: -18px;
+        cursor: pointer;
+      }
+
+      .player-hand .card--hand:first-child {
+        margin-left: 0;
+      }
+
+      .player-hand .card--hand:active {
+        transform: translateY(-10px);
+      }
+
+      /* ========== ACTION PANEL ========== */
+      .actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 0 16px;
+        background: var(--table-rim);
+        border-top: 1.5px solid var(--table-rim-light);
+      }
+
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 10px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      .btn--play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .btn--play:active {
+        background: #d4b45a;
+        box-shadow: 0 4px 16px var(--gold-glow);
+      }
+
+      .btn--pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+
+      .btn--pass:active {
+        border-color: var(--text-primary);
+        background: rgba(232, 220, 200, 0.08);
+      }
+
+      /* ========== LOG DRAWER TOGGLE ========== */
+      .log-toggle {
+        position: fixed;
+        top: 60px;
+        right: 8px;
+        z-index: 200;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--text-muted);
+        color: var(--text-primary);
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+
+      .log-toggle:active {
+        background: rgba(201, 168, 76, 0.2);
+        border-color: var(--gold-accent);
+      }
+
+      /* ========== LOG DRAWER ========== */
+      .log-drawer {
+        position: fixed;
+        top: 0;
+        right: -280px;
+        width: 280px;
+        height: 100%;
+        z-index: 300;
+        background: var(--panel-bg);
+        border-left: 1.5px solid var(--table-rim-light);
+        transition: right 0.25s ease;
+        display: flex;
+        flex-direction: column;
+        backdrop-filter: blur(8px);
+      }
+
+      .log-drawer--open {
+        right: 0;
+      }
+
+      .log-drawer__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+
+      .log-drawer__close {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 1.4rem;
+        cursor: pointer;
+        padding: 4px 8px;
+      }
+
+      .log-drawer__close:active {
+        color: var(--text-primary);
+      }
+
+      .log-drawer__entries {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .log-entry {
+        font-family: var(--font-ui);
+        font-size: 0.75rem;
+        color: var(--text-primary);
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(138, 126, 110, 0.15);
+      }
+
+      .log-entry__name {
+        font-weight: 600;
+        color: var(--gold-accent);
+      }
+
+      /* ========== FRAME INFO ========== */
+      .frame-info {
+        position: fixed;
+        bottom: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 300;
+        font-family: var(--font-ui);
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        background: rgba(0, 0, 0, 0.7);
+        padding: 2px 8px;
+        border-radius: 4px;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-board">
+      <!-- Opponents Strip -->
+      <div class="opponents">
+        <div class="opponent opponent--active">
+          <span class="opponent__dot"></span>
+          <span class="opponent__name">Bob</span>
+          <span class="opponent__count">9</span>
+        </div>
+        <div class="opponent">
+          <span class="opponent__name">Charlie</span>
+          <span class="opponent__count">11</span>
+        </div>
+        <div class="opponent">
+          <span class="opponent__name">Dave</span>
+          <span class="opponent__count">8</span>
+        </div>
+      </div>
+
+      <!-- Play Area -->
+      <div class="play-area">
+        <div class="turn-banner">Your turn</div>
+        <div class="play-area__label">Pair</div>
+        <div class="play-area__cards">
+          <div class="card card--play black">
+            <div class="card__corner">
+              <span class="card__corner-rank">7</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">7</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+          <div class="card card--play red">
+            <div class="card__corner">
+              <span class="card__corner-rank">7</span
+              ><span class="card__corner-suit">&#9829;</span>
+            </div>
+            <span class="card__rank">7</span
+            ><span class="card__suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="play-area__played-by">played by Bob</div>
+      </div>
+
+      <!-- Player Hand -->
+      <div class="player-hand-zone">
+        <div class="hand-label">Your hand (13)</div>
+        <div class="player-hand">
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">3</span
+              ><span class="card__corner-suit">&#9827;</span>
+            </div>
+            <span class="card__rank">3</span
+            ><span class="card__suit">&#9827;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">4</span
+              ><span class="card__corner-suit">&#9830;</span>
+            </div>
+            <span class="card__rank">4</span
+            ><span class="card__suit">&#9830;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">5</span
+              ><span class="card__corner-suit">&#9829;</span>
+            </div>
+            <span class="card__rank">5</span
+            ><span class="card__suit">&#9829;</span>
+          </div>
+          <div class="card card--hand black card--selected">
+            <div class="card__corner">
+              <span class="card__corner-rank">5</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">5</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+          <div class="card card--hand red card--selected">
+            <div class="card__corner">
+              <span class="card__corner-rank">7</span
+              ><span class="card__corner-suit">&#9830;</span>
+            </div>
+            <span class="card__rank">7</span
+            ><span class="card__suit">&#9830;</span>
+          </div>
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">9</span
+              ><span class="card__corner-suit">&#9827;</span>
+            </div>
+            <span class="card__rank">9</span
+            ><span class="card__suit">&#9827;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">J</span
+              ><span class="card__corner-suit">&#9829;</span>
+            </div>
+            <span class="card__rank">J</span
+            ><span class="card__suit">&#9829;</span>
+          </div>
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">Q</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">Q</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">K</span
+              ><span class="card__corner-suit">&#9830;</span>
+            </div>
+            <span class="card__rank">K</span
+            ><span class="card__suit">&#9830;</span>
+          </div>
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">K</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">K</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">A</span
+              ><span class="card__corner-suit">&#9827;</span>
+            </div>
+            <span class="card__rank">A</span
+            ><span class="card__suit">&#9827;</span>
+          </div>
+          <div class="card card--hand red">
+            <div class="card__corner">
+              <span class="card__corner-rank">A</span
+              ><span class="card__corner-suit">&#9829;</span>
+            </div>
+            <span class="card__rank">A</span
+            ><span class="card__suit">&#9829;</span>
+          </div>
+          <div class="card card--hand black">
+            <div class="card__corner">
+              <span class="card__corner-rank">2</span
+              ><span class="card__corner-suit">&#9824;</span>
+            </div>
+            <span class="card__rank">2</span
+            ><span class="card__suit">&#9824;</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button class="btn btn--pass">Pass</button>
+        <button class="btn btn--play">Play</button>
+      </div>
+    </div>
+
+    <!-- Log drawer toggle -->
+    <div
+      class="log-toggle"
+      title="Game Log"
+      onclick="
+        document
+          .querySelector('.log-drawer')
+          .classList.toggle('log-drawer--open')
+      "
+    >
+      &#9776;
+    </div>
+
+    <!-- Log drawer -->
+    <div class="log-drawer">
+      <div class="log-drawer__header">
+        <span>Game Log</span>
+        <button
+          class="log-drawer__close"
+          onclick="
+            this.closest('.log-drawer').classList.remove('log-drawer--open')
+          "
+        >
+          &times;
+        </button>
+      </div>
+      <div class="log-drawer__entries">
+        <div class="log-entry">
+          <span class="log-entry__name">Bob</span> played Pair 7&#9824; 7&#9829;
+        </div>
+        <div class="log-entry">
+          <span class="log-entry__name">You</span> played Single K&#9824;
+        </div>
+        <div class="log-entry">
+          <span class="log-entry__name">Charlie</span> passed
+        </div>
+        <div class="log-entry">
+          <span class="log-entry__name">Dave</span> played Single Q&#9830;
+        </div>
+        <div class="log-entry">
+          <span class="log-entry__name">Bob</span> passed
+        </div>
+        <div class="log-entry">
+          <span class="log-entry__name">You</span> played Single A&#9827;
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

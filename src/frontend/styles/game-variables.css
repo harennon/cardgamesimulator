@@ -48,4 +48,33 @@
   /* Link */
   --link-color: var(--gold-accent);
   --link-hover: #d4b45a;
+
+  /* Card sizing tokens (desktop defaults) */
+  --card-hand-width: 64px;
+  --card-hand-height: 90px;
+  --card-play-width: 64px;
+  --card-play-height: 90px;
+  --card-overlap: -20px;
+  --card-selected-lift: -20px;
+  --card-hover-lift: -8px;
+  --card-selected-hover-lift: -24px;
+
+  /* Mobile layout tokens (used by grid/spacing) */
+  --mobile-rim-width: 4px;
+  --mobile-opponent-height: 52px;
+  --mobile-hand-height: 160px;
+  --mobile-actions-height: 56px;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --card-hand-width: 52px;
+    --card-hand-height: 73px;
+    --card-play-width: 48px;
+    --card-play-height: 68px;
+    --card-overlap: -18px;
+    --card-selected-lift: -14px;
+    --card-hover-lift: 0px;
+    --card-selected-hover-lift: -14px;
+  }
 }

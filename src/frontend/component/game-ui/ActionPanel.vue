@@ -113,4 +113,15 @@ const canPass = computed(() =>
   border-color: var(--text-primary);
   background: rgba(232, 220, 200, 0.08);
 }
+
+@media (max-width: 767px) {
+  .action-panel {
+    height: var(--mobile-actions-height);
+  }
+
+  .action-panel__btn {
+    padding: 10px 28px;
+    font-size: 0.85rem;
+  }
+}
 </style>

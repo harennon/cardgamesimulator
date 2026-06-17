@@ -76,16 +76,15 @@ const displayRank = computed(() => props.card.rank);
   flex-shrink: 0;
 }
 
-.card--large {
-  width: 64px;
-  height: 90px;
-  font-size: 1.1rem;
+.card--large,
+.card--medium {
+  width: var(--card-hand-width);
+  height: var(--card-hand-height);
+  font-size: 1rem;
 }
 
-.card--medium {
-  width: 64px;
-  height: 90px;
-  font-size: 1rem;
+.card--large {
+  font-size: 1.1rem;
 }
 
 .card--small {
@@ -145,7 +144,7 @@ const displayRank = computed(() => props.card.rank);
 }
 
 .card--selected {
-  transform: translateY(-20px);
+  transform: translateY(var(--card-selected-lift));
   box-shadow:
     0 8px 24px var(--gold-glow),
     3px 6px 16px var(--card-shadow);
