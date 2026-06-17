@@ -6,6 +6,7 @@ import {
   AlreadyExistsError,
   BadRequestError,
   NotFoundError,
+  OptimisticLockError,
 } from "@/util/errors";
 
 function deduplicateDisplayName(
@@ -50,18 +51,12 @@ export class JoinGameHandler extends Handler {
       try {
         await gameRepo.saveGame(game);
       } catch (e: unknown) {
-        if (
-          e instanceof Error &&
-          e.name === "OptimisticLockVersionMismatchError"
-        ) {
+        if (e instanceof OptimisticLockError) {
           const retry = await this.loadAndJoin(gameId, userId, displayName);
           try {
             await gameRepo.saveGame(retry.game);
           } catch (retryErr: unknown) {
-            if (
-              retryErr instanceof Error &&
-              retryErr.name === "OptimisticLockVersionMismatchError"
-            ) {
+            if (retryErr instanceof OptimisticLockError) {
               throw new AlreadyExistsError();
             }
             throw retryErr;

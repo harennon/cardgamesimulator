@@ -1,4 +1,4 @@
-import { PostgresDB } from "./postgres";
+import { SupabaseDB } from "./supabaseDb";
 import {
   GameRepository,
   PlayerStatsRepository,
@@ -6,6 +6,6 @@ import {
 } from "./database";
 
 export type { GameRepository, PlayerStatsRepository, FeedbackRepository };
-export const gameRepo: GameRepository = PostgresDB.INSTANCE;
-export const statsRepo: PlayerStatsRepository = PostgresDB.INSTANCE;
-export const feedbackRepo: FeedbackRepository = PostgresDB.INSTANCE;
+export const gameRepo: GameRepository = SupabaseDB.INSTANCE;
+export const statsRepo: PlayerStatsRepository = SupabaseDB.INSTANCE;
+export const feedbackRepo: FeedbackRepository = SupabaseDB.INSTANCE;

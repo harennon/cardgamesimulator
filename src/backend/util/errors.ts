@@ -81,3 +81,15 @@ export class NotFoundError extends Error implements ErrorWithStatus {
     Object.setPrototypeOf(this, NotFoundError.prototype);
   }
 }
+
+export class OptimisticLockError extends Error implements ErrorWithStatus {
+  public readonly status: number = 409;
+
+  constructor(gameId: string, expectedVersion: number) {
+    super(
+      `Optimistic lock failed for game ${gameId} at version ${expectedVersion}`,
+    );
+    this.name = "OptimisticLockError";
+    Object.setPrototypeOf(this, OptimisticLockError.prototype);
+  }
+}

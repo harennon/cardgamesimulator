@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Game } from "../../src/backend/database/entities/Game.js";
+import { OptimisticLockError } from "../../src/backend/util/errors.js";
 
 function makeGame(overrides: Partial<Game> = {}): Game {
   const game = new Game();
@@ -155,8 +156,7 @@ describe("JoinGameHandler", () => {
       const game = makeGame({ playerIds: ["player-1"] });
       mockGetGame.mockResolvedValue(game);
 
-      const versionError = new Error("version mismatch");
-      versionError.name = "OptimisticLockVersionMismatchError";
+      const versionError = new OptimisticLockError("game-1", 1);
 
       mockSaveGame
         .mockRejectedValueOnce(versionError)
@@ -177,8 +177,7 @@ describe("JoinGameHandler", () => {
       const game = makeGame({ playerIds: ["player-1"] });
       mockGetGame.mockResolvedValue(game);
 
-      const versionError = new Error("version mismatch");
-      versionError.name = "OptimisticLockVersionMismatchError";
+      const versionError = new OptimisticLockError("game-1", 1);
 
       mockSaveGame.mockRejectedValue(versionError);
 

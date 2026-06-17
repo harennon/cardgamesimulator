@@ -9,7 +9,7 @@ import morgan from "morgan";
 import { Handler } from "@/api/handler";
 import { EchoHandler } from "@/api/echo";
 import { ServeAppHandler } from "@/api/serveApp";
-import { PostgresDB } from "@/database/postgres";
+import { SupabaseDB } from "@/database/supabaseDb";
 import { errorHandler } from "@/middleware/errorHandler";
 import {
   createAuthMiddleware,
@@ -179,7 +179,7 @@ export class Server {
 
   public async start() {
     // initialize database
-    await PostgresDB.INSTANCE.initialize();
+    SupabaseDB.INSTANCE.initialize();
 
     // start server
     const port = process.env.BACKEND_PORT || 3000;

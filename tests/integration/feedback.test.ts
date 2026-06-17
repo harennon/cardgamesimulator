@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import type { DataSource } from "typeorm";
 import type { SubmitFeedbackResponse } from "../../src/shared/model.js";
 import {
   createTestServer,
@@ -8,19 +7,15 @@ import {
 } from "./helpers/testServer.js";
 import { createTestUser } from "./helpers/supabaseUser.js";
 import { createTestGuest } from "./helpers/guestUser.js";
+import { SupabaseDB } from "../../src/backend/database/supabaseDb.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 async function getFeedbackById(id: string) {
-  const { PostgresDB } = await import("../../src/backend/database/postgres.js");
-  const { Feedback } =
-    await import("../../src/backend/database/entities/Feedback.js");
-  const datasource = (
-    PostgresDB.INSTANCE as unknown as { dataSource: DataSource }
-  ).dataSource;
-  return datasource.getRepository(Feedback).findOneBy({ id });
+  const all = await SupabaseDB.INSTANCE.getAllFeedback();
+  return all.find((f) => f.id === id) ?? null;
 }
 
 // ---------------------------------------------------------------------------

@@ -615,10 +615,10 @@ describe("Player stats integration", () => {
   });
 
   it("incrementStats is atomic — concurrent upserts both succeed and values are summed", async () => {
-    // Direct repository-level test using PostgresDB.INSTANCE (already initialized by testServer)
-    const { PostgresDB } =
-      await import("../../src/backend/database/postgres.js");
-    const db = PostgresDB.INSTANCE;
+    // Direct repository-level test using SupabaseDB.INSTANCE (already initialized by testServer)
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
     const testUserId = `ffffffff-0000-0000-0000-${Date.now().toString(16).padStart(12, "0")}`;
 
     const delta1 = {
