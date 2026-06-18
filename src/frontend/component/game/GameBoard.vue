@@ -277,6 +277,12 @@ watch(logDrawerOpen, (open) => {
 
 @media (max-width: 767px) {
   .game-board--mobile {
+    /* Override inset: 0 block axis — use dvh for Firefox URL bar compat */
+    top: 0;
+    bottom: auto;
+    height: 100vh; /* fallback for older browsers */
+    height: 100dvh; /* dynamic viewport height — accounts for URL bar */
+
     grid-template-rows:
       var(--mobile-opponent-height) 1fr var(--mobile-hand-height)
       var(--mobile-actions-height);
@@ -286,7 +292,14 @@ watch(logDrawerOpen, (open) => {
       "table"
       "hand"
       "actions";
+
+    /* clip prevents scroll context creation; hidden is fallback */
+    overflow: hidden;
     overflow: clip;
+  }
+
+  .game-board--mobile .game-board__table {
+    min-height: 0; /* Allow 1fr row to shrink on Firefox */
   }
 
   .game-board--mobile::after {
@@ -304,6 +317,7 @@ watch(logDrawerOpen, (open) => {
   .game-board--mobile .game-board__hand {
     flex-direction: column;
     align-items: flex-start;
+    overflow: hidden; /* contain within grid cell */
   }
 }
 </style>
