@@ -222,7 +222,7 @@ Run these commands in order from ${repoRoot}:
    git -C ${wtPath} branch --show-current
 
 5. Install dependencies in the worktree (needed for build/test):
-   cd ${wtPath} && npm install --silent
+   npm --prefix ${wtPath} install --silent
 
 Return status "ready" with the branch name, or "failed" with the error.`,
   { label: "setup-worktree", schema: SETUP_SCHEMA },
@@ -246,10 +246,9 @@ if (context.restart) {
     `Reset the feature branch to start fresh. The previous work on this branch had the wrong diagnosis.
 
 Run these commands:
-1. cd ${wtPath}
-2. git reset --hard origin/main
-3. git clean -fd
-4. Verify: git log --oneline -1 (should match origin/main)
+1. git -C ${wtPath} reset --hard origin/main
+2. git -C ${wtPath} clean -fd
+3. git -C ${wtPath} log --oneline -1 (verify it matches origin/main)
 
 Reason for restart: ${context.restart}`,
     { label: "restart-reset-branch" },
@@ -258,10 +257,13 @@ Reason for restart: ${context.restart}`,
 }
 
 // Preamble for all subsequent agents operating in the worktree
-const WT_PREAMBLE = `**IMPORTANT: All commands must be run from the worktree directory.**
-Before running ANY command, first: cd ${wtPath}
-Your working directory is ${wtPath} (absolute path) — this is an isolated git worktree on branch "${context.branchName}".
-Do NOT switch branches. Do NOT modify files outside this directory.`;
+const WT_PREAMBLE = `**IMPORTANT: All file paths and commands must target the worktree directory: ${wtPath}**
+This is an isolated git worktree on branch "${context.branchName}".
+- For git commands, use: git -C ${wtPath} <subcommand>
+- For npm commands, use: npm --prefix ${wtPath} <subcommand>
+- For file reads/writes, use absolute paths under ${wtPath}/
+- Do NOT use "cd ${wtPath} && ..." — use -C or --prefix flags instead.
+- Do NOT switch branches. Do NOT modify files outside this directory.`;
 
 // Phase 3: Frontend Design (conditional — skipped for backend-only issues)
 let frontendSpec = null;
@@ -304,9 +306,9 @@ Save HTML mockup(s) to docs/mockups/${context.lldSlug}.html (and variants if pro
 The mockup(s) should demonstrate the visual layout and key states.
 
 Then:
-1. git add docs/mockups/
-2. git commit -m "Add frontend mockups for ${context.issueTitle}"
-3. git push -u origin ${context.branchName}
+1. git -C ${wtPath} add docs/mockups/
+2. git -C ${wtPath} commit -m "Add frontend mockups for ${context.issueTitle}"
+3. git -C ${wtPath} push -u origin ${context.branchName}
 4. Comment on GitHub issue #${issueNum} with:
    - A summary of the design options/decisions proposed
    - A link to view the mockups on the branch (point to the file paths on GitHub)
@@ -370,10 +372,10 @@ Write the LLD following the standard structure (Scope, Approach, Interfaces/Type
 ${frontendSpec ? `\nInclude a **## Frontend Design** section in the LLD that incorporates these frontend architecture decisions:\n${frontendSpec}` : ""}
 Keep it concise — enough to implement from, not a textbook.
 
-Save the file to ${lldPath}.
+Save the file to ${wtPath}/${lldPath}.
 Then commit it immediately:
-  git add ${lldPath}
-  git commit -m "Add LLD ${context.nextLldNumber}: ${context.issueTitle}"`,
+  git -C ${wtPath} add ${lldPath}
+  git -C ${wtPath} commit -m "Add LLD ${context.nextLldNumber}: ${context.issueTitle}"`,
   { label: "architect", model: "opus", agentType: "architect" },
 );
 
@@ -434,8 +436,8 @@ Relevant files: ${context.relevantFiles.join(", ")}
 
 Read the LLD, address the feedback, and update the file in place. Do not change the filename.
 Then commit:
-  git add ${lldPath}
-  git commit -m "Revise LLD ${context.nextLldNumber} per review feedback"`,
+  git -C ${wtPath} add ${lldPath}
+  git -C ${wtPath} commit -m "Revise LLD ${context.nextLldNumber} per review feedback"`,
         {
           label: `architect-revision-${designAttempts}`,
           model: "opus",
@@ -449,7 +451,7 @@ Then commit:
 if (!designApproved) {
   log(`Design review failed after ${MAX_DESIGN_ATTEMPTS} attempts. Stopping.`);
   await agent(
-    `Clean up the worktree: git worktree remove ${wtPath} --force 2>/dev/null || true`,
+    `Clean up the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
     { label: "cleanup-worktree" },
   );
   return { status: "failed", phase: "design-review", lldPath };
@@ -460,21 +462,21 @@ phase("Implement");
 await agent(
   `${WT_PREAMBLE}
 
-Implement the approved LLD at ${lldPath}.
+Implement the approved LLD at ${wtPath}/${lldPath}.
 
 Process:
 1. Read the LLD thoroughly
 2. Implement module by module, writing tests alongside
-3. Run npm run build — fix any errors
-4. Run npm test — fix any failures
-5. Run npm run lint:fix
+3. Run npm --prefix ${wtPath} run build — fix any errors
+4. Run npm --prefix ${wtPath} test — fix any failures
+5. Run npm --prefix ${wtPath} run lint:fix
 6. Update CHANGELOG.md under [Unreleased] with what was implemented
 7. Stage and commit:
-   - Run git status to see what changed
+   - Run git -C ${wtPath} status to see what changed
    - Stage ONLY source files you created/modified (src/**, tests/**, CHANGELOG.md, package.json, etc.)
    - Do NOT stage .env, .env.*, credentials, secrets, node_modules, build/, or dist/
-   - git add <specific files>
-   - git commit -m "Implement LLD ${context.nextLldNumber}: ${context.issueTitle}"
+   - git -C ${wtPath} add <specific files>
+   - git -C ${wtPath} commit -m "Implement LLD ${context.nextLldNumber}: ${context.issueTitle}"
 
 You are already on branch ${context.branchName}. Do NOT create or switch branches.`,
   { label: "implementer", model: "sonnet", agentType: "implementer" },
@@ -494,12 +496,12 @@ while (!codeApproved && codeAttempts < MAX_CODE_ATTEMPTS) {
   const codeReview = await agent(
     `${WT_PREAMBLE}
 
-Review the implementation of the LLD at ${lldPath}.
+Review the implementation of the LLD at ${wtPath}/${lldPath}.
 
 Run these commands first:
-- git diff main --stat (to see what files changed)
-- npm run build (verify it compiles)
-- npm test (verify tests pass)
+- git -C ${wtPath} diff main --stat (to see what files changed)
+- npm --prefix ${wtPath} run build (verify it compiles)
+- npm --prefix ${wtPath} test (verify tests pass)
 
 ${codeAttempts > 1 ? "This is a re-review after the implementer addressed prior feedback. Verify fixes are correct." : ""}
 
@@ -545,11 +547,12 @@ ${issues || codeReview.summary}
 
 Fix these issues in the code. Reference the LLD if needed.
 After fixing:
-- Run npm run build (must pass)
-- Run npm test (must pass)
-- Run npm run lint:fix
+- Run npm --prefix ${wtPath} run build (must pass)
+- Run npm --prefix ${wtPath} test (must pass)
+- Run npm --prefix ${wtPath} run lint:fix
 - Stage only the files you modified (no .env, secrets, node_modules, build/)
-- Commit: git add <your changed files> && git commit -m "Address code review feedback (round ${codeAttempts})"`,
+- git -C ${wtPath} add <your changed files>
+- git -C ${wtPath} commit -m "Address code review feedback (round ${codeAttempts})"`,
         {
           label: `implementer-fix-${codeAttempts}`,
           model: "sonnet",
@@ -563,7 +566,7 @@ After fixing:
 if (!codeApproved) {
   log(`Code review failed after ${MAX_CODE_ATTEMPTS} attempts. Stopping.`);
   await agent(
-    `Clean up the worktree: git worktree remove ${wtPath} --force 2>/dev/null || true`,
+    `Clean up the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
     { label: "cleanup-worktree" },
   );
   return { status: "failed", phase: "code-review", lldPath };
@@ -581,10 +584,10 @@ while (!qaApproved && qaAttempts < MAX_QA_ATTEMPTS) {
   const qaResult = await agent(
     `${WT_PREAMBLE}
 
-Validate the implementation of the LLD at ${lldPath}.
+Validate the implementation of the LLD at ${wtPath}/${lldPath}.
 
-Check the changed files (run: git diff main --stat, then read relevant ones).
-Cross-reference with docs/customer-experience.md for expected user flows.
+Check the changed files (run: git -C ${wtPath} diff main --stat, then read relevant ones).
+Cross-reference with ${wtPath}/docs/customer-experience.md for expected user flows.
 
 ${qaAttempts > 1 ? "This is a re-check after the implementer addressed prior QA feedback. Verify the fixes." : ""}
 
@@ -623,11 +626,12 @@ ${qaResult.issues ? qaResult.issues.join("\n") : qaResult.summary}
 
 Fix these issues. Reference the LLD and CX doc if needed.
 After fixing:
-- Run npm run build (must pass)
-- Run npm test (must pass)
-- Run npm run lint:fix
+- Run npm --prefix ${wtPath} run build (must pass)
+- Run npm --prefix ${wtPath} test (must pass)
+- Run npm --prefix ${wtPath} run lint:fix
 - Stage only the files you modified (no .env, secrets, node_modules, build/)
-- Commit: git add <your changed files> && git commit -m "Address QA feedback (round ${qaAttempts})"`,
+- git -C ${wtPath} add <your changed files>
+- git -C ${wtPath} commit -m "Address QA feedback (round ${qaAttempts})"`,
         {
           label: `implementer-qa-fix-${qaAttempts}`,
           model: "sonnet",
@@ -641,7 +645,7 @@ After fixing:
 if (!qaApproved) {
   log(`QA failed after ${MAX_QA_ATTEMPTS} attempts. Stopping.`);
   await agent(
-    `Clean up the worktree: git worktree remove ${wtPath} --force 2>/dev/null || true`,
+    `Clean up the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
     { label: "cleanup-worktree" },
   );
   return { status: "failed", phase: "qa", lldPath };
@@ -656,9 +660,9 @@ Ship the implementation. You are on branch ${context.branchName}.
 
 Steps:
 1. Verify you are on the correct branch:
-   git branch --show-current (must output "${context.branchName}")
+   git -C ${wtPath} branch --show-current (must output "${context.branchName}")
 
-2. Push: git push -u origin ${context.branchName}
+2. Push: git -C ${wtPath} push -u origin ${context.branchName}
 
 3. Create PR: gh pr create --title "..." --body "$(cat <<'PREOF'
 ## Summary
@@ -686,7 +690,7 @@ Return the PR URL, commit message summary, and confirm closesIssue is ${issueNum
 if (!shipResult) {
   log("Ship agent failed. Branch is pushed but PR may not exist.");
   await agent(
-    `Clean up the worktree: git worktree remove ${wtPath} --force 2>/dev/null || true`,
+    `Clean up the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
     { label: "cleanup-worktree" },
   );
   return { status: "failed", phase: "ship", branchName: context.branchName };
@@ -703,7 +707,7 @@ log(`PR raised: ${shipResult.prUrl}`);
 // Clean up worktree
 await agent(
   `Remove the worktree now that the PR is up:
-git worktree remove ${wtPath} --force 2>/dev/null || true`,
+git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
   { label: "cleanup-worktree" },
 );
 
