@@ -64,16 +64,7 @@ export class CreateGameHandler extends Handler {
         throw err;
       }
     }
-    // All retries exhausted — create without a join code
-    return await gameRepo.createGame(
-      gameId,
-      gameType,
-      creatorId,
-      maxPlayers,
-      creatorDisplayName,
-      turnTimerSeconds,
-      null,
-    );
+    throw new Error("Failed to generate unique join code after max retries");
   }
 
   private validateRequest(request: Request<CreateGameRequest>) {
