@@ -72,6 +72,11 @@ const GATHER_SCHEMA = {
       description:
         "If hasFrontend and a prior frontend design decision exists in issue comments, extract that text. null if no decision yet.",
     },
+    restart: {
+      type: ["string", "null"],
+      description:
+        "If any issue comment contains 'Restart:' prefix, extract the text after it (reason for restart). null if no restart requested. A restart means the previous diagnosis/LLD was wrong and work should start over.",
+    },
   },
   required: [
     "issueTitle",
@@ -166,6 +171,7 @@ Then:
 4. Identify the most relevant source files the architect should read (check files referenced in the issue, or grep for relevant code). List 3-8 paths.
 5. Determine hasFrontend: true if the issue involves UI/frontend changes (Vue components, CSS, layouts, user-facing views), false if backend-only.
 6. If hasFrontend AND this is a GitHub issue, check the issue comments (gh issue view ${issueNum || "N/A"} --comments) for a comment containing "Frontend decision:". If found, extract the decision text into frontendDecision. If not found, set frontendDecision to null.
+7. Check if any comment contains "Restart:" prefix. If found, extract the text after it into restart. This means a previous attempt at this issue had the wrong diagnosis and needs to start fresh.
 
 Return the structured result.`,
   { label: "gather-context", schema: GATHER_SCHEMA },
@@ -233,6 +239,24 @@ log(
   `Worktree created at ${wtPath} on branch ${setupResult.branch || context.branchName}`,
 );
 
+// Handle restart: reset branch to main if a Restart: comment was found
+if (context.restart) {
+  log(`Restart requested: "${context.restart}" — resetting branch to main`);
+  await agent(
+    `Reset the feature branch to start fresh. The previous work on this branch had the wrong diagnosis.
+
+Run these commands:
+1. cd ${wtPath}
+2. git reset --hard origin/main
+3. git clean -fd
+4. Verify: git log --oneline -1 (should match origin/main)
+
+Reason for restart: ${context.restart}`,
+    { label: "restart-reset-branch" },
+  );
+  log("Branch reset to main — starting fresh");
+}
+
 // Preamble for all subsequent agents operating in the worktree
 const WT_PREAMBLE = `**IMPORTANT: All commands must be run from the worktree directory.**
 Before running ANY command, first: cd ${wtPath}
@@ -241,6 +265,13 @@ Do NOT switch branches. Do NOT modify files outside this directory.`;
 
 // Phase 3: Frontend Design (conditional — skipped for backend-only issues)
 let frontendSpec = null;
+// On restart, ignore any prior frontend decision — it was based on wrong diagnosis
+if (context.restart && context.frontendDecision) {
+  log(
+    "Ignoring prior frontend decision due to restart — will produce new mockups",
+  );
+  context.frontendDecision = null;
+}
 if (context.hasFrontend) {
   phase("Frontend Design");
 
