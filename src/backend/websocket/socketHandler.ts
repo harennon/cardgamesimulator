@@ -14,6 +14,7 @@ import type {
   TimerExpiredPayload,
 } from "@shared/socket-events";
 import type { TurnTimerService } from "@/timer/turnTimerService";
+import type { JoinCodeService } from "@/service/joinCodeService";
 
 function emitSpectatorCount(
   io: TypedServer,
@@ -138,6 +139,7 @@ async function handleGameJoin(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  joinCodeService: JoinCodeService,
 ): Promise<void> {
   const { gameId, role } = payload;
   const { userId, displayName } = socket.data;
@@ -175,7 +177,12 @@ async function handleGameJoin(
         playerId: id,
         displayName: game.playerDisplayNames[id] ?? id,
       }));
-      socket.emit("lobby:state", { players, maxPlayers: game.maxPlayers });
+      const joinCode = (await joinCodeService.resolveCode(gameId)) ?? "";
+      socket.emit("lobby:state", {
+        players,
+        maxPlayers: game.maxPlayers,
+        joinCode,
+      });
 
       // Notify others (incremental update)
       socket.to(`game:${gameId}`).emit("lobby:playerJoined", {
@@ -588,6 +595,7 @@ export function registerSocketHandlers(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  joinCodeService: JoinCodeService,
 ): void {
   io.on("connection", (socket) => {
     socket.on("game:join", (payload, ack) => {
@@ -599,6 +607,7 @@ export function registerSocketHandlers(
         gameService,
         connectionManager,
         turnTimerService,
+        joinCodeService,
       ).catch((err: unknown) => {
         console.error("game:join error", err);
         ack({ success: false, error: "INTERNAL_ERROR" });

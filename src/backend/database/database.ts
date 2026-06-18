@@ -38,3 +38,10 @@ export interface FeedbackRepository {
   createFeedback(feedback: Feedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
 }
+
+export interface JoinCodeRepository {
+  createJoinCode(code: string, gameId: string): Promise<void>;
+  getGameIdByCode(code: string): Promise<string | null>;
+  deleteByGameId(gameId: string): Promise<void>;
+  deleteExpired(maxAgeMs: number): Promise<number>; // returns count deleted
+}

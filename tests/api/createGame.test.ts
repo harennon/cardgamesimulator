@@ -27,11 +27,36 @@ const mockCreateGame =
     ) => Promise<Game>
   >();
 
+const mockGenerateCode = vi.fn<(gameId: string) => Promise<string>>();
+
 vi.mock("@/database", () => ({
   gameRepo: {
     createGame: (
       ...args: [string, string, string, number, string, number | null]
     ) => mockCreateGame(...args),
+  },
+  joinCodeRepo: {
+    createJoinCode: vi.fn().mockResolvedValue(undefined),
+    getGameIdByCode: vi.fn().mockResolvedValue(null),
+    deleteByGameId: vi.fn().mockResolvedValue(undefined),
+    deleteExpired: vi.fn().mockResolvedValue(0),
+  },
+}));
+
+vi.mock("@/service/joinCodeService", () => ({
+  JoinCodeService: class {
+    generateCode(gameId: string) {
+      return mockGenerateCode(gameId);
+    }
+    resolveCode() {
+      return Promise.resolve(null);
+    }
+    deleteForGame() {
+      return Promise.resolve();
+    }
+    cleanupExpired() {
+      return Promise.resolve(0);
+    }
   },
 }));
 
@@ -73,10 +98,11 @@ function makeResponse() {
 describe("CreateGameHandler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGenerateCode.mockResolvedValue("H7K3");
   });
 
   describe("happy path", () => {
-    it("creates game and returns gameId and gameType", async () => {
+    it("creates game and returns gameId, gameType, and joinCode", async () => {
       const game = makeGame();
       mockCreateGame.mockResolvedValue(game);
 
@@ -87,7 +113,11 @@ describe("CreateGameHandler", () => {
       );
 
       expect(data.statusCode).toBe(200);
-      expect(data.body).toEqual({ gameId: "game-1", gameType: "big2" });
+      expect(data.body).toEqual({
+        gameId: "game-1",
+        gameType: "big2",
+        joinCode: "H7K3",
+      });
     });
 
     it("passes displayName to gameRepo.createGame", async () => {

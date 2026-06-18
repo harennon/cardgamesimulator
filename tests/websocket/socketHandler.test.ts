@@ -6,6 +6,7 @@ import type {
 import type { ConnectionManager } from "../../src/backend/websocket/connectionManager.js";
 import type { GameService } from "../../src/backend/service/gameService.js";
 import type { TurnTimerService } from "../../src/backend/timer/turnTimerService.js";
+import type { JoinCodeService } from "../../src/backend/service/joinCodeService.js";
 import { registerSocketHandlers } from "../../src/backend/websocket/socketHandler.js";
 import { Game } from "../../src/backend/database/entities/Game.js";
 import type {
@@ -217,10 +218,20 @@ function makeIo(): {
  * Sets up registerSocketHandlers, captures the connection handler, and returns
  * a helper that fires game:join on a given socket.
  */
+function makeJoinCodeService(): JoinCodeService {
+  return {
+    generateCode: vi.fn(),
+    resolveCode: vi.fn().mockResolvedValue(null),
+    deleteForGame: vi.fn(),
+    cleanupExpired: vi.fn(),
+  } as unknown as JoinCodeService;
+}
+
 function setupHandlers(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  joinCodeService?: JoinCodeService,
 ): {
   fireGameJoin: (
     socket: TypedSocket,
@@ -244,7 +255,13 @@ function setupHandlers(
     to: vi.fn().mockReturnValue({ emit: vi.fn() }),
   } as unknown as TypedServer;
 
-  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
+  registerSocketHandlers(
+    io,
+    gameService,
+    connectionManager,
+    turnTimerService,
+    joinCodeService ?? makeJoinCodeService(),
+  );
 
   const fireGameJoin = (
     socket: TypedSocket,

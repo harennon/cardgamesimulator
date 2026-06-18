@@ -1,14 +1,17 @@
 import { type Request, type Response } from "@/util/types";
 import { Handler } from "@/api/handler";
 import { CreateGameRequest, CreateGameResponse } from "@shared/model";
-import { gameRepo } from "@/database";
+import { gameRepo, joinCodeRepo } from "@/database";
 import { BadRequestError } from "@/util/errors";
+import { JoinCodeService } from "@/service/joinCodeService";
 
 const VALID_TIMER_VALUES: ReadonlySet<number> = new Set([30, 60, 90]);
 
 export class CreateGameHandler extends Handler {
-  public static INSTANCE: CreateGameHandler = new CreateGameHandler();
-  private constructor() {
+  public static INSTANCE: CreateGameHandler = new CreateGameHandler(
+    new JoinCodeService(joinCodeRepo),
+  );
+  private constructor(private readonly joinCodeService: JoinCodeService) {
     super();
   }
 
@@ -22,6 +25,7 @@ export class CreateGameHandler extends Handler {
       throw new BadRequestError();
     }
     const gameId = crypto.randomUUID();
+    const joinCode = await this.joinCodeService.generateCode(gameId);
     const game = await gameRepo.createGame(
       gameId,
       request.body.gameType,
@@ -33,6 +37,7 @@ export class CreateGameHandler extends Handler {
     const createGameResponse: CreateGameResponse = {
       gameId: game.gameId,
       gameType: request.body.gameType,
+      joinCode,
     };
     response.status(200).json(createGameResponse);
   }

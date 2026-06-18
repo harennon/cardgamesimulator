@@ -3,6 +3,7 @@ import {
   GameRepository,
   PlayerStatsRepository,
   FeedbackRepository,
+  JoinCodeRepository,
   StatsDelta,
 } from "@/database/database";
 import { Game } from "@/database/entities/Game";
@@ -12,7 +13,11 @@ import { OptimisticLockError } from "@/util/errors";
 import type { GameType } from "@shared/engine-types";
 
 export class SupabaseDB
-  implements GameRepository, PlayerStatsRepository, FeedbackRepository
+  implements
+    GameRepository,
+    PlayerStatsRepository,
+    FeedbackRepository,
+    JoinCodeRepository
 {
   public static readonly INSTANCE = new SupabaseDB();
   private client: SupabaseClient | undefined;
@@ -163,6 +168,45 @@ export class SupabaseDB
     return (data ?? []).map((row) =>
       this.mapFeedback(row as Record<string, unknown>),
     );
+  }
+
+  // --- JoinCodeRepository ---
+
+  public async createJoinCode(code: string, gameId: string): Promise<void> {
+    const { error } = await this.db
+      .from("join_codes")
+      .insert({ code, game_id: gameId });
+    if (error) throw new Error(`createJoinCode failed: ${error.message}`);
+  }
+
+  public async getGameIdByCode(code: string): Promise<string | null> {
+    const { data, error } = await this.db
+      .from("join_codes")
+      .select("game_id")
+      .eq("code", code)
+      .maybeSingle();
+    if (error) throw new Error(`getGameIdByCode failed: ${error.message}`);
+    if (!data) return null;
+    return (data as Record<string, unknown>).game_id as string;
+  }
+
+  public async deleteByGameId(gameId: string): Promise<void> {
+    const { error } = await this.db
+      .from("join_codes")
+      .delete()
+      .eq("game_id", gameId);
+    if (error) throw new Error(`deleteByGameId failed: ${error.message}`);
+  }
+
+  public async deleteExpired(maxAgeMs: number): Promise<number> {
+    const cutoff = new Date(Date.now() - maxAgeMs).toISOString();
+    const { data, error } = await this.db
+      .from("join_codes")
+      .delete()
+      .lt("created_at", cutoff)
+      .select("code");
+    if (error) throw new Error(`deleteExpired failed: ${error.message}`);
+    return (data ?? []).length;
   }
 
   // --- Row mappers (snake_case DB columns -> camelCase domain objects) ---
