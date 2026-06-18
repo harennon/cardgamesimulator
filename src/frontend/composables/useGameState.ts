@@ -1,10 +1,11 @@
 import { shallowRef, ref, readonly } from "vue";
 import type { ShallowRef, Ref, DeepReadonly } from "vue";
-import type { PlayerView, GameStatus } from "@shared/engine-types";
+import type { GameStatus } from "@shared/engine-types";
+import type { EnrichedPlayerView } from "@shared/socket-events";
 import type { TypedClientSocket } from "./useSocket";
 
 interface UseGameStateReturn {
-  gameState: DeepReadonly<ShallowRef<PlayerView | null>>;
+  gameState: DeepReadonly<ShallowRef<EnrichedPlayerView | null>>;
   status: Ref<GameStatus | null>;
   initialized: Ref<boolean>;
   bind(socket: TypedClientSocket): void;
@@ -12,13 +13,13 @@ interface UseGameStateReturn {
 }
 
 export function useGameState(): UseGameStateReturn {
-  const gameState = shallowRef<PlayerView | null>(null);
+  const gameState = shallowRef<EnrichedPlayerView | null>(null);
   const status = ref<GameStatus | null>(null);
   const initialized = ref(false);
 
   let boundSocket: TypedClientSocket | null = null;
 
-  function onGameState(view: PlayerView): void {
+  function onGameState(view: EnrichedPlayerView): void {
     gameState.value = view;
     status.value = view.status;
     initialized.value = true;

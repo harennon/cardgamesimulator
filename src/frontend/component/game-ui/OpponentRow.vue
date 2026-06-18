@@ -19,6 +19,12 @@
         <span v-if="!player.isConnected" class="opponent__disconnected"
           >disconnected</span
         >
+        <OpponentTimer
+          v-if="isActive(player.originalIndex)"
+          :turn-deadline="turnDeadline"
+          :is-active="true"
+          :total-seconds="totalSeconds"
+        />
       </div>
       <div
         v-if="isActive(player.originalIndex)"
@@ -31,11 +37,14 @@
 <script lang="ts" setup>
 import type { PlayerPublicInfo } from "@shared/engine-types";
 import { computed } from "vue";
+import OpponentTimer from "./OpponentTimer.vue";
 
 const props = defineProps<{
   players: readonly PlayerPublicInfo[];
   currentPlayerIndex: number;
   myPlayerIndex: number;
+  turnDeadline: number | null;
+  totalSeconds: number;
 }>();
 
 const opponents = computed(() =>

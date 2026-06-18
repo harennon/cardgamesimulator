@@ -9,6 +9,8 @@
         :players="gameState.players"
         :current-player-index="gameState.currentPlayerIndex"
         :my-player-index="myPlayerIndex"
+        :turn-deadline="turnDeadline"
+        :total-seconds="totalSeconds"
       />
     </div>
 
@@ -18,6 +20,8 @@
         :is-my-turn="isMyTurn"
         :current-player-name="currentPlayerName"
         :players="gameState.players"
+        :turn-deadline="turnDeadline"
+        :total-seconds="totalSeconds"
       />
     </div>
 
@@ -84,7 +88,7 @@
 
 <script lang="ts" setup>
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
-import type { PlayerView } from "@shared/engine-types";
+import type { EnrichedPlayerView } from "@shared/socket-events";
 import type { Big2PublicState } from "@shared/big2-types";
 import OpponentRow from "@/component/game-ui/OpponentRow.vue";
 import PlayArea from "@/component/game-ui/PlayArea.vue";
@@ -93,11 +97,12 @@ import GameLog from "@/component/game-ui/GameLog.vue";
 import ActionPanel from "@/component/game-ui/ActionPanel.vue";
 
 const props = defineProps<{
-  gameState: PlayerView;
+  gameState: EnrichedPlayerView;
   selectedIndices: Set<number>;
   selectionCount: number;
   actionError: string | null;
   actionPending: boolean;
+  turnTimerSeconds: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -135,6 +140,12 @@ const isFinished = computed(() => {
   const finishedIndices = big2State.value?.finishedPlayerIndices ?? [];
   return finishedIndices.includes(myPlayerIndex.value);
 });
+
+const turnDeadline = computed<number | null>(
+  () => props.gameState.turnDeadline ?? null,
+);
+
+const totalSeconds = computed<number>(() => props.turnTimerSeconds ?? 0);
 
 function toggleCard(index: number): void {
   emit("toggle-card", index);

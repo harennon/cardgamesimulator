@@ -1,12 +1,11 @@
 <template>
   <div class="play-area">
-    <div
-      class="play-area__turn-banner"
-      :class="{ 'play-area__turn-banner--mine': isMyTurn }"
-    >
-      <span v-if="isMyTurn">Your turn</span>
-      <span v-else>{{ currentPlayerName }}'s turn</span>
-    </div>
+    <TurnTimer
+      :turn-deadline="turnDeadline"
+      :is-my-turn="isMyTurn"
+      :current-player-name="currentPlayerName"
+      :total-seconds="totalSeconds"
+    />
 
     <div v-if="lastPlay" class="play-area__cards">
       <div class="play-area__hand-label">
@@ -34,6 +33,7 @@ import { computed } from "vue";
 import type { PlayerPublicInfo } from "@shared/engine-types";
 import type { Big2PublicState } from "@shared/big2-types";
 import GameCard from "./GameCard.vue";
+import TurnTimer from "./TurnTimer.vue";
 
 const HAND_TYPE_LABELS: Record<string, string> = {
   single: "Single",
@@ -49,6 +49,8 @@ const props = defineProps<{
   isMyTurn: boolean;
   currentPlayerName: string;
   players: readonly PlayerPublicInfo[];
+  turnDeadline: number | null;
+  totalSeconds: number;
 }>();
 
 const handTypeLabel = computed(() => {
@@ -79,38 +81,6 @@ const lastPlayDisplayName = computed(() => {
   gap: 12px;
   height: 100%;
   padding: 16px;
-}
-
-.play-area__turn-banner {
-  font-family: var(--font-ui);
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  padding: 4px 16px;
-  border-radius: 20px;
-  background: var(--panel-bg);
-  border: 1px solid rgba(138, 126, 110, 0.3);
-  transition:
-    color 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.play-area__turn-banner--mine {
-  color: var(--gold-accent);
-  border-color: var(--gold-accent);
-  animation: glow 2s ease-in-out infinite;
-}
-
-@keyframes glow {
-  0%,
-  100% {
-    box-shadow: 0 0 8px var(--gold-glow);
-  }
-  50% {
-    box-shadow:
-      0 0 20px var(--gold-glow),
-      0 0 40px rgba(201, 168, 76, 0.1);
-  }
 }
 
 .play-area__cards {
@@ -146,11 +116,5 @@ const lastPlayDisplayName = computed(() => {
   color: var(--text-muted);
   font-style: italic;
   text-align: center;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .play-area__turn-banner--mine {
-    animation: none;
-  }
 }
 </style>
