@@ -177,7 +177,7 @@ async function handleGameJoin(
         playerId: id,
         displayName: game.playerDisplayNames[id] ?? id,
       }));
-      const joinCode = (await joinCodeService.resolveCode(gameId)) ?? "";
+      const joinCode = (await joinCodeService.getCodeForGame(gameId)) ?? "";
       socket.emit("lobby:state", {
         players,
         maxPlayers: game.maxPlayers,

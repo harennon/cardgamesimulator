@@ -9,6 +9,7 @@ export class JoinCodeService {
   private static readonly ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
   private readonly cache = new Map<string, string>(); // code → gameId
+  private readonly reverseCache = new Map<string, string>(); // gameId → code
 
   constructor(private readonly joinCodeRepo: JoinCodeRepository) {}
 
@@ -19,6 +20,7 @@ export class JoinCodeService {
       try {
         await this.joinCodeRepo.createJoinCode(code, gameId);
         this.cache.set(code, gameId);
+        this.reverseCache.set(gameId, code);
         return code;
       } catch (err: unknown) {
         // Unique constraint violation — retry with a new code
@@ -40,14 +42,20 @@ export class JoinCodeService {
     return this.joinCodeRepo.getGameIdByCode(normalized);
   }
 
+  /** Resolve a gameId to its join code. Returns null if not found. */
+  async getCodeForGame(gameId: string): Promise<string | null> {
+    const cached = this.reverseCache.get(gameId);
+    if (cached !== undefined) return cached;
+    return this.joinCodeRepo.getCodeByGameId(gameId);
+  }
+
   /** Delete code for a completed/expired game. */
   async deleteForGame(gameId: string): Promise<void> {
-    // Remove from cache
-    for (const [code, id] of this.cache.entries()) {
-      if (id === gameId) {
-        this.cache.delete(code);
-        break;
-      }
+    // Remove from both caches
+    const code = this.reverseCache.get(gameId);
+    if (code !== undefined) {
+      this.cache.delete(code);
+      this.reverseCache.delete(gameId);
     }
     await this.joinCodeRepo.deleteByGameId(gameId);
   }

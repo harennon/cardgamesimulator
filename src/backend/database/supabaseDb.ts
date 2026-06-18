@@ -190,6 +190,17 @@ export class SupabaseDB
     return (data as Record<string, unknown>).game_id as string;
   }
 
+  public async getCodeByGameId(gameId: string): Promise<string | null> {
+    const { data, error } = await this.db
+      .from("join_codes")
+      .select("code")
+      .eq("game_id", gameId)
+      .maybeSingle();
+    if (error) throw new Error(`getCodeByGameId failed: ${error.message}`);
+    if (!data) return null;
+    return (data as Record<string, unknown>).code as string;
+  }
+
   public async deleteByGameId(gameId: string): Promise<void> {
     const { error } = await this.db
       .from("join_codes")

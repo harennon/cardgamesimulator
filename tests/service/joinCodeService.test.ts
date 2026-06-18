@@ -10,6 +10,9 @@ function makeRepo(
     getGameIdByCode: vi
       .fn<(code: string) => Promise<string | null>>()
       .mockResolvedValue(null),
+    getCodeByGameId: vi
+      .fn<(gameId: string) => Promise<string | null>>()
+      .mockResolvedValue(null),
     deleteByGameId: vi.fn<(gameId: string) => Promise<void>>(),
     deleteExpired: vi
       .fn<(maxAgeMs: number) => Promise<number>>()
@@ -117,6 +120,23 @@ describe("JoinCodeService", () => {
       expect(resolved).toBe("game-cache");
       expect(getGameIdByCode).not.toHaveBeenCalled();
     });
+
+    it("populates the reverse cache after successful generation", async () => {
+      const getCodeByGameId = vi
+        .fn<(gameId: string) => Promise<string | null>>()
+        .mockResolvedValue(null);
+      const repo = makeRepo({
+        createJoinCode: vi.fn().mockResolvedValue(undefined),
+        getCodeByGameId,
+      });
+      const service = new JoinCodeService(repo);
+      const code = await service.generateCode("game-reverse");
+
+      // Should resolve from reverse cache without hitting the DB
+      const resolved = await service.getCodeForGame("game-reverse");
+      expect(resolved).toBe(code);
+      expect(getCodeByGameId).not.toHaveBeenCalled();
+    });
   });
 
   describe("resolveCode", () => {
@@ -166,6 +186,43 @@ describe("JoinCodeService", () => {
     });
   });
 
+  describe("getCodeForGame", () => {
+    it("returns the code for a known gameId from the DB", async () => {
+      const repo = makeRepo({
+        getCodeByGameId: vi.fn().mockResolvedValue("H7K3"),
+      });
+      const service = new JoinCodeService(repo);
+      const result = await service.getCodeForGame("game-abc");
+      expect(result).toBe("H7K3");
+    });
+
+    it("returns null for an unknown gameId", async () => {
+      const repo = makeRepo({
+        getCodeByGameId: vi.fn().mockResolvedValue(null),
+      });
+      const service = new JoinCodeService(repo);
+      const result = await service.getCodeForGame("nonexistent-game");
+      expect(result).toBeNull();
+    });
+
+    it("returns from reverse cache without hitting DB when code was recently generated", async () => {
+      const getCodeByGameId = vi
+        .fn<(gameId: string) => Promise<string | null>>()
+        .mockResolvedValue(null);
+      const repo = makeRepo({
+        createJoinCode: vi.fn().mockResolvedValue(undefined),
+        getCodeByGameId,
+      });
+      const service = new JoinCodeService(repo);
+
+      const code = await service.generateCode("game-1");
+      const result = await service.getCodeForGame("game-1");
+
+      expect(result).toBe(code);
+      expect(getCodeByGameId).not.toHaveBeenCalled();
+    });
+  });
+
   describe("deleteForGame", () => {
     it("calls deleteByGameId on the repository", async () => {
       const deleteByGameId = vi
@@ -179,7 +236,7 @@ describe("JoinCodeService", () => {
       expect(deleteByGameId).toHaveBeenCalledWith("game-1");
     });
 
-    it("removes the code from the in-memory cache", async () => {
+    it("removes the code from the forward cache", async () => {
       const getGameIdByCode = vi
         .fn<(code: string) => Promise<string | null>>()
         .mockResolvedValue(null);
@@ -193,9 +250,28 @@ describe("JoinCodeService", () => {
       const code = await service.generateCode("game-del");
       await service.deleteForGame("game-del");
 
-      // Cache entry removed — should fall through to DB
+      // Forward cache entry removed — should fall through to DB
       await service.resolveCode(code);
       expect(getGameIdByCode).toHaveBeenCalledWith(code);
+    });
+
+    it("removes the gameId from the reverse cache", async () => {
+      const getCodeByGameId = vi
+        .fn<(gameId: string) => Promise<string | null>>()
+        .mockResolvedValue(null);
+      const repo = makeRepo({
+        createJoinCode: vi.fn().mockResolvedValue(undefined),
+        deleteByGameId: vi.fn().mockResolvedValue(undefined),
+        getCodeByGameId,
+      });
+      const service = new JoinCodeService(repo);
+
+      await service.generateCode("game-del");
+      await service.deleteForGame("game-del");
+
+      // Reverse cache entry removed — should fall through to DB
+      await service.getCodeForGame("game-del");
+      expect(getCodeByGameId).toHaveBeenCalledWith("game-del");
     });
   });
 

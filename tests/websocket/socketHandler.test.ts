@@ -222,6 +222,7 @@ function makeJoinCodeService(): JoinCodeService {
   return {
     generateCode: vi.fn(),
     resolveCode: vi.fn().mockResolvedValue(null),
+    getCodeForGame: vi.fn().mockResolvedValue(null),
     deleteForGame: vi.fn(),
     cleanupExpired: vi.fn(),
   } as unknown as JoinCodeService;
@@ -355,6 +356,35 @@ describe("socketHandler handleGameJoin — CREATED branch", () => {
       playerId: "joiner-id",
       displayName: "Joiner",
     });
+    // joinCode defaults to "" when getCodeForGame returns null
+    expect(payload.joinCode).toBe("");
+  });
+
+  it("includes the join code in lobby:state when getCodeForGame returns a code", async () => {
+    const game = makeGame();
+    (gameService.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(game);
+
+    const joinCodeService = makeJoinCodeService();
+    (
+      joinCodeService.getCodeForGame as ReturnType<typeof vi.fn>
+    ).mockResolvedValue("H7K3");
+
+    const { socket, emitted } = makeSocket("joiner-id", "Joiner");
+    const { fireGameJoin } = setupHandlers(
+      gameService,
+      connectionManager,
+      turnTimerService,
+      joinCodeService,
+    );
+
+    await fireGameJoin(socket, "game-1", () => {});
+
+    const lobbyStateArgs = emitted.get("lobby:state") as
+      | [LobbyStatePayload]
+      | undefined;
+    expect(lobbyStateArgs).toBeDefined();
+    const payload = lobbyStateArgs![0];
+    expect(payload.joinCode).toBe("H7K3");
   });
 
   it("emits lobby:playerJoined to others in the room", async () => {
