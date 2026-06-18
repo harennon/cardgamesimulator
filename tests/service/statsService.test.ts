@@ -26,8 +26,6 @@ function makeGuestSessionStore(guestIds: string[] = []): GuestSessionStore {
     get: vi.fn((id: string) => (guestIds.includes(id) ? { id } : null)),
     set: vi.fn(),
     delete: vi.fn(),
-    startCleanupLoop: vi.fn(),
-    stopCleanupLoop: vi.fn(),
   } as unknown as GuestSessionStore;
 }
 

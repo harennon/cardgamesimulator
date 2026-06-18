@@ -82,7 +82,6 @@ export async function createTestServer(
   app.use(cors({ origin: "*" }));
 
   const guestSessionStore = new GuestSessionStore();
-  guestSessionStore.startCleanupLoop();
   const authMiddleware = createAuthMiddleware(guestSessionStore);
 
   new Map<string, Handler>([
@@ -131,7 +130,6 @@ export async function createTestServer(
   io.use(createSocketAuthMiddleware(guestSessionStore));
 
   const gameCache = new GameCache();
-  gameCache.startEvictionLoop();
   const statsService = new StatsService(SupabaseDB.INSTANCE, guestSessionStore);
   const gameService = new GameService(
     gameCache,
@@ -182,8 +180,6 @@ export async function createTestServer(
   const baseUrl = `http://localhost:${address.port}`;
 
   const close = (): Promise<void> => {
-    guestSessionStore.stopCleanupLoop();
-    gameCache.stopEvictionLoop();
     timerProvider.cancelAll();
     io.disconnectSockets(true);
     return new Promise<void>((resolve, reject) => {

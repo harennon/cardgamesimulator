@@ -8,36 +8,34 @@ export interface GameCacheEntry {
 
 export interface GameCacheConfig {
   maxEntries: number;
-  evictionCheckIntervalMs: number;
   inactivityThresholdMs: number;
 }
 
 const DEFAULT_CONFIG: GameCacheConfig = {
   maxEntries: 1000,
-  evictionCheckIntervalMs: 60_000,
   inactivityThresholdMs: 3_600_000,
 };
 
 export class GameCache {
   private readonly cache: Map<string, GameCacheEntry> = new Map();
   private readonly config: GameCacheConfig;
-  private evictionTimer: NodeJS.Timeout | null = null;
 
   constructor(config?: Partial<GameCacheConfig>) {
     this.config = {
       maxEntries: config?.maxEntries ?? DEFAULT_CONFIG.maxEntries,
-      evictionCheckIntervalMs:
-        config?.evictionCheckIntervalMs ??
-        DEFAULT_CONFIG.evictionCheckIntervalMs,
       inactivityThresholdMs:
         config?.inactivityThresholdMs ?? DEFAULT_CONFIG.inactivityThresholdMs,
     };
   }
 
-  /** Get game state from cache. Returns null if not cached (caller must load from DB). */
+  /** Get game state from cache. Returns null if not cached or inactive (caller must load from DB). */
   get(gameId: string): InternalGameState | null {
     const entry = this.cache.get(gameId);
     if (!entry) {
+      return null;
+    }
+    if (entry.lastAccessedAt < Date.now() - this.config.inactivityThresholdMs) {
+      this.cache.delete(gameId);
       return null;
     }
     entry.lastAccessedAt = Date.now();
@@ -46,6 +44,7 @@ export class GameCache {
 
   /** Put game state into cache. Marks as clean (just loaded or just persisted). */
   set(gameId: string, state: InternalGameState): void {
+    this.evictInactive();
     this.evictLeastRecentlyAccessedIfFull();
     this.cache.set(gameId, {
       state,
@@ -98,24 +97,6 @@ export class GameCache {
       }
     }
     return dirty;
-  }
-
-  /** Start the periodic eviction timer. Called once at server startup. */
-  startEvictionLoop(): void {
-    if (this.evictionTimer !== null) {
-      return;
-    }
-    this.evictionTimer = setInterval(() => {
-      this.evictInactive();
-    }, this.config.evictionCheckIntervalMs);
-  }
-
-  /** Stop the eviction timer. Called on server shutdown. */
-  stopEvictionLoop(): void {
-    if (this.evictionTimer !== null) {
-      clearInterval(this.evictionTimer);
-      this.evictionTimer = null;
-    }
   }
 
   private evictInactive(): void {

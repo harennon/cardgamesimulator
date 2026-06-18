@@ -10,6 +10,12 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 13: Railway Sleep-on-Idle** — enable `sleepApplication: true` by removing `setInterval` loops that kept the process alive and adding turn-timer recovery on wake
+  - `src/backend/engine/game-cache.ts` — replaced periodic eviction loop with lazy on-access eviction (check inactivity threshold on `get()`, sweep stale entries on `set()`)
+  - `src/backend/guest/guestSessionStore.ts` — replaced periodic cleanup loop with lazy expiry deletion in `getByGame()`
+  - `src/backend/websocket/socketHandler.ts` — added timer recovery in `handleGameJoin`: if an IN_PROGRESS game has no active timer after wake, immediately trigger timeout
+  - `railway.json` — `sleepApplication: true`
+
 - **LLD 12: Supabase SDK Migration** — replaced TypeORM with `@supabase/supabase-js` for all DB operations; added Row-Level Security
   - `supabase/migrations/001_create_tables.sql` — snake_case schema for `games`, `player_stats`, `feedback` tables with indexes
   - `supabase/migrations/002_enable_rls.sql` — RLS enabled on all three tables; policies restrict direct PostgREST access (service-role bypasses automatically)
@@ -26,6 +32,20 @@ Format: each entry has a date, short description, and category. Most recent firs
   - Deleted `src/backend/database/postgres.ts`
 
 ### Fixed
+
+- **Hotfix: Lobby real-time player list** — fixed race condition where players already in the lobby did not see newly joined players without a page refresh
+  - `src/shared/socket-events.ts` — added `LobbyStatePayload` interface and `lobby:state` event to `ServerToClientEvents`
+  - `src/backend/websocket/socketHandler.ts` — on `game:join` for CREATED games, emits `lobby:state` to the joining socket with the full authoritative player list before the incremental `lobby:playerJoined` broadcast to others
+  - `src/frontend/component/game/GameView.vue` — registers `lobby:state` listener that replaces `lobbyPlayers` with the server-authoritative list, closing the race window between REST fetch and socket room join
+  - `tests/websocket/socketHandler.test.ts` — 4 unit tests covering CREATED/IN_PROGRESS/COMPLETED branches and displayName fallback
+
+- **Hotfix: Invite link auth bypass** — registered users visiting `/game/:gameId/join` are now joined directly using their Supabase session and redirected to the game view; unauthenticated users continue to see GuestEntryView as before
+  - `src/frontend/routes.ts` — exported `joinRouteGuard` function added as `beforeEnter` on the `/game/:gameId/join` route; calls `POST /api/joinGame` with the authenticated token and redirects to `/game/:gameId` on success (or home on 404)
+  - `vitest.config.ts` — extended frontend service alias to include `http`, added `@/component` alias for testability
+  - `tests/frontend/joinRouteGuard.test.ts` — 5 unit tests covering authenticated join, unauthenticated fallthrough, 404, 409, and network error cases
+
+- **Hotfix: Mobile Firefox game board layout** — cards and play/pass buttons now visible on Firefox Android (378x707 viewport)
+  - `src/frontend/component/game/GameBoard.vue` — added `height: 100dvh` (with `100vh` fallback) to override `inset: 0` block axis on mobile; `overflow: hidden` fallback before `overflow: clip`; `min-height: 0` on `.game-board__table` to allow Firefox's 1fr row to shrink; `overflow: hidden` on `.game-board__hand` to create intermediate scroll context
 
 - **LLD 12 code review**: removed fragile `error.message.includes("0 rows")` fallback from `saveGame` — `PGRST116` error code check alone is sufficient per PostgREST docs
 - **LLD 12 code review**: reduced `as unknown as` casting in `supabaseDb.test.ts` — extracted `makeTestInstance()` helper and call public methods directly on typed `db` variable
