@@ -37,7 +37,6 @@ import { FeedbackHandler } from "../../../src/backend/api/feedback/submitFeedbac
 import { FakeTimerProvider } from "../../../src/backend/timer/fakeTimerProvider.js";
 import { TurnTimerService } from "../../../src/backend/timer/turnTimerService.js";
 import { createSeedStateRouter } from "../../../src/backend/api/test/seedState.js";
-import { JoinCodeService } from "../../../src/backend/service/joinCodeService.js";
 
 export interface TestServerContext {
   app: Express;
@@ -157,14 +156,7 @@ export async function createTestServer(
       turnTimerService,
     ).catch((err: unknown) => console.error("Timer expired error:", err));
   });
-  const joinCodeService = new JoinCodeService(SupabaseDB.INSTANCE);
-  registerSocketHandlers(
-    io,
-    gameService,
-    connectionManager,
-    turnTimerService,
-    joinCodeService,
-  );
+  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
 
   // Initialize DB (idempotent across test files in the same process)
   ensureDbInitialized();

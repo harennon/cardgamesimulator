@@ -6,7 +6,6 @@ import type {
 import type { ConnectionManager } from "../../src/backend/websocket/connectionManager.js";
 import type { GameService } from "../../src/backend/service/gameService.js";
 import type { TurnTimerService } from "../../src/backend/timer/turnTimerService.js";
-import type { JoinCodeService } from "../../src/backend/service/joinCodeService.js";
 import { registerSocketHandlers } from "../../src/backend/websocket/socketHandler.js";
 import { Game } from "../../src/backend/database/entities/Game.js";
 import type {
@@ -218,21 +217,10 @@ function makeIo(): {
  * Sets up registerSocketHandlers, captures the connection handler, and returns
  * a helper that fires game:join on a given socket.
  */
-function makeJoinCodeService(): JoinCodeService {
-  return {
-    generateCode: vi.fn(),
-    resolveCode: vi.fn().mockResolvedValue(null),
-    getCodeForGame: vi.fn().mockResolvedValue(null),
-    deleteForGame: vi.fn(),
-    cleanupExpired: vi.fn(),
-  } as unknown as JoinCodeService;
-}
-
 function setupHandlers(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
-  joinCodeService?: JoinCodeService,
 ): {
   fireGameJoin: (
     socket: TypedSocket,
@@ -256,13 +244,7 @@ function setupHandlers(
     to: vi.fn().mockReturnValue({ emit: vi.fn() }),
   } as unknown as TypedServer;
 
-  registerSocketHandlers(
-    io,
-    gameService,
-    connectionManager,
-    turnTimerService,
-    joinCodeService ?? makeJoinCodeService(),
-  );
+  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
 
   const fireGameJoin = (
     socket: TypedSocket,
@@ -356,25 +338,20 @@ describe("socketHandler handleGameJoin — CREATED branch", () => {
       playerId: "joiner-id",
       displayName: "Joiner",
     });
-    // joinCode defaults to "" when getCodeForGame returns null
+    // joinCode defaults to "" when game.joinCode is null
     expect(payload.joinCode).toBe("");
   });
 
-  it("includes the join code in lobby:state when getCodeForGame returns a code", async () => {
+  it("includes the join code in lobby:state when game has a joinCode", async () => {
     const game = makeGame();
+    game.joinCode = "H7K3";
     (gameService.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(game);
-
-    const joinCodeService = makeJoinCodeService();
-    (
-      joinCodeService.getCodeForGame as ReturnType<typeof vi.fn>
-    ).mockResolvedValue("H7K3");
 
     const { socket, emitted } = makeSocket("joiner-id", "Joiner");
     const { fireGameJoin } = setupHandlers(
       gameService,
       connectionManager,
       turnTimerService,
-      joinCodeService,
     );
 
     await fireGameJoin(socket, "game-1", () => {});

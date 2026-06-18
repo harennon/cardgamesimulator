@@ -10,6 +10,7 @@ function makeGame(overrides: Partial<Game> = {}): Game {
   game.maxPlayers = 4;
   game.status = "CREATED";
   game.state = {};
+  game.joinCode = "H7K3";
   game.version = 1;
   Object.assign(game, overrides);
   return game;
@@ -24,40 +25,28 @@ const mockCreateGame =
       maxPlayers: number,
       creatorDisplayName: string,
       turnTimerSeconds: number | null,
+      joinCode: string | null,
     ) => Promise<Game>
   >();
-
-const mockGenerateCode = vi.fn<(gameId: string) => Promise<string>>();
 
 vi.mock("@/database", () => ({
   gameRepo: {
     createGame: (
-      ...args: [string, string, string, number, string, number | null]
+      ...args: [
+        string,
+        string,
+        string,
+        number,
+        string,
+        number | null,
+        string | null,
+      ]
     ) => mockCreateGame(...args),
-  },
-  joinCodeRepo: {
-    createJoinCode: vi.fn().mockResolvedValue(undefined),
-    getGameIdByCode: vi.fn().mockResolvedValue(null),
-    deleteByGameId: vi.fn().mockResolvedValue(undefined),
-    deleteExpired: vi.fn().mockResolvedValue(0),
   },
 }));
 
 vi.mock("@/service/joinCodeService", () => ({
-  JoinCodeService: class {
-    generateCode(gameId: string) {
-      return mockGenerateCode(gameId);
-    }
-    resolveCode() {
-      return Promise.resolve(null);
-    }
-    deleteForGame() {
-      return Promise.resolve();
-    }
-    cleanupExpired() {
-      return Promise.resolve(0);
-    }
-  },
+  generateJoinCode: () => "H7K3",
 }));
 
 process.env.SUPABASE_JWT_SECRET = "test-secret";
@@ -98,7 +87,6 @@ function makeResponse() {
 describe("CreateGameHandler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGenerateCode.mockResolvedValue("H7K3");
   });
 
   describe("happy path", () => {
@@ -120,17 +108,9 @@ describe("CreateGameHandler", () => {
       });
     });
 
-    it("creates game row before generating join code (FK ordering)", async () => {
-      const callOrder: string[] = [];
+    it("passes joinCode to gameRepo.createGame", async () => {
       const game = makeGame();
-      mockCreateGame.mockImplementation(async (..._args) => {
-        callOrder.push("createGame");
-        return game;
-      });
-      mockGenerateCode.mockImplementation(async (_gameId: string) => {
-        callOrder.push("generateCode");
-        return "H7K3";
-      });
+      mockCreateGame.mockResolvedValue(game);
 
       const { res } = makeResponse();
       await CreateGameHandler.INSTANCE.post(
@@ -138,27 +118,10 @@ describe("CreateGameHandler", () => {
         res,
       );
 
-      expect(callOrder).toEqual(["createGame", "generateCode"]);
-    });
-
-    it("returns joinCode as empty string when code generation fails", async () => {
-      const game = makeGame();
-      mockCreateGame.mockResolvedValue(game);
-      mockGenerateCode.mockRejectedValue(
-        new Error("Failed to generate unique join code after max retries"),
-      );
-
-      const { res, data } = makeResponse();
-      await CreateGameHandler.INSTANCE.post(
-        makeRequest("user-1", "big2", 4, "Alice", 30),
-        res,
-      );
-
-      // Game is still created; joinCode degrades gracefully to empty string
-      expect(data.statusCode).toBe(200);
-      expect((data.body as { gameId: string }).gameId).toBe("game-1");
-      expect((data.body as { joinCode: string }).joinCode).toBe("");
       expect(mockCreateGame).toHaveBeenCalledOnce();
+      const args = mockCreateGame.mock.calls[0];
+      // Last arg is joinCode
+      expect(args[6]).toBe("H7K3");
     });
 
     it("passes displayName to gameRepo.createGame", async () => {
@@ -233,7 +196,6 @@ describe("CreateGameHandler", () => {
     it("throws 400 when turnTimerSeconds is null", async () => {
       const { res } = makeResponse();
       const req = makeRequest("user-1", "big2", 4, "Alice");
-      // explicitly set null
       (req.body as Record<string, unknown>).turnTimerSeconds = null;
       await expect(
         CreateGameHandler.INSTANCE.post(req, res),

@@ -3,7 +3,6 @@ import {
   GameRepository,
   PlayerStatsRepository,
   FeedbackRepository,
-  JoinCodeRepository,
   StatsDelta,
 } from "@/database/database";
 import { Game } from "@/database/entities/Game";
@@ -13,11 +12,7 @@ import { OptimisticLockError } from "@/util/errors";
 import type { GameType } from "@shared/engine-types";
 
 export class SupabaseDB
-  implements
-    GameRepository,
-    PlayerStatsRepository,
-    FeedbackRepository,
-    JoinCodeRepository
+  implements GameRepository, PlayerStatsRepository, FeedbackRepository
 {
   public static readonly INSTANCE = new SupabaseDB();
   private client: SupabaseClient | undefined;
@@ -58,6 +53,7 @@ export class SupabaseDB
     maxPlayers: number,
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
+    joinCode: string | null,
   ): Promise<Game> {
     const row = {
       game_id: gameId,
@@ -68,6 +64,7 @@ export class SupabaseDB
       status: "CREATED",
       state: {},
       turn_timer_seconds: turnTimerSeconds,
+      join_code: joinCode,
     };
     const { data, error } = await this.db
       .from("games")
@@ -85,6 +82,17 @@ export class SupabaseDB
       .eq("game_id", gameId)
       .maybeSingle();
     if (error) throw new Error(`getGame failed: ${error.message}`);
+    if (!data) return null;
+    return this.mapGame(data as Record<string, unknown>);
+  }
+
+  public async getGameByJoinCode(code: string): Promise<Game | null> {
+    const { data, error } = await this.db
+      .from("games")
+      .select("*")
+      .eq("join_code", code)
+      .maybeSingle();
+    if (error) throw new Error(`getGameByJoinCode failed: ${error.message}`);
     if (!data) return null;
     return this.mapGame(data as Record<string, unknown>);
   }
@@ -170,56 +178,6 @@ export class SupabaseDB
     );
   }
 
-  // --- JoinCodeRepository ---
-
-  public async createJoinCode(code: string, gameId: string): Promise<void> {
-    const { error } = await this.db
-      .from("join_codes")
-      .insert({ code, game_id: gameId });
-    if (error) throw new Error(`createJoinCode failed: ${error.message}`);
-  }
-
-  public async getGameIdByCode(code: string): Promise<string | null> {
-    const { data, error } = await this.db
-      .from("join_codes")
-      .select("game_id")
-      .eq("code", code)
-      .maybeSingle();
-    if (error) throw new Error(`getGameIdByCode failed: ${error.message}`);
-    if (!data) return null;
-    return (data as Record<string, unknown>).game_id as string;
-  }
-
-  public async getCodeByGameId(gameId: string): Promise<string | null> {
-    const { data, error } = await this.db
-      .from("join_codes")
-      .select("code")
-      .eq("game_id", gameId)
-      .maybeSingle();
-    if (error) throw new Error(`getCodeByGameId failed: ${error.message}`);
-    if (!data) return null;
-    return (data as Record<string, unknown>).code as string;
-  }
-
-  public async deleteByGameId(gameId: string): Promise<void> {
-    const { error } = await this.db
-      .from("join_codes")
-      .delete()
-      .eq("game_id", gameId);
-    if (error) throw new Error(`deleteByGameId failed: ${error.message}`);
-  }
-
-  public async deleteExpired(maxAgeMs: number): Promise<number> {
-    const cutoff = new Date(Date.now() - maxAgeMs).toISOString();
-    const { data, error } = await this.db
-      .from("join_codes")
-      .delete()
-      .lt("created_at", cutoff)
-      .select("code");
-    if (error) throw new Error(`deleteExpired failed: ${error.message}`);
-    return (data ?? []).length;
-  }
-
   // --- Row mappers (snake_case DB columns -> camelCase domain objects) ---
 
   private mapGame(row: Record<string, unknown>): Game {
@@ -235,6 +193,7 @@ export class SupabaseDB
     game.status = row.status as Game["status"];
     game.state = row.state as Record<string, unknown>;
     game.turnTimerSeconds = row.turn_timer_seconds as number | null;
+    game.joinCode = (row.join_code as string) ?? null;
     game.createdAt = new Date(row.created_at as string);
     game.updatedAt = new Date(row.updated_at as string);
     game.version = row.version as number;

@@ -3,16 +3,9 @@ import {
   GameRepository,
   PlayerStatsRepository,
   FeedbackRepository,
-  JoinCodeRepository,
 } from "./database";
 
-export type {
-  GameRepository,
-  PlayerStatsRepository,
-  FeedbackRepository,
-  JoinCodeRepository,
-};
+export type { GameRepository, PlayerStatsRepository, FeedbackRepository };
 export const gameRepo: GameRepository = SupabaseDB.INSTANCE;
 export const statsRepo: PlayerStatsRepository = SupabaseDB.INSTANCE;
 export const feedbackRepo: FeedbackRepository = SupabaseDB.INSTANCE;
-export const joinCodeRepo: JoinCodeRepository = SupabaseDB.INSTANCE;

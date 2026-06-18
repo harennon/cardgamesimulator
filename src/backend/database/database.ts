@@ -11,8 +11,10 @@ export interface GameRepository {
     maxPlayers: number,
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
+    joinCode: string | null,
   ): Promise<Game>;
   getGame(gameId: string): Promise<Game | null>;
+  getGameByJoinCode(code: string): Promise<Game | null>;
   saveGame(game: Game): Promise<Game>; // throws OptimisticLockError on version conflict
 }
 // Note: `createGame` takes gameId as a parameter (caller generates UUID via `crypto.randomUUID()`).
@@ -37,12 +39,4 @@ export interface PlayerStatsRepository {
 export interface FeedbackRepository {
   createFeedback(feedback: Feedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
-}
-
-export interface JoinCodeRepository {
-  createJoinCode(code: string, gameId: string): Promise<void>;
-  getGameIdByCode(code: string): Promise<string | null>;
-  getCodeByGameId(gameId: string): Promise<string | null>;
-  deleteByGameId(gameId: string): Promise<void>;
-  deleteExpired(maxAgeMs: number): Promise<number>; // returns count deleted
 }

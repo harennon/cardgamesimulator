@@ -33,7 +33,7 @@ import { GameService } from "@/service/gameService";
 import { StatsService } from "@/service/statsService";
 import { GameCache } from "@/engine/game-cache";
 import { engineFactory } from "@/engine/game-engine-factory";
-import { gameRepo, statsRepo, joinCodeRepo } from "@/database";
+import { gameRepo, statsRepo } from "@/database";
 import { GuestSessionStore } from "@/guest/guestSessionStore";
 import { createSessionRouter } from "@/api/guest/createSession";
 import { createClaimRouter } from "@/api/guest/claimSession";
@@ -41,11 +41,7 @@ import { GetStatsHandler } from "@/api/stats/getStats";
 import { FeedbackHandler } from "@/api/feedback/submitFeedback";
 import { RealTimerProvider } from "@/timer/realTimerProvider";
 import { TurnTimerService } from "@/timer/turnTimerService";
-import { JoinCodeService } from "@/service/joinCodeService";
 import { createResolveJoinCodeRouter } from "@/api/game/resolveJoinCode";
-
-const JOIN_CODE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-const JOIN_CODE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export class Server {
   private readonly app: Express;
@@ -53,7 +49,6 @@ export class Server {
   private readonly io: TypedServer;
   private readonly guestSessionStore: GuestSessionStore;
   private readonly timerProvider: RealTimerProvider;
-  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.app = express();
@@ -131,11 +126,8 @@ export class Server {
     // Feedback route (auth required, guests allowed for POST; admin-only for GET)
     this.app.use("/feedback", authMiddleware, FeedbackHandler.INSTANCE.router);
 
-    // Join code service — shared between REST route and socket handler
-    const joinCodeService = new JoinCodeService(joinCodeRepo);
-
     // Join code resolution — no auth required (guests need to resolve before session)
-    this.app.use("/games/join", createResolveJoinCodeRouter(joinCodeService));
+    this.app.use("/games/join", createResolveJoinCodeRouter(gameRepo));
 
     // register error middleware
     this.app.use(errorHandler);
@@ -174,15 +166,7 @@ export class Server {
       gameService,
       connectionManager,
       turnTimerService,
-      joinCodeService,
     );
-
-    // Periodic cleanup of join codes for inactive games (> 24h)
-    this.cleanupInterval = setInterval(() => {
-      joinCodeService
-        .cleanupExpired(JOIN_CODE_MAX_AGE_MS)
-        .catch((err: unknown) => console.error("Join code cleanup error", err));
-    }, JOIN_CODE_CLEANUP_INTERVAL_MS);
 
     // Seed endpoint — only loaded in test environments
     if (process.env.NODE_ENV === "test") {
@@ -209,7 +193,6 @@ export class Server {
     // callback function to close dependencies
     callback(force);
     this.timerProvider.cancelAll();
-    if (this.cleanupInterval) clearInterval(this.cleanupInterval);
     this.server.close();
   }
 

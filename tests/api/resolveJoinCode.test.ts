@@ -1,30 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import express from "express";
 import request from "supertest";
-import type { JoinCodeService } from "../../src/backend/service/joinCodeService.js";
+import { Game } from "../../src/backend/database/entities/Game.js";
+import type { GameRepository } from "../../src/backend/database/database.js";
 
-function makeService(
-  overrides: Partial<Record<keyof JoinCodeService, unknown>> = {},
-): JoinCodeService {
+function makeRepo(
+  overrides: Partial<Record<keyof GameRepository, unknown>> = {},
+): GameRepository {
   return {
-    generateCode: vi.fn(),
-    resolveCode: vi
-      .fn<(code: string) => Promise<string | null>>()
+    createGame: vi.fn(),
+    getGame: vi.fn(),
+    getGameByJoinCode: vi
+      .fn<(code: string) => Promise<Game | null>>()
       .mockResolvedValue(null),
-    deleteForGame: vi.fn(),
-    cleanupExpired: vi.fn(),
+    saveGame: vi.fn(),
     ...overrides,
-  } as unknown as JoinCodeService;
+  } as unknown as GameRepository;
 }
 
-async function makeApp(service: JoinCodeService) {
+function makeGame(joinCode: string): Game {
+  const game = new Game();
+  game.gameId = "game-abc";
+  game.joinCode = joinCode;
+  return game;
+}
+
+async function makeApp(repo: GameRepository) {
   const { createResolveJoinCodeRouter } =
     await import("../../src/backend/api/game/resolveJoinCode.js");
   const { errorHandler } =
     await import("../../src/backend/middleware/errorHandler.js");
   const app = express();
   app.use(express.json());
-  app.use("/games/join", createResolveJoinCodeRouter(service));
+  app.use("/games/join", createResolveJoinCodeRouter(repo));
   app.use(errorHandler);
   return app;
 }
@@ -35,10 +43,10 @@ describe("GET /games/join/:code", () => {
   });
 
   it("returns 200 with gameId when code resolves", async () => {
-    const service = makeService({
-      resolveCode: vi.fn().mockResolvedValue("game-abc"),
+    const repo = makeRepo({
+      getGameByJoinCode: vi.fn().mockResolvedValue(makeGame("H7K3")),
     });
-    const app = await makeApp(service);
+    const app = await makeApp(repo);
 
     const res = await request(app).get("/games/join/H7K3");
 
@@ -47,20 +55,20 @@ describe("GET /games/join/:code", () => {
   });
 
   it("normalizes the code to uppercase before resolving", async () => {
-    const resolveCode = vi.fn().mockResolvedValue("game-abc");
-    const service = makeService({ resolveCode });
-    const app = await makeApp(service);
+    const getGameByJoinCode = vi.fn().mockResolvedValue(makeGame("H7K3"));
+    const repo = makeRepo({ getGameByJoinCode });
+    const app = await makeApp(repo);
 
     await request(app).get("/games/join/h7k3");
 
-    expect(resolveCode).toHaveBeenCalledWith("H7K3");
+    expect(getGameByJoinCode).toHaveBeenCalledWith("H7K3");
   });
 
   it("returns 404 when code is not found", async () => {
-    const service = makeService({
-      resolveCode: vi.fn().mockResolvedValue(null),
+    const repo = makeRepo({
+      getGameByJoinCode: vi.fn().mockResolvedValue(null),
     });
-    const app = await makeApp(service);
+    const app = await makeApp(repo);
 
     const res = await request(app).get("/games/join/XXXX");
 

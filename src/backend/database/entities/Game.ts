@@ -9,6 +9,7 @@ export class Game {
   status: GameStatus = "CREATED";
   state: Record<string, unknown> = {};
   turnTimerSeconds: number | null = null;
+  joinCode: string | null = null;
   createdAt: Date = new Date();
   updatedAt: Date = new Date();
   version: number = 1;

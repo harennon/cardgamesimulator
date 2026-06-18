@@ -1,19 +1,16 @@
 import { type Request, type Response } from "@/util/types";
 import { Handler } from "@/api/handler";
 import { CreateGameRequest, CreateGameResponse } from "@shared/model";
-import { gameRepo, joinCodeRepo } from "@/database";
+import { gameRepo } from "@/database";
 import { BadRequestError } from "@/util/errors";
-import { JoinCodeService } from "@/service/joinCodeService";
+import { generateJoinCode } from "@/service/joinCodeService";
+import { Game } from "@/database/entities/Game";
+import type { GameType } from "@shared/engine-types";
 
 const VALID_TIMER_VALUES: ReadonlySet<number> = new Set([30, 60, 90]);
 
 export class CreateGameHandler extends Handler {
-  public static INSTANCE: CreateGameHandler = new CreateGameHandler(
-    new JoinCodeService(joinCodeRepo),
-  );
-  private constructor(private readonly joinCodeService: JoinCodeService) {
-    super();
-  }
+  public static INSTANCE: CreateGameHandler = new CreateGameHandler();
 
   public override async post(
     request: Request<CreateGameRequest>,
@@ -25,7 +22,7 @@ export class CreateGameHandler extends Handler {
       throw new BadRequestError();
     }
     const gameId = crypto.randomUUID();
-    const game = await gameRepo.createGame(
+    const game = await this.createGameWithCode(
       gameId,
       request.body.gameType,
       request.userId!,
@@ -33,21 +30,50 @@ export class CreateGameHandler extends Handler {
       request.displayName ?? request.userId!,
       turnTimerSeconds,
     );
-    // Generate code after game row exists to satisfy the FK constraint on join_codes.
-    // If code generation fails, the game is still accessible via direct link.
-    let joinCode: string;
-    try {
-      joinCode = await this.joinCodeService.generateCode(gameId);
-    } catch (err) {
-      console.error(`Failed to generate join code for game ${gameId}:`, err);
-      joinCode = "";
-    }
     const createGameResponse: CreateGameResponse = {
       gameId: game.gameId,
       gameType: request.body.gameType,
-      joinCode,
+      joinCode: game.joinCode ?? "",
     };
     response.status(200).json(createGameResponse);
+  }
+
+  private async createGameWithCode(
+    gameId: string,
+    gameType: GameType,
+    creatorId: string,
+    maxPlayers: number,
+    creatorDisplayName: string,
+    turnTimerSeconds: number | null,
+  ): Promise<Game> {
+    const MAX_RETRIES = 5;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        return await gameRepo.createGame(
+          gameId,
+          gameType,
+          creatorId,
+          maxPlayers,
+          creatorDisplayName,
+          turnTimerSeconds,
+          generateJoinCode(),
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("duplicate") || msg.includes("unique")) continue;
+        throw err;
+      }
+    }
+    // All retries exhausted — create without a join code
+    return await gameRepo.createGame(
+      gameId,
+      gameType,
+      creatorId,
+      maxPlayers,
+      creatorDisplayName,
+      turnTimerSeconds,
+      null,
+    );
   }
 
   private validateRequest(request: Request<CreateGameRequest>) {
