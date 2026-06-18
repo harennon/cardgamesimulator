@@ -203,19 +203,24 @@ Step 1 — Fetch all open issues:
 Step 2 — Fetch open PRs to exclude in-progress issues:
   gh pr list --json number,headRefName --state open
 
-Step 3 — Classify each issue:
+Step 3 — For each issue, check for "Restart:" comments:
+  gh issue view <number> --json comments --jq '.comments[].body' | grep -i "^Restart:" (check last few comments)
+  If a "Restart:" comment exists, the issue ALWAYS needs re-triage regardless of labels or open PRs.
+
+Step 4 — Classify each issue:
   A) NEEDS TRIAGE (add to needsTriage):
+     - Has a comment with "Restart:" prefix (previous attempt was wrong — override all skip rules)
      - No label starting with "triage:" (never triaged)
      - Has "triage:needs-info" BUT updatedAt is more than 24 hours after the issue was last labeled (info was likely provided)
      - Has "triage:defer" AND updatedAt is more than ${DEFER_STALENESS_DAYS} days ago (stale defer — reassess)
      - Has "triage:close" BUT updatedAt is more recent than when the label was likely applied (pushback received)
 
   B) SKIP (exclude):
-     - Has "triage:fix" label (handled by selection phase)
-     - Has any triage label with no re-triage trigger met
-     - Has an open PR whose branch name contains the issue number (already being shipped)
+     - Has "triage:fix" label AND no "Restart:" comment (handled by selection phase)
+     - Has any triage label with no re-triage trigger met AND no "Restart:" comment
+     - Has an open PR whose branch name contains the issue number AND no "Restart:" comment (already being shipped)
 
-For items in category A that have an existing triage label, add them to labelsToRemove with the exact label string (e.g. "triage:defer").
+For items in category A that have an existing triage label (including "triage:fix" when triggered by a "Restart:" comment), add them to labelsToRemove with the exact label string (e.g. "triage:defer", "triage:fix").
 
 Do NOT run any gh issue edit commands. Only read and classify.`,
   { label: "fetch-issues", schema: FETCH_SCHEMA },
