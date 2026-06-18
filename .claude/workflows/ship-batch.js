@@ -184,6 +184,37 @@ const SELECTION_SCHEMA = {
   required: ["selected", "reasoning"],
 };
 
+const ISSUE_POOL_SCHEMA = {
+  type: "object",
+  properties: {
+    issues: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          number: { type: "integer" },
+          title: { type: "string" },
+          summary: { type: "string", description: "First 200 chars of body" },
+        },
+        required: ["number", "title"],
+      },
+    },
+  },
+  required: ["issues"],
+};
+
+const ISSUE_STATE_SCHEMA = {
+  type: "object",
+  properties: {
+    state: {
+      type: "string",
+      enum: ["OPEN", "CLOSED"],
+      description: "The issue state from GitHub",
+    },
+  },
+  required: ["state"],
+};
+
 // --- Helpers ---
 
 const MAX_PARALLEL_TRIAGE = 15;
@@ -257,29 +288,23 @@ if (issuesToTriage.length === 0) {
   log("No untriaged issues found.");
 
   // Check if there are triage:fix issues waiting for selection
-  const existingPoolAgent = await agent(
+  const existingPoolResult = await agent(
     `Run: gh issue list --state open --label "triage:fix" --json number,title --limit 20
-Return the result as plain JSON text.`,
-    { label: "check-fix-pool" },
+Return the issues found.`,
+    { label: "check-fix-pool", schema: ISSUE_POOL_SCHEMA },
   );
 
-  let existingPool;
-  try {
-    existingPool =
-      typeof existingPoolAgent === "string"
-        ? JSON.parse(existingPoolAgent)
-        : existingPoolAgent;
-  } catch {
-    existingPool = [];
-  }
-
-  if (!Array.isArray(existingPool) || existingPool.length === 0) {
+  if (
+    !existingPoolResult ||
+    !existingPoolResult.issues ||
+    existingPoolResult.issues.length === 0
+  ) {
     log("No triage:fix issues in pool either. Fully idle.");
     return { status: "idle", message: "No issues to triage or ship" };
   }
 
   log(
-    `Skipping triage — ${existingPool.length} issues already in triage:fix pool`,
+    `Skipping triage — ${existingPoolResult.issues.length} issues already in triage:fix pool`,
   );
 }
 
@@ -390,29 +415,27 @@ log(
 phase("Select");
 
 // Gather full triage:fix pool (includes pre-existing + newly labeled)
-const poolAgent = await agent(
+const poolResult = await agent(
   `Run: gh issue list --state open --label "triage:fix" --json number,title,body --limit 20
 
 For each issue, also fetch a brief summary by running: gh issue view <number> --json title,body --jq '.body[:200]'
 
-Return a JSON array of {number, title, summary} objects where summary is the first 200 chars of the body.
-Return as plain JSON text.`,
-  { label: "fetch-fix-pool" },
+Return the issues with their summaries (first 200 chars of body).`,
+  { label: "fetch-fix-pool", schema: ISSUE_POOL_SCHEMA },
 );
 
-let fixPool;
-try {
-  fixPool = typeof poolAgent === "string" ? JSON.parse(poolAgent) : poolAgent;
-} catch {
-  log("Failed to parse fix pool");
+if (!poolResult) {
+  log("Failed to fetch fix pool");
   return { status: "failed", phase: "select" };
 }
 
-if (!Array.isArray(fixPool) || fixPool.length === 0) {
+const fixPool = poolResult.issues || [];
+
+if (fixPool.length === 0) {
   log("No triage:fix issues — checking deferred pool for promotion");
 
   // Fallback: ask CEO to re-evaluate deferred issues when fix pool is empty
-  const deferredAgent = await agent(
+  const deferredResult = await agent(
     `The triage:fix pool is empty — nothing to ship. Check if any deferred issues should be promoted.
 
 Run: gh issue list --state open --label "triage:defer" --json number,title,body,labels --limit 20
@@ -422,22 +445,13 @@ Exclude any issue that also has the label "blocked:frontend-decision" — those 
 For each remaining issue, also get a brief summary:
   gh issue view <number> --json title,body --jq '.body[:200]'
 
-Return a JSON array of {number, title, summary} objects. If no deferred issues exist (or all are blocked), return an empty array.`,
-    { label: "fetch-deferred-pool" },
+Return the issues found. If no deferred issues exist (or all are blocked), return an empty issues array.`,
+    { label: "fetch-deferred-pool", schema: ISSUE_POOL_SCHEMA },
   );
 
-  let deferredPool;
-  try {
-    deferredPool =
-      typeof deferredAgent === "string"
-        ? JSON.parse(deferredAgent)
-        : deferredAgent;
-  } catch {
-    log("Warning: failed to parse deferred pool response — treating as empty");
-    deferredPool = [];
-  }
+  const deferredPool = deferredResult ? deferredResult.issues || [] : [];
 
-  if (!Array.isArray(deferredPool) || deferredPool.length === 0) {
+  if (deferredPool.length === 0) {
     log("No deferred issues either. Fully idle.");
     return {
       status: "triaged-only",
@@ -513,15 +527,17 @@ If nothing is worth promoting, return an empty selected array with reasoning.`,
     const issueCheck = await agent(
       `Check if issue #${issueNumber} is still open:
 gh issue view ${issueNumber} --json state --jq '.state'
-Return ONLY the state string (e.g. "OPEN" or "CLOSED").`,
-      { label: `check-open-${issueNumber}` },
+Return the state.`,
+      { label: `check-open-${issueNumber}`, schema: ISSUE_STATE_SCHEMA },
     );
 
-    if (
-      issueCheck &&
-      typeof issueCheck === "string" &&
-      issueCheck.toUpperCase().includes("CLOSED")
-    ) {
+    if (!issueCheck) {
+      log(`#${issueNumber} state check failed — skipping to be safe`);
+      results.push({ issueNumber, status: "skipped-check-failed" });
+      continue;
+    }
+
+    if (issueCheck.state === "CLOSED") {
       log(`#${issueNumber} is already closed — skipping`);
       await agent(
         `Remove triage:fix label from closed issue #${issueNumber}:
@@ -677,15 +693,17 @@ for (const issueNumber of selection.selected) {
   const issueCheck = await agent(
     `Check if issue #${issueNumber} is still open:
 gh issue view ${issueNumber} --json state --jq '.state'
-Return ONLY the state string (e.g. "OPEN" or "CLOSED").`,
-    { label: `check-open-${issueNumber}` },
+Return the state.`,
+    { label: `check-open-${issueNumber}`, schema: ISSUE_STATE_SCHEMA },
   );
 
-  if (
-    issueCheck &&
-    typeof issueCheck === "string" &&
-    issueCheck.toUpperCase().includes("CLOSED")
-  ) {
+  if (!issueCheck) {
+    log(`#${issueNumber} state check failed — skipping to be safe`);
+    results.push({ issueNumber, status: "skipped-check-failed" });
+    continue;
+  }
+
+  if (issueCheck.state === "CLOSED") {
     log(`#${issueNumber} is already closed — skipping`);
     await agent(
       `Remove triage:fix label from closed issue #${issueNumber}:

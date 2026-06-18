@@ -89,6 +89,24 @@ const GATHER_SCHEMA = {
   ],
 };
 
+const FRONTEND_DECISION_CHECK_SCHEMA = {
+  type: "object",
+  properties: {
+    status: {
+      type: "string",
+      enum: ["decision", "mockups_no_decision", "none"],
+      description:
+        "decision: valid decision exists after latest mockups. mockups_no_decision: mockups posted but no decision after them. none: no mockups or decision.",
+    },
+    decisionText: {
+      type: ["string", "null"],
+      description:
+        "The text of the frontend decision (after 'Frontend decision:'). null unless status is 'decision'.",
+    },
+  },
+  required: ["status"],
+};
+
 const REVIEW_SCHEMA = {
   type: "object",
   properties: {
@@ -292,23 +310,20 @@ Apply temporal logic:
 - A decision is VALID only if DECISION_TIME > MOCKUP_TIME (the decision was made AFTER the mockups it refers to)
 - If mockups exist but no valid decision exists after them, the decision is stale or missing
 
-Return one of:
-- "DECISION: <text after Frontend decision:>" — if a temporally valid decision exists (posted after the latest mockups)
-- "MOCKUPS_EXIST_NO_DECISION" — if mockups exist but no valid decision after them
-- "NONE" — if no mockups and no decision exist at all
-
-Return the raw string — no JSON wrapping, no explanation.`,
-      { label: "check-existing-frontend-decision" },
+Return status "decision" with decisionText if a valid decision exists, "mockups_no_decision" if mockups exist but no valid decision after them, or "none" if neither exists.`,
+      {
+        label: "check-existing-frontend-decision",
+        schema: FRONTEND_DECISION_CHECK_SCHEMA,
+      },
     );
 
-    if (decisionCheck && typeof decisionCheck === "string") {
-      const trimmed = decisionCheck.trim();
-      if (trimmed.startsWith("DECISION: ")) {
-        context.frontendDecision = trimmed.slice("DECISION: ".length);
+    if (decisionCheck) {
+      if (decisionCheck.status === "decision" && decisionCheck.decisionText) {
+        context.frontendDecision = decisionCheck.decisionText;
         log(
           `Frontend decision found via direct check: ${context.frontendDecision}`,
         );
-      } else if (trimmed === "MOCKUPS_EXIST_NO_DECISION") {
+      } else if (decisionCheck.status === "mockups_no_decision") {
         log(
           "Mockups already posted but no valid decision after them — awaiting decision, not re-running frontend-architect.",
         );
