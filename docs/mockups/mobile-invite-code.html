@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mobile Invite Code — Game Lobby Mockup</title>
+    <style>
+      /* ═══════════════════════════════════════════════════════
+     DESIGN DIRECTION: Prominent Room Code for Mobile Lobby
+
+     Problem: On mobile (354x599), the URL bar is hidden/truncated.
+     Users need to verbally share a game code with friends.
+     Current lobby only has "Copy Invite Link" — no visible code.
+
+     Two options:
+     A) "Casino Chip" — Bold, gold-bordered code display as the
+        dominant invite element. Large monospace with letter-spacing.
+     B) "Scoreboard Strip" — Code integrated into a horizontal
+        strip at the top of the lobby, always visible like a
+        venue marquee. Compact but unmissable.
+
+     Both use the first 8 chars of the UUID, uppercased, grouped
+     as XXXX XXXX for verbal readability (4+4 is natural speech rhythm).
+     ═══════════════════════════════════════════════════════ */
+
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fira+Code:wght@500;700&family=Playfair+Display:wght@700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #0a0a0a;
+        color: #e8dcc8;
+        font-family: "DM Sans", sans-serif;
+        padding: 40px 20px;
+        min-height: 100vh;
+      }
+
+      .page-title {
+        font-family: "Playfair Display", serif;
+        font-size: 0.85rem;
+        letter-spacing: 0.08em;
+        color: #8a7e6e;
+        margin-bottom: 12px;
+        text-align: center;
+      }
+
+      .page-subtitle {
+        font-size: 0.7rem;
+        color: #5a5248;
+        text-align: center;
+        margin-bottom: 48px;
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.6;
+      }
+
+      .mockup-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 64px;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .mockup-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .mockup-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: #c9a84c;
+        font-weight: 700;
+        padding: 4px 12px;
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 3px;
+        background: rgba(201, 168, 76, 0.05);
+      }
+
+      /* ─── PHONE FRAME ─── */
+      .phone-frame {
+        width: 354px;
+        height: 599px;
+        border: 2px solid #2a2a2a;
+        border-radius: 28px;
+        overflow: hidden;
+        position: relative;
+        background: #1a4a2e;
+        box-shadow:
+          0 0 0 1px rgba(201, 168, 76, 0.1),
+          0 24px 80px rgba(0, 0, 0, 0.7),
+          inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      /* Felt texture overlay */
+      .phone-frame::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            ellipse at 50% 20%,
+            rgba(37, 107, 66, 0.5) 0%,
+            transparent 55%
+          ),
+          repeating-conic-gradient(rgba(0, 0, 0, 0.01) 0%, transparent 0.5%) 0
+            0 / 4px 4px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ─── LOBBY PANEL (inside phone) ─── */
+      .lobby {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        z-index: 1;
+        padding: 20px 16px;
+      }
+
+      .lobby__panel {
+        background: rgba(20, 12, 8, 0.88);
+        border: 1.5px solid #4a2c1e;
+        border-radius: 14px;
+        padding: 24px 18px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        width: 100%;
+        max-width: 320px;
+        backdrop-filter: blur(12px);
+        box-shadow:
+          0 8px 32px rgba(0, 0, 0, 0.4),
+          inset 0 1px 0 rgba(201, 168, 76, 0.08);
+      }
+
+      .lobby__title {
+        font-family: "Playfair Display", serif;
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #c9a84c;
+        letter-spacing: 0.02em;
+      }
+
+      /* ─── PLAYERS LIST ─── */
+      .lobby__players {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .lobby__player {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #e8dcc8;
+        padding: 8px 12px;
+        background: rgba(45, 24, 16, 0.55);
+        border: 1px solid rgba(74, 44, 30, 0.7);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .lobby__player::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #4a9;
+        flex-shrink: 0;
+      }
+
+      .lobby__player--empty {
+        color: #6a5e4e;
+        font-weight: 400;
+        font-style: italic;
+        border-style: dashed;
+        border-color: rgba(74, 44, 30, 0.4);
+      }
+
+      .lobby__player--empty::before {
+        background: #3a3428;
+      }
+
+      /* ═══════════════════════════════════════════════════════
+     OPTION A: "Casino Chip" — Bold Code Display
+     Large monospace code as the hero element of the invite section.
+     Gold double-border evokes a chip edge. Tap to copy.
+     ═══════════════════════════════════════════════════════ */
+
+      .invite-section {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      .invite-label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: #8a7e6e;
+        font-weight: 500;
+      }
+
+      /* The code display — "casino chip" treatment */
+      .invite-code {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 14px 16px;
+        background:
+          linear-gradient(135deg, rgba(201, 168, 76, 0.06) 0%, transparent 40%),
+          rgba(30, 18, 10, 0.9);
+        border: 2px solid #c9a84c;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        /* Double-rim effect */
+        box-shadow:
+          inset 0 0 0 3px rgba(20, 12, 8, 0.95),
+          inset 0 0 0 4.5px rgba(201, 168, 76, 0.25),
+          0 4px 20px rgba(0, 0, 0, 0.5);
+      }
+
+      .invite-code:hover {
+        border-color: #d4b45a;
+        box-shadow:
+          inset 0 0 0 3px rgba(20, 12, 8, 0.95),
+          inset 0 0 0 4.5px rgba(201, 168, 76, 0.35),
+          0 4px 24px rgba(201, 168, 76, 0.12);
+      }
+
+      .invite-code:active {
+        transform: scale(0.97);
+        transition: transform 0.1s;
+      }
+
+      .invite-code__text {
+        font-family: "Fira Code", monospace;
+        font-size: 1.55rem;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        color: #c9a84c;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+      }
+
+      .invite-code__icon {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 16px;
+        height: 16px;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+      }
+
+      .invite-code:hover .invite-code__icon {
+        opacity: 0.8;
+      }
+
+      .invite-code__icon svg {
+        width: 100%;
+        height: 100%;
+        fill: none;
+        stroke: #e8dcc8;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      /* Tap feedback */
+      .invite-code--copied {
+        animation: chipFlash 0.5s ease;
+      }
+
+      @keyframes chipFlash {
+        0% {
+          background-color: rgba(201, 168, 76, 0.2);
+          border-color: #d4b45a;
+        }
+        100% {
+          background-color: rgba(30, 18, 10, 0.9);
+          border-color: #c9a84c;
+        }
+      }
+
+      .invite-toast {
+        font-size: 0.68rem;
+        color: #c9a84c;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        opacity: 0;
+        transition: opacity 0.25s;
+        height: 14px;
+      }
+
+      .invite-toast--visible {
+        opacity: 1;
+      }
+
+      /* Secondary action */
+      .invite-link-btn {
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #8a7e6e;
+        background: transparent;
+        border: 1px solid rgba(138, 126, 110, 0.4);
+        border-radius: 5px;
+        padding: 7px 14px;
+        cursor: pointer;
+        transition: all 0.15s;
+        width: 100%;
+        text-align: center;
+      }
+
+      .invite-link-btn:hover {
+        color: #e8dcc8;
+        border-color: rgba(232, 220, 200, 0.4);
+        background: rgba(232, 220, 200, 0.04);
+      }
+
+      /* ─── START BUTTON ─── */
+      .lobby__btn-start {
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 11px 24px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        background: #c9a84c;
+        color: #1a0f06;
+        width: 100%;
+        transition: background 0.15s;
+        letter-spacing: 0.02em;
+      }
+
+      .lobby__btn-start:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      .lobby__btn-start:not(:disabled):hover {
+        background: #d4b45a;
+      }
+
+      /* ═══════════════════════════════════════════════════════
+     OPTION B: "Scoreboard Strip" — Top-mounted code marquee
+     Code lives in a fixed strip above the lobby panel content,
+     always visible, styled like a venue scoreboard ticker.
+     ═══════════════════════════════════════════════════════ */
+
+      .phone-frame--b .lobby__panel {
+        padding-top: 0;
+        overflow: hidden;
+      }
+
+      .code-strip {
+        width: calc(100% + 36px);
+        margin: 0 -18px;
+        padding: 12px 18px;
+        background:
+          linear-gradient(
+            90deg,
+            rgba(201, 168, 76, 0.08) 0%,
+            rgba(201, 168, 76, 0.03) 50%,
+            rgba(201, 168, 76, 0.08) 100%
+          ),
+          rgba(15, 8, 4, 0.95);
+        border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .code-strip:hover {
+        background:
+          linear-gradient(
+            90deg,
+            rgba(201, 168, 76, 0.12) 0%,
+            rgba(201, 168, 76, 0.06) 50%,
+            rgba(201, 168, 76, 0.12) 100%
+          ),
+          rgba(15, 8, 4, 0.95);
+      }
+
+      .code-strip:active {
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      .code-strip__label {
+        font-size: 0.58rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #6a5e4e;
+        font-weight: 600;
+      }
+
+      .code-strip__code {
+        font-family: "Fira Code", monospace;
+        font-size: 1.15rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        color: #c9a84c;
+      }
+
+      .code-strip__copy {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.6rem;
+        color: #8a7e6e;
+        transition: color 0.2s;
+      }
+
+      .code-strip:hover .code-strip__copy {
+        color: #c9a84c;
+      }
+
+      .code-strip__copy svg {
+        width: 12px;
+        height: 12px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .phone-frame--b .lobby__panel > .invite-section {
+        margin-top: 0;
+      }
+
+      /* ═══════════════════════════════════════════════════════
+     INTERACTION STATES
+     ═══════════════════════════════════════════════════════ */
+
+      .states-section {
+        margin-top: 72px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .states-title {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #5a5248;
+        font-weight: 600;
+      }
+
+      .states-row {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .state-card {
+        background: rgba(20, 12, 8, 0.7);
+        border: 1px solid #3a2c1e;
+        border-radius: 10px;
+        padding: 18px;
+        width: 220px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .state-card__label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #6a5e4e;
+        font-weight: 600;
+        align-self: flex-start;
+      }
+
+      .state-card .invite-code {
+        width: 100%;
+        padding: 10px 12px;
+      }
+
+      .state-card .invite-code__text {
+        font-size: 1.1rem;
+      }
+
+      /* Copied state */
+      .state-card--copied .invite-code {
+        border-color: #d4b45a;
+        background:
+          linear-gradient(135deg, rgba(201, 168, 76, 0.12) 0%, transparent 40%),
+          rgba(30, 18, 10, 0.9);
+      }
+
+      /* ─── ANNOTATIONS ─── */
+      .annotation {
+        font-size: 0.65rem;
+        color: #5a5248;
+        text-align: center;
+        max-width: 320px;
+        line-height: 1.6;
+      }
+
+      .annotation strong {
+        color: #8a7e6e;
+      }
+
+      /* ─── SPEC NOTES ─── */
+      .spec-section {
+        max-width: 700px;
+        margin: 80px auto 0;
+        padding: 28px;
+        background: rgba(20, 12, 8, 0.5);
+        border: 1px solid #2a2018;
+        border-radius: 10px;
+      }
+
+      .spec-section__title {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #c9a84c;
+        margin-bottom: 16px;
+        font-weight: 700;
+      }
+
+      .spec-section pre {
+        font-family: "Fira Code", monospace;
+        font-size: 0.7rem;
+        color: #7a6e5e;
+        line-height: 1.8;
+        white-space: pre-wrap;
+      }
+
+      .spec-section pre em {
+        color: #c9a84c;
+        font-style: normal;
+      }
+
+      /* ─── RESPONSIVE (meta layout) ─── */
+      @media (max-width: 800px) {
+        .mockup-grid {
+          flex-direction: column;
+          align-items: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p class="page-title">Mobile Invite Code Display</p>
+    <p class="page-subtitle">
+      Issue #28 — Users cannot see the game room ID on mobile. The URL bar is
+      hidden or truncated. We need a visible room code in the lobby UI for
+      verbal sharing.
+    </p>
+
+    <div class="mockup-grid">
+      <!-- ═══ OPTION A: "Casino Chip" — Bold Code Display ═══ -->
+      <div class="mockup-section">
+        <span class="mockup-label">Option A — Casino Chip (Recommended)</span>
+        <div class="phone-frame">
+          <div class="lobby">
+            <div class="lobby__panel">
+              <h2 class="lobby__title">Game Lobby</h2>
+
+              <div class="lobby__players">
+                <div class="lobby__player">Alice (host)</div>
+                <div class="lobby__player">Bob</div>
+                <div class="lobby__player lobby__player--empty">
+                  Waiting for player...
+                </div>
+                <div class="lobby__player lobby__player--empty">
+                  Waiting for player...
+                </div>
+              </div>
+
+              <div class="invite-section">
+                <span class="invite-label">Room Code</span>
+                <div class="invite-code" id="codeA" onclick="copyCode(this)">
+                  <span class="invite-code__text">A7F2 B9D1</span>
+                  <span class="invite-code__icon">
+                    <svg viewBox="0 0 24 24">
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                      />
+                    </svg>
+                  </span>
+                </div>
+                <span class="invite-toast" id="toastA"
+                  >Copied to clipboard</span
+                >
+                <button class="invite-link-btn" onclick="copyLink()">
+                  Copy Full Invite Link
+                </button>
+              </div>
+
+              <button class="lobby__btn-start" disabled>Start Game</button>
+            </div>
+          </div>
+        </div>
+        <p class="annotation">
+          <strong>Hero code element</strong> — large monospace glyphs with
+          letter-spacing for verbal readability. Gold double-border evokes a
+          casino chip. Tap anywhere on the code to copy it. "Copy Full Invite
+          Link" demoted to secondary action.
+        </p>
+      </div>
+
+      <!-- ═══ OPTION B: "Scoreboard Strip" — Top marquee ═══ -->
+      <div class="mockup-section">
+        <span class="mockup-label">Option B — Scoreboard Strip</span>
+        <div class="phone-frame phone-frame--b">
+          <div class="lobby">
+            <div class="lobby__panel">
+              <div class="code-strip" id="codeB" onclick="copyCode(this)">
+                <div>
+                  <div class="code-strip__label">Room Code</div>
+                  <div class="code-strip__code">A7F2 B9D1</div>
+                </div>
+                <div class="code-strip__copy">
+                  <svg viewBox="0 0 24 24">
+                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                    <path
+                      d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                    />
+                  </svg>
+                  TAP
+                </div>
+              </div>
+
+              <h2
+                class="lobby__title"
+                style="font-size: 1.1rem; margin-top: 8px"
+              >
+                Game Lobby
+              </h2>
+
+              <div class="lobby__players">
+                <div class="lobby__player">Alice (host)</div>
+                <div class="lobby__player">Bob</div>
+                <div class="lobby__player lobby__player--empty">
+                  Waiting for player...
+                </div>
+                <div class="lobby__player lobby__player--empty">
+                  Waiting for player...
+                </div>
+              </div>
+
+              <div class="invite-section">
+                <span class="invite-toast" id="toastB">Code copied!</span>
+                <button class="invite-link-btn" onclick="copyLink()">
+                  Copy Full Invite Link
+                </button>
+              </div>
+
+              <button class="lobby__btn-start" disabled>Start Game</button>
+            </div>
+          </div>
+        </div>
+        <p class="annotation">
+          <strong>Top-mounted strip</strong> — code is always visible at the top
+          of the panel like a venue scoreboard. More compact, leaves room for
+          content below. Tap the strip to copy. Works well if players glance at
+          the phone to read the code aloud.
+        </p>
+      </div>
+    </div>
+
+    <!-- ═══ INTERACTION STATES ═══ -->
+    <div class="states-section">
+      <span class="states-title">Interaction States (Option A)</span>
+      <div class="states-row">
+        <div class="state-card">
+          <span class="state-card__label">Default / Idle</span>
+          <div class="invite-code" style="pointer-events: none">
+            <span class="invite-code__text">A7F2 B9D1</span>
+            <span class="invite-code__icon">
+              <svg viewBox="0 0 24 24">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path
+                  d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                />
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="state-card state-card--copied">
+          <span class="state-card__label">After Tap — Copied</span>
+          <div class="invite-code" style="pointer-events: none">
+            <span class="invite-code__text">A7F2 B9D1</span>
+            <span class="invite-code__icon">
+              <svg viewBox="0 0 24 24">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </span>
+          </div>
+          <span class="invite-toast invite-toast--visible"
+            >Copied to clipboard</span
+          >
+        </div>
+
+        <div class="state-card">
+          <span class="state-card__label">Full UUID (truncated)</span>
+          <div class="invite-code" style="pointer-events: none">
+            <span
+              class="invite-code__text"
+              style="font-size: 1rem; letter-spacing: 0.1em"
+              >a7f2b9d1-...</span
+            >
+            <span class="invite-code__icon">
+              <svg viewBox="0 0 24 24">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path
+                  d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                />
+              </svg>
+            </span>
+          </div>
+          <p class="annotation" style="margin-top: 0; font-size: 0.6rem">
+            Fallback if short codes are not implemented. Display first 8 chars;
+            copy full UUID.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ COMPONENT ARCHITECTURE NOTES ═══ -->
+    <div class="spec-section">
+      <p class="spec-section__title">Component Architecture</p>
+      <pre>
+<em>GameLobbyView.vue</em> (modified)
+  Props: { gameId: string, players, maxPlayers, isHost, actionPending }
+  New computed: <em>shortCode</em> — first 8 chars of gameId, uppercased, grouped as "XXXX XXXX"
+  New method: <em>copyGameCode()</em> — writes shortCode (no spaces) to clipboard, shows toast
+  Existing method: copyInviteLink() — unchanged, demoted to secondary button
+
+  Template change:
+    Replace .lobby__invite with .invite-section:
+      span.invite-label        — "Room Code"
+      .invite-code             — tap target (code text + copy icon SVG)
+      span.invite-toast        — "Copied to clipboard" (visible 2s)
+      button.invite-link-btn   — "Copy Full Invite Link" (secondary)
+
+<em>Layout strategy:</em>
+  Flexbox column within lobby__panel (already is).
+  invite-section is full-width within panel.
+  On mobile (&lt;767px), lobby__panel padding reduces to 24px 18px.
+  Code font-size scales down slightly on very narrow screens (min 1.3rem).
+
+<em>State management:</em>
+  codeCopied: ref&lt;boolean&gt; — drives toast + icon swap
+  setTimeout resets codeCopied after 2000ms
+  No new composables — purely local component state.
+
+<em>Interaction model:</em>
+  1. User taps .invite-code → copyGameCode() fires
+  2. Icon swaps from clipboard to checkmark (CSS transition)
+  3. Toast appears below code ("Copied to clipboard")
+  4. After 2s, icon and toast revert
+  5. "Copy Full Invite Link" remains as fallback for sharing the URL
+
+<em>Data flow:</em>
+  gameId prop (already passed from GameView parent)
+  → computed shortCode derives display string
+  → no backend changes needed (UUID first 8 chars are unique enough for verbal sharing)
+  → JoinGameView already accepts full gameId as input — users paste/type the short code,
+    backend finds game by prefix match OR we require full ID (decision needed)
+      </pre>
+    </div>
+
+    <script>
+      // Interactive demo — tap to copy simulation
+      function copyCode(el) {
+        const section =
+          el.closest(".invite-section") ||
+          el.closest(".lobby__panel") ||
+          el.closest(".state-card");
+
+        // Determine which code text to copy
+        const codeEl =
+          el.querySelector(".invite-code__text") ||
+          el.querySelector(".code-strip__code");
+        const text = codeEl
+          ? codeEl.textContent.replace(/\s/g, "")
+          : "A7F2B9D1";
+
+        // Visual feedback — flash
+        el.classList.add("invite-code--copied");
+        setTimeout(() => el.classList.remove("invite-code--copied"), 500);
+
+        // Show toast
+        const toast = section?.querySelector(".invite-toast");
+        if (toast) {
+          toast.classList.add("invite-toast--visible");
+          setTimeout(
+            () => toast.classList.remove("invite-toast--visible"),
+            2000,
+          );
+        }
+
+        // Swap icon to checkmark
+        const icon = el.querySelector(".invite-code__icon");
+        if (icon) {
+          const original = icon.innerHTML;
+          icon.innerHTML =
+            '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+          setTimeout(() => {
+            icon.innerHTML = original;
+          }, 2000);
+        }
+
+        // Copy to clipboard
+        navigator.clipboard?.writeText(text).catch(() => {});
+      }
+
+      function copyLink() {
+        const url =
+          "https://danbing.app/game/a7f2b9d1-1234-5678-abcd-ef0123456789/join";
+        navigator.clipboard?.writeText(url).catch(() => {});
+
+        // Brief visual feedback on the button
+        event.target.textContent = "Copied!";
+        setTimeout(() => {
+          event.target.textContent = "Copy Full Invite Link";
+        }, 1500);
+      }
+    </script>
+  </body>
+</html>
