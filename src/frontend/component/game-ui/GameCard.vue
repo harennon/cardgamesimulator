@@ -70,9 +70,9 @@ const displayRank = computed(() => props.card.rank);
   user-select: none;
   box-shadow: 2px 4px 8px var(--card-shadow);
   transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease,
-    border-color 0.15s ease;
+    transform var(--card-select-duration) var(--card-select-easing),
+    box-shadow var(--card-select-duration) var(--card-select-easing),
+    border-color var(--card-select-duration) var(--card-select-easing);
   flex-shrink: 0;
 }
 
