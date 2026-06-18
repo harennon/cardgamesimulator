@@ -2,7 +2,7 @@ import type { TypedServer, TypedSocket } from "./socketServer.js";
 import type { ConnectionManager } from "./connectionManager.js";
 import type { GameService } from "@/service/gameService";
 import { engineFactory } from "@/engine/game-engine-factory";
-import type { PlayerPublicInfo } from "@shared/engine-types";
+import type { PlayerPublicInfo, PlayerInfo } from "@shared/engine-types";
 import type {
   GameJoinPayload,
   GameJoinResponse,
@@ -170,7 +170,14 @@ async function handleGameJoin(
     await socket.join(`game:${gameId}`);
 
     if (game.status === "CREATED") {
-      // Lobby: notify others that this player joined
+      // Send full lobby state to the joining socket for reconciliation
+      const players: PlayerInfo[] = game.playerIds.map((id) => ({
+        playerId: id,
+        displayName: game.playerDisplayNames[id] ?? id,
+      }));
+      socket.emit("lobby:state", { players, maxPlayers: game.maxPlayers });
+
+      // Notify others (incremental update)
       socket.to(`game:${gameId}`).emit("lobby:playerJoined", {
         player: { playerId: userId, displayName },
         playerCount: game.playerIds.length,

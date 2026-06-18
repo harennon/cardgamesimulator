@@ -163,6 +163,11 @@ onMounted(async () => {
     return;
   }
 
+  s.on("lobby:state", (payload) => {
+    lobbyPlayers.value = payload.players;
+    maxPlayers.value = payload.maxPlayers;
+  });
+
   s.on("lobby:playerJoined", (payload) => {
     if (
       !lobbyPlayers.value.find((p) => p.playerId === payload.player.playerId)

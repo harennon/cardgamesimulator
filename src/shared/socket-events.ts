@@ -101,6 +101,9 @@ export interface ServerToClientEvents {
   /** Spectator count changed (emitted to players when a spectator joins/leaves). */
   "game:spectatorCount": (payload: SpectatorCountPayload) => void;
 
+  /** Full lobby state sent to a player upon joining a CREATED game room. */
+  "lobby:state": (payload: LobbyStatePayload) => void;
+
   /** A player joined the lobby (pre-game). */
   "lobby:playerJoined": (payload: LobbyPlayerJoinedPayload) => void;
 
@@ -118,6 +121,11 @@ export interface ServerToClientEvents {
 
   /** Server-side error for this client. */
   error: (payload: SocketErrorPayload) => void;
+}
+
+export interface LobbyStatePayload {
+  players: PlayerInfo[];
+  maxPlayers: number;
 }
 
 export interface LobbyPlayerJoinedPayload {
