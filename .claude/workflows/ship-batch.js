@@ -169,6 +169,12 @@ const SELECTION_SCHEMA = {
       items: { type: "integer" },
       description: "Issue numbers to ship, ordered by priority (1-3 items)",
     },
+    implementationNotes: {
+      type: "object",
+      additionalProperties: { type: "string" },
+      description:
+        "Per-issue implementation guidance keyed by issue number (as string). Each value is a concise note on HOW this issue should be approached — constraints, approved direction, pitfalls to avoid. These notes are passed directly to the architect.",
+    },
     demote: {
       type: "array",
       items: { type: "integer" },
@@ -232,16 +238,16 @@ Step 1 — Fetch all open issues:
   gh issue list --state open --json number,title,labels,updatedAt --limit 50
 
 Step 2 — Fetch open PRs to exclude in-progress issues:
-  gh pr list --json number,headRefName --state open
+  gh pr list --json number,headRefName,body --state open
+  NOTE: Match PRs to issues by checking if the PR body contains "Closes #<issue_number>" or "#<issue_number>". Do NOT rely on the branch name containing the issue number — branches are named by LLD slug (e.g. "lld-25-card-selection-animation-mobile"), not issue number.
 
 Step 3 — For each issue, check for "Restart:" comments:
-  gh issue view <number> --json comments --jq '[.comments[] | select(.body | startswith("Restart:"))] | last | .createdAt'
-  If a "Restart:" comment exists, compare its createdAt timestamp against the createdAt of any open PR for that issue (from step 2).
-  The restart is ACTIVE only if no open PR was created AFTER the Restart comment (i.e., the restart hasn't been acted on yet).
+  gh issue view <number> --json comments --jq '.comments[-1].body'
+  A "Restart:" comment is ACTIVE only if it is the LAST comment on the issue (i.e., nothing has happened after it — no triage, no bot comment, no frontend decision). If any comment exists after the Restart comment, it has been consumed and is no longer active.
 
 Step 4 — Classify each issue:
   A) NEEDS TRIAGE (add to needsTriage):
-     - Has an ACTIVE "Restart:" comment (no open PR created after it — override all other skip rules)
+     - Has an ACTIVE "Restart:" comment (it is the last comment on the issue — override all other skip rules)
      - No label starting with "triage:" AND no "blocked:" label (never triaged)
      - Has "blocked:frontend-decision" AND a comment containing "Frontend decision:" that is MORE RECENT than the latest "Frontend Design Mockups" comment (decision provided — unblock it)
      - Has "triage:needs-info" BUT updatedAt is more than 24 hours after the issue was last labeled (info was likely provided)
@@ -250,9 +256,9 @@ Step 4 — Classify each issue:
 
   B) SKIP (exclude):
      - Has "blocked:frontend-decision" label (waiting on human input — never triage or promote)
-     - Has "triage:fix" label AND no active restart (handled by selection phase)
-     - Has any triage label with no re-triage trigger met AND no active restart
-     - Has an open PR whose branch name contains the issue number AND no active restart (already being shipped)
+     - Has "triage:fix" label AND no active Restart (handled by selection phase)
+     - Has any triage label with no re-triage trigger met AND no active Restart
+     - Has an open PR whose body contains "Closes #<number>" or "#<number>" AND no active Restart (already being shipped)
 
 For items in category A that have an existing triage label or "blocked:" label (including "triage:fix" when triggered by a "Restart:" comment, or "blocked:frontend-decision" when unblocked), add them to labelsToRemove with the exact label string (e.g. "triage:defer", "triage:fix", "blocked:frontend-decision").
 
@@ -479,7 +485,9 @@ For any issue where the summary above is insufficient, read it: gh issue view <n
 - Would shipping any of these move the product forward meaningfully?
 
 If yes, select 1-3 to promote and ship. Return their issue numbers.
-If nothing is worth promoting, return an empty selected array with reasoning.`,
+If nothing is worth promoting, return an empty selected array with reasoning.
+
+For each selected issue, also provide implementationNotes — a concise per-issue note on HOW it should be approached (key constraints, approved direction, what previous attempts got wrong, pitfalls to avoid). These notes are passed directly to the architect agent. Key by issue number as a string (e.g. "24": "...").`,
     {
       label: "ceo-promote-deferred",
       model: "opus",
@@ -549,7 +557,13 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
     }
 
     log(`Shipping issue #${issueNumber}...`);
-    const result = await workflow("ship-issue", issueNumber);
+    const notes = promotion.implementationNotes
+      ? promotion.implementationNotes[String(issueNumber)]
+      : null;
+    const result = await workflow("ship-issue", {
+      issue: issueNumber,
+      ceoNotes: notes,
+    });
     results.push({ issueNumber, ...(result || { status: "agent-failed" }) });
 
     if (result && result.status === "success") {
@@ -638,6 +652,8 @@ Read docs/execution-plan.md and docs/project-hld.md for strategic context.
 
 Select 1-3 issues to ship. If any triage:fix issues should be demoted to triage:defer (stale, lower priority than everything else, unlikely to be selected soon), list them separately.
 
+For each selected issue, also provide implementationNotes — a concise per-issue note on HOW it should be approached (key constraints, approved direction, what previous attempts got wrong, pitfalls to avoid). These notes are passed directly to the architect agent so it builds the right thing. Key the notes by issue number as a string (e.g. "24": "...").
+
 Return the issue numbers to ship in priority order with reasoning.`,
   {
     label: "ceo-select",
@@ -715,7 +731,13 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
   }
 
   log(`Shipping issue #${issueNumber}...`);
-  const result = await workflow("ship-issue", issueNumber);
+  const notes = selection.implementationNotes
+    ? selection.implementationNotes[String(issueNumber)]
+    : null;
+  const result = await workflow("ship-issue", {
+    issue: issueNumber,
+    ceoNotes: notes,
+  });
   results.push({ issueNumber, ...(result || { status: "agent-failed" }) });
 
   if (result && result.status === "success") {

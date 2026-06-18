@@ -75,7 +75,7 @@ const GATHER_SCHEMA = {
     restart: {
       type: ["string", "null"],
       description:
-        "If any issue comment contains 'Restart:' prefix, extract the text after it (reason for restart). null if no restart requested. A restart means the previous diagnosis/LLD was wrong and work should start over.",
+        "If the LAST comment on the issue starts with 'Restart:' prefix, extract the text after it (reason for restart). null if the Restart is not the most recent comment or no restart exists.",
     },
   },
   required: [
@@ -165,6 +165,10 @@ function issueIsNumber(input) {
 const input =
   typeof args === "object" && args !== null && args.issue ? args.issue : args;
 const issueNum = issueIsNumber(input) ? Number(input) : null;
+const ceoNotes =
+  typeof args === "object" && args !== null && args.ceoNotes
+    ? args.ceoNotes
+    : null;
 
 // Phase 1: Gather context
 phase("Gather");
@@ -189,7 +193,7 @@ Then:
 4. Identify the most relevant source files the architect should read (check files referenced in the issue, or grep for relevant code). List 3-8 paths.
 5. Determine hasFrontend: true if the issue involves UI/frontend changes (Vue components, CSS, layouts, user-facing views), false if backend-only.
 6. If hasFrontend AND this is a GitHub issue, check the issue comments (gh issue view ${issueNum || "N/A"} --comments) for a comment containing "Frontend decision:". If found, extract the decision text into frontendDecision. If not found, set frontendDecision to null.
-7. Check if any comment contains "Restart:" prefix. If found, extract the text after it into restart. This means a previous attempt at this issue had the wrong diagnosis and needs to start fresh.
+7. Check if the LAST comment on the issue starts with "Restart:" prefix. Only if it is the most recent comment (nothing posted after it), extract the text after "Restart:" into restart. If any comment exists after the Restart comment, the restart has already been consumed — set restart to null.
 
 Return the structured result.`,
   { label: "gather-context", schema: GATHER_SCHEMA },
@@ -208,7 +212,7 @@ log(
 phase("Setup");
 
 const repoRoot = "/personal-workplace/neijurli/cardgamesimulator";
-const wtPath = `${repoRoot}/../wt-${context.branchName}`;
+const wtPath = `/personal-workplace/neijurli/wt-${context.branchName}`;
 const lldPath = `docs/lld/${String(context.nextLldNumber).padStart(2, "0")}-${context.lldSlug}.md`;
 
 const SETUP_SCHEMA = {
@@ -435,6 +439,7 @@ Read DEVELOPMENT.md, docs/architecture-principles.md, docs/testing-principles.md
 Then read the relevant files listed above.
 Write the LLD following the standard structure (Scope, Approach, Interfaces/Types, State Model, Edge Cases, Dependencies, Test Requirements).
 ${frontendSpec ? `\nInclude a **## Frontend Design** section in the LLD that incorporates these frontend architecture decisions:\n${frontendSpec}` : ""}
+${ceoNotes ? `\n**IMPORTANT — Implementation guidance from selection:**\n${ceoNotes}\n\nThe above notes describe WHY this issue was selected and HOW it should be approached. Follow these constraints strictly — they override any conflicting interpretation of the issue description.` : ""}
 Keep it concise — enough to implement from, not a textbook.
 
 Save the file to ${wtPath}/${lldPath}.
@@ -534,9 +539,11 @@ Process:
 2. Implement module by module, writing tests alongside
 3. Run npm --prefix ${wtPath} run build — fix any errors
 4. Run npm --prefix ${wtPath} test — fix any failures
-5. Run npm --prefix ${wtPath} run lint:fix
-6. Update CHANGELOG.md under [Unreleased] with what was implemented
-7. Stage and commit:
+5. Run npm --prefix ${wtPath} run test:integration — fix any failures (these test the full server with DB)
+6. Run npm --prefix ${wtPath} run test:e2e — fix any failures (these run Playwright headless against the full stack)
+7. Run npm --prefix ${wtPath} run lint:fix
+8. Update CHANGELOG.md under [Unreleased] with what was implemented
+9. Stage and commit:
    - Run git -C ${wtPath} status to see what changed
    - Stage ONLY source files you created/modified (src/**, tests/**, CHANGELOG.md, package.json, etc.)
    - Do NOT stage .env, .env.*, credentials, secrets, node_modules, build/, or dist/
@@ -566,7 +573,9 @@ Review the implementation of the LLD at ${wtPath}/${lldPath}.
 Run these commands first:
 - git -C ${wtPath} diff main --stat (to see what files changed)
 - npm --prefix ${wtPath} run build (verify it compiles)
-- npm --prefix ${wtPath} test (verify tests pass)
+- npm --prefix ${wtPath} test (verify unit tests pass)
+- npm --prefix ${wtPath} run test:integration (verify integration tests pass)
+- npm --prefix ${wtPath} run test:e2e (verify e2e tests pass)
 
 ${codeAttempts > 1 ? "This is a re-review after the implementer addressed prior feedback. Verify fixes are correct." : ""}
 
@@ -718,6 +727,29 @@ if (!qaApproved) {
 
 // Phase 9: Ship (push and PR)
 phase("Ship");
+
+// Close any existing PRs for this issue (from prior failed attempts / restarts)
+if (issueNum) {
+  await agent(
+    `Check for existing open PRs that reference issue #${issueNum} and close them.
+
+1. Search for open PRs that mention the issue:
+   gh pr list --state open --json number,title,headRefName,body --limit 20
+
+2. From the results, find any PR whose body contains "Closes #${issueNum}" or "#${issueNum}" AND whose branch is NOT "${context.branchName}" (the current branch).
+
+3. For each matching PR, close it with a comment explaining it's superseded:
+   gh pr close <number> --comment "Superseded by a new attempt for #${issueNum} on branch ${context.branchName}."
+
+4. Also delete the remote branch for closed PRs (clean up):
+   gh pr close already deletes the branch if --delete-branch is passed, so use:
+   gh pr close <number> --comment "Superseded by a new attempt for #${issueNum} on branch ${context.branchName}." --delete-branch
+
+If no matching PRs are found, do nothing.`,
+    { label: "close-stale-prs" },
+  );
+}
+
 const shipResult = await agent(
   `${WT_PREAMBLE}
 

@@ -16,7 +16,12 @@
       "Bash(gh *)",
       "Bash(mkdir *)",
       "Bash(python3 -m http.server *)",
-      "Bash(pkill -f *http.server 8090*)"
+      "Bash(pkill -f *http.server 8090*)",
+      "Bash(cd /personal-workplace/neijurli/wt-* && *)",
+      "Bash(find /personal-workplace/neijurli/wt-*)",
+      "Bash(ls /personal-workplace/neijurli/wt-*)",
+      "Bash(cat /personal-workplace/neijurli/wt-*)",
+      "Bash(grep * /personal-workplace/neijurli/wt-*)"
     ]
   },
   "hooks": {
