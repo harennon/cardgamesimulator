@@ -211,17 +211,19 @@ Step 3 — For each issue, check for "Restart:" comments:
 Step 4 — Classify each issue:
   A) NEEDS TRIAGE (add to needsTriage):
      - Has an ACTIVE "Restart:" comment (no open PR created after it — override all other skip rules)
-     - No label starting with "triage:" (never triaged)
+     - No label starting with "triage:" AND no "blocked:" label (never triaged)
+     - Has "blocked:frontend-decision" AND a comment containing "Frontend decision:" that is MORE RECENT than the latest "Frontend Design Mockups" comment (decision provided — unblock it)
      - Has "triage:needs-info" BUT updatedAt is more than 24 hours after the issue was last labeled (info was likely provided)
      - Has "triage:defer" AND updatedAt is more than ${DEFER_STALENESS_DAYS} days ago (stale defer — reassess)
      - Has "triage:close" BUT updatedAt is more recent than when the label was likely applied (pushback received)
 
   B) SKIP (exclude):
+     - Has "blocked:frontend-decision" label (waiting on human input — never triage or promote)
      - Has "triage:fix" label AND no active restart (handled by selection phase)
      - Has any triage label with no re-triage trigger met AND no active restart
      - Has an open PR whose branch name contains the issue number AND no active restart (already being shipped)
 
-For items in category A that have an existing triage label (including "triage:fix" when triggered by a "Restart:" comment), add them to labelsToRemove with the exact label string (e.g. "triage:defer", "triage:fix").
+For items in category A that have an existing triage label or "blocked:" label (including "triage:fix" when triggered by a "Restart:" comment, or "blocked:frontend-decision" when unblocked), add them to labelsToRemove with the exact label string (e.g. "triage:defer", "triage:fix", "blocked:frontend-decision").
 
 Do NOT run any gh issue edit commands. Only read and classify.`,
   { label: "fetch-issues", schema: FETCH_SCHEMA },
@@ -413,12 +415,14 @@ if (!Array.isArray(fixPool) || fixPool.length === 0) {
   const deferredAgent = await agent(
     `The triage:fix pool is empty — nothing to ship. Check if any deferred issues should be promoted.
 
-Run: gh issue list --state open --label "triage:defer" --json number,title,body --limit 20
+Run: gh issue list --state open --label "triage:defer" --json number,title,body,labels --limit 20
 
-For each issue, also get a brief summary:
+Exclude any issue that also has the label "blocked:frontend-decision" — those are waiting on a human decision and cannot be shipped.
+
+For each remaining issue, also get a brief summary:
   gh issue view <number> --json title,body --jq '.body[:200]'
 
-Return a JSON array of {number, title, summary} objects. If no deferred issues exist, return an empty array.`,
+Return a JSON array of {number, title, summary} objects. If no deferred issues exist (or all are blocked), return an empty array.`,
     { label: "fetch-deferred-pool" },
   );
 
@@ -546,8 +550,8 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
       await agent(
         `Issue #${issueNumber} is awaiting a frontend design decision. Re-label it:
 1. gh issue edit ${issueNumber} --remove-label "triage:fix"
-2. gh issue edit ${issueNumber} --add-label "triage:defer"`,
-        { label: `defer-awaiting-${issueNumber}` },
+2. gh issue edit ${issueNumber} --add-label "blocked:frontend-decision"`,
+        { label: `block-awaiting-${issueNumber}` },
       );
     } else {
       const failPhase = result ? result.phase || result.status : "unknown";
@@ -707,12 +711,11 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
     log(
       `#${issueNumber} paused: awaiting frontend decision (branch: ${result.branchName}). Will skip on next run until decision is posted.`,
     );
-    // Replace triage:fix with triage:defer so it's not re-selected next batch
     await agent(
       `Issue #${issueNumber} is awaiting a frontend design decision. Re-label it:
 1. gh issue edit ${issueNumber} --remove-label "triage:fix"
-2. gh issue edit ${issueNumber} --add-label "triage:defer"`,
-      { label: `defer-awaiting-${issueNumber}` },
+2. gh issue edit ${issueNumber} --add-label "blocked:frontend-decision"`,
+      { label: `block-awaiting-${issueNumber}` },
     );
   } else {
     const failPhase = result ? result.phase || result.status : "unknown";

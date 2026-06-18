@@ -277,6 +277,56 @@ if (context.restart && context.frontendDecision) {
 if (context.hasFrontend) {
   phase("Frontend Design");
 
+  // Belt-and-suspenders: if gather agent missed the decision, check directly with temporal ordering
+  if (!context.frontendDecision && issueNum) {
+    const decisionCheck = await agent(
+      `Check if issue #${issueNum} already has frontend mockups and/or a decision, respecting temporal order.
+
+Run: gh issue view ${issueNum} --json comments --jq '[.comments[] | {body: .body, createdAt: .createdAt}]'
+
+Parse the comments chronologically and find:
+1. The LATEST comment containing "Frontend Design Mockups" (case-insensitive) — record its createdAt as MOCKUP_TIME
+2. The LATEST comment containing "Frontend decision:" (case-insensitive) — record its createdAt as DECISION_TIME
+
+Apply temporal logic:
+- A decision is VALID only if DECISION_TIME > MOCKUP_TIME (the decision was made AFTER the mockups it refers to)
+- If mockups exist but no valid decision exists after them, the decision is stale or missing
+
+Return one of:
+- "DECISION: <text after Frontend decision:>" — if a temporally valid decision exists (posted after the latest mockups)
+- "MOCKUPS_EXIST_NO_DECISION" — if mockups exist but no valid decision after them
+- "NONE" — if no mockups and no decision exist at all
+
+Return the raw string — no JSON wrapping, no explanation.`,
+      { label: "check-existing-frontend-decision" },
+    );
+
+    if (decisionCheck && typeof decisionCheck === "string") {
+      const trimmed = decisionCheck.trim();
+      if (trimmed.startsWith("DECISION: ")) {
+        context.frontendDecision = trimmed.slice("DECISION: ".length);
+        log(
+          `Frontend decision found via direct check: ${context.frontendDecision}`,
+        );
+      } else if (trimmed === "MOCKUPS_EXIST_NO_DECISION") {
+        log(
+          "Mockups already posted but no valid decision after them — awaiting decision, not re-running frontend-architect.",
+        );
+        await agent(
+          `Remove the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
+          { label: "cleanup-worktree" },
+        );
+        return {
+          status: "awaiting-frontend-decision",
+          issueTitle: context.issueTitle,
+          branchName: context.branchName,
+          message:
+            "Mockups already posted on issue. Reply with 'Frontend decision: <choice>' to proceed.",
+        };
+      }
+    }
+  }
+
   if (context.frontendDecision) {
     frontendSpec = context.frontendDecision;
     log("Frontend decision found in issue comments — skipping mockup phase");
