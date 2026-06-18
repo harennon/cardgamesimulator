@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Previous Played Cards — Design Mockup</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      body {
+        background: #0a0a0a;
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        overflow-x: hidden;
+      }
+
+      h1 {
+        text-align: center;
+        padding: 24px;
+        font-size: 1.1rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.05em;
+      }
+
+      .design-note {
+        max-width: 800px;
+        margin: 0 auto 32px;
+        padding: 16px 24px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      .design-note strong { color: var(--text-primary); }
+
+      .section-label {
+        text-align: center;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        margin: 48px 0 16px;
+        font-weight: 600;
+      }
+
+      /* ===== TABLE AREA ===== */
+      .table-area {
+        position: relative;
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto 48px;
+        height: 320px;
+        background: radial-gradient(ellipse 80% 70% at 50% 50%, var(--felt-light) 0%, var(--felt) 50%, #0f2e1c 100%);
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(135deg, var(--table-rim-light), var(--table-rim), #1a0f08) 1;
+        overflow: hidden;
+      }
+
+      /* Felt texture */
+      .table-area::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+
+      /* ===== OPTION A: Horizontal Timeline Strip ===== */
+      .play-history-strip {
+        position: absolute;
+        bottom: 16px;
+        left: 16px;
+        right: 16px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 0;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .play-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        transition: opacity 0.4s ease, transform 0.4s ease;
+      }
+
+      /* Previous plays: smaller, faded, offset to the left */
+      .play-group--previous {
+        transform: scale(0.72);
+        opacity: 0.45;
+        margin-right: -8px;
+      }
+
+      .play-group--previous-recent {
+        transform: scale(0.82);
+        opacity: 0.65;
+        margin-right: 4px;
+      }
+
+      /* Current play: full size, centered, prominent */
+      .play-group--current {
+        transform: scale(1);
+        opacity: 1;
+        margin: 0 16px;
+      }
+
+      .play-group__label {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+      }
+
+      .play-group--current .play-group__label {
+        color: var(--gold-accent);
+        font-weight: 600;
+        font-size: 0.7rem;
+      }
+
+      .play-group__hand-type {
+        font-size: 0.65rem;
+        color: var(--gold-accent);
+        font-weight: 500;
+        letter-spacing: 0.04em;
+      }
+
+      .play-group--previous .play-group__hand-type,
+      .play-group--previous-recent .play-group__hand-type {
+        color: var(--text-muted);
+      }
+
+      .play-group__cards {
+        display: flex;
+        gap: 2px;
+      }
+
+      .play-group--current .play-group__cards {
+        gap: 4px;
+      }
+
+      .play-group__player {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+      }
+
+      .play-group--current .play-group__player {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      /* Pass indicator */
+      .play-group--pass .play-group__cards {
+        padding: 8px 12px;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        font-style: italic;
+        border: 1px dashed rgba(138, 126, 110, 0.3);
+        border-radius: 4px;
+      }
+
+      /* ===== MINI CARD ===== */
+      .mini-card {
+        width: 42px;
+        height: 60px;
+        background: var(--card-face);
+        border-radius: 4px;
+        box-shadow: 0 2px 6px var(--card-shadow);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        position: relative;
+        border: 1px solid rgba(0,0,0,0.1);
+      }
+
+      .mini-card--small {
+        width: 34px;
+        height: 48px;
+      }
+
+      .mini-card__rank {
+        font-size: 0.85rem;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .mini-card--small .mini-card__rank {
+        font-size: 0.7rem;
+      }
+
+      .mini-card__suit {
+        font-size: 0.7rem;
+        line-height: 1;
+        margin-top: 1px;
+      }
+
+      .mini-card--small .mini-card__suit {
+        font-size: 0.6rem;
+      }
+
+      .mini-card--red .mini-card__rank,
+      .mini-card--red .mini-card__suit {
+        color: var(--red-suit);
+      }
+
+      .mini-card--black .mini-card__rank,
+      .mini-card--black .mini-card__suit {
+        color: var(--black-suit);
+      }
+
+      /* Current play cards are larger */
+      .play-group--current .mini-card {
+        width: 52px;
+        height: 74px;
+      }
+      .play-group--current .mini-card .mini-card__rank {
+        font-size: 1rem;
+      }
+      .play-group--current .mini-card .mini-card__suit {
+        font-size: 0.85rem;
+      }
+
+      /* ===== OPTION B: Stacked / Layered Approach ===== */
+      .table-area-b {
+        position: relative;
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto 48px;
+        height: 320px;
+        background: radial-gradient(ellipse 80% 70% at 50% 50%, var(--felt-light) 0%, var(--felt) 50%, #0f2e1c 100%);
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(135deg, var(--table-rim-light), var(--table-rim), #1a0f08) 1;
+        overflow: hidden;
+      }
+
+      .table-area-b::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+
+      .layered-history {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .layer {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .layer--oldest {
+        left: 12%;
+        top: 50%;
+        transform: translateY(-50%) rotate(-3deg) scale(0.65);
+        opacity: 0.35;
+      }
+
+      .layer--middle {
+        left: 28%;
+        top: 50%;
+        transform: translateY(-50%) rotate(-1.5deg) scale(0.78);
+        opacity: 0.6;
+      }
+
+      .layer--current {
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+
+      .layer__meta {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .layer__hand-type {
+        font-size: 0.65rem;
+        color: var(--gold-accent);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .layer--oldest .layer__hand-type,
+      .layer--middle .layer__hand-type {
+        color: var(--text-muted);
+      }
+
+      .layer__player {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+      }
+
+      .layer--current .layer__player {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      .layer__cards {
+        display: flex;
+        gap: 3px;
+      }
+
+      .layer--current .layer__cards {
+        gap: 5px;
+      }
+
+      /* ===== OPTION C: Left sidebar mini-history ===== */
+      .table-area-c {
+        position: relative;
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto 48px;
+        height: 320px;
+        background: radial-gradient(ellipse 80% 70% at 50% 50%, var(--felt-light) 0%, var(--felt) 50%, #0f2e1c 100%);
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(135deg, var(--table-rim-light), var(--table-rim), #1a0f08) 1;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 140px 1fr;
+      }
+
+      .table-area-c::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E');
+        pointer-events: none;
+      }
+
+      .sidebar-history {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 12px;
+        padding: 16px 12px;
+        border-right: 1px solid rgba(74, 44, 30, 0.4);
+      }
+
+      .sidebar-history__title {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+
+      .sidebar-entry {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 6px 8px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(74, 44, 30, 0.2);
+        transition: opacity 0.3s ease;
+      }
+
+      .sidebar-entry--older {
+        opacity: 0.55;
+      }
+
+      .sidebar-entry__player {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+
+      .sidebar-entry__cards {
+        display: flex;
+        gap: 2px;
+      }
+
+      .sidebar-entry__type {
+        font-size: 0.55rem;
+        color: var(--gold-accent);
+        opacity: 0.8;
+      }
+
+      .sidebar-entry--pass {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+      .center-play {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .center-play__label {
+        font-size: 0.75rem;
+        color: var(--gold-accent);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .center-play__cards {
+        display: flex;
+        gap: 5px;
+      }
+
+      .center-play__player {
+        font-size: 0.7rem;
+        color: var(--text-primary);
+      }
+
+      /* Tiny cards for sidebar */
+      .tiny-card {
+        width: 24px;
+        height: 34px;
+        background: var(--card-face);
+        border-radius: 3px;
+        box-shadow: 0 1px 3px var(--card-shadow);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        border: 1px solid rgba(0,0,0,0.08);
+      }
+
+      .tiny-card__rank {
+        font-size: 0.5rem;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .tiny-card__suit {
+        font-size: 0.45rem;
+        line-height: 1;
+      }
+
+      .tiny-card--red .tiny-card__rank,
+      .tiny-card--red .tiny-card__suit {
+        color: var(--red-suit);
+      }
+
+      .tiny-card--black .tiny-card__rank,
+      .tiny-card--black .tiny-card__suit {
+        color: var(--black-suit);
+      }
+
+      /* ===== TURN TIMER (shared) ===== */
+      .turn-indicator {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.75rem;
+        color: var(--text-primary);
+        z-index: 2;
+      }
+
+      .turn-indicator__dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-glow);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(0.85); }
+      }
+
+      .turn-indicator__timer {
+        font-variant-numeric: tabular-nums;
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      /* New trick indicator */
+      .new-trick {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        font-style: italic;
+        text-align: center;
+      }
+
+      /* ===== INTERACTIVE DEMO ===== */
+      .demo-controls {
+        max-width: 600px;
+        margin: 0 auto 32px;
+        padding: 16px 24px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .demo-controls button {
+        font-family: var(--font-ui);
+        font-size: 0.75rem;
+        padding: 8px 16px;
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-primary);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .demo-controls button:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+
+      .demo-controls button.active {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border-color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      /* ===== RESPONSIVE ===== */
+      @media (max-width: 767px) {
+        .table-area, .table-area-b, .table-area-c {
+          height: 260px;
+          margin: 0 8px 32px;
+        }
+
+        .play-group--previous { transform: scale(0.6); }
+        .play-group--previous-recent { transform: scale(0.7); }
+
+        .table-area-c { grid-template-columns: 100px 1fr; }
+        .sidebar-history { padding: 8px 6px; gap: 8px; }
+        .tiny-card { width: 20px; height: 28px; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Show Previous Played Cards on the Table</h1>
+
+    <div class="design-note">
+      <strong>Context:</strong> Currently, only the <code>lastPlay</code> is
+      shown in the PlayArea center. Full history lives in the GameLog sidebar
+      (desktop) or drawer (mobile). Users want to see the last 2-3 plays
+      directly on the table without opening the log. Three design directions are
+      shown below.<br /><br />
+      <strong>Data source:</strong>
+      <code>Big2PublicState.playHistory</code> already contains the full play
+      history (array of <code>Big2HistoryEntry</code>). We slice the last 3
+      entries for display.
+    </div>
+
+    <!-- ===== OPTION A ===== -->
+    <div class="section-label">
+      Option A — Horizontal Timeline (Cards Drift Left)
+    </div>
+    <div class="design-note">
+      Previous plays slide left and shrink as new plays arrive. The current play
+      stays centered and large. Older plays fade and reduce in size, giving a
+      natural sense of time flow across the felt.
+      <strong>Passes are shown as dashed outlines</strong> so the visual rhythm
+      is maintained.
+    </div>
+
+    <div class="table-area">
+      <div class="turn-indicator">
+        <span class="turn-indicator__dot"></span>
+        <span>Your turn</span>
+        <span class="turn-indicator__timer">0:42</span>
+      </div>
+
+      <div class="play-history-strip">
+        <!-- Oldest play -->
+        <div class="play-group play-group--previous">
+          <span class="play-group__hand-type">Straight</span>
+          <div class="play-group__cards">
+            <div class="mini-card mini-card--small mini-card--black">
+              <span class="mini-card__rank">3</span
+              ><span class="mini-card__suit">&clubs;</span>
+            </div>
+            <div class="mini-card mini-card--small mini-card--red">
+              <span class="mini-card__rank">4</span
+              ><span class="mini-card__suit">&diams;</span>
+            </div>
+            <div class="mini-card mini-card--small mini-card--red">
+              <span class="mini-card__rank">5</span
+              ><span class="mini-card__suit">&hearts;</span>
+            </div>
+            <div class="mini-card mini-card--small mini-card--black">
+              <span class="mini-card__rank">6</span
+              ><span class="mini-card__suit">&spades;</span>
+            </div>
+            <div class="mini-card mini-card--small mini-card--red">
+              <span class="mini-card__rank">7</span
+              ><span class="mini-card__suit">&diams;</span>
+            </div>
+          </div>
+          <span class="play-group__player">Alice</span>
+        </div>
+
+        <!-- Previous-recent (pass) -->
+        <div class="play-group play-group--previous-recent play-group--pass">
+          <span class="play-group__hand-type">&nbsp;</span>
+          <div class="play-group__cards">passed</div>
+          <span class="play-group__player">Charlie</span>
+        </div>
+
+        <!-- Current play -->
+        <div class="play-group play-group--current">
+          <span class="play-group__hand-type">Pair</span>
+          <div class="play-group__cards">
+            <div class="mini-card mini-card--black">
+              <span class="mini-card__rank">7</span
+              ><span class="mini-card__suit">&spades;</span>
+            </div>
+            <div class="mini-card mini-card--red">
+              <span class="mini-card__rank">7</span
+              ><span class="mini-card__suit">&hearts;</span>
+            </div>
+          </div>
+          <span class="play-group__player">Bob</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== OPTION B ===== -->
+    <div class="section-label">
+      Option B — Scattered Layers (Cards Left on Table)
+    </div>
+    <div class="design-note">
+      Cards appear to be physically left on the felt at slightly different
+      positions with subtle rotations. The current play is centered, older plays
+      drift left with reduced opacity and slight rotation angles. This feels
+      most like a real card table where previous plays are pushed aside.
+      <strong>Most organic feeling, but uses more horizontal space.</strong>
+    </div>
+
+    <div class="table-area-b">
+      <div class="turn-indicator">
+        <span class="turn-indicator__dot"></span>
+        <span>Your turn</span>
+        <span class="turn-indicator__timer">0:42</span>
+      </div>
+
+      <div class="layered-history">
+        <!-- Oldest -->
+        <div class="layer layer--oldest">
+          <div class="layer__cards">
+            <div class="mini-card mini-card--small mini-card--black">
+              <span class="mini-card__rank">3</span
+              ><span class="mini-card__suit">&clubs;</span>
+            </div>
+            <div class="mini-card mini-card--small mini-card--red">
+              <span class="mini-card__rank">4</span
+              ><span class="mini-card__suit">&diams;</span>
+            </div>
+            <div class="mini-card mini-card--small mini-card--red">
+              <span class="mini-card__rank">5</span
+              ><span class="mini-card__suit">&hearts;</span>
+            </div>
+            <div class="mini-card mini-card--small mini-card--black">
+              <span class="mini-card__rank">6</span
+              ><span class="mini-card__suit">&spades;</span>
+            </div>
+            <div class="mini-card mini-card--small mini-card--red">
+              <span class="mini-card__rank">7</span
+              ><span class="mini-card__suit">&diams;</span>
+            </div>
+          </div>
+          <div class="layer__meta">
+            <span class="layer__hand-type">Straight</span>
+            <span class="layer__player">Alice</span>
+          </div>
+        </div>
+
+        <!-- Middle -->
+        <div class="layer layer--middle">
+          <div class="layer__cards">
+            <div class="mini-card mini-card--small mini-card--red">
+              <span class="mini-card__rank">K</span
+              ><span class="mini-card__suit">&hearts;</span>
+            </div>
+            <div class="mini-card mini-card--small mini-card--black">
+              <span class="mini-card__rank">K</span
+              ><span class="mini-card__suit">&spades;</span>
+            </div>
+          </div>
+          <div class="layer__meta">
+            <span class="layer__hand-type">Pair</span>
+            <span class="layer__player">Dave</span>
+          </div>
+        </div>
+
+        <!-- Current -->
+        <div class="layer layer--current">
+          <div class="layer__cards">
+            <div class="mini-card mini-card--black">
+              <span class="mini-card__rank">7</span
+              ><span class="mini-card__suit">&spades;</span>
+            </div>
+            <div class="mini-card mini-card--red">
+              <span class="mini-card__rank">7</span
+              ><span class="mini-card__suit">&hearts;</span>
+            </div>
+          </div>
+          <div class="layer__meta">
+            <span class="layer__hand-type">Pair</span>
+            <span class="layer__player">Bob</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== OPTION C ===== -->
+    <div class="section-label">Option C — Left Sidebar Mini-History</div>
+    <div class="design-note">
+      A compact vertical strip on the left side of the table area shows the last
+      3 plays in a list format. This is the most information-dense option and
+      least disruptive to the existing layout. The current play remains centered
+      and prominent. The sidebar uses tiny cards for maximum density.
+      <strong
+        >Best for mobile adaptation — collapses cleanly into existing
+        drawer.</strong
+      >
+    </div>
+
+    <div class="table-area-c">
+      <div class="sidebar-history">
+        <span class="sidebar-history__title">Recent</span>
+
+        <div class="sidebar-entry sidebar-entry--older">
+          <span class="sidebar-entry__player">Alice</span>
+          <div class="sidebar-entry__cards">
+            <div class="tiny-card tiny-card--black">
+              <span class="tiny-card__rank">3</span
+              ><span class="tiny-card__suit">&clubs;</span>
+            </div>
+            <div class="tiny-card tiny-card--red">
+              <span class="tiny-card__rank">4</span
+              ><span class="tiny-card__suit">&diams;</span>
+            </div>
+            <div class="tiny-card tiny-card--red">
+              <span class="tiny-card__rank">5</span
+              ><span class="tiny-card__suit">&hearts;</span>
+            </div>
+            <div class="tiny-card tiny-card--black">
+              <span class="tiny-card__rank">6</span
+              ><span class="tiny-card__suit">&spades;</span>
+            </div>
+            <div class="tiny-card tiny-card--red">
+              <span class="tiny-card__rank">7</span
+              ><span class="tiny-card__suit">&diams;</span>
+            </div>
+          </div>
+          <span class="sidebar-entry__type">Straight</span>
+        </div>
+
+        <div class="sidebar-entry">
+          <span class="sidebar-entry__player">Charlie</span>
+          <div class="sidebar-entry--pass">passed</div>
+        </div>
+
+        <div class="sidebar-entry">
+          <span class="sidebar-entry__player">Dave</span>
+          <div class="sidebar-entry__cards">
+            <div class="tiny-card tiny-card--red">
+              <span class="tiny-card__rank">K</span
+              ><span class="tiny-card__suit">&hearts;</span>
+            </div>
+            <div class="tiny-card tiny-card--black">
+              <span class="tiny-card__rank">K</span
+              ><span class="tiny-card__suit">&spades;</span>
+            </div>
+          </div>
+          <span class="sidebar-entry__type">Pair</span>
+        </div>
+      </div>
+
+      <div class="center-play">
+        <span class="center-play__label">Pair</span>
+        <div class="center-play__cards">
+          <div class="mini-card mini-card--black">
+            <span class="mini-card__rank">7</span
+            ><span class="mini-card__suit">&spades;</span>
+          </div>
+          <div class="mini-card mini-card--red">
+            <span class="mini-card__rank">7</span
+            ><span class="mini-card__suit">&hearts;</span>
+          </div>
+        </div>
+        <span class="center-play__player">played by Bob</span>
+      </div>
+    </div>
+
+    <!-- ===== COMPARISON TABLE ===== -->
+    <div class="section-label">Comparison</div>
+    <div class="design-note">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem">
+        <tr style="border-bottom: 1px solid var(--table-rim-light)">
+          <th
+            style="
+              text-align: left;
+              padding: 6px 8px;
+              color: var(--text-primary);
+            "
+          >
+            Aspect
+          </th>
+          <th
+            style="
+              text-align: left;
+              padding: 6px 8px;
+              color: var(--text-primary);
+            "
+          >
+            A — Timeline
+          </th>
+          <th
+            style="
+              text-align: left;
+              padding: 6px 8px;
+              color: var(--text-primary);
+            "
+          >
+            B — Scattered
+          </th>
+          <th
+            style="
+              text-align: left;
+              padding: 6px 8px;
+              color: var(--text-primary);
+            "
+          >
+            C — Sidebar
+          </th>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(74, 44, 30, 0.3)">
+          <td style="padding: 6px 8px"><strong>Feel</strong></td>
+          <td style="padding: 6px 8px">Sequential, orderly</td>
+          <td style="padding: 6px 8px">Organic, table-like</td>
+          <td style="padding: 6px 8px">Dense, information-first</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(74, 44, 30, 0.3)">
+          <td style="padding: 6px 8px"><strong>Space usage</strong></td>
+          <td style="padding: 6px 8px">Uses full width</td>
+          <td style="padding: 6px 8px">Spreads horizontally</td>
+          <td style="padding: 6px 8px">Compact left column</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(74, 44, 30, 0.3)">
+          <td style="padding: 6px 8px"><strong>Mobile</strong></td>
+          <td style="padding: 6px 8px">Cards shrink further</td>
+          <td style="padding: 6px 8px">Needs adaptation</td>
+          <td style="padding: 6px 8px">Hides sidebar, uses drawer</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(74, 44, 30, 0.3)">
+          <td style="padding: 6px 8px"><strong>Animation</strong></td>
+          <td style="padding: 6px 8px">Slide left + fade</td>
+          <td style="padding: 6px 8px">Drift + rotate + fade</td>
+          <td style="padding: 6px 8px">Slide down + fade</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 8px"><strong>Disruption</strong></td>
+          <td style="padding: 6px 8px">Medium — changes PlayArea layout</td>
+          <td style="padding: 6px 8px">Medium — absolute positioning</td>
+          <td style="padding: 6px 8px">Low — adds a column</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- ===== COMPONENT ARCHITECTURE ===== -->
+    <div class="section-label">Component Architecture (All Options)</div>
+    <div
+      class="design-note"
+      style="
+        font-family: monospace;
+        white-space: pre;
+        font-size: 0.7rem;
+        line-height: 1.5;
+      "
+    >
+      GameBoard.vue PlayArea.vue (modified) TurnTimer (existing) PlayHistory
+      (NEW) -- renders last N plays PlayHistoryEntry (NEW) -- single previous
+      play (cards + label) GameCard (existing) -- reused with size="small" or
+      "tiny" CurrentPlay (extracted) -- the current lastPlay (was inline in
+      PlayArea) Props flow: GameBoard passes big2State.playHistory to PlayArea
+      PlayArea slices last 3 entries, passes to PlayHistory PlayHistory renders
+      each entry with shrinking scale/opacity New CSS variables:
+      --card-history-width: 34px --card-history-height: 48px
+      --history-entry-opacity-oldest: 0.45 --history-entry-opacity-recent: 0.65
+      --history-entry-scale-oldest: 0.72 --history-entry-scale-recent: 0.82
+    </div>
+
+    <div class="section-label">State Management</div>
+    <div
+      class="design-note"
+      style="
+        font-family: monospace;
+        white-space: pre;
+        font-size: 0.7rem;
+        line-height: 1.5;
+      "
+    >
+      No new composable needed. Data already available: - big2State.playHistory:
+      readonly Big2HistoryEntry[] - big2State.lastPlay: Big2Play | null Computed
+      in PlayArea: const recentPlays = computed(() => { const history =
+      props.playHistory; if (history.length <= 1) return []; // Show last 2-3
+      entries BEFORE the current lastPlay return history.slice(-4, -1); });
+      Mobile behavior: - On mobile (max-width: 767px), hide PlayHistory - Recent
+      plays remain visible in the drawer/log only - Keeps table area uncluttered
+      on small screens
+    </div>
+  </body>
+</html>
