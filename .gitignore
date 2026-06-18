@@ -1,6 +1,7 @@
 # configuration files
 .env
 .env.local
+.env.admin
 *.cert
 *.key
 
