@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS games (
   status VARCHAR(20) NOT NULL DEFAULT 'CREATED',
   state JSONB NOT NULL DEFAULT '{}',
   turn_timer_seconds INT,
+  join_code TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   version INT NOT NULL DEFAULT 1
@@ -35,6 +36,8 @@ CREATE TABLE IF NOT EXISTS feedback (
 -- Index for player lookups in games
 CREATE INDEX IF NOT EXISTS idx_games_player_ids ON games USING GIN (player_ids);
 CREATE INDEX IF NOT EXISTS idx_games_status ON games (status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_games_join_code ON games (join_code)
+  WHERE join_code IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback (created_at DESC);
 
 -- Grant table access to Supabase roles.

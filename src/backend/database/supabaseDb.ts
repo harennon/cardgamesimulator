@@ -53,6 +53,7 @@ export class SupabaseDB
     maxPlayers: number,
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
+    joinCode: string | null,
   ): Promise<Game> {
     const row = {
       game_id: gameId,
@@ -63,6 +64,7 @@ export class SupabaseDB
       status: "CREATED",
       state: {},
       turn_timer_seconds: turnTimerSeconds,
+      join_code: joinCode,
     };
     const { data, error } = await this.db
       .from("games")
@@ -80,6 +82,17 @@ export class SupabaseDB
       .eq("game_id", gameId)
       .maybeSingle();
     if (error) throw new Error(`getGame failed: ${error.message}`);
+    if (!data) return null;
+    return this.mapGame(data as Record<string, unknown>);
+  }
+
+  public async getGameByJoinCode(code: string): Promise<Game | null> {
+    const { data, error } = await this.db
+      .from("games")
+      .select("*")
+      .eq("join_code", code)
+      .maybeSingle();
+    if (error) throw new Error(`getGameByJoinCode failed: ${error.message}`);
     if (!data) return null;
     return this.mapGame(data as Record<string, unknown>);
   }
@@ -180,6 +193,7 @@ export class SupabaseDB
     game.status = row.status as Game["status"];
     game.state = row.state as Record<string, unknown>;
     game.turnTimerSeconds = row.turn_timer_seconds as number | null;
+    game.joinCode = (row.join_code as string) ?? null;
     game.createdAt = new Date(row.created_at as string);
     game.updatedAt = new Date(row.updated_at as string);
     game.version = row.version as number;

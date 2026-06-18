@@ -41,6 +41,7 @@ import { GetStatsHandler } from "@/api/stats/getStats";
 import { FeedbackHandler } from "@/api/feedback/submitFeedback";
 import { RealTimerProvider } from "@/timer/realTimerProvider";
 import { TurnTimerService } from "@/timer/turnTimerService";
+import { createResolveJoinCodeRouter } from "@/api/game/resolveJoinCode";
 
 export class Server {
   private readonly app: Express;
@@ -124,6 +125,9 @@ export class Server {
 
     // Feedback route (auth required, guests allowed for POST; admin-only for GET)
     this.app.use("/feedback", authMiddleware, FeedbackHandler.INSTANCE.router);
+
+    // Join code resolution — no auth required (guests need to resolve before session)
+    this.app.use("/games/join", createResolveJoinCodeRouter(gameRepo));
 
     // register error middleware
     this.app.use(errorHandler);

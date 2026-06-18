@@ -175,7 +175,11 @@ async function handleGameJoin(
         playerId: id,
         displayName: game.playerDisplayNames[id] ?? id,
       }));
-      socket.emit("lobby:state", { players, maxPlayers: game.maxPlayers });
+      socket.emit("lobby:state", {
+        players,
+        maxPlayers: game.maxPlayers,
+        joinCode: game.joinCode ?? "",
+      });
 
       // Notify others (incremental update)
       socket.to(`game:${gameId}`).emit("lobby:playerJoined", {

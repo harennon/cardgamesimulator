@@ -20,6 +20,11 @@ export interface CreateGameRequest {
 export interface CreateGameResponse {
   gameId: string;
   gameType: GameType;
+  joinCode: string; // 4-char alphanumeric code
+}
+
+export interface ResolveJoinCodeResponse {
+  gameId: string;
 }
 
 export interface JoinGameRequest {

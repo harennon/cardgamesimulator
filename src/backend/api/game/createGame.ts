@@ -3,14 +3,14 @@ import { Handler } from "@/api/handler";
 import { CreateGameRequest, CreateGameResponse } from "@shared/model";
 import { gameRepo } from "@/database";
 import { BadRequestError } from "@/util/errors";
+import { generateJoinCode } from "@/service/joinCodeService";
+import { Game } from "@/database/entities/Game";
+import type { GameType } from "@shared/engine-types";
 
 const VALID_TIMER_VALUES: ReadonlySet<number> = new Set([30, 60, 90]);
 
 export class CreateGameHandler extends Handler {
   public static INSTANCE: CreateGameHandler = new CreateGameHandler();
-  private constructor() {
-    super();
-  }
 
   public override async post(
     request: Request<CreateGameRequest>,
@@ -22,7 +22,7 @@ export class CreateGameHandler extends Handler {
       throw new BadRequestError();
     }
     const gameId = crypto.randomUUID();
-    const game = await gameRepo.createGame(
+    const game = await this.createGameWithCode(
       gameId,
       request.body.gameType,
       request.userId!,
@@ -33,8 +33,38 @@ export class CreateGameHandler extends Handler {
     const createGameResponse: CreateGameResponse = {
       gameId: game.gameId,
       gameType: request.body.gameType,
+      joinCode: game.joinCode ?? "",
     };
     response.status(200).json(createGameResponse);
+  }
+
+  private async createGameWithCode(
+    gameId: string,
+    gameType: GameType,
+    creatorId: string,
+    maxPlayers: number,
+    creatorDisplayName: string,
+    turnTimerSeconds: number | null,
+  ): Promise<Game> {
+    const MAX_RETRIES = 5;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        return await gameRepo.createGame(
+          gameId,
+          gameType,
+          creatorId,
+          maxPlayers,
+          creatorDisplayName,
+          turnTimerSeconds,
+          generateJoinCode(),
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("duplicate") || msg.includes("unique")) continue;
+        throw err;
+      }
+    }
+    throw new Error("Failed to generate unique join code after max retries");
   }
 
   private validateRequest(request: Request<CreateGameRequest>) {

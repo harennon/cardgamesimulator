@@ -16,6 +16,26 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 28: Mobile Invite Code** — short 4-character room code for easy mobile sharing
+  - `supabase/migrations/004_join_codes.sql` — `join_codes` table (code PK → game_id FK, created_at); index on game_id; SELECT grants to authenticated/anon
+  - `src/backend/database/database.ts` — `JoinCodeRepository` interface (`createJoinCode`, `getGameIdByCode`, `deleteByGameId`, `deleteExpired`)
+  - `src/backend/database/supabaseDb.ts` — `SupabaseDB` implements `JoinCodeRepository`; `deleteExpired` uses ISO cutoff timestamp
+  - `src/backend/database/index.ts` — exports `joinCodeRepo`
+  - `src/backend/service/joinCodeService.ts` — `JoinCodeService`: generates 4-char codes from reduced alphabet (A-Z minus O/I/L, 2-9); in-memory cache; retry on collision; `resolveCode` normalises to uppercase; `cleanupExpired` delegates to repo
+  - `src/backend/api/game/resolveJoinCode.ts` — `GET /api/games/join/:code` router; no auth; 200 `{gameId}` or 404
+  - `src/backend/api/game/createGame.ts` — calls `joinCodeService.generateCode` before `gameRepo.createGame`; `joinCode` included in `CreateGameResponse`
+  - `src/backend/websocket/socketHandler.ts` — `handleGameJoin` resolves join code and includes it in `lobby:state` payload; `registerSocketHandlers` accepts `JoinCodeService`
+  - `src/backend/server.ts` — instantiates `JoinCodeService`; registers `/games/join` route; passes service to socket handler; runs hourly cleanup interval (24h max age); `close()` clears interval
+  - `src/shared/model.ts` — `CreateGameResponse.joinCode: string`; new `ResolveJoinCodeResponse`
+  - `src/shared/socket-events.ts` — `LobbyStatePayload.joinCode: string`
+  - `src/frontend/component/game/GameLobbyView.vue` — casino chip display: gold-bordered monospace element with "ROOM CODE" label; tap-to-copy with "Copied!" toast; clipboard fallback "Long-press to copy."; `joinCode` prop added; mobile responsive (`1.6rem` at `< 480px`)
+  - `src/frontend/component/game/GameView.vue` — `lobbyJoinCode` ref populated from `lobby:state`; passed to `GameLobbyView`
+  - `src/frontend/component/JoinGameView.vue` — detects 4-char codes vs UUIDs; resolves short codes via `GET /api/games/join/:code` before joining; `text-transform: uppercase` input style; placeholder updated
+  - `tests/service/joinCodeService.test.ts` — 12 unit tests: code length/alphabet/case, collision retry, error propagation, cache population, case normalisation, delete cache eviction, cleanup delegation
+  - `tests/api/resolveJoinCode.test.ts` — 3 endpoint tests: 200 with gameId, uppercase normalisation, 404 for unknown code
+  - `tests/frontend/gameLobbyView.test.ts` — 6 tests: chip display, copy-to-clipboard success/failure, invite link copy
+  - `tests/frontend/joinGameView.test.ts` — 12 tests: UUID/short-code/invalid classification, full join flows, error cases
+
 - **LLD 13: Railway Sleep-on-Idle** — enable `sleepApplication: true` by removing `setInterval` loops that kept the process alive and adding turn-timer recovery on wake
   - `src/backend/engine/game-cache.ts` — replaced periodic eviction loop with lazy on-access eviction (check inactivity threshold on `get()`, sweep stale entries on `set()`)
   - `src/backend/guest/guestSessionStore.ts` — replaced periodic cleanup loop with lazy expiry deletion in `getByGame()`

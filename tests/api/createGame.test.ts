@@ -10,6 +10,7 @@ function makeGame(overrides: Partial<Game> = {}): Game {
   game.maxPlayers = 4;
   game.status = "CREATED";
   game.state = {};
+  game.joinCode = "H7K3";
   game.version = 1;
   Object.assign(game, overrides);
   return game;
@@ -24,15 +25,28 @@ const mockCreateGame =
       maxPlayers: number,
       creatorDisplayName: string,
       turnTimerSeconds: number | null,
+      joinCode: string | null,
     ) => Promise<Game>
   >();
 
 vi.mock("@/database", () => ({
   gameRepo: {
     createGame: (
-      ...args: [string, string, string, number, string, number | null]
+      ...args: [
+        string,
+        string,
+        string,
+        number,
+        string,
+        number | null,
+        string | null,
+      ]
     ) => mockCreateGame(...args),
   },
+}));
+
+vi.mock("@/service/joinCodeService", () => ({
+  generateJoinCode: () => "H7K3",
 }));
 
 process.env.SUPABASE_JWT_SECRET = "test-secret";
@@ -76,7 +90,7 @@ describe("CreateGameHandler", () => {
   });
 
   describe("happy path", () => {
-    it("creates game and returns gameId and gameType", async () => {
+    it("creates game and returns gameId, gameType, and joinCode", async () => {
       const game = makeGame();
       mockCreateGame.mockResolvedValue(game);
 
@@ -87,7 +101,27 @@ describe("CreateGameHandler", () => {
       );
 
       expect(data.statusCode).toBe(200);
-      expect(data.body).toEqual({ gameId: "game-1", gameType: "big2" });
+      expect(data.body).toEqual({
+        gameId: "game-1",
+        gameType: "big2",
+        joinCode: "H7K3",
+      });
+    });
+
+    it("passes joinCode to gameRepo.createGame", async () => {
+      const game = makeGame();
+      mockCreateGame.mockResolvedValue(game);
+
+      const { res } = makeResponse();
+      await CreateGameHandler.INSTANCE.post(
+        makeRequest("user-1", "big2", 4, "Alice", 30),
+        res,
+      );
+
+      expect(mockCreateGame).toHaveBeenCalledOnce();
+      const args = mockCreateGame.mock.calls[0];
+      // Last arg is joinCode
+      expect(args[6]).toBe("H7K3");
     });
 
     it("passes displayName to gameRepo.createGame", async () => {
@@ -162,7 +196,6 @@ describe("CreateGameHandler", () => {
     it("throws 400 when turnTimerSeconds is null", async () => {
       const { res } = makeResponse();
       const req = makeRequest("user-1", "big2", 4, "Alice");
-      // explicitly set null
       (req.body as Record<string, unknown>).turnTimerSeconds = null;
       await expect(
         CreateGameHandler.INSTANCE.post(req, res),

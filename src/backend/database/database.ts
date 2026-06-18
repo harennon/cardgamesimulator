@@ -11,8 +11,10 @@ export interface GameRepository {
     maxPlayers: number,
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
+    joinCode: string | null,
   ): Promise<Game>;
   getGame(gameId: string): Promise<Game | null>;
+  getGameByJoinCode(code: string): Promise<Game | null>;
   saveGame(game: Game): Promise<Game>; // throws OptimisticLockError on version conflict
 }
 // Note: `createGame` takes gameId as a parameter (caller generates UUID via `crypto.randomUUID()`).

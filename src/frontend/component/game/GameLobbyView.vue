@@ -3,6 +3,27 @@
     <div class="lobby__panel">
       <h2 class="lobby__title">Game Lobby</h2>
 
+      <div class="lobby__chip-container" data-testid="join-code-container">
+        <span class="lobby__chip-label">ROOM CODE</span>
+        <button
+          class="lobby__chip"
+          :aria-label="`Room code ${joinCode}. Tap to copy.`"
+          data-testid="join-code-chip"
+          @click="copyJoinCode"
+        >
+          {{ joinCode }}
+        </button>
+        <span
+          v-if="codeCopied"
+          class="lobby__copied"
+          data-testid="code-copied-toast"
+          >Copied!</span
+        >
+        <span v-if="clipboardFallback" class="lobby__copied"
+          >Long-press to copy.</span
+        >
+      </div>
+
       <div class="lobby__players">
         <div
           v-for="player in players"
@@ -59,6 +80,7 @@ const props = defineProps<{
   maxPlayers: number;
   isHost: boolean;
   actionPending: boolean;
+  joinCode: string;
 }>();
 
 const emit = defineEmits<{
@@ -66,6 +88,8 @@ const emit = defineEmits<{
 }>();
 
 const copied = ref(false);
+const codeCopied = ref(false);
+const clipboardFallback = ref(false);
 const errorMessage = ref<string | null>(null);
 
 const canStart = computed(() => props.isHost && props.players.length >= 2);
@@ -80,6 +104,22 @@ const inviteLink = computed(
 
 function onStart(): void {
   emit("start");
+}
+
+async function copyJoinCode(): Promise<void> {
+  clipboardFallback.value = false;
+  try {
+    await navigator.clipboard.writeText(props.joinCode);
+    codeCopied.value = true;
+    setTimeout(() => {
+      codeCopied.value = false;
+    }, 2000);
+  } catch {
+    clipboardFallback.value = true;
+    setTimeout(() => {
+      clipboardFallback.value = false;
+    }, 3000);
+  }
 }
 
 async function copyInviteLink(): Promise<void> {
@@ -125,6 +165,49 @@ async function copyInviteLink(): Promise<void> {
   font-weight: 700;
   color: var(--gold-accent);
   margin: 0;
+}
+
+.lobby__chip-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.lobby__chip-label {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.lobby__chip {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--gold-accent);
+  background: transparent;
+  border: 3px solid var(--gold-accent);
+  border-radius: 12px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.lobby__chip:hover {
+  background: rgba(212, 180, 90, 0.1);
+}
+
+@media (max-width: 480px) {
+  .lobby__chip {
+    font-size: 1.6rem;
+    padding: 10px 20px;
+  }
 }
 
 .lobby__players {

@@ -18,6 +18,7 @@
     :max-players="maxPlayers"
     :is-host="isHost"
     :action-pending="actionPending"
+    :join-code="lobbyJoinCode"
     @start="onStartGame"
   />
 
@@ -97,6 +98,7 @@ const {
 
 const joinError = ref<string | null>(null);
 const lobbyPlayers = ref<PlayerInfo[]>([]);
+const lobbyJoinCode = ref("");
 const maxPlayers = ref(4);
 const isHost = ref(false);
 const isGuest = ref(false);
@@ -169,6 +171,7 @@ onMounted(async () => {
   s.on("lobby:state", (payload) => {
     lobbyPlayers.value = payload.players;
     maxPlayers.value = payload.maxPlayers;
+    lobbyJoinCode.value = payload.joinCode;
   });
 
   s.on("lobby:playerJoined", (payload) => {

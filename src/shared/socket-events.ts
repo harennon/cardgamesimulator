@@ -126,6 +126,7 @@ export interface ServerToClientEvents {
 export interface LobbyStatePayload {
   players: PlayerInfo[];
   maxPlayers: number;
+  joinCode: string; // 4-char invite code
 }
 
 export interface LobbyPlayerJoinedPayload {

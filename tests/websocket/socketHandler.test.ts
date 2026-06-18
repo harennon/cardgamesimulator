@@ -338,6 +338,30 @@ describe("socketHandler handleGameJoin — CREATED branch", () => {
       playerId: "joiner-id",
       displayName: "Joiner",
     });
+    // joinCode defaults to "" when game.joinCode is null
+    expect(payload.joinCode).toBe("");
+  });
+
+  it("includes the join code in lobby:state when game has a joinCode", async () => {
+    const game = makeGame();
+    game.joinCode = "H7K3";
+    (gameService.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(game);
+
+    const { socket, emitted } = makeSocket("joiner-id", "Joiner");
+    const { fireGameJoin } = setupHandlers(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    await fireGameJoin(socket, "game-1", () => {});
+
+    const lobbyStateArgs = emitted.get("lobby:state") as
+      | [LobbyStatePayload]
+      | undefined;
+    expect(lobbyStateArgs).toBeDefined();
+    const payload = lobbyStateArgs![0];
+    expect(payload.joinCode).toBe("H7K3");
   });
 
   it("emits lobby:playerJoined to others in the room", async () => {
