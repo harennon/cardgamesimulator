@@ -204,21 +204,22 @@ Step 2 — Fetch open PRs to exclude in-progress issues:
   gh pr list --json number,headRefName --state open
 
 Step 3 — For each issue, check for "Restart:" comments:
-  gh issue view <number> --json comments --jq '.comments[].body' | grep -i "^Restart:" (check last few comments)
-  If a "Restart:" comment exists, the issue ALWAYS needs re-triage regardless of labels or open PRs.
+  gh issue view <number> --json comments --jq '[.comments[] | select(.body | startswith("Restart:"))] | last | .createdAt'
+  If a "Restart:" comment exists, compare its createdAt timestamp against the createdAt of any open PR for that issue (from step 2).
+  The restart is ACTIVE only if no open PR was created AFTER the Restart comment (i.e., the restart hasn't been acted on yet).
 
 Step 4 — Classify each issue:
   A) NEEDS TRIAGE (add to needsTriage):
-     - Has a comment with "Restart:" prefix (previous attempt was wrong — override all skip rules)
+     - Has an ACTIVE "Restart:" comment (no open PR created after it — override all other skip rules)
      - No label starting with "triage:" (never triaged)
      - Has "triage:needs-info" BUT updatedAt is more than 24 hours after the issue was last labeled (info was likely provided)
      - Has "triage:defer" AND updatedAt is more than ${DEFER_STALENESS_DAYS} days ago (stale defer — reassess)
      - Has "triage:close" BUT updatedAt is more recent than when the label was likely applied (pushback received)
 
   B) SKIP (exclude):
-     - Has "triage:fix" label AND no "Restart:" comment (handled by selection phase)
-     - Has any triage label with no re-triage trigger met AND no "Restart:" comment
-     - Has an open PR whose branch name contains the issue number AND no "Restart:" comment (already being shipped)
+     - Has "triage:fix" label AND no active restart (handled by selection phase)
+     - Has any triage label with no re-triage trigger met AND no active restart
+     - Has an open PR whose branch name contains the issue number AND no active restart (already being shipped)
 
 For items in category A that have an existing triage label (including "triage:fix" when triggered by a "Restart:" comment), add them to labelsToRemove with the exact label string (e.g. "triage:defer", "triage:fix").
 
