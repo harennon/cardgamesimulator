@@ -159,5 +159,6 @@ When deciding what to test:
 3. **Test the security boundary.** Any action a client can submit must be validated. Test that invalid submissions are rejected.
 4. **Don't test framework behavior.** Don't test that Express routes work or that Socket.IO emits events — those are library responsibilities.
 5. **Don't test trivial getters/setters.** If it's just `return this.field`, it doesn't need a test.
+6. **Bias against manual tests.** If behavior can be verified with an automated unit or integration test, write one. Only specify manual test steps for things that genuinely require visual/UX verification (animations, layout, responsiveness) and cannot be covered by checking computed state or DOM assertions. An LLD's test section should be mostly automated tests; a manual test table is the exception, not the default.
 
 Minimum effective strategy for a solo dev: comprehensive unit tests for the game engine (rules, validation, scoring), one full-game integration test, and invariant checks. Skip UI tests until the game logic is stable.
