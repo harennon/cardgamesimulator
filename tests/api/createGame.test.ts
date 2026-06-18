@@ -120,6 +120,47 @@ describe("CreateGameHandler", () => {
       });
     });
 
+    it("creates game row before generating join code (FK ordering)", async () => {
+      const callOrder: string[] = [];
+      const game = makeGame();
+      mockCreateGame.mockImplementation(async (..._args) => {
+        callOrder.push("createGame");
+        return game;
+      });
+      mockGenerateCode.mockImplementation(async (_gameId: string) => {
+        callOrder.push("generateCode");
+        return "H7K3";
+      });
+
+      const { res } = makeResponse();
+      await CreateGameHandler.INSTANCE.post(
+        makeRequest("user-1", "big2", 4, "Alice", 30),
+        res,
+      );
+
+      expect(callOrder).toEqual(["createGame", "generateCode"]);
+    });
+
+    it("returns joinCode as empty string when code generation fails", async () => {
+      const game = makeGame();
+      mockCreateGame.mockResolvedValue(game);
+      mockGenerateCode.mockRejectedValue(
+        new Error("Failed to generate unique join code after max retries"),
+      );
+
+      const { res, data } = makeResponse();
+      await CreateGameHandler.INSTANCE.post(
+        makeRequest("user-1", "big2", 4, "Alice", 30),
+        res,
+      );
+
+      // Game is still created; joinCode degrades gracefully to empty string
+      expect(data.statusCode).toBe(200);
+      expect((data.body as { gameId: string }).gameId).toBe("game-1");
+      expect((data.body as { joinCode: string }).joinCode).toBe("");
+      expect(mockCreateGame).toHaveBeenCalledOnce();
+    });
+
     it("passes displayName to gameRepo.createGame", async () => {
       const game = makeGame();
       mockCreateGame.mockResolvedValue(game);

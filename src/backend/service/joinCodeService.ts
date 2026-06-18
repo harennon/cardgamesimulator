@@ -69,11 +69,19 @@ export class JoinCodeService {
   }
 
   private randomCode(): string {
-    const bytes = randomBytes(CODE_LENGTH);
     const alphabetLength = JoinCodeService.ALPHABET.length;
+    // Rejection-sampling threshold: largest multiple of alphabetLength that fits
+    // in a byte (0–255). Values at or above this threshold are discarded to
+    // eliminate modulo bias.
+    const threshold = Math.floor(256 / alphabetLength) * alphabetLength; // 240
     let code = "";
-    for (let i = 0; i < CODE_LENGTH; i++) {
-      code += JoinCodeService.ALPHABET[bytes[i] % alphabetLength];
+    while (code.length < CODE_LENGTH) {
+      const bytes = randomBytes(CODE_LENGTH);
+      for (let i = 0; i < bytes.length && code.length < CODE_LENGTH; i++) {
+        if (bytes[i] < threshold) {
+          code += JoinCodeService.ALPHABET[bytes[i] % alphabetLength];
+        }
+      }
     }
     return code;
   }

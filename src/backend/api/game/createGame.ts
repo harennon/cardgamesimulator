@@ -25,7 +25,6 @@ export class CreateGameHandler extends Handler {
       throw new BadRequestError();
     }
     const gameId = crypto.randomUUID();
-    const joinCode = await this.joinCodeService.generateCode(gameId);
     const game = await gameRepo.createGame(
       gameId,
       request.body.gameType,
@@ -34,6 +33,15 @@ export class CreateGameHandler extends Handler {
       request.displayName ?? request.userId!,
       turnTimerSeconds,
     );
+    // Generate code after game row exists to satisfy the FK constraint on join_codes.
+    // If code generation fails, the game is still accessible via direct link.
+    let joinCode: string;
+    try {
+      joinCode = await this.joinCodeService.generateCode(gameId);
+    } catch (err) {
+      console.error(`Failed to generate join code for game ${gameId}:`, err);
+      joinCode = "";
+    }
     const createGameResponse: CreateGameResponse = {
       gameId: game.gameId,
       gameType: request.body.gameType,
