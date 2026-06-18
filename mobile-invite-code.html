@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mobile Invite Code — Game Lobby Mockup</title>
+    <style>
+      /* ═══════════════════════════════════════════════════════
+     DESIGN DIRECTION: "Casino Chip" Code Display
+
+     The game code is presented as a prominent, embossed token
+     that dominates the invite section. Large monospace glyphs
+     with generous letter-spacing for verbal readability.
+     Gold-bordered pill evokes a poker chip edge pattern.
+
+     Two options shown:
+     A) Full lobby view at 354px mobile viewport
+     B) Zoomed invite section with interaction states
+     ═══════════════════════════════════════════════════════ */
+
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #0d0d0d;
+        color: #e8dcc8;
+        font-family: "DM Sans", sans-serif;
+        padding: 40px 20px;
+        min-height: 100vh;
+      }
+
+      .page-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: #8a7e6e;
+        margin-bottom: 32px;
+        text-align: center;
+      }
+
+      .mockup-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 48px;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .mockup-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .mockup-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #c9a84c;
+        font-weight: 600;
+      }
+
+      /* ─── PHONE FRAME ─── */
+      .phone-frame {
+        width: 354px;
+        height: 599px;
+        border: 2px solid #333;
+        border-radius: 24px;
+        overflow: hidden;
+        position: relative;
+        background: #1a4a2e;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      }
+
+      /* ─── LOBBY PANEL (inside phone) ─── */
+      .lobby {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background:
+          radial-gradient(
+            ellipse at 50% 30%,
+            rgba(37, 107, 66, 0.4) 0%,
+            transparent 60%
+          ),
+          #1a4a2e;
+        padding: 16px;
+      }
+
+      .lobby__panel {
+        background: rgba(20, 12, 8, 0.85);
+        border: 2px solid #4a2c1e;
+        border-radius: 12px;
+        padding: 28px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        width: 100%;
+        max-width: 320px;
+        backdrop-filter: blur(8px);
+      }
+
+      .lobby__title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #c9a84c;
+      }
+
+      /* ─── PLAYERS LIST ─── */
+      .lobby__players {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .lobby__player {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #e8dcc8;
+        padding: 8px 14px;
+        background: rgba(45, 24, 16, 0.6);
+        border: 1px solid #4a2c1e;
+        border-radius: 6px;
+      }
+
+      .lobby__player--empty {
+        color: #8a7e6e;
+        font-weight: 400;
+        font-style: italic;
+      }
+
+      /* ═══════════════════════════════════════════════════════
+     INVITE CODE SECTION — the star of this mockup
+     ═══════════════════════════════════════════════════════ */
+
+      .invite-section {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      .invite-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #8a7e6e;
+        font-weight: 500;
+      }
+
+      /* The code display — "casino chip" treatment */
+      .invite-code {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 14px 16px;
+        background:
+          linear-gradient(135deg, rgba(201, 168, 76, 0.08) 0%, transparent 50%),
+          rgba(45, 24, 16, 0.8);
+        border: 2px solid #c9a84c;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        /* Chip-edge pattern via box-shadow */
+        box-shadow:
+          inset 0 0 0 3px rgba(20, 12, 8, 0.9),
+          inset 0 0 0 5px rgba(201, 168, 76, 0.3),
+          0 4px 16px rgba(0, 0, 0, 0.4);
+      }
+
+      .invite-code:hover {
+        border-color: #d4b45a;
+        box-shadow:
+          inset 0 0 0 3px rgba(20, 12, 8, 0.9),
+          inset 0 0 0 5px rgba(201, 168, 76, 0.4),
+          0 4px 20px rgba(201, 168, 76, 0.15);
+      }
+
+      .invite-code:active {
+        transform: scale(0.97);
+        border-color: #c9a84c;
+      }
+
+      .invite-code__text {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        color: #c9a84c;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        /* Only show first 8 chars of UUID for readability */
+      }
+
+      .invite-code__icon {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 18px;
+        height: 18px;
+        opacity: 0.6;
+      }
+
+      .invite-code__icon svg {
+        width: 100%;
+        height: 100%;
+        fill: none;
+        stroke: #e8dcc8;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      /* Tap feedback — gold flash */
+      .invite-code--copied {
+        border-color: #c9a84c !important;
+        animation: goldFlash 0.4s ease;
+      }
+
+      @keyframes goldFlash {
+        0% {
+          background-color: rgba(201, 168, 76, 0.2);
+        }
+        100% {
+          background-color: rgba(45, 24, 16, 0.8);
+        }
+      }
+
+      .invite-code__toast {
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.72rem;
+        color: #c9a84c;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .invite-code__toast--visible {
+        opacity: 1;
+      }
+
+      /* "or share the link" secondary action */
+      .invite-link-btn {
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: #e8dcc8;
+        background: transparent;
+        border: 1.5px solid #8a7e6e;
+        border-radius: 6px;
+        padding: 8px 16px;
+        cursor: pointer;
+        transition: all 0.15s;
+        width: 100%;
+      }
+
+      .invite-link-btn:hover {
+        border-color: #e8dcc8;
+        background: rgba(232, 220, 200, 0.06);
+      }
+
+      /* ─── START BUTTON ─── */
+      .lobby__btn-start {
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        background: #c9a84c;
+        color: #1a0f06;
+        width: 100%;
+        transition: background 0.15s;
+      }
+
+      .lobby__btn-start:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .lobby__btn-start:not(:disabled):hover {
+        background: #d4b45a;
+      }
+
+      /* ═══════════════════════════════════════════════════════
+     OPTION B: "Minimal Badge" variation
+     Code shown as a smaller inline badge above the copy button
+     ═══════════════════════════════════════════════════════ */
+
+      .phone-frame--b .invite-section {
+        gap: 8px;
+      }
+
+      .invite-code--minimal {
+        padding: 10px 16px;
+        background: rgba(45, 24, 16, 0.6);
+        border: 1.5px solid rgba(201, 168, 76, 0.5);
+        border-radius: 8px;
+        box-shadow: none;
+        width: auto;
+        min-width: 200px;
+      }
+
+      .invite-code--minimal .invite-code__text {
+        font-size: 1.25rem;
+        letter-spacing: 0.25em;
+        color: #e8dcc8;
+      }
+
+      .invite-code--minimal:hover {
+        border-color: #c9a84c;
+        box-shadow: 0 2px 12px rgba(201, 168, 76, 0.1);
+      }
+
+      /* ═══════════════════════════════════════════════════════
+     INTERACTION STATES — shown as separate panels
+     ═══════════════════════════════════════════════════════ */
+
+      .states-row {
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 48px;
+      }
+
+      .state-card {
+        background: rgba(20, 12, 8, 0.85);
+        border: 1.5px solid #4a2c1e;
+        border-radius: 10px;
+        padding: 20px;
+        width: 260px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .state-card__label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #8a7e6e;
+        align-self: flex-start;
+      }
+
+      /* Copied state */
+      .state-copied .invite-code {
+        border-color: #c9a84c;
+        background:
+          linear-gradient(135deg, rgba(201, 168, 76, 0.15) 0%, transparent 50%),
+          rgba(45, 24, 16, 0.8);
+      }
+
+      .state-copied .invite-code__text {
+        color: #d4b45a;
+      }
+
+      /* ─── ANNOTATIONS ─── */
+      .annotation {
+        font-size: 0.65rem;
+        color: #8a7e6e;
+        text-align: center;
+        max-width: 300px;
+        line-height: 1.5;
+        margin-top: 8px;
+      }
+
+      /* ─── RESPONSIVE (meta — the mockup page itself) ─── */
+      @media (max-width: 800px) {
+        .mockup-grid {
+          flex-direction: column;
+          align-items: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p class="page-title">
+      LLD 15 — Mobile Invite Code Display — Design Mockup
+    </p>
+
+    <div class="mockup-grid">
+      <!-- ═══ OPTION A: "Casino Chip" — Bold Code Display ═══ -->
+      <div class="mockup-section">
+        <span class="mockup-label">Option A — "Casino Chip" (Recommended)</span>
+        <div class="phone-frame">
+          <div class="lobby">
+            <div class="lobby__panel">
+              <h2 class="lobby__title">Game Lobby</h2>
+
+              <div class="lobby__players">
+                <div class="lobby__player">Alice (host)</div>
+                <div class="lobby__player">Bob</div>
+                <div class="lobby__player lobby__player--empty">
+                  Waiting for player...
+                </div>
+                <div class="lobby__player lobby__player--empty">
+                  Waiting for player...
+                </div>
+              </div>
+
+              <div class="invite-section">
+                <span class="invite-label">Room Code</span>
+                <div class="invite-code" id="codeA" onclick="copyCode(this)">
+                  <span class="invite-code__text">A7F2 B9D1</span>
+                  <span class="invite-code__icon">
+                    <svg viewBox="0 0 24 24">
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                      />
+                    </svg>
+                  </span>
+                </div>
+                <span class="invite-code__toast" id="toastA"
+                  >Copied to clipboard</span
+                >
+                <button class="invite-link-btn" onclick="copyLink()">
+                  Copy Full Invite Link
+                </button>
+              </div>
+
+              <button class="lobby__btn-start" disabled>Start Game</button>
+            </div>
+          </div>
+        </div>
+        <p class="annotation">
+          Game code displayed prominently in monospace with letter-spacing for
+          easy verbal sharing.<br />
+          Tap the code to copy. Gold border + inset shadow evokes a casino chip
+          edge.<br />
+          "Copy Full Invite Link" demoted to secondary action below.
+        </p>
+      </div>
+
+      <!-- ═══ OPTION B: "Minimal Badge" — Subtler Inline Code ═══ -->
+      <div class="mockup-section">
+        <span class="mockup-label">Option B — "Minimal Badge"</span>
+        <div class="phone-frame phone-frame--b">
+          <div class="lobby">
+            <div class="lobby__panel">
+              <h2 class="lobby__title">Game Lobby</h2>
+
+              <div class="lobby__players">
+                <div class="lobby__player">Alice (host)</div>
+                <div class="lobby__player">Bob</div>
+                <div class="lobby__player lobby__player--empty">
+                  Waiting for player...
+                </div>
+                <div class="lobby__player lobby__player--empty">
+                  Waiting for player...
+                </div>
+              </div>
+
+              <div class="invite-section">
+                <span class="invite-label">Room Code — tap to copy</span>
+                <div
+                  class="invite-code invite-code--minimal"
+                  id="codeB"
+                  onclick="copyCode(this)"
+                >
+                  <span class="invite-code__text">A7F2B9D1</span>
+                </div>
+                <span class="invite-code__toast" id="toastB">Copied!</span>
+                <button class="invite-link-btn" onclick="copyLink()">
+                  Copy Invite Link
+                </button>
+              </div>
+
+              <button class="lobby__btn-start" disabled>Start Game</button>
+            </div>
+          </div>
+        </div>
+        <p class="annotation">
+          More restrained: code appears as a subtle inline badge with lighter
+          border.<br />
+          No space/grouping in the code text. Less visual weight but still
+          readable.<br />
+          Relies on label text ("tap to copy") for affordance.
+        </p>
+      </div>
+    </div>
+
+    <!-- ═══ INTERACTION STATES ═══ -->
+    <div class="states-row">
+      <div class="state-card">
+        <span class="state-card__label">Default / Idle</span>
+        <div class="invite-code" style="width: 100%">
+          <span class="invite-code__text">A7F2 B9D1</span>
+          <span class="invite-code__icon">
+            <svg viewBox="0 0 24 24">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path
+                d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+              />
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <div class="state-card state-copied">
+        <span class="state-card__label">After Tap — "Copied"</span>
+        <div class="invite-code" style="width: 100%">
+          <span class="invite-code__text">A7F2 B9D1</span>
+          <span class="invite-code__icon">
+            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>
+          </span>
+        </div>
+        <span class="invite-code__toast invite-code__toast--visible"
+          >Copied to clipboard</span
+        >
+      </div>
+
+      <div class="state-card">
+        <span class="state-card__label">Long UUID (truncated display)</span>
+        <div class="invite-code" style="width: 100%">
+          <span
+            class="invite-code__text"
+            style="font-size: 1.1rem; letter-spacing: 0.12em"
+            >a7f2b9d1-...</span
+          >
+          <span class="invite-code__icon">
+            <svg viewBox="0 0 24 24">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path
+                d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+              />
+            </svg>
+          </span>
+        </div>
+        <p class="annotation" style="margin-top: 4px">
+          If using full UUID, show first 8 chars. Copies full ID to clipboard.
+        </p>
+      </div>
+    </div>
+
+    <!-- ═══ COMPONENT SPEC NOTES ═══ -->
+    <div
+      style="
+        max-width: 700px;
+        margin: 64px auto 0;
+        padding: 24px;
+        background: rgba(20, 12, 8, 0.6);
+        border: 1px solid #4a2c1e;
+        border-radius: 8px;
+      "
+    >
+      <p
+        style="
+          font-size: 0.7rem;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: #c9a84c;
+          margin-bottom: 12px;
+          font-weight: 600;
+        "
+      >
+        Component Architecture Notes
+      </p>
+      <pre
+        style="
+          font-family: &quot;JetBrains Mono&quot;, monospace;
+          font-size: 0.72rem;
+          color: #8a7e6e;
+          line-height: 1.7;
+          white-space: pre-wrap;
+        "
+      >
+GameLobbyView.vue (updated)
+  Props: { gameId: string, players, maxPlayers, isHost, actionPending }
+  New computed: shortCode — first 8 chars of gameId, uppercased, split into 2 groups of 4
+  New method: copyGameCode() — copies shortCode, shows toast
+
+  Template additions:
+    .invite-section (replaces current .lobby__invite)
+      span.invite-label  — "Room Code"
+      .invite-code       — tap target, contains code text + copy icon
+      span.invite-toast  — "Copied to clipboard" (shown 2s after tap)
+      button.invite-link — "Copy Full Invite Link" (secondary, existing behavior)
+
+  Layout: Flexbox column, centered. Code display is full-width within panel.
+  Responsive: Already inside the lobby panel which has max-width and padding.
+             On mobile (<767px), panel padding reduces (28px 20px vs 40px 48px).
+
+State:
+  codeCopied: ref&lt;boolean&gt; — drives toast visibility + icon swap
+  setTimeout resets after 2000ms
+
+No new composables needed — purely local component state.
+  </pre
+      >
+    </div>
+
+    <script>
+      // Interactive demo — tap to copy simulation
+      function copyCode(el) {
+        const section =
+          el.closest(".invite-section") || el.closest(".state-card");
+        const text = el
+          .querySelector(".invite-code__text")
+          .textContent.replace(/\s/g, "");
+
+        // Visual feedback
+        el.classList.add("invite-code--copied");
+        setTimeout(() => el.classList.remove("invite-code--copied"), 400);
+
+        // Show toast
+        const toast = section?.querySelector(".invite-code__toast");
+        if (toast) {
+          toast.classList.add("invite-code__toast--visible");
+          setTimeout(
+            () => toast.classList.remove("invite-code__toast--visible"),
+            2000,
+          );
+        }
+
+        // Swap icon to checkmark briefly
+        const icon = el.querySelector(".invite-code__icon");
+        if (icon) {
+          const original = icon.innerHTML;
+          icon.innerHTML =
+            '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+          setTimeout(() => {
+            icon.innerHTML = original;
+          }, 2000);
+        }
+
+        // Actually copy
+        navigator.clipboard?.writeText(text).catch(() => {});
+      }
+
+      function copyLink() {
+        navigator.clipboard
+          ?.writeText("https://danbing.app/game/a7f2b9d1-xxxx-xxxx/join")
+          .catch(() => {});
+      }
+    </script>
+  </body>
+</html>

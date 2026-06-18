@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Card Selection Animation — Mobile Fix Options</title>
+    <style>
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", system-ui, sans-serif;
+        --font-card: "Libre Baskerville", Georgia, serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: #0d0d0d;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      h1 {
+        font-size: 1.4rem;
+        margin-bottom: 8px;
+        color: var(--gold-accent);
+      }
+
+      .issue-context {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 32px;
+        max-width: 700px;
+        line-height: 1.5;
+      }
+
+      .issue-context code {
+        background: rgba(201, 168, 76, 0.15);
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        color: var(--text-primary);
+      }
+
+      .options-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 32px;
+        max-width: 1200px;
+      }
+
+      .option {
+        background: var(--panel-bg);
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 24px;
+      }
+
+      .option__header {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+
+      .option__label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      .option__title {
+        font-size: 1.05rem;
+        font-weight: 600;
+      }
+
+      .option__desc {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-bottom: 16px;
+        line-height: 1.4;
+      }
+
+      .option__spec {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-bottom: 16px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 6px;
+        font-family: monospace;
+        line-height: 1.6;
+      }
+
+      /* Card hand simulation */
+      .hand-demo {
+        display: flex;
+        align-items: flex-end;
+        padding: 20px 12px 8px;
+        background: var(--felt-light);
+        border-radius: 8px;
+        border: 1.5px solid var(--table-rim-light);
+        min-height: 110px;
+        overflow-x: auto;
+        position: relative;
+      }
+
+      .hand-demo::before {
+        content: "Tap cards to test selection feel";
+        position: absolute;
+        top: 4px;
+        left: 12px;
+        font-size: 0.55rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        opacity: 0.7;
+      }
+
+      .card {
+        position: relative;
+        width: 52px;
+        height: 73px;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .card + .card {
+        margin-left: -18px;
+      }
+
+      .card__rank {
+        font-size: 0.9rem;
+        line-height: 1;
+      }
+
+      .card__suit {
+        font-size: 1.1rem;
+        line-height: 1;
+      }
+
+      .card.red .card__rank,
+      .card.red .card__suit {
+        color: var(--red-suit);
+      }
+
+      .card.black .card__rank,
+      .card.black .card__suit {
+        color: var(--black-suit);
+      }
+
+      /* Option A: Faster duration + ease-out */
+      .option-a .card {
+        transition:
+          transform 80ms ease-out,
+          box-shadow 80ms ease-out,
+          border-color 80ms ease-out;
+      }
+
+      .option-a .card.selected {
+        transform: translateY(-14px);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* Option B: Keep 150ms, change to ease-out */
+      .option-b .card {
+        transition:
+          transform 150ms ease-out,
+          box-shadow 150ms ease-out,
+          border-color 150ms ease-out;
+      }
+
+      .option-b .card.selected {
+        transform: translateY(-14px);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* Option C: Instant (no transition on mobile) */
+      .option-c .card {
+        transition: none;
+      }
+
+      .option-c .card.selected {
+        transform: translateY(-14px);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* Current (broken) for comparison */
+      .option-current .card {
+        transition:
+          transform 150ms ease,
+          box-shadow 150ms ease,
+          border-color 150ms ease;
+      }
+
+      .option-current .card.selected {
+        transform: translateY(-14px);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* Recommendation badge */
+      .recommended {
+        border-color: var(--gold-accent);
+      }
+
+      .recommended .option__label::after {
+        content: " — RECOMMENDED";
+        color: var(--gold-accent);
+      }
+
+      /* Change summary */
+      .change-summary {
+        margin-top: 32px;
+        max-width: 700px;
+        padding: 20px 24px;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 12px;
+      }
+
+      .change-summary h2 {
+        font-size: 0.9rem;
+        color: var(--gold-accent);
+        margin-bottom: 12px;
+      }
+
+      .change-summary p,
+      .change-summary li {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+
+      .change-summary ul {
+        padding-left: 20px;
+        margin-top: 8px;
+      }
+
+      .change-summary li + li {
+        margin-top: 4px;
+      }
+
+      .change-summary code {
+        background: rgba(201, 168, 76, 0.15);
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 0.72rem;
+        color: var(--text-primary);
+      }
+
+      /* Reduced motion simulation toggle */
+      .motion-toggle {
+        margin-top: 24px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .motion-toggle label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+
+      .motion-toggle input {
+        accent-color: var(--gold-accent);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Issue #24: Card Selection Animation Feels Slow on Mobile</h1>
+    <div class="issue-context">
+      <strong>Root cause:</strong> The current transition uses
+      <code>150ms ease</code> for the card lift on selection. The
+      <code>ease</code> timing function (CSS default cubic-bezier) starts slowly
+      — on a small 14px mobile lift, the first ~50ms show almost no visible
+      movement, making the tap feel unresponsive. On desktop the 20px lift over
+      150ms is perceptible enough; on mobile the shorter distance amplifies the
+      perceived lag. <br /><br />
+      <strong>Reported on:</strong> Firefox Android, 395x804 viewport.
+      <br />
+      <strong>Current code:</strong>
+      <code>transition: transform 0.15s ease</code> in GameCard.vue
+    </div>
+
+    <div class="options-grid">
+      <!-- Current (broken) -->
+      <div class="option option-current">
+        <div class="option__header">
+          <span class="option__label">Current</span>
+          <span class="option__title">150ms ease (the problem)</span>
+        </div>
+        <p class="option__desc">
+          This is what the user reported as slow. The cubic-bezier(0.25, 0.1,
+          0.25, 1.0) starts with very low velocity — the card barely moves in
+          the first 50ms after tap.
+        </p>
+        <div class="option__spec">
+          transition: transform 150ms ease;<br />
+          transform: translateY(-14px);
+        </div>
+        <div class="hand-demo" id="demo-current"></div>
+      </div>
+
+      <!-- Option A -->
+      <div class="option option-a recommended">
+        <div class="option__header">
+          <span class="option__label">Option A</span>
+          <span class="option__title">80ms ease-out</span>
+        </div>
+        <p class="option__desc">
+          Shorter duration + ease-out curve. The card jumps immediately on tap
+          (high initial velocity) then decelerates into position. Sub-100ms
+          feels instant to the human brain while still providing a subtle
+          animation rather than a hard snap.
+        </p>
+        <div class="option__spec">
+          transition: transform 80ms ease-out;<br />
+          transform: translateY(-14px);<br />
+          /* Also applies to box-shadow + border-color */
+        </div>
+        <div class="hand-demo" id="demo-a"></div>
+      </div>
+
+      <!-- Option B -->
+      <div class="option option-b">
+        <div class="option__header">
+          <span class="option__label">Option B</span>
+          <span class="option__title">150ms ease-out</span>
+        </div>
+        <p class="option__desc">
+          Same duration, different curve. The ease-out means the card responds
+          immediately (full velocity at start) then settles. More visible
+          animation than Option A but still removes the initial lag. Minimal
+          code change.
+        </p>
+        <div class="option__spec">
+          transition: transform 150ms ease-out;<br />
+          transform: translateY(-14px);
+        </div>
+        <div class="hand-demo" id="demo-b"></div>
+      </div>
+
+      <!-- Option C -->
+      <div class="option option-c">
+        <div class="option__header">
+          <span class="option__label">Option C</span>
+          <span class="option__title">No transition (instant)</span>
+        </div>
+        <p class="option__desc">
+          Zero animation on mobile. Card snaps into selected position
+          immediately. Maximum responsiveness but loses the polished feel. Good
+          if users just want speed over smoothness.
+        </p>
+        <div class="option__spec">
+          transition: none;<br />
+          transform: translateY(-14px);<br />
+          /* desktop keeps 150ms ease for mouse hover feel */
+        </div>
+        <div class="hand-demo" id="demo-c"></div>
+      </div>
+    </div>
+
+    <div class="change-summary">
+      <h2>Implementation Scope (all options)</h2>
+      <p>
+        This is a 1-variable CSS change. The fix lives entirely in
+        <code>game-variables.css</code>.
+      </p>
+      <ul>
+        <li>
+          Add <code>--card-select-duration</code> and
+          <code>--card-select-easing</code> CSS custom properties to
+          <code>:root</code>
+        </li>
+        <li>
+          Override them inside the existing
+          <code>@media (max-width: 767px)</code> block
+        </li>
+        <li>
+          Update <code>GameCard.vue</code> transition to use the variables:
+          <code
+            >transition: transform var(--card-select-duration)
+            var(--card-select-easing)</code
+          >
+        </li>
+        <li>
+          Add <code>@media (prefers-reduced-motion: reduce)</code> override:
+          <code>--card-select-duration: 0ms</code>
+        </li>
+        <li>No component logic changes, no new files, no prop changes</li>
+      </ul>
+    </div>
+
+    <script>
+      const CARDS = [
+        { rank: "3", suit: "clubs", color: "black" },
+        { rank: "5", suit: "hearts", color: "red" },
+        { rank: "7", suit: "spades", color: "black" },
+        { rank: "9", suit: "diamonds", color: "red" },
+        { rank: "J", suit: "clubs", color: "black" },
+        { rank: "Q", suit: "hearts", color: "red" },
+        { rank: "K", suit: "spades", color: "black" },
+        { rank: "A", suit: "diamonds", color: "red" },
+        { rank: "2", suit: "clubs", color: "black" },
+      ];
+
+      const SUIT_SYMBOLS = {
+        clubs: "♣",
+        diamonds: "♦",
+        hearts: "♥",
+        spades: "♠",
+      };
+
+      function createHand(containerId) {
+        const container = document.getElementById(containerId);
+        CARDS.forEach((c) => {
+          const el = document.createElement("div");
+          el.className = `card ${c.color}`;
+          el.innerHTML = `<span class="card__rank">${c.rank}</span><span class="card__suit">${SUIT_SYMBOLS[c.suit]}</span>`;
+          el.addEventListener("click", () => {
+            el.classList.toggle("selected");
+          });
+          // Also handle touch for mobile testing
+          el.addEventListener("touchend", (e) => {
+            e.preventDefault();
+            el.classList.toggle("selected");
+          });
+          container.appendChild(el);
+        });
+      }
+
+      createHand("demo-current");
+      createHand("demo-a");
+      createHand("demo-b");
+      createHand("demo-c");
+    </script>
+  </body>
+</html>
