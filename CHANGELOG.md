@@ -10,6 +10,10 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 26: Show Game Room ID / Invite Code Prominently on Mobile** — replaced the minimal "Copy Invite Link" button in the lobby with a Casino Chip–styled room code display
+  - `src/frontend/component/game/GameLobbyView.vue` — replaced `.lobby__invite` section with `.invite-section`; added `shortCode` computed (first 8 hex chars of gameId, uppercased, space-split as `A7F2 B9D1`); added `codeCopied` ref and `copyGameCode()` method (copies full UUID to clipboard, shows gold-flash + checkmark icon + toast for 2s); renamed existing `copied` ref to `linkCopied` to avoid collision; retained "Copy Full Invite Link" as secondary action; added JetBrains Mono import and full Casino Chip CSS (gold border, inset shadow, hover/active/copied states); added mobile breakpoint reducing panel padding at ≤400px
+  - `tests/frontend/GameLobbyView.test.ts` — 15 unit tests covering: `shortCode` formatting for various UUIDs, `copyGameCode` copies full UUID (not short code), `codeCopied` lifecycle (true on success, resets after 2000ms, stays true before 2000ms), clipboard error sets `errorMessage`, `copyInviteLink` regression (copies full URL, lifecycle, error handling), independent `codeCopied`/`linkCopied` state, and reactive `shortCode` recomputation
+
 - **LLD 13: Railway Sleep-on-Idle** — enable `sleepApplication: true` by removing `setInterval` loops that kept the process alive and adding turn-timer recovery on wake
   - `src/backend/engine/game-cache.ts` — replaced periodic eviction loop with lazy on-access eviction (check inactivity threshold on `get()`, sweep stale entries on `set()`)
   - `src/backend/guest/guestSessionStore.ts` — replaced periodic cleanup loop with lazy expiry deletion in `getByGame()`
