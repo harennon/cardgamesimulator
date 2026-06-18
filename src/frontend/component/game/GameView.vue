@@ -28,6 +28,7 @@
     :selection-count="selectionCount"
     :action-error="actionError"
     :action-pending="actionPending"
+    :turn-timer-seconds="turnTimerSeconds"
     @toggle-card="toggleCard"
     @play="onPlay"
     @pass="onPass"
@@ -99,6 +100,7 @@ const lobbyPlayers = ref<PlayerInfo[]>([]);
 const maxPlayers = ref(4);
 const isHost = ref(false);
 const isGuest = ref(false);
+const turnTimerSeconds = ref<number | null>(null);
 
 // REST-fetched status is used for initial CREATED render before socket connects.
 // Once useGameState receives a game:state event, status.value takes precedence.
@@ -137,6 +139,7 @@ onMounted(async () => {
       await axiosInstance.get("/api/getGameState", { params: request });
     const game = response.data.gameState;
     maxPlayers.value = game.maxPlayers;
+    turnTimerSeconds.value = game.turnTimerSeconds;
     initialPlayerIds = game.playerIds;
 
     lobbyPlayers.value = initialPlayerIds.map((id) => ({

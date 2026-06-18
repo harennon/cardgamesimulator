@@ -54,7 +54,11 @@ For **visual design exploration** (mockups — always first):
 2. Read existing frontend code to understand current component structure
 3. Produce self-contained HTML files in `design-mockups/` that demonstrate visual directions
 4. Each mockup should be a complete, viewable page (inline CSS/JS, no external deps)
-5. Serve mockups on port 8090 for browser preview
+5. Start a detached HTTP server so reviewers can browse mockups:
+   ```
+   pkill -f "http.server 8090" || true
+   python3 -m http.server 8090 --directory design-mockups &
+   ```
 6. **STOP and wait for user feedback before proceeding to LLD**
 
 For **component architecture** (LLD — only after mockup approval):
@@ -104,7 +108,7 @@ useComposableName(args)
 
 - **`/frontend-design` skill**: Invoke this skill when creating mockups. It provides aesthetic guidance (typography, color, motion, spatial composition) to avoid generic AI aesthetics.
 - **`/playground` skill**: For creating interactive HTML playgrounds with live controls — useful for tuning specific design parameters (spacing, timing, colors) after a direction is chosen. Not for initial mockup passes.
-- **Mockup server**: HTML files placed in `design-mockups/` are served at `http://localhost:8090/`. The user views them in their browser via port forwarding. Do NOT attempt to screenshot mockups programmatically — the user is the verifier.
+- **Mockup server**: Start a detached server with `python3 -m http.server 8090 --directory design-mockups &` so reviewers can browse mockups via port forwarding. Do NOT attempt to screenshot mockups programmatically — the user is the verifier.
 
 ## Tech Constraints
 
