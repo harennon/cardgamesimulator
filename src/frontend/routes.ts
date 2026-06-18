@@ -14,6 +14,30 @@ import GameView from "@/component/game/GameView.vue";
 import GuestEntryView from "@/component/GuestEntryView.vue";
 import { getSession } from "@/service/authService";
 import { restoreGuestSession } from "@/service/guestService";
+import { axiosInstance } from "@/service/http";
+import type { JoinGameRequest, JoinGameResponse } from "@shared/model";
+import type { RouteLocationNormalized, RouteLocationRaw } from "vue-router";
+
+export async function joinRouteGuard(
+  to: RouteLocationNormalized,
+): Promise<RouteLocationRaw | undefined> {
+  const session = await getSession();
+  if (!session) return undefined; // Not authenticated — show GuestEntryView
+
+  const gameId = to.params.gameId as string;
+  try {
+    const joinRequest: JoinGameRequest = { gameId };
+    await axiosInstance.post<JoinGameResponse>("/api/joinGame", joinRequest);
+    return { path: `/game/${gameId}` };
+  } catch (error: unknown) {
+    const e = error as { response?: { status?: number } };
+    if (e.response?.status === 404) {
+      return { path: "/", query: { error: "game-not-found" } };
+    }
+    // 409 (game full / already joined) or any other error: redirect to game view
+    return { path: `/game/${gameId}` };
+  }
+}
 
 const routes: RouteRecordSingleView[] = [
   { path: "/", component: HomeView, meta: { requiresAuth: false } },
@@ -32,6 +56,7 @@ const routes: RouteRecordSingleView[] = [
     component: GuestEntryView,
     meta: { requiresAuth: false },
     props: true,
+    beforeEnter: joinRouteGuard,
   },
   {
     path: "/game/:gameId",
