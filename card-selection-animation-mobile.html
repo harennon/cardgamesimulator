@@ -5,24 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Card Selection Animation — Mobile Fix Options</title>
     <style>
-      :root {
-        --felt: #1a4a2e;
-        --felt-light: #256b42;
-        --table-rim: #2d1810;
-        --table-rim-light: #4a2c1e;
-        --card-face: #faf3e8;
-        --card-shadow: rgba(0, 0, 0, 0.5);
-        --gold-accent: #c9a84c;
-        --gold-glow: rgba(201, 168, 76, 0.3);
-        --red-suit: #8b1a1a;
-        --black-suit: #1a1a1a;
-        --text-primary: #e8dcc8;
-        --text-muted: #8a7e6e;
-        --panel-bg: rgba(20, 12, 8, 0.85);
-        --font-ui: "DM Sans", system-ui, sans-serif;
-        --font-card: "Libre Baskerville", Georgia, serif;
-      }
-
       * {
         box-sizing: border-box;
         margin: 0;
@@ -30,453 +12,672 @@
       }
 
       body {
-        background: #0d0d0d;
-        color: var(--text-primary);
-        font-family: var(--font-ui);
+        font-family: "DM Sans", sans-serif;
+        background: #1a4a2e;
+        color: #e8dcc8;
         min-height: 100vh;
-        padding: 24px;
+        padding: 24px 16px;
       }
 
       h1 {
-        font-size: 1.4rem;
+        font-size: 1.2rem;
         margin-bottom: 8px;
-        color: var(--gold-accent);
+        color: #c9a84c;
       }
 
-      .issue-context {
+      .issue-summary {
+        background: rgba(20, 12, 8, 0.85);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
         font-size: 0.85rem;
-        color: var(--text-muted);
-        margin-bottom: 32px;
-        max-width: 700px;
         line-height: 1.5;
+        border: 1px solid #4a2c1e;
       }
 
-      .issue-context code {
+      .issue-summary code {
         background: rgba(201, 168, 76, 0.15);
-        padding: 1px 5px;
+        padding: 2px 6px;
         border-radius: 3px;
         font-size: 0.8rem;
-        color: var(--text-primary);
       }
 
-      .options-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-        gap: 32px;
-        max-width: 1200px;
-      }
-
-      .option {
-        background: var(--panel-bg);
-        border: 1.5px solid var(--table-rim-light);
+      .option-section {
+        background: rgba(20, 12, 8, 0.85);
         border-radius: 12px;
-        padding: 24px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #4a2c1e;
       }
 
-      .option__header {
-        display: flex;
-        align-items: baseline;
-        gap: 10px;
-        margin-bottom: 6px;
+      .option-section h2 {
+        font-size: 1rem;
+        margin-bottom: 4px;
+        color: #c9a84c;
       }
 
-      .option__label {
-        font-size: 0.7rem;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: var(--gold-accent);
-        font-weight: 600;
-      }
-
-      .option__title {
-        font-size: 1.05rem;
-        font-weight: 600;
-      }
-
-      .option__desc {
-        font-size: 0.78rem;
-        color: var(--text-muted);
+      .option-section .description {
+        font-size: 0.8rem;
+        color: #8a7e6e;
         margin-bottom: 16px;
         line-height: 1.4;
       }
 
-      .option__spec {
-        font-size: 0.72rem;
-        color: var(--text-muted);
-        margin-bottom: 16px;
+      .option-section .code-change {
+        font-size: 0.75rem;
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 4px;
         padding: 8px 12px;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 6px;
+        margin-bottom: 16px;
         font-family: monospace;
-        line-height: 1.6;
+        color: #8a7e6e;
+        overflow-x: auto;
       }
 
-      /* Card hand simulation */
+      .code-change .removed {
+        color: #e05555;
+      }
+      .code-change .added {
+        color: #55e088;
+      }
+
+      /* Hand container — simulates mobile viewport */
       .hand-demo {
         display: flex;
         align-items: flex-end;
-        padding: 20px 12px 8px;
-        background: var(--felt-light);
-        border-radius: 8px;
-        border: 1.5px solid var(--table-rim-light);
-        min-height: 110px;
+        padding: 16px 8px;
         overflow-x: auto;
-        position: relative;
+        background: rgba(26, 74, 46, 0.4);
+        border-radius: 8px;
+        min-height: 110px;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+        scrollbar-width: none;
+      }
+      .hand-demo::-webkit-scrollbar {
+        display: none;
       }
 
-      .hand-demo::before {
-        content: "Tap cards to test selection feel";
-        position: absolute;
-        top: 4px;
-        left: 12px;
-        font-size: 0.55rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--text-muted);
-        opacity: 0.7;
-      }
-
+      /* Card styling — matches production */
       .card {
         position: relative;
         width: 52px;
         height: 73px;
         border-radius: 6px;
         border: 1.5px solid #c8b89a;
-        background: var(--card-face);
+        background: #faf3e8;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        font-family: var(--font-card);
+        font-family: "Libre Baskerville", serif;
         font-weight: 700;
         user-select: none;
-        box-shadow: 2px 4px 8px var(--card-shadow);
+        box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.5);
         flex-shrink: 0;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
       }
 
       .card + .card {
         margin-left: -18px;
       }
 
-      .card__rank {
+      .card .rank {
         font-size: 0.9rem;
         line-height: 1;
       }
-
-      .card__suit {
+      .card .suit {
         font-size: 1.1rem;
         line-height: 1;
       }
 
-      .card.red .card__rank,
-      .card.red .card__suit {
-        color: var(--red-suit);
+      .card.red .rank,
+      .card.red .suit {
+        color: #8b1a1a;
+      }
+      .card.black .rank,
+      .card.black .suit {
+        color: #1a1a1a;
       }
 
-      .card.black .card__rank,
-      .card.black .card__suit {
-        color: var(--black-suit);
+      .card__corner {
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .card__corner-rank {
+        font-size: 9px;
+        line-height: 1;
+      }
+      .card__corner-suit {
+        font-size: 8px;
+        line-height: 1;
+        margin-top: -1px;
       }
 
-      /* Option A: Faster duration + ease-out */
+      /* ===== OPTION A: Current (0.15s ease) — baseline ===== */
       .option-a .card {
         transition:
-          transform 80ms ease-out,
-          box-shadow 80ms ease-out,
-          border-color 80ms ease-out;
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
       }
-
       .option-a .card.selected {
         transform: translateY(-14px);
         box-shadow:
-          0 8px 24px var(--gold-glow),
-          3px 6px 16px var(--card-shadow);
-        border-color: var(--gold-accent);
+          0 8px 24px rgba(201, 168, 76, 0.3),
+          3px 6px 16px rgba(0, 0, 0, 0.5);
+        border-color: #c9a84c;
       }
 
-      /* Option B: Keep 150ms, change to ease-out */
+      /* ===== OPTION B: Faster + ease-out (0.08s ease-out) ===== */
       .option-b .card {
         transition:
-          transform 150ms ease-out,
-          box-shadow 150ms ease-out,
-          border-color 150ms ease-out;
+          transform 0.08s ease-out,
+          box-shadow 0.08s ease-out,
+          border-color 0.08s ease-out;
+        will-change: transform;
       }
-
       .option-b .card.selected {
         transform: translateY(-14px);
         box-shadow:
-          0 8px 24px var(--gold-glow),
-          3px 6px 16px var(--card-shadow);
-        border-color: var(--gold-accent);
+          0 8px 24px rgba(201, 168, 76, 0.3),
+          3px 6px 16px rgba(0, 0, 0, 0.5);
+        border-color: #c9a84c;
       }
 
-      /* Option C: Instant (no transition on mobile) */
+      /* ===== OPTION C: Instant on mobile (no transition) ===== */
       .option-c .card {
-        transition: none;
+        transition:
+          box-shadow 0.1s ease-out,
+          border-color 0.1s ease-out;
+        will-change: transform;
       }
-
       .option-c .card.selected {
         transform: translateY(-14px);
         box-shadow:
-          0 8px 24px var(--gold-glow),
-          3px 6px 16px var(--card-shadow);
-        border-color: var(--gold-accent);
+          0 8px 24px rgba(201, 168, 76, 0.3),
+          3px 6px 16px rgba(0, 0, 0, 0.5);
+        border-color: #c9a84c;
       }
 
-      /* Current (broken) for comparison */
-      .option-current .card {
+      /* ===== OPTION D: Spring-like cubic-bezier (0.1s) ===== */
+      .option-d .card {
         transition:
-          transform 150ms ease,
-          box-shadow 150ms ease,
-          border-color 150ms ease;
+          transform 0.1s cubic-bezier(0.2, 0, 0, 1.2),
+          box-shadow 0.1s ease-out,
+          border-color 0.1s ease-out;
+        will-change: transform;
       }
-
-      .option-current .card.selected {
+      .option-d .card.selected {
         transform: translateY(-14px);
         box-shadow:
-          0 8px 24px var(--gold-glow),
-          3px 6px 16px var(--card-shadow);
-        border-color: var(--gold-accent);
+          0 8px 24px rgba(201, 168, 76, 0.3),
+          3px 6px 16px rgba(0, 0, 0, 0.5);
+        border-color: #c9a84c;
       }
 
-      /* Recommendation badge */
-      .recommended {
-        border-color: var(--gold-accent);
+      /* Comparison helper */
+      .option-label {
+        display: inline-block;
+        font-size: 0.7rem;
+        color: #c9a84c;
+        background: rgba(201, 168, 76, 0.1);
+        padding: 3px 8px;
+        border-radius: 4px;
+        margin-bottom: 8px;
       }
 
-      .recommended .option__label::after {
-        content: " — RECOMMENDED";
-        color: var(--gold-accent);
-      }
-
-      /* Change summary */
-      .change-summary {
-        margin-top: 32px;
-        max-width: 700px;
-        padding: 20px 24px;
-        background: var(--panel-bg);
-        border: 1.5px solid var(--table-rim-light);
-        border-radius: 12px;
-      }
-
-      .change-summary h2 {
-        font-size: 0.9rem;
-        color: var(--gold-accent);
-        margin-bottom: 12px;
-      }
-
-      .change-summary p,
-      .change-summary li {
-        font-size: 0.78rem;
-        color: var(--text-muted);
-        line-height: 1.6;
-      }
-
-      .change-summary ul {
-        padding-left: 20px;
+      .tap-hint {
+        font-size: 0.7rem;
+        color: #8a7e6e;
+        text-align: center;
         margin-top: 8px;
       }
 
-      .change-summary li + li {
-        margin-top: 4px;
+      .recommendation {
+        background: rgba(201, 168, 76, 0.1);
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-top: 16px;
+        font-size: 0.8rem;
+        line-height: 1.4;
       }
 
-      .change-summary code {
-        background: rgba(201, 168, 76, 0.15);
-        padding: 1px 5px;
-        border-radius: 3px;
-        font-size: 0.72rem;
-        color: var(--text-primary);
+      .recommendation strong {
+        color: #c9a84c;
       }
 
-      /* Reduced motion simulation toggle */
-      .motion-toggle {
-        margin-top: 24px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
+      .side-by-side {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 20px;
       }
 
-      .motion-toggle label {
+      @media (max-width: 500px) {
+        .side-by-side {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .perf-notes {
+        margin-top: 16px;
         font-size: 0.75rem;
-        color: var(--text-muted);
-        cursor: pointer;
+        color: #8a7e6e;
+        line-height: 1.4;
       }
-
-      .motion-toggle input {
-        accent-color: var(--gold-accent);
+      .perf-notes li {
+        margin-bottom: 4px;
+      }
+      .perf-notes li::marker {
+        color: #c9a84c;
       }
     </style>
   </head>
   <body>
     <h1>Issue #24: Card Selection Animation Feels Slow on Mobile</h1>
-    <div class="issue-context">
-      <strong>Root cause:</strong> The current transition uses
-      <code>150ms ease</code> for the card lift on selection. The
-      <code>ease</code> timing function (CSS default cubic-bezier) starts slowly
-      — on a small 14px mobile lift, the first ~50ms show almost no visible
-      movement, making the tap feel unresponsive. On desktop the 20px lift over
-      150ms is perceptible enough; on mobile the shorter distance amplifies the
-      perceived lag. <br /><br />
-      <strong>Reported on:</strong> Firefox Android, 395x804 viewport.
-      <br />
-      <strong>Current code:</strong>
-      <code>transition: transform 0.15s ease</code> in GameCard.vue
+
+    <div class="issue-summary">
+      <strong>Problem:</strong> The <code>translateY</code> transition on card
+      selection feels sluggish on mobile (Firefox Android, 395x804 viewport).<br /><br />
+      <strong>Current CSS:</strong>
+      <code>transition: transform 0.15s ease</code> on <code>.card</code><br />
+      <strong>Root causes:</strong><br />
+      1. <code>ease</code> timing function decelerates at the end — the last few
+      pixels feel slow<br />
+      2. No <code>will-change: transform</code> hint — mobile browsers may not
+      GPU-accelerate<br />
+      3. 150ms is long enough to perceive on touch (touch interaction expects
+      near-instant feedback)<br />
+      4. No <code>prefers-reduced-motion</code> media query — accessibility gap
     </div>
 
-    <div class="options-grid">
-      <!-- Current (broken) -->
-      <div class="option option-current">
-        <div class="option__header">
-          <span class="option__label">Current</span>
-          <span class="option__title">150ms ease (the problem)</span>
-        </div>
-        <p class="option__desc">
-          This is what the user reported as slow. The cubic-bezier(0.25, 0.1,
-          0.25, 1.0) starts with very low velocity — the card barely moves in
-          the first 50ms after tap.
-        </p>
-        <div class="option__spec">
-          transition: transform 150ms ease;<br />
-          transform: translateY(-14px);
-        </div>
-        <div class="hand-demo" id="demo-current"></div>
-      </div>
-
-      <!-- Option A -->
-      <div class="option option-a recommended">
-        <div class="option__header">
-          <span class="option__label">Option A</span>
-          <span class="option__title">80ms ease-out</span>
-        </div>
-        <p class="option__desc">
-          Shorter duration + ease-out curve. The card jumps immediately on tap
-          (high initial velocity) then decelerates into position. Sub-100ms
-          feels instant to the human brain while still providing a subtle
-          animation rather than a hard snap.
-        </p>
-        <div class="option__spec">
-          transition: transform 80ms ease-out;<br />
-          transform: translateY(-14px);<br />
-          /* Also applies to box-shadow + border-color */
-        </div>
-        <div class="hand-demo" id="demo-a"></div>
-      </div>
-
-      <!-- Option B -->
-      <div class="option option-b">
-        <div class="option__header">
-          <span class="option__label">Option B</span>
-          <span class="option__title">150ms ease-out</span>
-        </div>
-        <p class="option__desc">
-          Same duration, different curve. The ease-out means the card responds
-          immediately (full velocity at start) then settles. More visible
-          animation than Option A but still removes the initial lag. Minimal
-          code change.
-        </p>
-        <div class="option__spec">
-          transition: transform 150ms ease-out;<br />
-          transform: translateY(-14px);
-        </div>
-        <div class="hand-demo" id="demo-b"></div>
-      </div>
-
-      <!-- Option C -->
-      <div class="option option-c">
-        <div class="option__header">
-          <span class="option__label">Option C</span>
-          <span class="option__title">No transition (instant)</span>
-        </div>
-        <p class="option__desc">
-          Zero animation on mobile. Card snaps into selected position
-          immediately. Maximum responsiveness but loses the polished feel. Good
-          if users just want speed over smoothness.
-        </p>
-        <div class="option__spec">
-          transition: none;<br />
-          transform: translateY(-14px);<br />
-          /* desktop keeps 150ms ease for mouse hover feel */
-        </div>
-        <div class="hand-demo" id="demo-c"></div>
-      </div>
-    </div>
-
-    <div class="change-summary">
-      <h2>Implementation Scope (all options)</h2>
-      <p>
-        This is a 1-variable CSS change. The fix lives entirely in
-        <code>game-variables.css</code>.
+    <!-- OPTION A: Current Behavior (Baseline) -->
+    <div class="option-section">
+      <h2>Option A: Current Behavior (baseline)</h2>
+      <p class="description">
+        <code>transition: transform 0.15s ease</code> — the existing production
+        code. Perceptibly smooth on desktop, but the deceleration at the end of
+        <code>ease</code>
+        makes the last 3-4px of lift feel dragged out on mobile touch.
       </p>
-      <ul>
+      <div class="code-change">
+        /* GameCard.vue — no change */<br />
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color
+        0.15s ease;
+      </div>
+      <span class="option-label">Tap cards to compare</span>
+      <div class="hand-demo option-a" data-option="a">
+        <div class="card black" data-idx="0">
+          <span class="rank">3</span><span class="suit">&#9827;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">3</span
+            ><span class="card__corner-suit">&#9827;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="1">
+          <span class="rank">5</span><span class="suit">&#9830;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">5</span
+            ><span class="card__corner-suit">&#9830;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="2">
+          <span class="rank">7</span><span class="suit">&#9829;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">7</span
+            ><span class="card__corner-suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="3">
+          <span class="rank">9</span><span class="suit">&#9824;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">9</span
+            ><span class="card__corner-suit">&#9824;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="4">
+          <span class="rank">J</span><span class="suit">&#9829;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">J</span
+            ><span class="card__corner-suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="5">
+          <span class="rank">K</span><span class="suit">&#9827;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">K</span
+            ><span class="card__corner-suit">&#9827;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="6">
+          <span class="rank">A</span><span class="suit">&#9824;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">A</span
+            ><span class="card__corner-suit">&#9824;</span>
+          </div>
+        </div>
+      </div>
+      <p class="tap-hint">Tap/click cards to toggle selection</p>
+    </div>
+
+    <!-- OPTION B: Faster + ease-out -->
+    <div class="option-section">
+      <h2>Option B: Faster + ease-out (recommended)</h2>
+      <p class="description">
+        <code>transition: transform 0.08s ease-out</code> +
+        <code>will-change: transform</code>. 80ms is below the perception
+        threshold for "animation" — it feels like instant feedback with just
+        enough motion to communicate the state change.
+        <code>ease-out</code> starts fast and decelerates gently, which feels
+        responsive. <code>will-change</code> ensures GPU layer promotion.
+      </p>
+      <div class="code-change">
+        <span class="removed"
+          >- transition: transform 0.15s ease, box-shadow 0.15s ease,
+          border-color 0.15s ease;</span
+        ><br />
+        <span class="added"
+          >+ transition: transform 0.08s ease-out, box-shadow 0.08s ease-out,
+          border-color 0.08s ease-out;</span
+        ><br />
+        <span class="added">+ will-change: transform;</span>
+      </div>
+      <span class="option-label">Tap cards to compare</span>
+      <div class="hand-demo option-b" data-option="b">
+        <div class="card black" data-idx="0">
+          <span class="rank">3</span><span class="suit">&#9827;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">3</span
+            ><span class="card__corner-suit">&#9827;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="1">
+          <span class="rank">5</span><span class="suit">&#9830;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">5</span
+            ><span class="card__corner-suit">&#9830;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="2">
+          <span class="rank">7</span><span class="suit">&#9829;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">7</span
+            ><span class="card__corner-suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="3">
+          <span class="rank">9</span><span class="suit">&#9824;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">9</span
+            ><span class="card__corner-suit">&#9824;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="4">
+          <span class="rank">J</span><span class="suit">&#9829;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">J</span
+            ><span class="card__corner-suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="5">
+          <span class="rank">K</span><span class="suit">&#9827;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">K</span
+            ><span class="card__corner-suit">&#9827;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="6">
+          <span class="rank">A</span><span class="suit">&#9824;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">A</span
+            ><span class="card__corner-suit">&#9824;</span>
+          </div>
+        </div>
+      </div>
+      <p class="tap-hint">Tap/click cards to toggle selection</p>
+    </div>
+
+    <!-- OPTION C: Instant transform (no animation on position) -->
+    <div class="option-section">
+      <h2>Option C: Instant lift (no transform transition)</h2>
+      <p class="description">
+        No transition on <code>transform</code> — the card snaps up immediately
+        on tap. Only <code>box-shadow</code> and
+        <code>border-color</code> animate (0.1s) for visual polish. Most
+        game-like feel. Zero perceived delay.
+      </p>
+      <div class="code-change">
+        <span class="removed"
+          >- transition: transform 0.15s ease, box-shadow 0.15s ease,
+          border-color 0.15s ease;</span
+        ><br />
+        <span class="added"
+          >+ transition: box-shadow 0.1s ease-out, border-color 0.1s
+          ease-out;</span
+        ><br />
+        <span class="added">+ will-change: transform;</span>
+      </div>
+      <span class="option-label">Tap cards to compare</span>
+      <div class="hand-demo option-c" data-option="c">
+        <div class="card black" data-idx="0">
+          <span class="rank">3</span><span class="suit">&#9827;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">3</span
+            ><span class="card__corner-suit">&#9827;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="1">
+          <span class="rank">5</span><span class="suit">&#9830;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">5</span
+            ><span class="card__corner-suit">&#9830;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="2">
+          <span class="rank">7</span><span class="suit">&#9829;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">7</span
+            ><span class="card__corner-suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="3">
+          <span class="rank">9</span><span class="suit">&#9824;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">9</span
+            ><span class="card__corner-suit">&#9824;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="4">
+          <span class="rank">J</span><span class="suit">&#9829;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">J</span
+            ><span class="card__corner-suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="5">
+          <span class="rank">K</span><span class="suit">&#9827;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">K</span
+            ><span class="card__corner-suit">&#9827;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="6">
+          <span class="rank">A</span><span class="suit">&#9824;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">A</span
+            ><span class="card__corner-suit">&#9824;</span>
+          </div>
+        </div>
+      </div>
+      <p class="tap-hint">Tap/click cards to toggle selection</p>
+    </div>
+
+    <!-- OPTION D: Spring cubic-bezier -->
+    <div class="option-section">
+      <h2>Option D: Spring overshoot (cubic-bezier)</h2>
+      <p class="description">
+        <code>transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1.2)</code> —
+        the card lifts fast with a slight overshoot, giving a spring/bounce
+        feel. Feels playful and responsive. The overshoot (1.2 end value) adds a
+        subtle "pop" without feeling gimmicky.
+      </p>
+      <div class="code-change">
+        <span class="removed"
+          >- transition: transform 0.15s ease, box-shadow 0.15s ease,
+          border-color 0.15s ease;</span
+        ><br />
+        <span class="added"
+          >+ transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1.2), box-shadow
+          0.1s ease-out, border-color 0.1s ease-out;</span
+        ><br />
+        <span class="added">+ will-change: transform;</span>
+      </div>
+      <span class="option-label">Tap cards to compare</span>
+      <div class="hand-demo option-d" data-option="d">
+        <div class="card black" data-idx="0">
+          <span class="rank">3</span><span class="suit">&#9827;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">3</span
+            ><span class="card__corner-suit">&#9827;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="1">
+          <span class="rank">5</span><span class="suit">&#9830;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">5</span
+            ><span class="card__corner-suit">&#9830;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="2">
+          <span class="rank">7</span><span class="suit">&#9829;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">7</span
+            ><span class="card__corner-suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="3">
+          <span class="rank">9</span><span class="suit">&#9824;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">9</span
+            ><span class="card__corner-suit">&#9824;</span>
+          </div>
+        </div>
+        <div class="card red" data-idx="4">
+          <span class="rank">J</span><span class="suit">&#9829;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">J</span
+            ><span class="card__corner-suit">&#9829;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="5">
+          <span class="rank">K</span><span class="suit">&#9827;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">K</span
+            ><span class="card__corner-suit">&#9827;</span>
+          </div>
+        </div>
+        <div class="card black" data-idx="6">
+          <span class="rank">A</span><span class="suit">&#9824;</span>
+          <div class="card__corner">
+            <span class="card__corner-rank">A</span
+            ><span class="card__corner-suit">&#9824;</span>
+          </div>
+        </div>
+      </div>
+      <p class="tap-hint">Tap/click cards to toggle selection</p>
+    </div>
+
+    <!-- Recommendation -->
+    <div class="option-section">
+      <h2>Additional Changes (all options)</h2>
+      <p class="description">
+        Regardless of which animation timing is chosen, the following changes
+        should also be applied:
+      </p>
+      <div class="code-change">
+        /* game-variables.css — add prefers-reduced-motion override */<br />
+        <span class="added">+ @media (prefers-reduced-motion: reduce) {</span
+        ><br />
+        <span class="added">+ :root {</span><br />
+        <span class="added"
+          >+ --card-selected-lift: -14px; /* keep the lift visible */</span
+        ><br />
+        <span class="added">+ }</span><br />
+        <span class="added">+ }</span><br /><br />
+        /* GameCard.vue — add reduced motion */<br />
+        <span class="added">+ @media (prefers-reduced-motion: reduce) {</span
+        ><br />
+        <span class="added">+ .card { transition: none; }</span><br />
+        <span class="added">+ }</span><br /><br />
+        /* GameCard.vue — add touch-action for tap performance */<br />
+        <span class="added">+ .card--interactive {</span><br />
+        <span class="added">+ touch-action: manipulation;</span><br />
+        <span class="added">+ -webkit-tap-highlight-color: transparent;</span
+        ><br />
+        <span class="added">+ }</span>
+      </div>
+
+      <div class="recommendation">
+        <strong>Recommendation: Option B</strong> (0.08s ease-out +
+        will-change).<br /><br />
+        Rationale: 80ms is fast enough that the card feels instantly responsive
+        on touch, while retaining just enough motion to communicate the state
+        change visually. The <code>ease-out</code> curve front-loads the
+        movement so the user sees the card start lifting immediately. Combined
+        with <code>will-change: transform</code> for GPU compositing and
+        <code>touch-action: manipulation</code> to eliminate tap delay, this
+        should completely resolve the perceived sluggishness on mobile
+        Firefox.<br /><br />
+        Option C (instant) is the safest fallback if 80ms still feels slow on
+        low-end devices, but loses the subtle motion quality.
+      </div>
+
+      <ul class="perf-notes">
         <li>
-          Add <code>--card-select-duration</code> and
-          <code>--card-select-easing</code> CSS custom properties to
-          <code>:root</code>
+          <code>will-change: transform</code> promotes the card to its own
+          compositor layer — GPU-accelerated
         </li>
         <li>
-          Override them inside the existing
-          <code>@media (max-width: 767px)</code> block
+          <code>touch-action: manipulation</code> removes the 300ms tap delay on
+          mobile browsers
         </li>
         <li>
-          Update <code>GameCard.vue</code> transition to use the variables:
-          <code
-            >transition: transform var(--card-select-duration)
-            var(--card-select-easing)</code
-          >
+          <code>-webkit-tap-highlight-color: transparent</code> removes the blue
+          flash on Android Chrome/Firefox
         </li>
         <li>
-          Add <code>@media (prefers-reduced-motion: reduce)</code> override:
-          <code>--card-select-duration: 0ms</code>
+          <code>prefers-reduced-motion: reduce</code> respects user
+          accessibility settings
         </li>
-        <li>No component logic changes, no new files, no prop changes</li>
+        <li>
+          Desktop transition unchanged (0.15s ease) — only mobile gets faster
+          timing via media query, OR apply globally since 80ms still looks
+          smooth on desktop
+        </li>
       </ul>
     </div>
 
     <script>
-      const CARDS = [
-        { rank: "3", suit: "clubs", color: "black" },
-        { rank: "5", suit: "hearts", color: "red" },
-        { rank: "7", suit: "spades", color: "black" },
-        { rank: "9", suit: "diamonds", color: "red" },
-        { rank: "J", suit: "clubs", color: "black" },
-        { rank: "Q", suit: "hearts", color: "red" },
-        { rank: "K", suit: "spades", color: "black" },
-        { rank: "A", suit: "diamonds", color: "red" },
-        { rank: "2", suit: "clubs", color: "black" },
-      ];
-
-      const SUIT_SYMBOLS = {
-        clubs: "♣",
-        diamonds: "♦",
-        hearts: "♥",
-        spades: "♠",
-      };
-
-      function createHand(containerId) {
-        const container = document.getElementById(containerId);
-        CARDS.forEach((c) => {
-          const el = document.createElement("div");
-          el.className = `card ${c.color}`;
-          el.innerHTML = `<span class="card__rank">${c.rank}</span><span class="card__suit">${SUIT_SYMBOLS[c.suit]}</span>`;
-          el.addEventListener("click", () => {
-            el.classList.toggle("selected");
-          });
-          // Also handle touch for mobile testing
-          el.addEventListener("touchend", (e) => {
-            e.preventDefault();
-            el.classList.toggle("selected");
-          });
-          container.appendChild(el);
+      // Toggle card selection on click/tap
+      document.querySelectorAll(".hand-demo .card").forEach((card) => {
+        card.addEventListener("click", (e) => {
+          e.preventDefault();
+          card.classList.toggle("selected");
         });
-      }
-
-      createHand("demo-current");
-      createHand("demo-a");
-      createHand("demo-b");
-      createHand("demo-c");
+        // Prevent double-tap zoom on mobile
+        card.addEventListener("touchend", (e) => {
+          e.preventDefault();
+          card.classList.toggle("selected");
+        });
+      });
     </script>
   </body>
 </html>
