@@ -67,7 +67,6 @@ export class Server {
 
     // Set up guest session store and auth middleware (dependency injection)
     this.guestSessionStore = new GuestSessionStore();
-    this.guestSessionStore.startCleanupLoop();
     const authMiddleware = createAuthMiddleware(this.guestSessionStore);
 
     // Health endpoint — no auth, used by Railway + monitoring
@@ -137,7 +136,6 @@ export class Server {
     this.io.use(createSocketAuthMiddleware(this.guestSessionStore));
 
     const gameCache = new GameCache();
-    gameCache.startEvictionLoop();
     const statsService = new StatsService(statsRepo, this.guestSessionStore);
     const gameService = new GameService(
       gameCache,
@@ -190,7 +188,6 @@ export class Server {
   public close(force: boolean, callback: (force: boolean) => void) {
     // callback function to close dependencies
     callback(force);
-    this.guestSessionStore.stopCleanupLoop();
     this.timerProvider.cancelAll();
     this.server.close();
   }

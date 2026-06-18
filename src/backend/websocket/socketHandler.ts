@@ -184,6 +184,27 @@ async function handleGameJoin(
       });
       ack({ success: true });
     } else {
+      if (game.status === "IN_PROGRESS") {
+        // Timer recovery: if the game has a timer but no active deadline, the server
+        // likely slept and lost the in-memory timer. Treat the missed turn as expired.
+        if (
+          game.turnTimerSeconds != null &&
+          turnTimerService.getDeadline(gameId) === null &&
+          !turnTimerService.hasTimer(gameId)
+        ) {
+          turnTimerService.registerGame(gameId, {
+            turnTimerSeconds: game.turnTimerSeconds,
+          });
+          await handleTimerExpired(
+            io,
+            gameId,
+            gameService,
+            connectionManager,
+            turnTimerService,
+          );
+        }
+      }
+
       // IN_PROGRESS or COMPLETED: send current game state
       const view = await gameService.getPlayerView(gameId, userId);
       if (view) {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GameCache } from "../../src/backend/engine/game-cache.js";
 import type { InternalGameState } from "../../src/shared/engine-types.js";
 
@@ -25,10 +25,6 @@ describe("GameCache", () => {
     cache = new GameCache();
   });
 
-  afterEach(() => {
-    cache.stopEvictionLoop();
-  });
-
   describe("get", () => {
     it("returns null for a game that is not in cache", () => {
       expect(cache.get("nonexistent")).toBeNull();
@@ -38,6 +34,49 @@ describe("GameCache", () => {
       const state = makeState("game-1");
       cache.set("game-1", state);
       expect(cache.get("game-1")).toBe(state);
+    });
+
+    it("returns null and deletes an entry that has exceeded inactivityThresholdMs", () => {
+      vi.useFakeTimers();
+      const timedCache = new GameCache({ inactivityThresholdMs: 5_000 });
+      timedCache.set("stale-game", makeState("stale-game"));
+
+      vi.advanceTimersByTime(6_000);
+
+      expect(timedCache.get("stale-game")).toBeNull();
+      expect(timedCache.has("stale-game")).toBe(false);
+
+      vi.useRealTimers();
+    });
+
+    it("returns state for an entry within the inactivity threshold", () => {
+      vi.useFakeTimers();
+      const timedCache = new GameCache({ inactivityThresholdMs: 5_000 });
+      const state = makeState("active-game");
+      timedCache.set("active-game", state);
+
+      vi.advanceTimersByTime(3_000);
+
+      expect(timedCache.get("active-game")).toBe(state);
+
+      vi.useRealTimers();
+    });
+
+    it("updates lastAccessedAt on successful get, preventing expiry", () => {
+      vi.useFakeTimers();
+      const timedCache = new GameCache({ inactivityThresholdMs: 5_000 });
+      timedCache.set("active-game", makeState("active-game"));
+
+      // Access at 3s (before threshold)
+      vi.advanceTimersByTime(3_000);
+      timedCache.get("active-game");
+
+      // Advance another 4s — total 7s but last access was only 4s ago
+      vi.advanceTimersByTime(4_000);
+
+      expect(timedCache.get("active-game")).not.toBeNull();
+
+      vi.useRealTimers();
     });
   });
 
@@ -56,6 +95,26 @@ describe("GameCache", () => {
       cache.set("game-3", s2);
       expect(cache.get("game-3")).toBe(s2);
       expect(cache.getDirtyEntries()).toHaveLength(0);
+    });
+
+    it("evicts inactive entries before checking capacity", () => {
+      vi.useFakeTimers();
+      const timedCache = new GameCache({
+        maxEntries: 2,
+        inactivityThresholdMs: 5_000,
+      });
+      timedCache.set("stale-a", makeState("stale-a"));
+      timedCache.set("stale-b", makeState("stale-b"));
+
+      vi.advanceTimersByTime(6_000);
+
+      // Both entries are now stale. Adding a new one should succeed without
+      // LRU-evicting stale-a or stale-b (they get cleaned by evictInactive first).
+      timedCache.set("fresh", makeState("fresh"));
+
+      expect(timedCache.has("fresh")).toBe(true);
+
+      vi.useRealTimers();
     });
   });
 
@@ -162,8 +221,6 @@ describe("GameCache", () => {
       expect(smallCache.has("lru-1")).toBe(false);
       expect(smallCache.has("lru-2")).toBe(true);
       expect(smallCache.has("lru-3")).toBe(true);
-
-      smallCache.stopEvictionLoop();
     });
 
     it("does not evict when under max capacity", () => {
@@ -172,70 +229,39 @@ describe("GameCache", () => {
       smallCache.set("b", makeState("b"));
       expect(smallCache.has("a")).toBe(true);
       expect(smallCache.has("b")).toBe(true);
-      smallCache.stopEvictionLoop();
+    });
+
+    it("cache size never exceeds maxEntries", () => {
+      const smallCache = new GameCache({ maxEntries: 3 });
+      for (let i = 0; i < 10; i++) {
+        smallCache.set(`game-${i}`, makeState(`game-${i}`));
+      }
+      // We verify this by checking that only 3 are in cache (no public size accessor,
+      // but getDirtyEntries + set pattern verifies capacity constraint via LRU eviction)
+      let count = 0;
+      for (let i = 0; i < 10; i++) {
+        if (smallCache.has(`game-${i}`)) count++;
+      }
+      expect(count).toBe(3);
     });
   });
 
-  describe("inactivity eviction", () => {
-    it("evicts entries that have not been accessed within inactivityThresholdMs", () => {
+  describe("no active handles after construction", () => {
+    it("does not create a setInterval during construction", () => {
+      // If a setInterval were created, fake timers would fire it.
+      // We verify no timer-driven side-effects occur by confirming
+      // the cache behaves purely lazily with fake timers.
       vi.useFakeTimers();
+      const timedCache = new GameCache({ inactivityThresholdMs: 1_000 });
+      timedCache.set("g", makeState("g"));
 
-      const timedCache = new GameCache({
-        evictionCheckIntervalMs: 1_000,
-        inactivityThresholdMs: 5_000,
-      });
+      // Advance time without calling get — entry should still be in has()
+      vi.advanceTimersByTime(5_000);
+      // has() doesn't check expiry (it's a raw map check), so it returns true
+      expect(timedCache.has("g")).toBe(true);
+      // get() is what triggers lazy eviction
+      expect(timedCache.get("g")).toBeNull();
 
-      timedCache.set("stale-game", makeState("stale-game"));
-      timedCache.startEvictionLoop();
-
-      // Advance past the inactivity threshold and the eviction check interval
-      vi.advanceTimersByTime(7_000);
-
-      expect(timedCache.has("stale-game")).toBe(false);
-
-      timedCache.stopEvictionLoop();
-      vi.useRealTimers();
-    });
-
-    it("does not evict recently accessed entries", () => {
-      vi.useFakeTimers();
-
-      const timedCache = new GameCache({
-        evictionCheckIntervalMs: 1_000,
-        inactivityThresholdMs: 5_000,
-      });
-
-      timedCache.set("active-game", makeState("active-game"));
-      timedCache.startEvictionLoop();
-
-      // Access at 3s (before threshold)
-      vi.advanceTimersByTime(3_000);
-      timedCache.get("active-game");
-
-      // Advance another 4s — total 7s but last access was only 4s ago
-      vi.advanceTimersByTime(4_000);
-
-      expect(timedCache.has("active-game")).toBe(true);
-
-      timedCache.stopEvictionLoop();
-      vi.useRealTimers();
-    });
-  });
-
-  describe("startEvictionLoop / stopEvictionLoop", () => {
-    it("stopEvictionLoop is safe to call when not started", () => {
-      expect(() => cache.stopEvictionLoop()).not.toThrow();
-    });
-
-    it("startEvictionLoop is idempotent", () => {
-      vi.useFakeTimers();
-      const timedCache = new GameCache({
-        evictionCheckIntervalMs: 1_000,
-        inactivityThresholdMs: 5_000,
-      });
-      timedCache.startEvictionLoop();
-      timedCache.startEvictionLoop(); // should not throw or double-register
-      timedCache.stopEvictionLoop();
       vi.useRealTimers();
     });
   });

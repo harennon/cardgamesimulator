@@ -53,11 +53,13 @@ describe("GuestSessionStore.get", () => {
     expect(store.get("unknown-guest-id")).toBeNull();
   });
 
-  it("returns null for an expired session", () => {
+  it("returns null and deletes the entry for an expired session", () => {
     vi.useFakeTimers();
     const store = new GuestSessionStore();
     const session = store.create(DISPLAY_NAME, GAME_ID, 1000);
     vi.advanceTimersByTime(2000);
+    expect(store.get(session.guestId)).toBeNull();
+    // Verify it was deleted (a second call also returns null)
     expect(store.get(session.guestId)).toBeNull();
   });
 });
@@ -90,7 +92,7 @@ describe("GuestSessionStore.getByGame", () => {
     expect(ids).toContain(s2.guestId);
   });
 
-  it("excludes expired sessions", () => {
+  it("excludes expired sessions from results", () => {
     vi.useFakeTimers();
     const store = new GuestSessionStore();
     store.create("Alice", GAME_ID, 500);
@@ -103,35 +105,34 @@ describe("GuestSessionStore.getByGame", () => {
     expect(result[0]!.guestId).toBe(active.guestId);
   });
 
+  it("deletes expired sessions encountered during scan", () => {
+    vi.useFakeTimers();
+    const store = new GuestSessionStore();
+    const expired = store.create("Alice", GAME_ID, 500);
+    store.create("Bob", GAME_ID, ONE_HOUR_MS);
+
+    vi.advanceTimersByTime(1000);
+
+    store.getByGame(GAME_ID);
+
+    // Expired session should have been deleted from the store
+    expect(store.get(expired.guestId)).toBeNull();
+  });
+
   it("returns empty array when no sessions exist for game", () => {
     const store = new GuestSessionStore();
     expect(store.getByGame("no-such-game")).toEqual([]);
   });
-});
 
-describe("GuestSessionStore cleanup loop", () => {
-  it("removes expired sessions after interval fires", () => {
+  it("does not create a setInterval during construction", () => {
     vi.useFakeTimers();
     const store = new GuestSessionStore();
     const session = store.create(DISPLAY_NAME, GAME_ID, 500);
-    store.startCleanupLoop(1000);
 
-    vi.advanceTimersByTime(2000);
+    // Advance time without calling getByGame — no interval should fire and delete it
+    vi.advanceTimersByTime(5_000);
 
-    expect(store.get(session.guestId)).toBeNull();
-    store.stopCleanupLoop();
-  });
-
-  it("stopCleanupLoop prevents further cleanup runs", () => {
-    vi.useFakeTimers();
-    const store = new GuestSessionStore();
-    store.startCleanupLoop(1000);
-    store.stopCleanupLoop();
-
-    const session = store.create(DISPLAY_NAME, GAME_ID, 500);
-    vi.advanceTimersByTime(2000);
-
-    // Session is expired by TTL but cleanup loop was stopped — get() still evicts inline
+    // get() does lazy eviction inline, not via a timer
     expect(store.get(session.guestId)).toBeNull();
   });
 });

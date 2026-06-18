@@ -13,6 +13,24 @@ import type {
   LobbyPlayerJoinedPayload,
 } from "../../src/shared/socket-events.js";
 
+vi.mock("../../src/backend/engine/game-engine-factory.js", () => {
+  const mockEngine = {
+    gameType: "big2",
+    getPlayerView: vi.fn().mockReturnValue({ players: [] }),
+    getSpectatorView: vi.fn().mockReturnValue({ players: [] }),
+    getAutoTimeoutAction: vi.fn().mockReturnValue({
+      type: "pass",
+      playerId: "host-id",
+    }),
+  };
+  return {
+    engineFactory: {
+      getEngine: vi.fn().mockReturnValue(mockEngine),
+      hasEngine: vi.fn().mockReturnValue(true),
+    },
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -409,5 +427,150 @@ describe("socketHandler handleGameJoin — CREATED branch", () => {
     );
     // Falls back to playerId when displayName is absent from playerDisplayNames
     expect(noNamePlayer?.displayName).toBe("no-name-id");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Timer recovery tests
+// ---------------------------------------------------------------------------
+
+describe("socketHandler handleGameJoin — timer recovery on wake", () => {
+  let gameService: GameService;
+  let connectionManager: ConnectionManager;
+  let turnTimerService: TurnTimerService;
+
+  beforeEach(() => {
+    connectionManager = makeConnectionManager();
+    gameService = {
+      getGame: vi.fn(),
+      getGameState: vi.fn().mockResolvedValue(null),
+      getPlayerView: vi.fn().mockResolvedValue(null),
+      getSpectatorView: vi.fn().mockResolvedValue(null),
+      applyAction: vi.fn().mockResolvedValue(undefined),
+      startGame: vi.fn(),
+    } as unknown as GameService;
+  });
+
+  it("registers game timer and triggers timeout when IN_PROGRESS game has no active timer", async () => {
+    // Timer has no deadline (lost during sleep) and no registered config
+    turnTimerService = {
+      getDeadline: vi.fn().mockReturnValue(null),
+      hasTimer: vi.fn().mockReturnValue(false),
+      registerGame: vi.fn(),
+      startTurn: vi.fn(),
+      unregisterGame: vi.fn(),
+    } as unknown as TurnTimerService;
+
+    const game = makeGame({ status: "IN_PROGRESS", turnTimerSeconds: 30 });
+    (gameService.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(game);
+
+    // getGameState returns an IN_PROGRESS state so handleTimerExpired can proceed
+    const inProgressState = {
+      gameId: "game-1",
+      gameType: "big2",
+      status: "IN_PROGRESS",
+      version: 1,
+      players: [{ playerId: "host-id" }, { playerId: "joiner-id" }],
+      currentPlayerIndex: 0,
+      turnNumber: 1,
+      gameSpecificState: null,
+      winner: null,
+      scores: null,
+      randomSeed: "test-seed",
+    };
+    (gameService.getGameState as ReturnType<typeof vi.fn>).mockResolvedValue(
+      inProgressState,
+    );
+
+    const { socket } = makeSocket("host-id", "Host");
+    const { fireGameJoin } = setupHandlers(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    await fireGameJoin(socket, "game-1", () => {});
+
+    expect(turnTimerService.registerGame).toHaveBeenCalledWith("game-1", {
+      turnTimerSeconds: 30,
+    });
+    expect(gameService.applyAction).toHaveBeenCalled();
+  });
+
+  it("does not register timer when timer is already active (second reconnect)", async () => {
+    // Timer is already registered (deadline exists, hasTimer returns true)
+    turnTimerService = {
+      getDeadline: vi.fn().mockReturnValue(Date.now() + 15_000),
+      hasTimer: vi.fn().mockReturnValue(true),
+      registerGame: vi.fn(),
+      startTurn: vi.fn(),
+      unregisterGame: vi.fn(),
+    } as unknown as TurnTimerService;
+
+    const game = makeGame({ status: "IN_PROGRESS", turnTimerSeconds: 30 });
+    (gameService.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(game);
+
+    const { socket } = makeSocket("host-id", "Host");
+    const { fireGameJoin } = setupHandlers(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    await fireGameJoin(socket, "game-1", () => {});
+
+    expect(turnTimerService.registerGame).not.toHaveBeenCalled();
+    expect(gameService.applyAction).not.toHaveBeenCalled();
+  });
+
+  it("does not trigger recovery for a COMPLETED game", async () => {
+    turnTimerService = {
+      getDeadline: vi.fn().mockReturnValue(null),
+      hasTimer: vi.fn().mockReturnValue(false),
+      registerGame: vi.fn(),
+      startTurn: vi.fn(),
+      unregisterGame: vi.fn(),
+    } as unknown as TurnTimerService;
+
+    const game = makeGame({ status: "COMPLETED", turnTimerSeconds: 30 });
+    (gameService.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(game);
+
+    const { socket } = makeSocket("host-id", "Host");
+    const { fireGameJoin } = setupHandlers(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    await fireGameJoin(socket, "game-1", () => {});
+
+    expect(turnTimerService.registerGame).not.toHaveBeenCalled();
+    expect(gameService.applyAction).not.toHaveBeenCalled();
+  });
+
+  it("does not trigger recovery when game has no timer configured", async () => {
+    turnTimerService = {
+      getDeadline: vi.fn().mockReturnValue(null),
+      hasTimer: vi.fn().mockReturnValue(false),
+      registerGame: vi.fn(),
+      startTurn: vi.fn(),
+      unregisterGame: vi.fn(),
+    } as unknown as TurnTimerService;
+
+    // turnTimerSeconds is null — no timer configured
+    const game = makeGame({ status: "IN_PROGRESS", turnTimerSeconds: null });
+    (gameService.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(game);
+
+    const { socket } = makeSocket("host-id", "Host");
+    const { fireGameJoin } = setupHandlers(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    await fireGameJoin(socket, "game-1", () => {});
+
+    expect(turnTimerService.registerGame).not.toHaveBeenCalled();
+    expect(gameService.applyAction).not.toHaveBeenCalled();
   });
 });

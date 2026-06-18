@@ -94,8 +94,6 @@ const nullStore = {
   get: (): null => null,
   delete: (): void => undefined,
   getByGame: (): never[] => [],
-  startCleanupLoop: (): void => undefined,
-  stopCleanupLoop: (): void => undefined,
 } as unknown as GuestSessionStore;
 
 /**

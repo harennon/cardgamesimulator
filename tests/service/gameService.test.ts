@@ -165,7 +165,6 @@ describe("GameService", () => {
 
       expect(result).toBe(state);
       expect(repo.getGame).not.toHaveBeenCalled();
-      cache.stopEvictionLoop();
     });
 
     it("loads from DB and caches when cache misses", async () => {
@@ -187,7 +186,6 @@ describe("GameService", () => {
       // Subsequent call should hit cache
       await service.getGameState("game-1");
       expect(repo.getGame).toHaveBeenCalledTimes(1);
-      cache.stopEvictionLoop();
     });
 
     it("returns null when the game does not exist in DB", async () => {
@@ -199,7 +197,6 @@ describe("GameService", () => {
       const result = await service.getGameState("nonexistent");
 
       expect(result).toBeNull();
-      cache.stopEvictionLoop();
     });
 
     it("returns null when the game exists but has no state (not started)", async () => {
@@ -212,7 +209,6 @@ describe("GameService", () => {
       const result = await service.getGameState("game-1");
 
       expect(result).toBeNull();
-      cache.stopEvictionLoop();
     });
   });
 
@@ -234,7 +230,6 @@ describe("GameService", () => {
       expect(engine.initialize).toHaveBeenCalled();
       expect(repo.saveGame).toHaveBeenCalled();
       expect(cache.get("game-1")).toBe(initialState);
-      cache.stopEvictionLoop();
     });
 
     it("throws GAME_NOT_FOUND when the game does not exist", async () => {
@@ -246,7 +241,6 @@ describe("GameService", () => {
       await expect(service.startGame("missing", "player-a")).rejects.toThrow(
         "GAME_NOT_FOUND",
       );
-      cache.stopEvictionLoop();
     });
 
     it("throws GAME_ALREADY_STARTED when game is not in CREATED status", async () => {
@@ -259,7 +253,6 @@ describe("GameService", () => {
       await expect(service.startGame("game-1", "player-a")).rejects.toThrow(
         "GAME_ALREADY_STARTED",
       );
-      cache.stopEvictionLoop();
     });
 
     it("throws NOT_HOST when requester is not the first player", async () => {
@@ -272,7 +265,6 @@ describe("GameService", () => {
       await expect(service.startGame("game-1", "player-b")).rejects.toThrow(
         "NOT_HOST",
       );
-      cache.stopEvictionLoop();
     });
 
     it("throws NOT_ENOUGH_PLAYERS when only one player has joined", async () => {
@@ -285,7 +277,6 @@ describe("GameService", () => {
       await expect(service.startGame("game-1", "player-a")).rejects.toThrow(
         "NOT_ENOUGH_PLAYERS",
       );
-      cache.stopEvictionLoop();
     });
   });
 
@@ -312,7 +303,6 @@ describe("GameService", () => {
       expect(result).toBe(newState);
       expect(cache.get("game-1")).toBe(newState);
       expect(repo.saveGame).toHaveBeenCalled();
-      cache.stopEvictionLoop();
     });
 
     it("throws with the engine error message on an invalid action", async () => {
@@ -338,7 +328,6 @@ describe("GameService", () => {
       // Cache must remain unchanged after a rejected action
       expect(cache.get("game-1")).toBe(state);
       expect(repo.saveGame).not.toHaveBeenCalled();
-      cache.stopEvictionLoop();
     });
 
     it("throws GAME_NOT_FOUND when no state exists", async () => {
@@ -350,7 +339,6 @@ describe("GameService", () => {
       await expect(
         service.applyAction("missing", { type: "pass", playerId: "player-a" }),
       ).rejects.toThrow("GAME_NOT_FOUND");
-      cache.stopEvictionLoop();
     });
 
     it("calls statsService.recordGameCompletion when game transitions to COMPLETED", async () => {
@@ -386,7 +374,6 @@ describe("GameService", () => {
       expect(statsService.recordGameCompletion).toHaveBeenCalledWith(
         completedState,
       );
-      cache.stopEvictionLoop();
     });
 
     it("does not call statsService.recordGameCompletion for non-COMPLETED transitions", async () => {
@@ -413,7 +400,6 @@ describe("GameService", () => {
       });
 
       expect(statsService.recordGameCompletion).not.toHaveBeenCalled();
-      cache.stopEvictionLoop();
     });
   });
 
@@ -435,7 +421,6 @@ describe("GameService", () => {
 
       expect(result).toBe(expectedView);
       expect(engine.getPlayerView).toHaveBeenCalledWith(state, "player-a");
-      cache.stopEvictionLoop();
     });
 
     it("returns null when the game has no state", async () => {
@@ -447,7 +432,6 @@ describe("GameService", () => {
       const result = await service.getPlayerView("missing", "player-a");
 
       expect(result).toBeNull();
-      cache.stopEvictionLoop();
     });
 
     it("does not include other players' cards in the returned view", async () => {
@@ -473,7 +457,6 @@ describe("GameService", () => {
       for (const p of result!.players) {
         expect((p as Record<string, unknown>).hand).toBeUndefined();
       }
-      cache.stopEvictionLoop();
     });
   });
 });

@@ -8,7 +8,6 @@ import type { PlayerId } from "@shared/engine-types";
  */
 export class GuestSessionStore {
   private readonly sessions: Map<PlayerId, GuestSession> = new Map();
-  private cleanupInterval: NodeJS.Timeout | null = null;
 
   /**
    * Create and store a new guest session. Returns the session.
@@ -51,38 +50,19 @@ export class GuestSessionStore {
     this.sessions.delete(guestId);
   }
 
-  /** Get all active guest sessions for a specific game. */
+  /** Get all active guest sessions for a specific game. Deletes expired sessions encountered during scan. */
   getByGame(gameId: string): GuestSession[] {
     const now = Date.now();
     const result: GuestSession[] = [];
-    for (const session of this.sessions.values()) {
-      if (session.gameId === gameId && now <= session.expiresAt) {
+    for (const [guestId, session] of this.sessions) {
+      if (now > session.expiresAt) {
+        this.sessions.delete(guestId);
+        continue;
+      }
+      if (session.gameId === gameId) {
         result.push(session);
       }
     }
     return result;
-  }
-
-  /** Start periodic cleanup of expired sessions (call once at server start). */
-  startCleanupLoop(intervalMs: number = 60_000): void {
-    if (this.cleanupInterval) {
-      return;
-    }
-    this.cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      for (const [guestId, session] of this.sessions) {
-        if (now > session.expiresAt) {
-          this.sessions.delete(guestId);
-        }
-      }
-    }, intervalMs);
-  }
-
-  /** Stop the cleanup loop (for graceful shutdown). */
-  stopCleanupLoop(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
   }
 }
