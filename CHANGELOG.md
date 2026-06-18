@@ -8,6 +8,12 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Fixed
+
+- **LLD 27: Card Selection Animation Feels Slow on Mobile** — card selection lift is now instant on mobile viewports (<=767px) and for users with `prefers-reduced-motion: reduce`; desktop retains the existing 150ms ease transition
+  - `src/frontend/styles/game-variables.css` — added `--card-select-duration: 150ms` and `--card-select-easing: ease` to `:root`; overridden to `0ms`/`linear` inside the existing `@media (max-width: 767px)` block and a new `@media (prefers-reduced-motion: reduce)` block
+  - `src/frontend/component/game-ui/GameCard.vue` — replaced hardcoded `transition: transform 0.15s ease, ...` with `var(--card-select-duration)` and `var(--card-select-easing)` references
+
 ### Added
 
 - **LLD 13: Railway Sleep-on-Idle** — enable `sleepApplication: true` by removing `setInterval` loops that kept the process alive and adding turn-timer recovery on wake

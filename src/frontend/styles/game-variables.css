@@ -64,6 +64,10 @@
   --mobile-opponent-height: 52px;
   --mobile-hand-height: 160px;
   --mobile-actions-height: 56px;
+
+  /* Card selection animation tokens */
+  --card-select-duration: 150ms;
+  --card-select-easing: ease;
 }
 
 @media (max-width: 767px) {
@@ -76,5 +80,14 @@
     --card-selected-lift: -14px;
     --card-hover-lift: 0px;
     --card-selected-hover-lift: -14px;
+    --card-select-duration: 0ms;
+    --card-select-easing: linear;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --card-select-duration: 0ms;
+    --card-select-easing: linear;
   }
 }
