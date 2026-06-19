@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Card Selection Animation Fix — Mobile (Issue #24)</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", Georgia, serif;
+        --card-selected-lift: -14px;
+      }
+
+      body {
+        background: var(--bg-dark);
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* Mobile frame simulation */
+      .phone-frame {
+        width: 395px;
+        max-width: 100%;
+        margin: 0 auto;
+        min-height: 100vh;
+        background: var(--felt);
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Header / context */
+      .mockup-header {
+        background: var(--panel-bg);
+        border-bottom: 1px solid var(--table-rim-light);
+        padding: 16px 16px 12px;
+      }
+
+      .mockup-header h1 {
+        font-size: 0.95rem;
+        color: var(--gold-accent);
+        font-weight: 600;
+        margin-bottom: 4px;
+        letter-spacing: -0.01em;
+      }
+
+      .mockup-header p {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+
+      .mockup-header code {
+        background: rgba(201, 168, 76, 0.12);
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 0.65rem;
+        color: var(--text-primary);
+      }
+
+      /* Tab navigation */
+      .tabs {
+        display: flex;
+        background: rgba(0, 0, 0, 0.4);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+
+      .tab {
+        flex: 1;
+        padding: 10px 8px;
+        text-align: center;
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .tab:hover {
+        color: var(--text-primary);
+      }
+
+      .tab.active {
+        color: var(--gold-accent);
+        border-bottom-color: var(--gold-accent);
+      }
+
+      .tab-label {
+        display: block;
+        font-size: 0.58rem;
+        font-weight: 400;
+        color: var(--text-muted);
+        margin-top: 2px;
+        opacity: 0.7;
+      }
+
+      /* Tab panels */
+      .tab-panel {
+        display: none;
+        padding: 0;
+      }
+
+      .tab-panel.active {
+        display: block;
+      }
+
+      /* Demo sections */
+      .demo-section {
+        padding: 16px;
+      }
+
+      .demo-label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .demo-description {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+        margin-bottom: 16px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 6px;
+        border-left: 2px solid var(--gold-accent);
+      }
+
+      /* Card hand container */
+      .hand-area {
+        background: linear-gradient(
+          180deg,
+          var(--felt) 0%,
+          var(--felt-light) 100%
+        );
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 8px;
+        padding: 24px 12px 12px;
+        min-height: 115px;
+        position: relative;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+        scrollbar-width: none;
+      }
+
+      .hand-area::-webkit-scrollbar {
+        display: none;
+      }
+
+      .hand-area::before {
+        content: attr(data-hint);
+        position: absolute;
+        top: 6px;
+        left: 12px;
+        font-size: 0.52rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        opacity: 0.6;
+      }
+
+      .hand {
+        display: flex;
+        align-items: flex-end;
+      }
+
+      /* Cards */
+      .card {
+        position: relative;
+        width: 52px;
+        height: 73px;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .card + .card {
+        margin-left: -18px;
+      }
+
+      .card__rank {
+        font-size: 0.85rem;
+        line-height: 1;
+      }
+
+      .card__suit {
+        font-size: 1.05rem;
+        line-height: 1;
+        margin-top: 1px;
+      }
+
+      .card.red .card__rank,
+      .card.red .card__suit {
+        color: var(--red-suit);
+      }
+
+      .card.black .card__rank,
+      .card.black .card__suit {
+        color: var(--black-suit);
+      }
+
+      /* --- Bug demo: simulates Vue async reactivity lag --- */
+      .panel-bug .card {
+        transition:
+          transform 0ms linear,
+          box-shadow 0ms linear,
+          border-color 0ms linear;
+      }
+
+      .panel-bug .card.selected {
+        transform: translateY(var(--card-selected-lift));
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* --- Fix A demo: rAF + will-change --- */
+      .panel-fix-a .card {
+        transition:
+          transform 0ms linear,
+          box-shadow 0ms linear,
+          border-color 0ms linear;
+        will-change: transform;
+      }
+
+      .panel-fix-a .card.selected {
+        transform: translateY(var(--card-selected-lift));
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* --- Desktop comparison: 150ms ease for reference --- */
+      .panel-desktop .card {
+        transition:
+          transform 150ms ease,
+          box-shadow 150ms ease,
+          border-color 150ms ease;
+      }
+
+      .panel-desktop .card.selected {
+        transform: translateY(-20px);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* Timing visualization */
+      .timing-diagram {
+        margin-top: 16px;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 6px;
+        border: 1px solid var(--table-rim-light);
+      }
+
+      .timing-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      .timing-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .timing-label {
+        font-size: 0.55rem;
+        color: var(--text-muted);
+        width: 70px;
+        flex-shrink: 0;
+        text-align: right;
+      }
+
+      .timing-bar-container {
+        flex: 1;
+        height: 14px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 3px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .timing-bar {
+        height: 100%;
+        border-radius: 3px;
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+
+      .timing-bar--tap {
+        width: 4px;
+        background: var(--gold-accent);
+      }
+
+      .timing-bar--microtask {
+        left: 4px;
+        width: 12px;
+        background: rgba(201, 168, 76, 0.4);
+      }
+
+      .timing-bar--raf {
+        left: 4px;
+        width: 20px;
+        background: rgba(201, 168, 76, 0.5);
+      }
+
+      .timing-bar--paint {
+        background: #4a9;
+        opacity: 0.7;
+      }
+
+      .timing-bar--paint.bug {
+        left: 50px;
+        width: 30px;
+      }
+
+      .timing-bar--paint.fix {
+        left: 24px;
+        width: 8px;
+      }
+
+      .timing-ms {
+        font-size: 0.5rem;
+        color: var(--text-muted);
+        margin-left: 4px;
+        white-space: nowrap;
+      }
+
+      /* Code diff display */
+      .code-block {
+        margin-top: 16px;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.45);
+        border-radius: 6px;
+        border: 1px solid var(--table-rim-light);
+        font-family: "SF Mono", "Fira Code", monospace;
+        font-size: 0.6rem;
+        line-height: 1.7;
+        overflow-x: auto;
+        color: var(--text-muted);
+      }
+
+      .code-block .added {
+        color: #6fbf7f;
+        background: rgba(111, 191, 127, 0.08);
+        display: block;
+        margin: 0 -12px;
+        padding: 0 12px;
+      }
+
+      .code-block .removed {
+        color: #e05555;
+        background: rgba(224, 85, 85, 0.08);
+        display: block;
+        margin: 0 -12px;
+        padding: 0 12px;
+        text-decoration: line-through;
+        opacity: 0.6;
+      }
+
+      .code-block .context {
+        display: block;
+      }
+
+      .code-block .file-label {
+        color: var(--gold-accent);
+        display: block;
+        margin-bottom: 4px;
+        font-weight: 600;
+      }
+
+      /* Latency counter */
+      .latency-counter {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 6px;
+      }
+
+      .latency-counter__label {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+      }
+
+      .latency-counter__value {
+        font-size: 0.75rem;
+        font-weight: 700;
+        font-family: "SF Mono", monospace;
+      }
+
+      .latency-counter__value--bad {
+        color: #e05555;
+      }
+
+      .latency-counter__value--good {
+        color: #6fbf7f;
+      }
+
+      /* Status badge */
+      .status-badge {
+        display: inline-block;
+        font-size: 0.55rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 3px 8px;
+        border-radius: 3px;
+        margin-left: 8px;
+      }
+
+      .status-badge--bug {
+        background: rgba(224, 85, 85, 0.15);
+        color: #e05555;
+        border: 1px solid rgba(224, 85, 85, 0.3);
+      }
+
+      .status-badge--fix {
+        background: rgba(111, 191, 127, 0.15);
+        color: #6fbf7f;
+        border: 1px solid rgba(111, 191, 127, 0.3);
+      }
+
+      .status-badge--ref {
+        background: rgba(201, 168, 76, 0.15);
+        color: var(--gold-accent);
+        border: 1px solid rgba(201, 168, 76, 0.3);
+      }
+
+      /* Summary section */
+      .summary {
+        padding: 16px;
+        margin: 16px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+      }
+
+      .summary h3 {
+        font-size: 0.75rem;
+        color: var(--gold-accent);
+        margin-bottom: 10px;
+      }
+
+      .summary ul {
+        list-style: none;
+        padding: 0;
+      }
+
+      .summary li {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+        padding-left: 14px;
+        position: relative;
+        margin-bottom: 4px;
+      }
+
+      .summary li::before {
+        content: "\2022";
+        position: absolute;
+        left: 0;
+        color: var(--gold-accent);
+      }
+
+      .summary li code {
+        background: rgba(201, 168, 76, 0.12);
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 0.62rem;
+        color: var(--text-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="phone-frame">
+      <div class="mockup-header">
+        <h1>Issue #24: Card Selection Animation Fix</h1>
+        <p>
+          <strong>Approved direction:</strong> Fix A —
+          <code>requestAnimationFrame</code> +
+          <code>will-change: transform</code> + 0ms mobile transition.<br />
+          Tap cards below to compare behavior. The bug tab simulates Vue's async
+          batching delay; the fix tab uses rAF scheduling.
+        </p>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" data-panel="panel-bug">
+          Bug<span class="tab-label">async batch</span>
+        </div>
+        <div class="tab" data-panel="panel-fix-a">
+          Fix A<span class="tab-label">rAF + will-change</span>
+        </div>
+        <div class="tab" data-panel="panel-desktop">
+          Desktop<span class="tab-label">150ms ease ref</span>
+        </div>
+      </div>
+
+      <!-- Bug Panel -->
+      <div class="tab-panel panel-bug active" id="panel-bug">
+        <div class="demo-section">
+          <div class="demo-label">
+            Current behavior (bug)
+            <span class="status-badge status-badge--bug">broken</span>
+          </div>
+          <div class="demo-description">
+            Vue's reactive update batches the Set assignment into a microtask.
+            On mobile Firefox/WebKit, the compositor sometimes skips the
+            <code>transform</code> repaint — the border-color changes
+            immediately but the translateY lift appears 1-2 frames late (16-32ms
+            visual stutter after tap).
+          </div>
+          <div
+            class="hand-area"
+            data-hint="Tap cards — notice delayed lift on some taps"
+          >
+            <div class="hand" id="hand-bug"></div>
+          </div>
+          <div class="latency-counter">
+            <span class="latency-counter__label">Avg paint delay:</span>
+            <span
+              class="latency-counter__value latency-counter__value--bad"
+              id="latency-bug"
+              >~32ms</span
+            >
+          </div>
+
+          <div class="timing-diagram">
+            <div class="timing-row">
+              <span class="timing-label">tap event</span>
+              <div class="timing-bar-container">
+                <div class="timing-bar timing-bar--tap"></div>
+              </div>
+              <span class="timing-ms">0ms</span>
+            </div>
+            <div class="timing-row">
+              <span class="timing-label">microtask</span>
+              <div class="timing-bar-container">
+                <div class="timing-bar timing-bar--microtask"></div>
+              </div>
+              <span class="timing-ms">~1ms</span>
+            </div>
+            <div class="timing-row">
+              <span class="timing-label">paint</span>
+              <div class="timing-bar-container">
+                <div class="timing-bar timing-bar--paint bug"></div>
+              </div>
+              <span class="timing-ms">~32ms (missed frame)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fix A Panel -->
+      <div class="tab-panel panel-fix-a" id="panel-fix-a">
+        <div class="demo-section">
+          <div class="demo-label">
+            Fix A: rAF + will-change
+            <span class="status-badge status-badge--fix">approved</span>
+          </div>
+          <div class="demo-description">
+            Wrapping <code>selectedIndices.value = next</code> inside
+            <code>requestAnimationFrame()</code> guarantees the DOM update lands
+            on a fresh compositor frame. Combined with
+            <code>will-change: transform</code> for GPU layer promotion, the
+            lift paints immediately on the next vsync.
+          </div>
+          <div
+            class="hand-area"
+            data-hint="Tap cards — instant lift, no stutter"
+          >
+            <div class="hand" id="hand-fix-a"></div>
+          </div>
+          <div class="latency-counter">
+            <span class="latency-counter__label">Avg paint delay:</span>
+            <span
+              class="latency-counter__value latency-counter__value--good"
+              id="latency-fix"
+              >~0ms</span
+            >
+          </div>
+
+          <div class="timing-diagram">
+            <div class="timing-row">
+              <span class="timing-label">tap event</span>
+              <div class="timing-bar-container">
+                <div class="timing-bar timing-bar--tap"></div>
+              </div>
+              <span class="timing-ms">0ms</span>
+            </div>
+            <div class="timing-row">
+              <span class="timing-label">rAF callback</span>
+              <div class="timing-bar-container">
+                <div class="timing-bar timing-bar--raf"></div>
+              </div>
+              <span class="timing-ms">~16ms (next frame)</span>
+            </div>
+            <div class="timing-row">
+              <span class="timing-label">paint</span>
+              <div class="timing-bar-container">
+                <div class="timing-bar timing-bar--paint fix"></div>
+              </div>
+              <span class="timing-ms">same frame (GPU layer)</span>
+            </div>
+          </div>
+
+          <div class="code-block">
+            <span class="file-label">// useCardSelection.ts</span>
+            <span class="context"
+              >function toggleCard(index: number): void {</span
+            >
+            <span class="context">
+              const next = new Set(selectedIndices.value);</span
+            >
+            <span class="context">
+              if (next.has(index)) next.delete(index);</span
+            >
+            <span class="context"> else next.add(index);</span>
+            <span class="removed"> selectedIndices.value = next;</span>
+            <span class="added"> requestAnimationFrame(() => {</span>
+            <span class="added"> selectedIndices.value = next;</span>
+            <span class="added"> });</span>
+            <span class="context">}</span>
+          </div>
+
+          <div class="code-block" style="margin-top: 8px">
+            <span class="file-label">// GameCard.vue &lt;style&gt;</span>
+            <span class="context">.card--interactive {</span>
+            <span class="context"> cursor: pointer;</span>
+            <span class="added"> will-change: transform;</span>
+            <span class="context">}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop Reference Panel -->
+      <div class="tab-panel panel-desktop" id="panel-desktop">
+        <div class="demo-section">
+          <div class="demo-label">
+            Desktop reference
+            <span class="status-badge status-badge--ref">unchanged</span>
+          </div>
+          <div class="demo-description">
+            On desktop, the 150ms ease transition remains. The 20px lift over
+            150ms is perceptible enough for a smooth hover/click feel. No
+            changes needed for desktop — the fix is mobile-only.
+          </div>
+          <div
+            class="hand-area"
+            data-hint="Click cards — smooth 150ms ease animation"
+          >
+            <div class="hand" id="hand-desktop"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Implementation summary -->
+      <div class="summary">
+        <h3>Implementation Summary (Fix A)</h3>
+        <ul>
+          <li>
+            <code>useCardSelection.ts</code> — wrap
+            <code>selectedIndices.value = next</code> in
+            <code>requestAnimationFrame()</code>
+          </li>
+          <li>
+            <code>GameCard.vue</code> — add
+            <code>will-change: transform</code> to
+            <code>.card--interactive</code>
+          </li>
+          <li>
+            <code>game-variables.css</code> — already done:
+            <code>--card-select-duration: 0ms</code> on mobile
+          </li>
+          <li>
+            No new props, no new components, no logic changes beyond the rAF
+            wrap
+          </li>
+          <li>
+            If rAF alone is insufficient on Samsung Firefox, add forced reflow
+            (<code>void el.offsetHeight</code>) as fallback
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      // Card data
+      const CARDS = [
+        { rank: "3", suit: "clubs", color: "black" },
+        { rank: "5", suit: "hearts", color: "red" },
+        { rank: "7", suit: "spades", color: "black" },
+        { rank: "9", suit: "diamonds", color: "red" },
+        { rank: "J", suit: "clubs", color: "black" },
+        { rank: "Q", suit: "hearts", color: "red" },
+        { rank: "K", suit: "spades", color: "black" },
+        { rank: "A", suit: "diamonds", color: "red" },
+        { rank: "2", suit: "clubs", color: "black" },
+      ];
+
+      const SUIT_SYMBOLS = {
+        clubs: "♣",
+        diamonds: "♦",
+        hearts: "♥",
+        spades: "♠",
+      };
+
+      // Tab switching
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.remove("active"));
+          document
+            .querySelectorAll(".tab-panel")
+            .forEach((p) => p.classList.remove("active"));
+          tab.classList.add("active");
+          document.getElementById(tab.dataset.panel).classList.add("active");
+        });
+      });
+
+      // Create card elements
+      function createCard(cardData) {
+        const el = document.createElement("div");
+        el.className = `card ${cardData.color}`;
+        el.innerHTML = `<span class="card__rank">${cardData.rank}</span><span class="card__suit">${SUIT_SYMBOLS[cardData.suit]}</span>`;
+        return el;
+      }
+
+      // Bug simulation: adds a random 16-32ms delay to simulate Vue microtask + compositor miss
+      function setupBugHand() {
+        const container = document.getElementById("hand-bug");
+        CARDS.forEach((c) => {
+          const el = createCard(c);
+          el.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            // Simulate Vue's async reactivity batching + compositor miss
+            const delay = 16 + Math.random() * 16; // 16-32ms
+            setTimeout(() => {
+              el.classList.toggle("selected");
+            }, delay);
+          });
+          container.appendChild(el);
+        });
+      }
+
+      // Fix A: uses requestAnimationFrame for immediate next-frame update
+      function setupFixAHand() {
+        const container = document.getElementById("hand-fix-a");
+        CARDS.forEach((c) => {
+          const el = createCard(c);
+          el.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            // Simulate the fix: rAF ensures we land on a fresh compositor frame
+            requestAnimationFrame(() => {
+              el.classList.toggle("selected");
+            });
+          });
+          container.appendChild(el);
+        });
+      }
+
+      // Desktop reference: direct toggle, CSS handles the 150ms transition
+      function setupDesktopHand() {
+        const container = document.getElementById("hand-desktop");
+        CARDS.forEach((c) => {
+          const el = createCard(c);
+          el.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            el.classList.toggle("selected");
+          });
+          container.appendChild(el);
+        });
+      }
+
+      setupBugHand();
+      setupFixAHand();
+      setupDesktopHand();
+    </script>
+  </body>
+</html>
