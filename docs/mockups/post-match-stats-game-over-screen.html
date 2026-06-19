@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Post-Match Stats — Game Over Screen</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --error-text: #e05555;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: var(--felt);
+        color: var(--text-primary);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        /* Subtle felt texture via radial grain */
+        background-image:
+          radial-gradient(
+            ellipse at 30% 20%,
+            rgba(37, 107, 66, 0.4) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            ellipse at 70% 80%,
+            rgba(37, 107, 66, 0.3) 0%,
+            transparent 50%
+          );
+      }
+
+      /* ─── Main Panel ─── */
+      .game-over {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 40px 48px;
+        width: 100%;
+        max-width: 580px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 28px;
+        backdrop-filter: blur(8px);
+        box-shadow:
+          0 24px 80px rgba(0, 0, 0, 0.5),
+          inset 0 1px 0 rgba(201, 168, 76, 0.1);
+      }
+
+      /* ─── Winner Announcement ─── */
+      .winner-section {
+        text-align: center;
+        animation: fadeInDown 0.5s ease-out;
+      }
+
+      .winner-crown {
+        font-size: 2rem;
+        margin-bottom: 8px;
+        display: block;
+        filter: drop-shadow(0 0 12px var(--gold-glow));
+      }
+
+      .winner-name {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-shadow: 0 0 24px var(--gold-glow);
+        margin: 0;
+      }
+
+      .winner-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin-top: 4px;
+      }
+
+      /* ─── Placement Table ─── */
+      .placements {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .placements thead th {
+        color: var(--gold-accent);
+        font-weight: 600;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--table-rim-light);
+        text-align: left;
+      }
+
+      .placements thead th:last-child,
+      .placements thead th:nth-child(3),
+      .placements thead th:nth-child(4) {
+        text-align: center;
+      }
+
+      .placements tbody tr {
+        transition: background 0.15s ease;
+      }
+
+      .placements tbody tr:hover {
+        background: rgba(201, 168, 76, 0.05);
+      }
+
+      .placements tbody tr.winner-row {
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      .placements tbody td {
+        padding: 10px 10px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.35);
+        font-size: 0.88rem;
+        vertical-align: middle;
+      }
+
+      .placements tbody td:last-child,
+      .placements tbody td:nth-child(3),
+      .placements tbody td:nth-child(4) {
+        text-align: center;
+      }
+
+      .placement-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 0.72rem;
+      }
+
+      .placement-badge--1 {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        box-shadow: 0 0 8px var(--gold-glow);
+      }
+
+      .placement-badge--2 {
+        background: rgba(180, 180, 180, 0.2);
+        color: #c0c0c0;
+        border: 1px solid rgba(180, 180, 180, 0.3);
+      }
+
+      .placement-badge--3 {
+        background: rgba(180, 120, 60, 0.2);
+        color: #b4783c;
+        border: 1px solid rgba(180, 120, 60, 0.3);
+      }
+
+      .placement-badge--4 {
+        background: rgba(100, 80, 60, 0.15);
+        color: var(--text-muted);
+        border: 1px solid rgba(100, 80, 60, 0.3);
+      }
+
+      .player-name {
+        font-weight: 500;
+      }
+
+      .player-name--you {
+        color: var(--gold-accent);
+      }
+
+      .player-name--you::after {
+        content: " (you)";
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        font-weight: 400;
+      }
+
+      .cards-left {
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .cards-left--zero {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      .score-pts {
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ─── Game Breakdown Section ─── */
+      .breakdown-section {
+        width: 100%;
+        border-top: 1px solid var(--table-rim-light);
+        padding-top: 20px;
+      }
+
+      .breakdown-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .breakdown-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+
+      .breakdown-toggle {
+        font-size: 0.7rem;
+        color: var(--gold-accent);
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-family: var(--font-ui);
+        padding: 2px 8px;
+        border-radius: 4px;
+        transition: background 0.15s;
+      }
+
+      .breakdown-toggle:hover {
+        background: rgba(201, 168, 76, 0.1);
+      }
+
+      .breakdown-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .breakdown-card {
+        background: rgba(45, 24, 16, 0.4);
+        border: 1px solid rgba(74, 44, 30, 0.4);
+        border-radius: 8px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .breakdown-card__label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+      }
+
+      .breakdown-card__value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .breakdown-card__value--highlight {
+        color: var(--gold-accent);
+      }
+
+      /* ─── Actions ─── */
+      .actions {
+        display: flex;
+        gap: 12px;
+        width: 100%;
+      }
+
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          transform 0.1s ease,
+          opacity 0.15s ease;
+        flex: 1;
+        text-align: center;
+      }
+
+      .btn:active {
+        transform: scale(0.97);
+      }
+
+      .btn--primary {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .btn--primary:hover {
+        background: #d4b45a;
+      }
+
+      .btn--secondary {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1.5px solid var(--text-muted);
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      .btn--tertiary {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--table-rim-light);
+        flex: unset;
+        padding: 10px 20px;
+        font-size: 0.85rem;
+      }
+
+      .btn--tertiary:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+
+      /* ─── Guest Nudge ─── */
+      .guest-nudge {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      .guest-nudge a {
+        color: var(--gold-accent);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+
+      .guest-nudge a:hover {
+        color: #d4b45a;
+      }
+
+      /* ─── Full Stats Link ─── */
+      .stats-link {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+
+      .stats-link a {
+        color: var(--gold-accent);
+        text-decoration: none;
+        border-bottom: 1px dashed rgba(201, 168, 76, 0.4);
+        transition: border-color 0.15s;
+      }
+
+      .stats-link a:hover {
+        border-bottom-color: var(--gold-accent);
+      }
+
+      /* ─── Turns badge (how many turns the game took) ─── */
+      .game-meta {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .game-meta__item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .game-meta__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--table-rim-light);
+      }
+
+      /* ─── Animations ─── */
+      @keyframes fadeInDown {
+        from {
+          opacity: 0;
+          transform: translateY(-12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .placements tbody tr {
+        animation: fadeInUp 0.4s ease-out both;
+      }
+      .placements tbody tr:nth-child(1) {
+        animation-delay: 0.1s;
+      }
+      .placements tbody tr:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .placements tbody tr:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      .placements tbody tr:nth-child(4) {
+        animation-delay: 0.4s;
+      }
+
+      .breakdown-section {
+        animation: fadeInUp 0.5s ease-out 0.5s both;
+      }
+
+      .actions {
+        animation: fadeInUp 0.4s ease-out 0.6s both;
+      }
+
+      /* ─── Mobile ─── */
+      @media (max-width: 767px) {
+        .game-over {
+          padding: 28px 20px;
+          gap: 22px;
+        }
+
+        .winner-name {
+          font-size: 1.4rem;
+        }
+
+        .placements thead th,
+        .placements tbody td {
+          padding: 8px 6px;
+          font-size: 0.8rem;
+        }
+
+        .breakdown-grid {
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .breakdown-card {
+          padding: 10px 12px;
+        }
+
+        .breakdown-card__value {
+          font-size: 1.1rem;
+        }
+
+        .actions {
+          flex-direction: column;
+        }
+
+        .btn {
+          min-height: 48px;
+          font-size: 16px;
+        }
+      }
+
+      /* ─── Demo switcher (not part of final design) ─── */
+      .demo-controls {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        display: flex;
+        gap: 8px;
+        z-index: 100;
+      }
+
+      .demo-btn {
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        padding: 6px 12px;
+        border-radius: 4px;
+        background: rgba(20, 12, 8, 0.9);
+        color: var(--text-muted);
+        border: 1px solid var(--table-rim-light);
+        cursor: pointer;
+      }
+
+      .demo-btn.active {
+        color: var(--gold-accent);
+        border-color: var(--gold-accent);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Demo controls to switch states -->
+    <div class="demo-controls">
+      <button class="demo-btn active" onclick="showState('registered')">
+        Registered User
+      </button>
+      <button class="demo-btn" onclick="showState('guest')">Guest User</button>
+      <button class="demo-btn" onclick="showState('collapsed')">
+        Stats Collapsed
+      </button>
+    </div>
+
+    <div class="game-over" id="game-over">
+      <!-- Winner Announcement -->
+      <div class="winner-section">
+        <span class="winner-crown" role="img" aria-label="trophy"
+          >&#127942;</span
+        >
+        <h1 class="winner-name">Alice wins!</h1>
+        <div class="winner-subtitle">Big 2 &mdash; 4 Players</div>
+      </div>
+
+      <!-- Game metadata -->
+      <div class="game-meta">
+        <span class="game-meta__item"
+          ><span class="game-meta__dot"></span> 23 turns</span
+        >
+        <span class="game-meta__item"
+          ><span class="game-meta__dot"></span> 4m 12s</span
+        >
+      </div>
+
+      <!-- Placement Table -->
+      <table class="placements">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Player</th>
+            <th>Cards Left</th>
+            <th>Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="winner-row">
+            <td><span class="placement-badge placement-badge--1">1</span></td>
+            <td><span class="player-name">Alice</span></td>
+            <td><span class="cards-left cards-left--zero">0</span></td>
+            <td><span class="score-pts">5</span></td>
+          </tr>
+          <tr>
+            <td><span class="placement-badge placement-badge--2">2</span></td>
+            <td><span class="player-name player-name--you">Bob</span></td>
+            <td><span class="cards-left">3</span></td>
+            <td><span class="score-pts">3</span></td>
+          </tr>
+          <tr>
+            <td><span class="placement-badge placement-badge--3">3</span></td>
+            <td><span class="player-name">Charlie</span></td>
+            <td><span class="cards-left">7</span></td>
+            <td><span class="score-pts">1</span></td>
+          </tr>
+          <tr>
+            <td><span class="placement-badge placement-badge--4">4</span></td>
+            <td><span class="player-name">Dave</span></td>
+            <td><span class="cards-left">12</span></td>
+            <td><span class="score-pts">0</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Per-game Breakdown (your stats this game) -->
+      <div class="breakdown-section" id="breakdown-section">
+        <div class="breakdown-header" onclick="toggleBreakdown()">
+          <span class="breakdown-title">Your Game Breakdown</span>
+          <button class="breakdown-toggle" id="breakdown-toggle">Hide</button>
+        </div>
+        <div class="breakdown-grid" id="breakdown-grid">
+          <div class="breakdown-card">
+            <span class="breakdown-card__label">Plays Made</span>
+            <span class="breakdown-card__value">8</span>
+          </div>
+          <div class="breakdown-card">
+            <span class="breakdown-card__label">Passes</span>
+            <span class="breakdown-card__value">4</span>
+          </div>
+          <div class="breakdown-card">
+            <span class="breakdown-card__label">Tricks Won</span>
+            <span class="breakdown-card__value breakdown-card__value--highlight"
+              >3</span
+            >
+          </div>
+          <div class="breakdown-card">
+            <span class="breakdown-card__label">Best Hand</span>
+            <span class="breakdown-card__value" style="font-size: 0.9rem"
+              >Full House</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="actions">
+        <button class="btn btn--secondary" disabled title="Coming soon">
+          Rematch
+        </button>
+        <button class="btn btn--primary">Back to Home</button>
+      </div>
+
+      <!-- View Full Stats (registered users only) -->
+      <div class="stats-link" id="stats-link">
+        <a href="/stats">View your lifetime stats &rarr;</a>
+      </div>
+
+      <!-- Guest nudge (shown only to guest users) -->
+      <div class="guest-nudge" id="guest-nudge" style="display: none">
+        <a href="/signup">Sign up to save your stats and play again later</a>
+      </div>
+    </div>
+
+    <script>
+      function toggleBreakdown() {
+        const grid = document.getElementById("breakdown-grid");
+        const toggle = document.getElementById("breakdown-toggle");
+        if (grid.style.display === "none") {
+          grid.style.display = "grid";
+          toggle.textContent = "Hide";
+        } else {
+          grid.style.display = "none";
+          toggle.textContent = "Show";
+        }
+      }
+
+      function showState(state) {
+        const statsLink = document.getElementById("stats-link");
+        const guestNudge = document.getElementById("guest-nudge");
+        const breakdownGrid = document.getElementById("breakdown-grid");
+        const breakdownToggle = document.getElementById("breakdown-toggle");
+
+        // Reset demo button styles
+        document
+          .querySelectorAll(".demo-btn")
+          .forEach((b) => b.classList.remove("active"));
+        event.target.classList.add("active");
+
+        if (state === "registered") {
+          statsLink.style.display = "";
+          guestNudge.style.display = "none";
+          breakdownGrid.style.display = "grid";
+          breakdownToggle.textContent = "Hide";
+        } else if (state === "guest") {
+          statsLink.style.display = "none";
+          guestNudge.style.display = "";
+          breakdownGrid.style.display = "grid";
+          breakdownToggle.textContent = "Hide";
+        } else if (state === "collapsed") {
+          statsLink.style.display = "";
+          guestNudge.style.display = "none";
+          breakdownGrid.style.display = "none";
+          breakdownToggle.textContent = "Show";
+        }
+      }
+    </script>
+  </body>
+</html>
