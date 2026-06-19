@@ -59,6 +59,31 @@ export async function createGameViaApi(
 }
 
 /**
+ * Creates a game via the backend REST API. Returns both gameId and joinCode.
+ */
+export async function createGameWithCodeViaApi(
+  request: APIRequestContext,
+  hostAccessToken: string,
+  options?: { maxPlayers?: number },
+): Promise<{ gameId: string; joinCode: string }> {
+  const res = await request.post(`${BACKEND_URL}/createGame`, {
+    headers: { Authorization: `Bearer ${hostAccessToken}` },
+    data: {
+      gameType: "big2",
+      maxPlayers: options?.maxPlayers ?? 4,
+      turnTimerSeconds: 30,
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `createGameWithCodeViaApi failed (${res.status()}): ${await res.text()}`,
+    );
+  }
+  const body = (await res.json()) as { gameId: string; joinCode: string };
+  return body;
+}
+
+/**
  * Joins a game via the backend REST API.
  */
 export async function joinGameViaApi(

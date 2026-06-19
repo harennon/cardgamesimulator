@@ -40,12 +40,19 @@ async function resolveGameId(param: string): Promise<string | null> {
 export async function joinRouteGuard(
   to: RouteLocationNormalized,
 ): Promise<RouteLocationRaw | undefined> {
+  const param = to.params.gameId as string;
+
+  // Resolve short codes to UUID for ALL users (guests included)
+  if (!UUID_REGEX.test(param)) {
+    const gameId = await resolveGameId(param);
+    if (!gameId) return { path: "/", query: { error: "game-not-found" } };
+    return { path: `/game/${gameId}/join` };
+  }
+
   const session = await getSession();
   if (!session) return undefined; // Not authenticated — show GuestEntryView
 
-  const param = to.params.gameId as string;
-  const gameId = await resolveGameId(param);
-  if (!gameId) return { path: "/", query: { error: "game-not-found" } };
+  const gameId = param.toLowerCase();
 
   // Redirect to canonical UUID path if entered via short code
   const canonicalPath = `/game/${gameId}`;
