@@ -1,0 +1,1328 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mobile Responsiveness — Non-Game Screens</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===== DEMO HARNESS ===== */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: #111;
+        color: #e8dcc8;
+        min-height: 100vh;
+      }
+
+      .harness {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 24px 16px;
+        gap: 24px;
+      }
+
+      .harness__title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #c9a84c;
+        text-align: center;
+        letter-spacing: 0.02em;
+      }
+
+      .harness__subtitle {
+        font-size: 0.8rem;
+        color: #8a7e6e;
+        text-align: center;
+        margin-top: -12px;
+      }
+
+      .harness__tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: center;
+        max-width: 700px;
+      }
+
+      .harness__tab {
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.75rem;
+        font-weight: 500;
+        padding: 6px 12px;
+        border: 1px solid #4a2c1e;
+        border-radius: 4px;
+        background: transparent;
+        color: #8a7e6e;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .harness__tab:hover {
+        border-color: #c9a84c;
+        color: #e8dcc8;
+      }
+
+      .harness__tab--active {
+        background: rgba(201, 168, 76, 0.15);
+        border-color: #c9a84c;
+        color: #c9a84c;
+      }
+
+      .harness__viewport-toggle {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .harness__viewport-btn {
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.7rem;
+        padding: 4px 10px;
+        border: 1px solid #4a2c1e;
+        border-radius: 4px;
+        background: transparent;
+        color: #8a7e6e;
+        cursor: pointer;
+      }
+
+      .harness__viewport-btn--active {
+        background: rgba(201, 168, 76, 0.15);
+        border-color: #c9a84c;
+        color: #c9a84c;
+      }
+
+      /* Phone frame */
+      .phone-frame {
+        width: 375px;
+        height: 667px;
+        border: 2px solid #4a2c1e;
+        border-radius: 24px;
+        overflow: hidden;
+        position: relative;
+        background: #1a4a2e;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        transition:
+          width 0.3s ease,
+          height 0.3s ease;
+      }
+
+      .phone-frame--desktop {
+        width: 1024px;
+        height: 700px;
+        border-radius: 8px;
+      }
+
+      .phone-frame__content {
+        width: 100%;
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      /* ===== DESIGN TOKENS (matching game-variables.css) ===== */
+      .phone-frame__content {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --input-border: #4a2c1e;
+        --input-border-focus: #c9a84c;
+        --input-text: #e8dcc8;
+        --input-placeholder: #8a7e6e;
+        --input-radius: 6px;
+        --btn-primary-bg: #c9a84c;
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-secondary-bg: transparent;
+        --btn-secondary-border: #8a7e6e;
+        --btn-secondary-text: #e8dcc8;
+        --btn-radius: 6px;
+        --btn-disabled-opacity: 0.4;
+        --error-text: #e05555;
+        --link-color: #c9a84c;
+        --link-hover: #d4b45a;
+        --page-max-width: 420px;
+        --card-panel-bg: rgba(20, 12, 8, 0.85);
+        --card-panel-border: #4a2c1e;
+        --card-panel-radius: 12px;
+        --card-panel-padding: 40px 48px;
+      }
+
+      /* ===== SHARED FLOW STYLES (from flows.css, adapted) ===== */
+      .flow-page {
+        min-height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+
+      .form-card {
+        background: var(--card-panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        padding: var(--card-panel-padding);
+        width: 100%;
+        max-width: var(--page-max-width);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .form-card__title {
+        font-family: var(--font-ui);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-align: center;
+        margin: 0;
+      }
+
+      .form-card__field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .form-card__label {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .form-card__input {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        padding: 10px 14px;
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: var(--input-radius);
+        color: var(--input-text);
+        outline: none;
+        transition: border-color 0.15s ease;
+      }
+
+      .form-card__input::placeholder {
+        color: var(--input-placeholder);
+      }
+
+      .form-card__input:focus {
+        border-color: var(--input-border-focus);
+      }
+
+      .btn-primary {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: var(--btn-radius);
+        border: none;
+        cursor: pointer;
+        background: var(--btn-primary-bg);
+        color: var(--btn-primary-text);
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease;
+        width: 100%;
+        text-align: center;
+        text-decoration: none;
+        display: block;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: var(--btn-primary-hover);
+      }
+
+      .btn-secondary {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 500;
+        padding: 10px 20px;
+        border-radius: var(--btn-radius);
+        border: 1.5px solid var(--btn-secondary-border);
+        background: var(--btn-secondary-bg);
+        color: var(--btn-secondary-text);
+        cursor: pointer;
+        text-decoration: none;
+        text-align: center;
+        display: block;
+        width: 100%;
+        transition:
+          border-color 0.15s ease,
+          background 0.15s ease;
+      }
+
+      .btn-secondary:hover {
+        border-color: var(--text-primary);
+        background: rgba(232, 220, 200, 0.08);
+      }
+
+      .form-card__error {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--error-text);
+        text-align: center;
+        margin: 0;
+      }
+
+      .form-card__footer {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      .form-card__footer a {
+        color: var(--link-color);
+        text-decoration: none;
+      }
+
+      .form-card__divider {
+        text-align: center;
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        position: relative;
+      }
+
+      .form-card__divider::before,
+      .form-card__divider::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        width: 35%;
+        height: 1px;
+        background: var(--table-rim-light);
+      }
+
+      .form-card__divider::before {
+        left: 0;
+      }
+      .form-card__divider::after {
+        right: 0;
+      }
+
+      /* ===== MOBILE OVERRIDES (@media max-width: 767px) ===== */
+      /* These are always active inside the phone frame demo. */
+      /* In production, these would be inside @media (max-width: 767px) { ... } */
+
+      .phone-frame .flow-page {
+        padding: 24px 16px;
+        align-items: flex-start;
+        padding-top: 48px;
+      }
+
+      .phone-frame .form-card {
+        padding: 28px 20px;
+        gap: 16px;
+        border-radius: 10px;
+      }
+
+      .phone-frame .form-card__title {
+        font-size: 1.3rem;
+      }
+
+      .phone-frame .form-card__input {
+        font-size: 16px; /* prevents iOS zoom on focus */
+        padding: 14px 14px; /* 44px+ touch target with line-height */
+        min-height: 44px;
+      }
+
+      .phone-frame .btn-primary {
+        font-size: 1rem;
+        padding: 14px 28px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .phone-frame .btn-secondary {
+        padding: 14px 20px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .phone-frame .form-card__footer {
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+
+      .phone-frame .form-card__footer a {
+        padding: 4px 0;
+        display: inline-block;
+      }
+
+      /* ===== DESKTOP MODE (undo mobile overrides) ===== */
+      .phone-frame--desktop .flow-page {
+        padding: 40px 20px;
+        align-items: center;
+        padding-top: 40px;
+      }
+
+      .phone-frame--desktop .form-card {
+        padding: 40px 48px;
+        gap: 20px;
+        border-radius: 12px;
+      }
+
+      .phone-frame--desktop .form-card__title {
+        font-size: 1.5rem;
+      }
+
+      .phone-frame--desktop .form-card__input {
+        font-size: 0.95rem;
+        padding: 10px 14px;
+        min-height: auto;
+      }
+
+      .phone-frame--desktop .btn-primary {
+        font-size: 0.95rem;
+        padding: 12px 28px;
+        min-height: auto;
+      }
+
+      .phone-frame--desktop .btn-secondary {
+        padding: 10px 20px;
+        min-height: auto;
+      }
+
+      /* ===== SCREEN-SPECIFIC STYLES ===== */
+
+      /* Home */
+      .home {
+        text-align: center;
+        width: 100%;
+        padding: 0 4px;
+      }
+
+      .home__title {
+        font-family: var(--font-ui);
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0 0 8px;
+      }
+
+      .home__subtitle {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        color: var(--text-primary);
+        margin: 0 0 28px;
+      }
+
+      .home__description {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin: 0 0 20px;
+        line-height: 1.5;
+      }
+
+      .home__actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+      }
+
+      .home__auth-prompt {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+        width: 100%;
+      }
+
+      /* Guest Entry — mobile-adapted version using form-card pattern */
+      .guest-entry .form-card {
+        padding: 28px 20px;
+      }
+
+      .guest-entry .form-card__divider {
+        margin: 4px 0;
+      }
+
+      .guest-entry .sign-in-link {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      .guest-entry .sign-in-link a {
+        color: var(--link-color);
+        text-decoration: none;
+        padding: 4px 0;
+        display: inline-block;
+      }
+
+      /* Lobby */
+      .lobby {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--felt);
+      }
+
+      .lobby__panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 40px 48px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        min-width: 360px;
+      }
+
+      /* Mobile lobby */
+      .phone-frame:not(.phone-frame--desktop) .lobby__panel {
+        padding: 24px 16px;
+        min-width: auto;
+        width: calc(100% - 32px);
+        max-width: 360px;
+        gap: 20px;
+      }
+
+      .lobby__title {
+        font-family: var(--font-ui);
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0;
+      }
+
+      .lobby__chip-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .lobby__chip-label {
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .lobby__chip {
+        font-family: "Courier New", monospace;
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: 0.3em;
+        color: var(--gold-accent);
+        background: transparent;
+        border: 3px solid var(--gold-accent);
+        border-radius: 12px;
+        padding: 10px 20px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        text-transform: uppercase;
+        line-height: 1;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .lobby__chip:active {
+        background: rgba(201, 168, 76, 0.15);
+      }
+
+      .lobby__players {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .lobby__player {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        padding: 12px 14px;
+        background: rgba(45, 24, 16, 0.6);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+      }
+
+      .lobby__player--empty {
+        color: var(--text-muted);
+        font-weight: 400;
+        font-style: italic;
+      }
+
+      .lobby__actions {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+      }
+
+      .lobby__btn--start {
+        font-family: var(--font-ui);
+        font-size: 1rem;
+        font-weight: 600;
+        padding: 14px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        width: 100%;
+        min-height: 48px;
+        transition: background 0.15s ease;
+      }
+
+      .lobby__btn--start:active {
+        background: #d4b45a;
+      }
+
+      .lobby__btn--start:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .lobby__waiting {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        font-style: italic;
+        text-align: center;
+      }
+
+      .lobby__invite {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+      }
+
+      .lobby__btn--copy {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 12px 16px;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+        cursor: pointer;
+        width: 100%;
+        min-height: 44px;
+        transition: border-color 0.15s ease;
+      }
+
+      .lobby__btn--copy:active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      .lobby__copied {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--gold-accent);
+      }
+
+      /* Desktop lobby overrides */
+      .phone-frame--desktop .lobby__panel {
+        padding: 40px 48px;
+        min-width: 360px;
+        width: auto;
+        max-width: none;
+        gap: 24px;
+      }
+
+      /* Game Over */
+      .game-over {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--felt);
+      }
+
+      .game-over__panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 40px 48px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        min-width: 400px;
+      }
+
+      /* Mobile game over */
+      .phone-frame:not(.phone-frame--desktop) .game-over__panel {
+        padding: 24px 16px;
+        min-width: auto;
+        width: calc(100% - 32px);
+        max-width: 380px;
+        gap: 20px;
+      }
+
+      .game-over__winner {
+        font-family: var(--font-ui);
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0;
+        text-shadow: 0 0 24px var(--gold-glow);
+        text-align: center;
+      }
+
+      .phone-frame--desktop .game-over__winner {
+        font-size: 2rem;
+      }
+
+      /* Score table */
+      .game-over__scores {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--text-primary);
+      }
+
+      .game-over__scores th {
+        color: var(--gold-accent);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.65rem;
+        letter-spacing: 0.06em;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--table-rim-light);
+        text-align: left;
+      }
+
+      .game-over__scores td {
+        padding: 8px 8px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+        color: var(--text-primary);
+        font-size: 0.85rem;
+      }
+
+      /* Desktop score table */
+      .phone-frame--desktop .game-over__scores th {
+        font-size: 0.75rem;
+        padding: 8px 12px;
+      }
+
+      .phone-frame--desktop .game-over__scores td {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+      }
+
+      .game-over__actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+      }
+
+      .phone-frame--desktop .game-over__actions {
+        flex-direction: row;
+        width: auto;
+        gap: 12px;
+      }
+
+      .game-over__btn {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 14px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        min-height: 48px;
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease;
+        width: 100%;
+      }
+
+      .phone-frame--desktop .game-over__btn {
+        width: auto;
+        min-height: auto;
+        padding: 10px 28px;
+      }
+
+      .game-over__btn--rematch {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1.5px solid var(--text-muted);
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      .game-over__btn--home {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .game-over__btn--home:active {
+        background: #d4b45a;
+      }
+
+      .game-over__guest-nudge {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      .game-over__guest-nudge a {
+        color: var(--gold-accent);
+        text-decoration: underline;
+        padding: 4px 0;
+        display: inline-block;
+      }
+
+      /* Desktop game over */
+      .phone-frame--desktop .game-over__panel {
+        padding: 40px 48px;
+        min-width: 400px;
+        width: auto;
+        max-width: none;
+        gap: 24px;
+      }
+
+      /* ===== SCREEN VISIBILITY ===== */
+      .screen {
+        display: none;
+        height: 100%;
+      }
+      .screen--active {
+        display: block;
+      }
+
+      /* ===== SELECT STYLE ===== */
+      .phone-frame select.form-card__input {
+        -webkit-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a7e6e' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+        padding-right: 36px;
+        min-height: 44px;
+      }
+
+      /* ===== RANGE INPUT ===== */
+      .form-card__range {
+        width: 100%;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: var(--input-bg);
+        border: 1px solid var(--input-border);
+        border-radius: 3px;
+        outline: none;
+        cursor: pointer;
+        margin: 8px 0;
+      }
+
+      .form-card__range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        cursor: pointer;
+      }
+
+      /* ===== ANNOTATIONS ===== */
+      .annotation {
+        position: absolute;
+        font-size: 0.6rem;
+        color: #c9a84c;
+        background: rgba(201, 168, 76, 0.1);
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 3px;
+        padding: 2px 6px;
+        pointer-events: none;
+        white-space: nowrap;
+        z-index: 100;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="harness">
+      <h1 class="harness__title">Mobile Responsiveness — Non-Game Screens</h1>
+      <p class="harness__subtitle">
+        LLD 30: All screens usable at 375px. Same breakpoint strategy as LLD 11
+        (max-width: 767px). CSS custom properties approach.
+      </p>
+
+      <div class="harness__tabs" id="tabs"></div>
+
+      <div class="harness__viewport-toggle">
+        <button
+          class="harness__viewport-btn harness__viewport-btn--active"
+          data-viewport="mobile"
+          onclick="setViewport('mobile')"
+        >
+          375px Mobile
+        </button>
+        <button
+          class="harness__viewport-btn"
+          data-viewport="desktop"
+          onclick="setViewport('desktop')"
+        >
+          1024px Desktop
+        </button>
+      </div>
+
+      <div class="phone-frame" id="phone-frame">
+        <div class="phone-frame__content">
+          <!-- ===== HOME (Signed In) ===== -->
+          <div class="screen" id="screen-home-signed-in">
+            <div class="flow-page">
+              <div class="home">
+                <h1 class="home__title">Card Game Simulator</h1>
+                <p class="home__subtitle">Welcome back, Alice</p>
+                <div class="home__actions">
+                  <a class="btn-primary" href="#">Create Game</a>
+                  <a class="btn-secondary" href="#">Join Game</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== HOME (Signed Out) ===== -->
+          <div class="screen" id="screen-home-signed-out">
+            <div class="flow-page">
+              <div class="home">
+                <h1 class="home__title">Card Game Simulator</h1>
+                <div class="home__auth-prompt">
+                  <p class="home__description">
+                    Play Big2 with friends. Create an account to host games, or
+                    join via an invite link as a guest.
+                  </p>
+                  <a class="btn-primary" href="#">Log In</a>
+                  <a class="btn-secondary" href="#">Sign Up</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== LOGIN ===== -->
+          <div class="screen" id="screen-login">
+            <div class="flow-page">
+              <form class="form-card" onsubmit="return false;">
+                <h2 class="form-card__title">Log In</h2>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Email</label>
+                  <input
+                    class="form-card__input"
+                    type="email"
+                    placeholder="you@example.com"
+                  />
+                </div>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Password</label>
+                  <input
+                    class="form-card__input"
+                    type="password"
+                    placeholder="Enter password"
+                  />
+                </div>
+
+                <button type="submit" class="btn-primary">Log In</button>
+
+                <p class="form-card__footer">
+                  New here? <a href="#">Create an account</a>
+                </p>
+                <p class="form-card__footer">
+                  Just want to play?
+                  <a href="#">Join as guest via invite link</a>
+                </p>
+              </form>
+            </div>
+          </div>
+
+          <!-- ===== LOGIN (Error State) ===== -->
+          <div class="screen" id="screen-login-error">
+            <div class="flow-page">
+              <form class="form-card" onsubmit="return false;">
+                <h2 class="form-card__title">Log In</h2>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Email</label>
+                  <input
+                    class="form-card__input"
+                    type="email"
+                    value="alice@example.com"
+                  />
+                </div>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Password</label>
+                  <input
+                    class="form-card__input"
+                    type="password"
+                    value="wrongpassword"
+                  />
+                </div>
+
+                <p class="form-card__error">Invalid login credentials.</p>
+
+                <button type="submit" class="btn-primary">Log In</button>
+
+                <p class="form-card__footer">
+                  New here? <a href="#">Create an account</a>
+                </p>
+              </form>
+            </div>
+          </div>
+
+          <!-- ===== GUEST ENTRY ===== -->
+          <div class="screen" id="screen-guest-entry">
+            <div class="flow-page guest-entry">
+              <form class="form-card" onsubmit="return false;">
+                <h2 class="form-card__title">Join as Guest</h2>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Choose a display name</label>
+                  <input
+                    class="form-card__input"
+                    type="text"
+                    placeholder="Enter your name"
+                    maxlength="20"
+                  />
+                </div>
+
+                <button type="submit" class="btn-primary">Join Game</button>
+
+                <div class="form-card__divider">or</div>
+
+                <a class="btn-secondary" href="#"
+                  >Sign up for stats &amp; history</a
+                >
+
+                <p class="sign-in-link">
+                  Already have an account? <a href="#">Sign in</a>
+                </p>
+              </form>
+            </div>
+          </div>
+
+          <!-- ===== CREATE GAME ===== -->
+          <div class="screen" id="screen-create-game">
+            <div class="flow-page">
+              <form class="form-card" onsubmit="return false;">
+                <h2 class="form-card__title">Create a Game</h2>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Game Type</label>
+                  <select class="form-card__input">
+                    <option>Big 2</option>
+                  </select>
+                </div>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Players: 4</label>
+                  <input
+                    class="form-card__range"
+                    type="range"
+                    min="2"
+                    max="4"
+                    value="4"
+                  />
+                </div>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Turn Timer</label>
+                  <select class="form-card__input">
+                    <option>30 seconds</option>
+                    <option selected>60 seconds</option>
+                    <option>90 seconds</option>
+                  </select>
+                </div>
+
+                <button type="submit" class="btn-primary">Create Game</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- ===== JOIN GAME ===== -->
+          <div class="screen" id="screen-join-game">
+            <div class="flow-page">
+              <form class="form-card" onsubmit="return false;">
+                <h2 class="form-card__title">Join a Game</h2>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Game Code</label>
+                  <input
+                    class="form-card__input"
+                    type="text"
+                    placeholder="Enter 4-letter room code"
+                    style="text-transform: uppercase"
+                    maxlength="4"
+                  />
+                </div>
+
+                <button type="submit" class="btn-primary">Join Game</button>
+
+                <p class="form-card__footer">
+                  Or paste an invite link directly in your browser address bar.
+                </p>
+              </form>
+            </div>
+          </div>
+
+          <!-- ===== JOIN GAME (Error State) ===== -->
+          <div class="screen" id="screen-join-game-error">
+            <div class="flow-page">
+              <form class="form-card" onsubmit="return false;">
+                <h2 class="form-card__title">Join a Game</h2>
+
+                <div class="form-card__field">
+                  <label class="form-card__label">Game Code</label>
+                  <input
+                    class="form-card__input"
+                    type="text"
+                    value="ZXQW"
+                    style="text-transform: uppercase"
+                    maxlength="4"
+                  />
+                </div>
+
+                <p class="form-card__error">Game not found.</p>
+
+                <button type="submit" class="btn-primary">Join Game</button>
+
+                <p class="form-card__footer">
+                  Or paste an invite link directly in your browser address bar.
+                </p>
+              </form>
+            </div>
+          </div>
+
+          <!-- ===== GAME LOBBY (Host) ===== -->
+          <div class="screen" id="screen-lobby-host">
+            <div class="lobby">
+              <div class="lobby__panel">
+                <h2 class="lobby__title">Game Lobby</h2>
+
+                <div class="lobby__chip-container">
+                  <span class="lobby__chip-label">ROOM CODE</span>
+                  <button class="lobby__chip">X7K2</button>
+                </div>
+
+                <div class="lobby__players">
+                  <div class="lobby__player">Alice (host)</div>
+                  <div class="lobby__player">Bob</div>
+                  <div class="lobby__player lobby__player--empty">
+                    Waiting for player...
+                  </div>
+                  <div class="lobby__player lobby__player--empty">
+                    Waiting for player...
+                  </div>
+                </div>
+
+                <div class="lobby__actions">
+                  <button class="lobby__btn--start" disabled>Start Game</button>
+                </div>
+
+                <div class="lobby__invite">
+                  <button class="lobby__btn--copy">Copy Invite Link</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== GAME LOBBY (Guest waiting) ===== -->
+          <div class="screen" id="screen-lobby-guest">
+            <div class="lobby">
+              <div class="lobby__panel">
+                <h2 class="lobby__title">Game Lobby</h2>
+
+                <div class="lobby__chip-container">
+                  <span class="lobby__chip-label">ROOM CODE</span>
+                  <button class="lobby__chip">X7K2</button>
+                </div>
+
+                <div class="lobby__players">
+                  <div class="lobby__player">Alice (host)</div>
+                  <div class="lobby__player">Bob</div>
+                  <div class="lobby__player">Charlie</div>
+                  <div class="lobby__player lobby__player--empty">
+                    Waiting for player...
+                  </div>
+                </div>
+
+                <div class="lobby__actions">
+                  <span class="lobby__waiting"
+                    >Waiting for host to start...</span
+                  >
+                </div>
+
+                <div class="lobby__invite">
+                  <button class="lobby__btn--copy">Copy Invite Link</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== GAME OVER ===== -->
+          <div class="screen" id="screen-game-over">
+            <div class="game-over">
+              <div class="game-over__panel">
+                <h1 class="game-over__winner">Alice wins!</h1>
+
+                <table class="game-over__scores">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Place</th>
+                      <th>Cards</th>
+                      <th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Alice</td>
+                      <td>1st</td>
+                      <td>0</td>
+                      <td>5</td>
+                    </tr>
+                    <tr>
+                      <td>Bob</td>
+                      <td>2nd</td>
+                      <td>3</td>
+                      <td>3</td>
+                    </tr>
+                    <tr>
+                      <td>Charlie</td>
+                      <td>3rd</td>
+                      <td>7</td>
+                      <td>1</td>
+                    </tr>
+                    <tr>
+                      <td>Dave</td>
+                      <td>4th</td>
+                      <td>12</td>
+                      <td>0</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="game-over__actions">
+                  <button
+                    class="game-over__btn game-over__btn--rematch"
+                    disabled
+                  >
+                    Rematch
+                  </button>
+                  <button class="game-over__btn game-over__btn--home">
+                    Back to Home
+                  </button>
+                </div>
+
+                <div class="game-over__guest-nudge">
+                  <a href="#">Sign up to save your stats</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const screens = [
+        { id: "home-signed-in", label: "Home (signed in)" },
+        { id: "home-signed-out", label: "Home (signed out)" },
+        { id: "login", label: "Login" },
+        { id: "login-error", label: "Login (error)" },
+        { id: "guest-entry", label: "Guest Entry" },
+        { id: "create-game", label: "Create Game" },
+        { id: "join-game", label: "Join Game" },
+        { id: "join-game-error", label: "Join (error)" },
+        { id: "lobby-host", label: "Lobby (host)" },
+        { id: "lobby-guest", label: "Lobby (guest)" },
+        { id: "game-over", label: "Game Over" },
+      ];
+
+      const tabsContainer = document.getElementById("tabs");
+      screens.forEach((s, i) => {
+        const btn = document.createElement("button");
+        btn.className =
+          "harness__tab" + (i === 0 ? " harness__tab--active" : "");
+        btn.textContent = s.label;
+        btn.onclick = () => showScreen(s.id);
+        tabsContainer.appendChild(btn);
+      });
+
+      function showScreen(id) {
+        document
+          .querySelectorAll(".screen")
+          .forEach((el) => el.classList.remove("screen--active"));
+        document.getElementById("screen-" + id).classList.add("screen--active");
+
+        document.querySelectorAll(".harness__tab").forEach((tab, i) => {
+          tab.classList.toggle("harness__tab--active", screens[i].id === id);
+        });
+      }
+
+      function setViewport(mode) {
+        const frame = document.getElementById("phone-frame");
+        if (mode === "desktop") {
+          frame.classList.add("phone-frame--desktop");
+        } else {
+          frame.classList.remove("phone-frame--desktop");
+        }
+        document.querySelectorAll(".harness__viewport-btn").forEach((btn) => {
+          btn.classList.toggle(
+            "harness__viewport-btn--active",
+            btn.dataset.viewport === mode,
+          );
+        });
+      }
+
+      // Show first screen
+      showScreen("home-signed-in");
+    </script>
+  </body>
+</html>
