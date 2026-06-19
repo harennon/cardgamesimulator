@@ -141,6 +141,7 @@ const displayRank = computed(() => props.card.rank);
 
 .card--interactive {
   cursor: pointer;
+  will-change: transform;
 }
 
 .card--selected {

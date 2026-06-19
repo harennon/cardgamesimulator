@@ -19,6 +19,11 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- **LLD 36: Card Selection Animation Feels Slow on Mobile (rAF fix)** — eliminates the 1-frame visual gap between tap and card lift on Firefox Android and lower-end mobile GPUs
+  - `src/frontend/composables/useCardSelection.ts` — `toggleCard` now wraps the reactive assignment in `requestAnimationFrame` to align the DOM class change with the compositor frame boundary; a `pending` accumulator batches rapid same-frame multi-taps so no taps are lost; `clearSelection` nullifies `pending` before writing to prevent a stale rAF from overwriting the clear
+  - `src/frontend/component/game-ui/GameCard.vue` — added `will-change: transform` to `.card--interactive` to force GPU layer promotion, allowing the compositor to apply the `translateY` change without a main-thread layout/paint cycle
+  - `tests/frontend/useCardSelection.test.ts` — globally stubs `requestAnimationFrame` to run synchronously so existing tests remain unaffected; adds three new rAF batching tests: rapid multi-tap batching, toggle-then-untoggle in same frame, and `clearSelection` cancels pending rAF
+
 - **LLD 27: Card Selection Animation Feels Slow on Mobile** — card selection lift is now instant on mobile viewports (<=767px) and for users with `prefers-reduced-motion: reduce`; desktop retains the existing 150ms ease transition
   - `src/frontend/styles/game-variables.css` — added `--card-select-duration: 150ms` and `--card-select-easing: ease` to `:root`; overridden to `0ms`/`linear` inside the existing `@media (max-width: 767px)` block and a new `@media (prefers-reduced-motion: reduce)` block
   - `src/frontend/component/game-ui/GameCard.vue` — replaced hardcoded `transition: transform 0.15s ease, ...` with `var(--card-select-duration)` and `var(--card-select-easing)` references
