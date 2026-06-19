@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Card Selection Animation Fix — Mobile Mockup</title>
+    <style>
+      /* ═══════════════════════════════════════════════════════════════
+   CARD SELECTION ANIMATION FIX — MOBILE MOCKUP
+
+   Demonstrates the bug and two fix approaches for the delayed
+   translateY repaint on mobile browsers (Firefox Android, Chrome iOS).
+
+   Bug: Gold border applies instantly on tap, but the -14px raise
+   doesn't visually commit until the next user interaction.
+
+   Fix A: GPU layer promotion + will-change + forced reflow
+   Fix B: Replace transform with margin-top on mobile (layout-based)
+   ═══════════════════════════════════════════════════════════════ */
+
+      @import url("https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-dark: #143d25;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.35);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --card-width: 52px;
+        --card-height: 73px;
+        --card-overlap: -18px;
+        --card-selected-lift: -14px;
+      }
+
+      html,
+      body {
+        height: 100%;
+        overflow-x: hidden;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: var(--felt-dark);
+        color: var(--text-primary);
+      }
+
+      /* ─── Page Layout ─── */
+      .page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        padding: 16px 20px;
+        background: var(--panel-bg);
+        border-bottom: 1px solid var(--table-rim-light);
+        text-align: center;
+      }
+
+      .header h1 {
+        font-family: var(--font-ui);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--gold-accent);
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+
+      .header p {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      /* ─── Tab Switcher ─── */
+      .tabs {
+        display: flex;
+        background: rgba(20, 12, 8, 0.6);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+
+      .tab {
+        flex: 1;
+        padding: 12px 8px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition:
+          color 0.2s,
+          border-color 0.2s;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .tab.active {
+        color: var(--gold-accent);
+        border-bottom-color: var(--gold-accent);
+      }
+
+      .tab .tab-label {
+        display: block;
+        font-size: 11px;
+        margin-top: 2px;
+        opacity: 0.7;
+      }
+
+      /* ─── Demo Panels ─── */
+      .demo-panels {
+        flex: 1;
+        position: relative;
+      }
+
+      .demo-panel {
+        display: none;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      .demo-panel.active {
+        display: flex;
+      }
+
+      /* ─── Game Table Area ─── */
+      .table-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        background: radial-gradient(
+          ellipse 120% 80% at 50% 60%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          var(--felt-dark) 100%
+        );
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Felt texture overlay */
+      .table-area::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23000' opacity='0.03'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23fff' opacity='0.02'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+
+      /* ─── Status Indicator ─── */
+      .status-bar {
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--text-muted);
+        position: relative;
+        z-index: 1;
+      }
+
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        animation: pulse-dot 2s infinite;
+      }
+
+      @keyframes pulse-dot {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      /* ─── Explanation Card ─── */
+      .explanation {
+        margin: 8px 16px;
+        padding: 12px 14px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--text-muted);
+        position: relative;
+        z-index: 1;
+      }
+
+      .explanation strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .explanation code {
+        font-family: "SF Mono", "Fira Code", monospace;
+        font-size: 10px;
+        background: rgba(201, 168, 76, 0.1);
+        color: var(--gold-accent);
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
+
+      .explanation .fix-tag {
+        display: inline-block;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-size: 9px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .explanation .bug-tag {
+        display: inline-block;
+        background: #e05555;
+        color: #fff;
+        font-size: 9px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      /* ─── Hand Container ─── */
+      .hand-container {
+        padding: 20px 12px 16px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .hand-label {
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 10px;
+        padding-left: 4px;
+      }
+
+      .hand {
+        display: flex;
+        align-items: flex-end;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+        scrollbar-width: none;
+      }
+
+      .hand::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* ─── Card Styles ─── */
+      .card {
+        position: relative;
+        width: var(--card-width);
+        height: var(--card-height);
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .card + .card {
+        margin-left: var(--card-overlap);
+      }
+
+      .card .card-rank {
+        font-size: 14px;
+        line-height: 1;
+      }
+
+      .card .card-suit {
+        font-size: 16px;
+        line-height: 1;
+      }
+
+      .card .card-corner {
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card .card-corner-rank {
+        font-size: 9px;
+        line-height: 1;
+      }
+
+      .card .card-corner-suit {
+        font-size: 8px;
+        line-height: 1;
+        margin-top: -1px;
+      }
+
+      .card.red .card-rank,
+      .card.red .card-suit,
+      .card.red .card-corner-rank,
+      .card.red .card-corner-suit {
+        color: var(--red-suit);
+      }
+
+      .card.black .card-rank,
+      .card.black .card-suit,
+      .card.black .card-corner-rank,
+      .card.black .card-corner-suit {
+        color: var(--black-suit);
+      }
+
+      /* ─── BUG DEMO: Original broken behavior ─── */
+      .demo-bug .card {
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      .demo-bug .card.selected {
+        /* This is what currently happens — border applies instantly,
+     but transform doesn't repaint on mobile until next interaction */
+        border-color: var(--gold-accent);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        transform: translateY(var(--card-selected-lift));
+      }
+
+      /* ─── FIX A: GPU compositing + will-change ─── */
+      .demo-fix-a .card {
+        /* Force GPU layer promotion BEFORE any interaction */
+        will-change: transform;
+        transform: translateZ(0) translateY(0px);
+        transition:
+          transform 0.12s cubic-bezier(0.2, 0, 0.2, 1),
+          box-shadow 0.12s ease,
+          border-color 0.08s ease;
+      }
+
+      .demo-fix-a .card.selected {
+        transform: translateZ(0) translateY(var(--card-selected-lift));
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* ─── FIX B: margin-top instead of transform ─── */
+      .demo-fix-b .card {
+        /* No transform for the raise — use margin-top which triggers layout
+     and is reliably repainted on all mobile browsers */
+        margin-top: 0px;
+        transition:
+          margin-top 0.1s ease-out,
+          box-shadow 0.1s ease,
+          border-color 0.08s ease;
+      }
+
+      .demo-fix-b .card.selected {
+        margin-top: var(--card-selected-lift);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* ─── Tap feedback ─── */
+      .card:active {
+        opacity: 0.92;
+      }
+
+      /* ─── Event Log ─── */
+      .event-log {
+        position: relative;
+        z-index: 1;
+        padding: 8px 16px 12px;
+        max-height: 80px;
+        overflow-y: auto;
+        font-family: "SF Mono", "Fira Code", monospace;
+        font-size: 9px;
+        line-height: 1.6;
+        color: var(--text-muted);
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid rgba(74, 44, 30, 0.4);
+      }
+
+      .event-log .log-entry {
+        opacity: 0;
+        animation: fade-in 0.2s forwards;
+      }
+
+      @keyframes fade-in {
+        to {
+          opacity: 1;
+        }
+      }
+
+      .event-log .log-entry .timestamp {
+        color: rgba(201, 168, 76, 0.5);
+      }
+
+      .event-log .log-entry .event-name {
+        color: var(--gold-accent);
+      }
+
+      /* ─── Action Bar (simulated game controls) ─── */
+      .action-bar {
+        display: flex;
+        gap: 10px;
+        padding: 10px 16px;
+        background: var(--panel-bg);
+        border-top: 1px solid var(--table-rim-light);
+        position: relative;
+        z-index: 1;
+      }
+
+      .action-bar button {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        font-family: var(--font-ui);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+
+      .action-bar .btn-play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .action-bar .btn-pass {
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-primary);
+      }
+
+      .action-bar button:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+
+      /* ─── Comparison View ─── */
+      .comparison-note {
+        padding: 12px 16px;
+        background: rgba(201, 168, 76, 0.06);
+        border-top: 1px solid rgba(201, 168, 76, 0.15);
+        font-size: 10px;
+        color: var(--text-muted);
+        text-align: center;
+        line-height: 1.5;
+      }
+
+      .comparison-note em {
+        color: var(--gold-accent);
+        font-style: normal;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <h1>Card Selection — Mobile Fix</h1>
+        <p>Tap cards to toggle selection. Compare behavior across tabs.</p>
+      </header>
+
+      <nav class="tabs">
+        <div class="tab active" data-panel="bug">
+          Bug
+          <span class="tab-label">Current</span>
+        </div>
+        <div class="tab" data-panel="fix-a">
+          Fix A
+          <span class="tab-label">GPU Layer</span>
+        </div>
+        <div class="tab" data-panel="fix-b">
+          Fix B
+          <span class="tab-label">Margin-top</span>
+        </div>
+      </nav>
+
+      <div class="demo-panels">
+        <!-- ═══ BUG DEMO ═══ -->
+        <section class="demo-panel demo-bug active" id="panel-bug">
+          <div class="table-area">
+            <div class="explanation">
+              <span class="bug-tag">Bug</span>
+              <p>
+                <strong>Problem:</strong> On mobile,
+                <code>border-color</code> updates instantly but
+                <code>transform: translateY</code> doesn't repaint until the
+                next user interaction. The card highlights gold but stays flat —
+                only raising on the <em>next</em> tap.
+              </p>
+              <p style="margin-top: 6px">
+                <strong>Root cause:</strong> Mobile browsers defer compositing
+                layer updates when triggered inside a touch event. The
+                transition fires but the GPU layer isn't flushed until another
+                interaction forces a repaint.
+              </p>
+            </div>
+            <div class="hand-container">
+              <div class="hand-label">Your Hand — tap to select</div>
+              <div class="hand" id="hand-bug"></div>
+            </div>
+            <div class="event-log" id="log-bug"></div>
+          </div>
+          <div class="action-bar">
+            <button class="btn-play" disabled>Play</button>
+            <button class="btn-pass">Pass</button>
+          </div>
+        </section>
+
+        <!-- ═══ FIX A: GPU Layer Promotion ═══ -->
+        <section class="demo-panel demo-fix-a" id="panel-fix-a">
+          <div class="table-area">
+            <div class="explanation">
+              <span class="fix-tag">Fix A — Recommended</span>
+              <p>
+                <strong>Strategy:</strong> Pre-promote cards to GPU compositing
+                layers with <code>will-change: transform</code> and
+                <code>translateZ(0)</code>. The browser keeps these on the GPU,
+                so <code>translateY</code> changes repaint immediately without
+                waiting for layout.
+              </p>
+              <p style="margin-top: 6px">
+                <strong>Trade-off:</strong> Slightly higher GPU memory (~13
+                layers for a full hand). Negligible on modern phones. Uses
+                <code>requestAnimationFrame</code> to batch the class toggle,
+                ensuring the frame is committed.
+              </p>
+            </div>
+            <div class="hand-container">
+              <div class="hand-label">Your Hand — tap to select</div>
+              <div class="hand" id="hand-fix-a"></div>
+            </div>
+            <div class="event-log" id="log-fix-a"></div>
+          </div>
+          <div class="action-bar">
+            <button class="btn-play" disabled>Play</button>
+            <button class="btn-pass">Pass</button>
+          </div>
+        </section>
+
+        <!-- ═══ FIX B: Margin-Top ═══ -->
+        <section class="demo-panel demo-fix-b" id="panel-fix-b">
+          <div class="table-area">
+            <div class="explanation">
+              <span class="fix-tag">Fix B — Alternative</span>
+              <p>
+                <strong>Strategy:</strong> Replace <code>translateY</code> with
+                <code>margin-top</code> on mobile only (<code
+                  >@media max-width: 767px</code
+                >). Margin changes trigger layout reflow, which mobile browsers
+                always repaint synchronously.
+              </p>
+              <p style="margin-top: 6px">
+                <strong>Trade-off:</strong> Layout shift causes sibling cards to
+                reflow (minimal with flex + align-items: flex-end). Slightly
+                less smooth than GPU-composited transforms but 100% reliable
+                across all mobile browsers. Desktop keeps transform for 60fps.
+              </p>
+            </div>
+            <div class="hand-container">
+              <div class="hand-label">Your Hand — tap to select</div>
+              <div class="hand" id="hand-fix-b"></div>
+            </div>
+            <div class="event-log" id="log-fix-b"></div>
+          </div>
+          <div class="action-bar">
+            <button class="btn-play" disabled>Play</button>
+            <button class="btn-pass">Pass</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="comparison-note">
+        <em>Test on a real mobile device</em> to observe the difference.<br />
+        Desktop browsers typically repaint both approaches identically.
+      </div>
+    </div>
+
+    <script>
+      // ═══════════════════════════════════════════════════════════════
+      // INTERACTIVE DEMO — Card selection with event logging
+      // ═══════════════════════════════════════════════════════════════
+
+      const CARDS = [
+        { rank: "3", suit: "clubs", color: "black", symbol: "♣" },
+        { rank: "5", suit: "hearts", color: "red", symbol: "♥" },
+        { rank: "7", suit: "spades", color: "black", symbol: "♠" },
+        { rank: "7", suit: "diamonds", color: "red", symbol: "♦" },
+        { rank: "9", suit: "clubs", color: "black", symbol: "♣" },
+        { rank: "J", suit: "hearts", color: "red", symbol: "♥" },
+        { rank: "Q", suit: "spades", color: "black", symbol: "♠" },
+        { rank: "K", suit: "diamonds", color: "red", symbol: "♦" },
+        { rank: "A", suit: "clubs", color: "black", symbol: "♣" },
+        { rank: "2", suit: "spades", color: "black", symbol: "♠" },
+      ];
+
+      function createCardEl(card) {
+        const el = document.createElement("div");
+        el.className = `card ${card.color}`;
+        el.innerHTML = `
+    <div class="card-corner">
+      <span class="card-corner-rank">${card.rank}</span>
+      <span class="card-corner-suit">${card.symbol}</span>
+    </div>
+    <span class="card-rank">${card.rank}</span>
+    <span class="card-suit">${card.symbol}</span>
+  `;
+        el.dataset.rank = card.rank;
+        el.dataset.suit = card.suit;
+        return el;
+      }
+
+      function logEvent(logEl, message) {
+        const now = new Date();
+        const ts = `${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}.${now.getMilliseconds().toString().padStart(3, "0")}`;
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        entry.innerHTML = `<span class="timestamp">[${ts}]</span> <span class="event-name">${message}</span>`;
+        logEl.prepend(entry);
+        // Keep only last 8 entries
+        while (logEl.children.length > 8) {
+          logEl.removeChild(logEl.lastChild);
+        }
+      }
+
+      function setupPanel(panelId, handId, logId, fixType) {
+        const handEl = document.getElementById(handId);
+        const logEl = document.getElementById(logId);
+        const panel = document.getElementById(panelId);
+        const playBtn = panel.querySelector(".btn-play");
+
+        CARDS.forEach((card, index) => {
+          const cardEl = createCardEl(card);
+
+          cardEl.addEventListener("click", (e) => {
+            e.preventDefault();
+
+            const isSelected = cardEl.classList.contains("selected");
+            const action = isSelected ? "deselect" : "select";
+
+            if (fixType === "bug") {
+              // BUG: Just toggle the class — simulates the broken behavior
+              // On mobile, the border will update but translateY won't repaint
+              cardEl.classList.toggle("selected");
+              logEvent(
+                logEl,
+                `${action} ${card.rank}${card.symbol} — class toggled (transform may lag)`,
+              );
+            } else if (fixType === "fix-a") {
+              // FIX A: Use requestAnimationFrame to ensure the browser
+              // commits the frame with the transform change
+              requestAnimationFrame(() => {
+                cardEl.classList.toggle("selected");
+                logEvent(
+                  logEl,
+                  `${action} ${card.rank}${card.symbol} — rAF + GPU layer`,
+                );
+              });
+            } else if (fixType === "fix-b") {
+              // FIX B: margin-top — forces synchronous layout reflow
+              cardEl.classList.toggle("selected");
+              // Force reflow to ensure repaint
+              void cardEl.offsetHeight;
+              logEvent(
+                logEl,
+                `${action} ${card.rank}${card.symbol} — margin-top + reflow`,
+              );
+            }
+
+            // Update play button state
+            const selectedCount = handEl.querySelectorAll(".selected").length;
+            playBtn.disabled = selectedCount === 0;
+          });
+
+          handEl.appendChild(cardEl);
+        });
+      }
+
+      // Initialize all three panels
+      setupPanel("panel-bug", "hand-bug", "log-bug", "bug");
+      setupPanel("panel-fix-a", "hand-fix-a", "log-fix-a", "fix-a");
+      setupPanel("panel-fix-b", "hand-fix-b", "log-fix-b", "fix-b");
+
+      // Tab switching
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.remove("active"));
+          document
+            .querySelectorAll(".demo-panel")
+            .forEach((p) => p.classList.remove("active"));
+          tab.classList.add("active");
+          document
+            .getElementById(`panel-${tab.dataset.panel}`)
+            .classList.add("active");
+        });
+      });
+    </script>
+  </body>
+</html>
