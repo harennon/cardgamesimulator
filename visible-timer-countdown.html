@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Timer Countdown — Card Game UI Mockup</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        /* Timer-specific tokens */
+        --timer-calm: #c9a84c;
+        --timer-warning: #d4843a;
+        --timer-critical: #c44040;
+        --timer-ring-bg: rgba(138, 126, 110, 0.2);
+        --timer-ring-width: 3px;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        overflow: hidden;
+        height: 100vh;
+      }
+
+      /* ========== GAME BOARD LAYOUT ========== */
+      .game-board {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        grid-template-rows: 80px 1fr 220px 64px;
+        grid-template-columns: 1fr 280px;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+      }
+
+      /* Felt texture */
+      .game-board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* Wood rim */
+      .game-board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        pointer-events: none;
+        z-index: 100;
+      }
+
+      .game-board > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ========== OPPONENT ROW ========== */
+      .opponent-row {
+        grid-area: opponents;
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 16px;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+      }
+
+      .opponent {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        transition: border-color 0.2s ease;
+        position: relative;
+      }
+
+      .opponent--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      .opponent__cards {
+        display: flex;
+      }
+
+      .opponent__cards .card-back {
+        width: 28px;
+        height: 40px;
+        margin-left: -10px;
+        border-radius: 4px;
+        border: 1px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        position: relative;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .opponent__cards .card-back:first-child {
+        margin-left: 0;
+      }
+
+      .opponent__cards .card-back::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 2px;
+      }
+
+      .opponent__info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .opponent__name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .opponent__count {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      /* ========== OPPONENT TIMER (compact ring) ========== */
+      .opponent-timer {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .opponent-timer__ring {
+        position: absolute;
+        inset: 0;
+      }
+
+      .opponent-timer__ring circle {
+        fill: none;
+        stroke-width: 2.5;
+      }
+
+      .opponent-timer__ring .ring-bg {
+        stroke: var(--timer-ring-bg);
+      }
+
+      .opponent-timer__ring .ring-fg {
+        stroke: var(--timer-calm);
+        stroke-linecap: round;
+        transform: rotate(-90deg);
+        transform-origin: center;
+        transition: stroke 0.3s ease;
+      }
+
+      .opponent-timer__ring.warning .ring-fg {
+        stroke: var(--timer-warning);
+      }
+      .opponent-timer__ring.critical .ring-fg {
+        stroke: var(--timer-critical);
+      }
+
+      .opponent-timer__seconds {
+        font-size: 0.55rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        z-index: 1;
+      }
+
+      /* ========== PLAY AREA (CENTER) ========== */
+      .play-area {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 16px;
+      }
+
+      /* ========== CENTER TIMER (main countdown) ========== */
+      .center-timer {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 20px;
+        border-radius: 24px;
+        background: var(--panel-bg);
+        border: 1px solid rgba(138, 126, 110, 0.3);
+        transition:
+          border-color 0.3s ease,
+          box-shadow 0.3s ease;
+      }
+
+      .center-timer--mine {
+        border-color: var(--gold-accent);
+        box-shadow: 0 0 12px var(--gold-glow);
+      }
+
+      .center-timer--warning {
+        border-color: var(--timer-warning);
+        box-shadow: 0 0 12px rgba(212, 132, 58, 0.3);
+      }
+
+      .center-timer--critical {
+        border-color: var(--timer-critical);
+        box-shadow: 0 0 16px rgba(196, 64, 64, 0.4);
+        animation: urgentPulse 0.8s ease-in-out infinite;
+      }
+
+      @keyframes urgentPulse {
+        0%,
+        100% {
+          box-shadow: 0 0 16px rgba(196, 64, 64, 0.4);
+        }
+        50% {
+          box-shadow: 0 0 28px rgba(196, 64, 64, 0.6);
+        }
+      }
+
+      .center-timer__label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        transition: color 0.3s ease;
+      }
+
+      .center-timer--mine .center-timer__label {
+        color: var(--gold-accent);
+      }
+
+      .center-timer__countdown {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .center-timer__ring-wrap {
+        width: 40px;
+        height: 40px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .center-timer__ring {
+        position: absolute;
+        inset: 0;
+      }
+
+      .center-timer__ring circle {
+        fill: none;
+      }
+
+      .center-timer__ring .ring-bg {
+        stroke: var(--timer-ring-bg);
+        stroke-width: 3;
+      }
+
+      .center-timer__ring .ring-fg {
+        stroke: var(--timer-calm);
+        stroke-width: 3;
+        stroke-linecap: round;
+        transform: rotate(-90deg);
+        transform-origin: center;
+        transition:
+          stroke 0.3s ease,
+          stroke-dashoffset 0.15s linear;
+      }
+
+      .center-timer--warning .center-timer__ring .ring-fg {
+        stroke: var(--timer-warning);
+      }
+      .center-timer--critical .center-timer__ring .ring-fg {
+        stroke: var(--timer-critical);
+      }
+
+      .center-timer__seconds {
+        font-size: 1.1rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-primary);
+        z-index: 1;
+        min-width: 24px;
+        text-align: center;
+        transition: color 0.3s ease;
+      }
+
+      .center-timer--warning .center-timer__seconds {
+        color: var(--timer-warning);
+      }
+      .center-timer--critical .center-timer__seconds {
+        color: var(--timer-critical);
+      }
+
+      /* ========== LAST PLAY CARDS ========== */
+      .play-area__cards {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .play-area__hand-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .play-area__card-row {
+        display: flex;
+        gap: 4px;
+      }
+
+      .game-card {
+        width: 64px;
+        height: 90px;
+        background: #faf3e8;
+        border-radius: 6px;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+
+      .game-card__rank {
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+
+      .game-card__suit {
+        font-size: 1.3rem;
+        line-height: 1;
+      }
+
+      .game-card--red {
+        color: var(--red-suit);
+      }
+      .game-card--black {
+        color: #1a1a1a;
+      }
+
+      .play-area__played-by {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      /* ========== PLAYER HAND ========== */
+      .hand-area {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 12px;
+      }
+
+      .hand-area__label {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 8px;
+      }
+
+      .hand-area__cards {
+        display: flex;
+        justify-content: center;
+      }
+
+      .hand-card {
+        width: 64px;
+        height: 90px;
+        margin-left: -20px;
+        background: #faf3e8;
+        border-radius: 6px;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        transition: transform 0.15s ease;
+        cursor: pointer;
+      }
+
+      .hand-card:first-child {
+        margin-left: 0;
+      }
+      .hand-card:hover {
+        transform: translateY(-8px);
+      }
+      .hand-card.selected {
+        transform: translateY(-20px);
+        box-shadow: 0 4px 16px var(--gold-glow);
+        border-color: var(--gold-accent);
+      }
+
+      /* ========== GAME LOG ========== */
+      .game-log {
+        grid-area: log;
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+        overflow-y: auto;
+        background: var(--panel-bg);
+        border-left: 1px solid var(--table-rim-light);
+      }
+
+      .game-log__title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+      }
+
+      .game-log__entry {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        padding: 4px 0;
+        border-bottom: 1px solid rgba(138, 126, 110, 0.1);
+      }
+
+      .game-log__entry--timeout {
+        color: var(--timer-warning);
+        font-style: italic;
+      }
+
+      /* ========== ACTION PANEL ========== */
+      .action-panel {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+      }
+
+      .action-btn {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 10px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease;
+      }
+
+      .action-btn--play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .action-btn--play:hover {
+        background: #d4b45a;
+      }
+
+      .action-btn--pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+
+      .action-btn--pass:hover {
+        border-color: var(--text-primary);
+      }
+
+      /* ========== STATE DEMO CONTROLS ========== */
+      .demo-controls {
+        position: fixed;
+        bottom: 80px;
+        left: 16px;
+        z-index: 500;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: rgba(0, 0, 0, 0.9);
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid #333;
+      }
+
+      .demo-controls__title {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #999;
+        margin-bottom: 4px;
+      }
+
+      .demo-controls button {
+        font-family: var(--font-ui);
+        font-size: 0.75rem;
+        padding: 6px 12px;
+        border: 1px solid #555;
+        background: #222;
+        color: #ccc;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+
+      .demo-controls button:hover {
+        background: #333;
+      }
+      .demo-controls button.active {
+        background: var(--gold-accent);
+        color: #000;
+        border-color: var(--gold-accent);
+      }
+
+      /* ========== MOBILE ========== */
+      @media (max-width: 767px) {
+        .game-board {
+          grid-template-rows: 52px 1fr 160px 56px;
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "opponents"
+            "table"
+            "hand"
+            "actions";
+        }
+
+        .game-board::after {
+          border-width: 4px;
+        }
+
+        .game-log {
+          display: none;
+        }
+
+        .opponent-row {
+          gap: 2px;
+          padding: 6px 8px;
+        }
+
+        .opponent {
+          flex-direction: row;
+          padding: 4px 10px;
+          border-radius: 16px;
+          gap: 6px;
+        }
+
+        .opponent__cards {
+          display: none;
+        }
+
+        .opponent-timer {
+          position: static;
+          width: 22px;
+          height: 22px;
+        }
+
+        .opponent-timer__seconds {
+          font-size: 0.5rem;
+        }
+
+        .center-timer {
+          padding: 6px 14px;
+          gap: 8px;
+        }
+
+        .center-timer__ring-wrap {
+          width: 32px;
+          height: 32px;
+        }
+
+        .center-timer__seconds {
+          font-size: 0.9rem;
+        }
+        .center-timer__label {
+          font-size: 0.75rem;
+        }
+
+        .hand-card {
+          width: 52px;
+          height: 73px;
+          margin-left: -18px;
+        }
+
+        .game-card {
+          width: 48px;
+          height: 68px;
+        }
+
+        .demo-controls {
+          bottom: 70px;
+          left: 8px;
+          padding: 10px;
+        }
+      }
+
+      /* ========== NO-TIMER STATE ========== */
+      .center-timer--hidden {
+        display: none;
+      }
+      .opponent-timer--hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-board">
+      <!-- OPPONENT ROW -->
+      <div class="opponent-row">
+        <div class="opponent" id="opp1">
+          <div class="opponent__cards">
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+          </div>
+          <div class="opponent__info">
+            <span class="opponent__name">Bob</span>
+            <span class="opponent__count">9 cards</span>
+          </div>
+          <!-- Opponent timer ring (visible only for active opponent) -->
+          <div class="opponent-timer opponent-timer--hidden" id="opp1-timer">
+            <svg class="opponent-timer__ring" viewBox="0 0 28 28">
+              <circle class="ring-bg" cx="14" cy="14" r="11" />
+              <circle
+                class="ring-fg"
+                cx="14"
+                cy="14"
+                r="11"
+                stroke-dasharray="69.12"
+                stroke-dashoffset="0"
+              />
+            </svg>
+            <span class="opponent-timer__seconds">42</span>
+          </div>
+        </div>
+
+        <div class="opponent opponent--active" id="opp2">
+          <div class="opponent__cards">
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+          </div>
+          <div class="opponent__info">
+            <span class="opponent__name">Charlie</span>
+            <span class="opponent__count">11 cards</span>
+          </div>
+          <!-- Active opponent shows timer -->
+          <div class="opponent-timer" id="opp2-timer">
+            <svg class="opponent-timer__ring" viewBox="0 0 28 28">
+              <circle class="ring-bg" cx="14" cy="14" r="11" />
+              <circle
+                class="ring-fg"
+                cx="14"
+                cy="14"
+                r="11"
+                stroke-dasharray="69.12"
+                stroke-dashoffset="0"
+              />
+            </svg>
+            <span class="opponent-timer__seconds">42</span>
+          </div>
+        </div>
+
+        <div class="opponent" id="opp3">
+          <div class="opponent__cards">
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+          </div>
+          <div class="opponent__info">
+            <span class="opponent__name">Dave</span>
+            <span class="opponent__count">8 cards</span>
+          </div>
+          <div class="opponent-timer opponent-timer--hidden" id="opp3-timer">
+            <svg class="opponent-timer__ring" viewBox="0 0 28 28">
+              <circle class="ring-bg" cx="14" cy="14" r="11" />
+              <circle
+                class="ring-fg"
+                cx="14"
+                cy="14"
+                r="11"
+                stroke-dasharray="69.12"
+                stroke-dashoffset="0"
+              />
+            </svg>
+            <span class="opponent-timer__seconds">42</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PLAY AREA (CENTER) -->
+      <div class="play-area">
+        <!-- CENTER TIMER -->
+        <div class="center-timer" id="center-timer">
+          <span class="center-timer__label" id="turn-label"
+            >Charlie's turn</span
+          >
+          <div class="center-timer__countdown">
+            <div class="center-timer__ring-wrap">
+              <svg class="center-timer__ring" viewBox="0 0 40 40">
+                <circle class="ring-bg" cx="20" cy="20" r="16" />
+                <circle
+                  class="ring-fg"
+                  cx="20"
+                  cy="20"
+                  r="16"
+                  stroke-dasharray="100.53"
+                  stroke-dashoffset="0"
+                  id="center-ring-fg"
+                />
+              </svg>
+              <span class="center-timer__seconds" id="center-seconds">42</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Last play -->
+        <div class="play-area__cards">
+          <div class="play-area__hand-label">Pair</div>
+          <div class="play-area__card-row">
+            <div class="game-card game-card--black">
+              <span class="game-card__rank">7</span>
+              <span class="game-card__suit">&spades;</span>
+            </div>
+            <div class="game-card game-card--red">
+              <span class="game-card__rank">7</span>
+              <span class="game-card__suit">&hearts;</span>
+            </div>
+          </div>
+          <div class="play-area__played-by">played by Bob</div>
+        </div>
+      </div>
+
+      <!-- PLAYER HAND -->
+      <div class="hand-area">
+        <div class="hand-area__label">Your hand (13)</div>
+        <div class="hand-area__cards">
+          <div class="hand-card game-card--black">
+            <span class="game-card__rank">3</span
+            ><span class="game-card__suit">&clubs;</span>
+          </div>
+          <div class="hand-card game-card--red">
+            <span class="game-card__rank">4</span
+            ><span class="game-card__suit">&diams;</span>
+          </div>
+          <div class="hand-card game-card--red">
+            <span class="game-card__rank">5</span
+            ><span class="game-card__suit">&hearts;</span>
+          </div>
+          <div class="hand-card game-card--black selected">
+            <span class="game-card__rank">5</span
+            ><span class="game-card__suit">&spades;</span>
+          </div>
+          <div class="hand-card game-card--red selected">
+            <span class="game-card__rank">7</span
+            ><span class="game-card__suit">&diams;</span>
+          </div>
+          <div class="hand-card game-card--black">
+            <span class="game-card__rank">9</span
+            ><span class="game-card__suit">&clubs;</span>
+          </div>
+          <div class="hand-card game-card--red">
+            <span class="game-card__rank">J</span
+            ><span class="game-card__suit">&hearts;</span>
+          </div>
+          <div class="hand-card game-card--black">
+            <span class="game-card__rank">Q</span
+            ><span class="game-card__suit">&spades;</span>
+          </div>
+          <div class="hand-card game-card--red">
+            <span class="game-card__rank">K</span
+            ><span class="game-card__suit">&diams;</span>
+          </div>
+          <div class="hand-card game-card--black">
+            <span class="game-card__rank">K</span
+            ><span class="game-card__suit">&spades;</span>
+          </div>
+          <div class="hand-card game-card--black">
+            <span class="game-card__rank">A</span
+            ><span class="game-card__suit">&clubs;</span>
+          </div>
+          <div class="hand-card game-card--red">
+            <span class="game-card__rank">A</span
+            ><span class="game-card__suit">&hearts;</span>
+          </div>
+          <div class="hand-card game-card--black">
+            <span class="game-card__rank">2</span
+            ><span class="game-card__suit">&spades;</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GAME LOG -->
+      <div class="game-log">
+        <div class="game-log__title">Game Log</div>
+        <div class="game-log__entry">Bob: Pair 7&spades; 7&hearts;</div>
+        <div class="game-log__entry game-log__entry--timeout">
+          Dave: Auto-passed (timeout)
+        </div>
+        <div class="game-log__entry">Alice: Pair 9&clubs; 9&diams;</div>
+        <div class="game-log__entry">Bob: Pass</div>
+        <div class="game-log__entry">Charlie: Pair J&hearts; J&spades;</div>
+        <div class="game-log__entry">Dave: Pass</div>
+        <div class="game-log__entry">Alice: Pass</div>
+        <div class="game-log__entry">Bob: Pair 7&spades; 7&hearts;</div>
+      </div>
+
+      <!-- ACTION PANEL -->
+      <div class="action-panel">
+        <button class="action-btn action-btn--pass" disabled>Pass</button>
+        <button class="action-btn action-btn--play" disabled>Play</button>
+      </div>
+    </div>
+
+    <!-- DEMO CONTROLS -->
+    <div class="demo-controls">
+      <div class="demo-controls__title">Timer State Demo</div>
+      <button id="btn-calm" class="active" onclick="setTimerState('calm')">
+        Calm (42s remaining)
+      </button>
+      <button id="btn-warning" onclick="setTimerState('warning')">
+        Warning (8s remaining)
+      </button>
+      <button id="btn-critical" onclick="setTimerState('critical')">
+        Critical (3s remaining)
+      </button>
+      <button id="btn-myturn" onclick="setTimerState('myturn')">
+        My Turn (25s)
+      </button>
+      <button id="btn-notimer" onclick="setTimerState('notimer')">
+        No Timer
+      </button>
+      <button id="btn-live" onclick="startLiveCountdown()">
+        Live Countdown (60s)
+      </button>
+    </div>
+
+    <script>
+      // Timer ring math
+      const OPPONENT_CIRCUMFERENCE = 2 * Math.PI * 11; // r=11
+      const CENTER_CIRCUMFERENCE = 2 * Math.PI * 16; // r=16
+      const TOTAL_SECONDS = 60;
+
+      let liveInterval = null;
+
+      function setTimerState(state) {
+        // Reset buttons
+        document
+          .querySelectorAll(".demo-controls button")
+          .forEach((b) => b.classList.remove("active"));
+
+        const centerTimer = document.getElementById("center-timer");
+        const centerSeconds = document.getElementById("center-seconds");
+        const centerRingFg = document.getElementById("center-ring-fg");
+        const turnLabel = document.getElementById("turn-label");
+        const opp2Timer = document.getElementById("opp2-timer");
+        const opp2Ring = opp2Timer.querySelector(".opponent-timer__ring");
+        const opp2Seconds = opp2Timer.querySelector(".opponent-timer__seconds");
+        const opp2RingFg = opp2Timer.querySelector(".ring-fg");
+
+        // Clear live countdown
+        if (liveInterval) {
+          clearInterval(liveInterval);
+          liveInterval = null;
+        }
+
+        // Reset classes
+        centerTimer.className = "center-timer";
+        opp2Timer.classList.remove("opponent-timer--hidden");
+        opp2Ring.className = "opponent-timer__ring";
+
+        // Reset active opponents
+        document.getElementById("opp1").classList.remove("opponent--active");
+        document.getElementById("opp2").classList.add("opponent--active");
+        document.getElementById("opp3").classList.remove("opponent--active");
+        document
+          .querySelectorAll(".opponent-timer")
+          .forEach((t) => t.classList.add("opponent-timer--hidden"));
+        opp2Timer.classList.remove("opponent-timer--hidden");
+
+        switch (state) {
+          case "calm":
+            document.getElementById("btn-calm").classList.add("active");
+            turnLabel.textContent = "Charlie's turn";
+            centerSeconds.textContent = "42";
+            setRingProgress(
+              centerRingFg,
+              CENTER_CIRCUMFERENCE,
+              42,
+              TOTAL_SECONDS,
+            );
+            opp2Seconds.textContent = "42";
+            setRingProgress(
+              opp2RingFg,
+              OPPONENT_CIRCUMFERENCE,
+              42,
+              TOTAL_SECONDS,
+            );
+            break;
+
+          case "warning":
+            document.getElementById("btn-warning").classList.add("active");
+            centerTimer.classList.add("center-timer--warning");
+            opp2Ring.classList.add("warning");
+            turnLabel.textContent = "Charlie's turn";
+            centerSeconds.textContent = "8";
+            setRingProgress(
+              centerRingFg,
+              CENTER_CIRCUMFERENCE,
+              8,
+              TOTAL_SECONDS,
+            );
+            opp2Seconds.textContent = "8";
+            setRingProgress(
+              opp2RingFg,
+              OPPONENT_CIRCUMFERENCE,
+              8,
+              TOTAL_SECONDS,
+            );
+            break;
+
+          case "critical":
+            document.getElementById("btn-critical").classList.add("active");
+            centerTimer.classList.add("center-timer--critical");
+            opp2Ring.classList.add("critical");
+            turnLabel.textContent = "Charlie's turn";
+            centerSeconds.textContent = "3";
+            setRingProgress(
+              centerRingFg,
+              CENTER_CIRCUMFERENCE,
+              3,
+              TOTAL_SECONDS,
+            );
+            opp2Seconds.textContent = "3";
+            setRingProgress(
+              opp2RingFg,
+              OPPONENT_CIRCUMFERENCE,
+              3,
+              TOTAL_SECONDS,
+            );
+            break;
+
+          case "myturn":
+            document.getElementById("btn-myturn").classList.add("active");
+            centerTimer.classList.add("center-timer--mine");
+            turnLabel.textContent = "Your turn";
+            centerSeconds.textContent = "25";
+            setRingProgress(
+              centerRingFg,
+              CENTER_CIRCUMFERENCE,
+              25,
+              TOTAL_SECONDS,
+            );
+            // Hide opponent timers, show none active
+            document
+              .querySelectorAll(".opponent-timer")
+              .forEach((t) => t.classList.add("opponent-timer--hidden"));
+            document
+              .getElementById("opp2")
+              .classList.remove("opponent--active");
+            // Enable action buttons
+            document
+              .querySelectorAll(".action-btn")
+              .forEach((b) => (b.disabled = false));
+            return; // skip disabling actions
+
+          case "notimer":
+            document.getElementById("btn-notimer").classList.add("active");
+            centerTimer.classList.add("center-timer--hidden");
+            document
+              .querySelectorAll(".opponent-timer")
+              .forEach((t) => t.classList.add("opponent-timer--hidden"));
+            turnLabel.textContent = "Charlie's turn";
+            break;
+        }
+
+        // Disable action buttons (not my turn)
+        document
+          .querySelectorAll(".action-btn")
+          .forEach((b) => (b.disabled = true));
+      }
+
+      function setRingProgress(ringEl, circumference, remaining, total) {
+        const fraction = remaining / total;
+        const offset = circumference * (1 - fraction);
+        ringEl.setAttribute("stroke-dashoffset", offset.toString());
+      }
+
+      function startLiveCountdown() {
+        document
+          .querySelectorAll(".demo-controls button")
+          .forEach((b) => b.classList.remove("active"));
+        document.getElementById("btn-live").classList.add("active");
+
+        if (liveInterval) clearInterval(liveInterval);
+
+        let remaining = 60;
+        const centerTimer = document.getElementById("center-timer");
+        const centerSeconds = document.getElementById("center-seconds");
+        const centerRingFg = document.getElementById("center-ring-fg");
+        const turnLabel = document.getElementById("turn-label");
+        const opp2Timer = document.getElementById("opp2-timer");
+        const opp2Ring = opp2Timer.querySelector(".opponent-timer__ring");
+        const opp2Seconds = opp2Timer.querySelector(".opponent-timer__seconds");
+        const opp2RingFg = opp2Timer.querySelector(".ring-fg");
+
+        // Reset
+        centerTimer.className = "center-timer";
+        opp2Timer.classList.remove("opponent-timer--hidden");
+        opp2Ring.className = "opponent-timer__ring";
+        turnLabel.textContent = "Charlie's turn";
+        document.getElementById("opp2").classList.add("opponent--active");
+        document
+          .querySelectorAll(".action-btn")
+          .forEach((b) => (b.disabled = true));
+
+        function tick() {
+          centerSeconds.textContent = remaining.toString();
+          opp2Seconds.textContent = remaining.toString();
+          setRingProgress(
+            centerRingFg,
+            CENTER_CIRCUMFERENCE,
+            remaining,
+            TOTAL_SECONDS,
+          );
+          setRingProgress(
+            opp2RingFg,
+            OPPONENT_CIRCUMFERENCE,
+            remaining,
+            TOTAL_SECONDS,
+          );
+
+          // Update state classes
+          centerTimer.className = "center-timer";
+          opp2Ring.className = "opponent-timer__ring";
+
+          if (remaining <= 5) {
+            centerTimer.classList.add("center-timer--critical");
+            opp2Ring.classList.add("critical");
+          } else if (remaining <= 10) {
+            centerTimer.classList.add("center-timer--warning");
+            opp2Ring.classList.add("warning");
+          }
+
+          if (remaining <= 0) {
+            clearInterval(liveInterval);
+            liveInterval = null;
+            // Show timeout in log
+            turnLabel.textContent = "Time's up!";
+          }
+          remaining--;
+        }
+
+        tick();
+        liveInterval = setInterval(tick, 1000);
+      }
+
+      // Initialize in calm state
+      setTimerState("calm");
+    </script>
+  </body>
+</html>
