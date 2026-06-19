@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Card Selection Animation — Mobile Fix Options</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap");
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-deep: #0f3520;
+        --felt-light: #256b42;
+        --felt-highlight: #2d7a4e;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.55);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.35);
+        --gold-dim: rgba(201, 168, 76, 0.12);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --text-dim: #5a5248;
+        --panel-bg: rgba(20, 12, 8, 0.9);
+        --panel-border: rgba(74, 44, 30, 0.6);
+        --font-ui: "DM Sans", system-ui, sans-serif;
+        --font-card: "Libre Baskerville", Georgia, serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--felt-deep);
+        background-image:
+          radial-gradient(
+            ellipse at 30% 20%,
+            rgba(37, 107, 66, 0.4) 0%,
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse at 70% 80%,
+            rgba(37, 107, 66, 0.3) 0%,
+            transparent 50%
+          );
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        padding: 32px 24px;
+        line-height: 1.5;
+      }
+
+      /* Felt texture overlay */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      header {
+        position: relative;
+        z-index: 1;
+        max-width: 900px;
+        margin: 0 auto 40px;
+      }
+
+      .page-title {
+        font-family: var(--font-card);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin-bottom: 4px;
+        letter-spacing: -0.01em;
+      }
+
+      .page-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 400;
+      }
+
+      .diagnosis {
+        position: relative;
+        z-index: 1;
+        max-width: 900px;
+        margin: 0 auto 40px;
+        padding: 20px 24px;
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        backdrop-filter: blur(8px);
+      }
+
+      .diagnosis__title {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+
+      .diagnosis__text {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.7;
+      }
+
+      .diagnosis__text code {
+        background: var(--gold-dim);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        color: var(--text-primary);
+        font-family: "SF Mono", "Fira Code", monospace;
+      }
+
+      .diagnosis__text strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* Options grid */
+      .options {
+        position: relative;
+        z-index: 1;
+        max-width: 900px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+
+      @media (min-width: 768px) {
+        .options {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      .option {
+        background: var(--panel-bg);
+        border: 1.5px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 20px;
+        backdrop-filter: blur(8px);
+        transition: border-color 0.3s ease;
+      }
+
+      .option:hover {
+        border-color: rgba(74, 44, 30, 0.9);
+      }
+
+      .option--recommended {
+        border-color: var(--gold-accent);
+        box-shadow: 0 0 20px rgba(201, 168, 76, 0.08);
+      }
+
+      .option--recommended:hover {
+        border-color: var(--gold-accent);
+      }
+
+      .option--current {
+        opacity: 0.7;
+      }
+
+      .option__badge {
+        display: inline-block;
+        font-size: 0.58rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+      }
+
+      .option__badge--current {
+        background: rgba(224, 85, 85, 0.15);
+        color: #e05555;
+      }
+
+      .option__badge--recommended {
+        background: rgba(201, 168, 76, 0.2);
+        color: var(--gold-accent);
+      }
+
+      .option__badge--alt {
+        background: rgba(138, 126, 110, 0.2);
+        color: var(--text-muted);
+      }
+
+      .option__title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+        color: var(--text-primary);
+      }
+
+      .option__desc {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+        line-height: 1.6;
+      }
+
+      .option__spec {
+        font-size: 0.7rem;
+        font-family: "SF Mono", "Fira Code", monospace;
+        color: var(--text-dim);
+        padding: 10px 14px;
+        background: rgba(0, 0, 0, 0.35);
+        border-radius: 6px;
+        margin-bottom: 16px;
+        line-height: 1.8;
+        border: 1px solid rgba(74, 44, 30, 0.3);
+      }
+
+      .option__spec .highlight {
+        color: var(--gold-accent);
+      }
+
+      /* Card hand demos */
+      .hand-demo {
+        position: relative;
+        display: flex;
+        align-items: flex-end;
+        padding: 24px 14px 10px;
+        background: radial-gradient(
+          ellipse at center,
+          var(--felt-highlight) 0%,
+          var(--felt) 100%
+        );
+        border-radius: 8px;
+        border: 1.5px solid rgba(45, 24, 16, 0.5);
+        min-height: 108px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+
+      .hand-demo::-webkit-scrollbar {
+        display: none;
+      }
+
+      .hand-demo__hint {
+        position: absolute;
+        top: 6px;
+        left: 14px;
+        font-size: 0.55rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(232, 220, 200, 0.4);
+        pointer-events: none;
+      }
+
+      /* Cards */
+      .card {
+        position: relative;
+        width: 52px;
+        height: 73px;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow:
+          1px 2px 4px rgba(0, 0, 0, 0.3),
+          2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+
+      .card + .card {
+        margin-left: -18px;
+      }
+
+      .card__rank {
+        font-size: 0.9rem;
+        line-height: 1;
+      }
+
+      .card__suit {
+        font-size: 1.1rem;
+        line-height: 1;
+        margin-top: 1px;
+      }
+
+      .card.red .card__rank,
+      .card.red .card__suit {
+        color: var(--red-suit);
+      }
+
+      .card.black .card__rank,
+      .card.black .card__suit {
+        color: var(--black-suit);
+      }
+
+      /* Selection states per option */
+
+      /* Current (the problem): 150ms ease */
+      .option-current .card {
+        transition:
+          transform 150ms ease,
+          box-shadow 150ms ease,
+          border-color 150ms ease;
+      }
+
+      .option-current .card.selected {
+        transform: translateY(-14px);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* Option A: 80ms ease-out (RECOMMENDED) */
+      .option-a .card {
+        transition:
+          transform 80ms ease-out,
+          box-shadow 80ms ease-out,
+          border-color 80ms ease-out;
+      }
+
+      .option-a .card.selected {
+        transform: translateY(-14px);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* Option B: 150ms ease-out */
+      .option-b .card {
+        transition:
+          transform 150ms ease-out,
+          box-shadow 150ms ease-out,
+          border-color 150ms ease-out;
+      }
+
+      .option-b .card.selected {
+        transform: translateY(-14px);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* Option C: Instant */
+      .option-c .card {
+        transition: none;
+      }
+
+      .option-c .card.selected {
+        transform: translateY(-14px);
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* Tap feedback pulse — subtle scale on touch */
+      .card:active {
+        transform: scale(0.97);
+      }
+
+      .card.selected:active {
+        transform: translateY(-14px) scale(0.97);
+      }
+
+      /* Implementation summary */
+      .summary {
+        position: relative;
+        z-index: 1;
+        max-width: 900px;
+        margin: 40px auto 0;
+        padding: 24px;
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        backdrop-filter: blur(8px);
+      }
+
+      .summary__title {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        font-weight: 600;
+        margin-bottom: 14px;
+      }
+
+      .summary__list {
+        list-style: none;
+        padding: 0;
+      }
+
+      .summary__list li {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.7;
+        padding-left: 16px;
+        position: relative;
+      }
+
+      .summary__list li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 8px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        opacity: 0.6;
+      }
+
+      .summary__list li + li {
+        margin-top: 6px;
+      }
+
+      .summary__list code {
+        background: var(--gold-dim);
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 0.72rem;
+        color: var(--text-primary);
+        font-family: "SF Mono", "Fira Code", monospace;
+      }
+
+      /* Timing comparison visualization */
+      .timing-viz {
+        position: relative;
+        z-index: 1;
+        max-width: 900px;
+        margin: 24px auto 0;
+        padding: 20px 24px;
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+      }
+
+      .timing-viz__title {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        font-weight: 600;
+        margin-bottom: 16px;
+      }
+
+      .timing-bar {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        gap: 12px;
+      }
+
+      .timing-bar__label {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        width: 80px;
+        flex-shrink: 0;
+        text-align: right;
+      }
+
+      .timing-bar__track {
+        flex: 1;
+        height: 18px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .timing-bar__fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        padding-left: 8px;
+        font-size: 0.6rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .timing-bar__fill--current {
+        width: 100%;
+        background: linear-gradient(
+          90deg,
+          rgba(224, 85, 85, 0.4),
+          rgba(224, 85, 85, 0.2)
+        );
+        border: 1px solid rgba(224, 85, 85, 0.5);
+      }
+
+      .timing-bar__fill--a {
+        width: 53%;
+        background: linear-gradient(
+          90deg,
+          rgba(201, 168, 76, 0.5),
+          rgba(201, 168, 76, 0.25)
+        );
+        border: 1px solid rgba(201, 168, 76, 0.6);
+      }
+
+      .timing-bar__fill--b {
+        width: 100%;
+        background: linear-gradient(
+          90deg,
+          rgba(138, 126, 110, 0.4),
+          rgba(138, 126, 110, 0.2)
+        );
+        border: 1px solid rgba(138, 126, 110, 0.4);
+      }
+
+      .timing-bar__fill--c {
+        width: 3%;
+        min-width: 24px;
+        background: linear-gradient(
+          90deg,
+          rgba(138, 126, 110, 0.5),
+          rgba(138, 126, 110, 0.3)
+        );
+        border: 1px solid rgba(138, 126, 110, 0.5);
+      }
+
+      .timing-bar__note {
+        font-size: 0.6rem;
+        color: var(--text-dim);
+        margin-left: 8px;
+        white-space: nowrap;
+      }
+
+      /* Perception threshold marker */
+      .timing-bar__track::after {
+        content: "100ms perception threshold";
+        position: absolute;
+        left: 66.6%;
+        top: -2px;
+        bottom: -2px;
+        border-left: 1px dashed rgba(201, 168, 76, 0.4);
+        font-size: 0.5rem;
+        color: var(--text-dim);
+        padding-left: 4px;
+        display: flex;
+        align-items: center;
+        pointer-events: none;
+      }
+
+      @media (max-width: 500px) {
+        body {
+          padding: 20px 14px;
+        }
+
+        .page-title {
+          font-size: 1.2rem;
+        }
+
+        .timing-bar__track::after {
+          content: "";
+          border-left: 1px dashed rgba(201, 168, 76, 0.3);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 class="page-title">Card Selection Animation Fix</h1>
+      <p class="page-subtitle">Issue #24 — Mobile responsiveness improvement</p>
+    </header>
+
+    <div class="diagnosis">
+      <div class="diagnosis__title">Root Cause Analysis</div>
+      <p class="diagnosis__text">
+        The current transition uses
+        <code>transition: transform 0.15s ease</code>. The
+        <strong>ease</strong> timing function (cubic-bezier 0.25, 0.1, 0.25,
+        1.0) starts with very low velocity — on a small <code>14px</code> mobile
+        lift, the first ~50ms shows almost no visible movement. This makes the
+        tap feel unresponsive. On desktop the larger 20px lift partially masks
+        this; on mobile the shorter distance amplifies perceived lag.
+      </p>
+    </div>
+
+    <div class="timing-viz">
+      <div class="timing-viz__title">Duration Comparison (scale: 0–150ms)</div>
+      <div class="timing-bar">
+        <span class="timing-bar__label">Current</span>
+        <div class="timing-bar__track">
+          <div class="timing-bar__fill timing-bar__fill--current">
+            150ms ease
+          </div>
+        </div>
+        <span class="timing-bar__note">slow start</span>
+      </div>
+      <div class="timing-bar">
+        <span class="timing-bar__label">Option A</span>
+        <div class="timing-bar__track">
+          <div class="timing-bar__fill timing-bar__fill--a">80ms</div>
+        </div>
+        <span class="timing-bar__note">fast start</span>
+      </div>
+      <div class="timing-bar">
+        <span class="timing-bar__label">Option B</span>
+        <div class="timing-bar__track">
+          <div class="timing-bar__fill timing-bar__fill--b">150ms ease-out</div>
+        </div>
+        <span class="timing-bar__note">fast start</span>
+      </div>
+      <div class="timing-bar">
+        <span class="timing-bar__label">Option C</span>
+        <div class="timing-bar__track">
+          <div class="timing-bar__fill timing-bar__fill--c">0</div>
+        </div>
+        <span class="timing-bar__note">instant</span>
+      </div>
+    </div>
+
+    <div class="options">
+      <!-- Current (the problem) -->
+      <div class="option option--current option-current">
+        <span class="option__badge option__badge--current"
+          >Current (Problem)</span
+        >
+        <h2 class="option__title">150ms ease</h2>
+        <p class="option__desc">
+          Slow start means ~50ms of no visible movement after tap. The card
+          feels stuck before it lifts.
+        </p>
+        <div class="option__spec">
+          transition: transform <span class="highlight">150ms ease</span>;<br />
+          transform: translateY(-14px);
+        </div>
+        <div class="hand-demo" id="demo-current">
+          <span class="hand-demo__hint">Tap cards to compare</span>
+        </div>
+      </div>
+
+      <!-- Option A: Recommended -->
+      <div class="option option--recommended option-a">
+        <span class="option__badge option__badge--recommended"
+          >Recommended</span
+        >
+        <h2 class="option__title">Option A: 80ms ease-out</h2>
+        <p class="option__desc">
+          Sub-100ms feels instant to human perception while retaining a subtle
+          smooth motion. High initial velocity means the card responds
+          immediately.
+        </p>
+        <div class="option__spec">
+          transition: transform
+          <span class="highlight">80ms ease-out</span>;<br />
+          transform: translateY(-14px);
+        </div>
+        <div class="hand-demo" id="demo-a">
+          <span class="hand-demo__hint">Tap cards to compare</span>
+        </div>
+      </div>
+
+      <!-- Option B -->
+      <div class="option option-b">
+        <span class="option__badge option__badge--alt">Alternative</span>
+        <h2 class="option__title">Option B: 150ms ease-out</h2>
+        <p class="option__desc">
+          Same duration, different curve. Ease-out starts at full velocity then
+          decelerates. More visible animation than A but removes the initial
+          lag. Minimal code change (just swap the easing function).
+        </p>
+        <div class="option__spec">
+          transition: transform
+          <span class="highlight">150ms ease-out</span>;<br />
+          transform: translateY(-14px);
+        </div>
+        <div class="hand-demo" id="demo-b">
+          <span class="hand-demo__hint">Tap cards to compare</span>
+        </div>
+      </div>
+
+      <!-- Option C -->
+      <div class="option option-c">
+        <span class="option__badge option__badge--alt">Alternative</span>
+        <h2 class="option__title">Option C: Instant (no animation)</h2>
+        <p class="option__desc">
+          Zero transition on mobile. Maximum responsiveness, trades polish for
+          speed. Desktop retains its current animation. Good for users who
+          prefer pure efficiency.
+        </p>
+        <div class="option__spec">
+          transition: <span class="highlight">none</span>;<br />
+          transform: translateY(-14px);
+        </div>
+        <div class="hand-demo" id="demo-c">
+          <span class="hand-demo__hint">Tap cards to compare</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="summary__title">Implementation Scope (all options)</div>
+      <ul class="summary__list">
+        <li>
+          Add <code>--card-select-duration</code> and
+          <code>--card-select-easing</code> CSS custom properties to
+          <code>:root</code> in <code>game-variables.css</code>
+        </li>
+        <li>
+          Override values inside the existing
+          <code>@media (max-width: 767px)</code> block
+        </li>
+        <li>
+          Update <code>GameCard.vue</code> transition shorthand to reference the
+          new variables
+        </li>
+        <li>
+          Add <code>@media (prefers-reduced-motion: reduce)</code> override
+          setting duration to <code>0ms</code>
+        </li>
+        <li>
+          No component logic changes, no new files, no prop changes — pure CSS
+          token update
+        </li>
+      </ul>
+    </div>
+
+    <script>
+      const CARDS = [
+        { rank: "3", suit: "clubs", color: "black" },
+        { rank: "5", suit: "hearts", color: "red" },
+        { rank: "7", suit: "spades", color: "black" },
+        { rank: "9", suit: "diamonds", color: "red" },
+        { rank: "J", suit: "clubs", color: "black" },
+        { rank: "Q", suit: "hearts", color: "red" },
+        { rank: "K", suit: "spades", color: "black" },
+        { rank: "A", suit: "diamonds", color: "red" },
+        { rank: "2", suit: "clubs", color: "black" },
+      ];
+
+      const SUIT_SYMBOLS = {
+        clubs: "♣",
+        diamonds: "♦",
+        hearts: "♥",
+        spades: "♠",
+      };
+
+      function createHand(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        CARDS.forEach((c) => {
+          const el = document.createElement("div");
+          el.className = "card " + c.color;
+          el.innerHTML =
+            '<span class="card__rank">' +
+            c.rank +
+            "</span>" +
+            '<span class="card__suit">' +
+            SUIT_SYMBOLS[c.suit] +
+            "</span>";
+
+          el.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            el.classList.toggle("selected");
+          });
+
+          container.appendChild(el);
+        });
+      }
+
+      createHand("demo-current");
+      createHand("demo-a");
+      createHand("demo-b");
+      createHand("demo-c");
+    </script>
+  </body>
+</html>
