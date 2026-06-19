@@ -306,4 +306,31 @@ async function copyInviteLink(): Promise<void> {
   border-color: var(--text-primary);
   background: rgba(232, 220, 200, 0.08);
 }
+
+@media (max-width: 767px) {
+  .lobby__panel {
+    min-width: unset;
+    width: calc(100% - 32px);
+    padding: 28px 20px;
+  }
+
+  .lobby__btn {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .lobby__btn--start {
+    width: 100%;
+  }
+
+  .lobby__btn--copy {
+    width: 100%;
+  }
+
+  .lobby__invite {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
 </style>

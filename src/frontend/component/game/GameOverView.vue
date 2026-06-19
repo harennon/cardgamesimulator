@@ -181,4 +181,34 @@ function goHome(): void {
   color: var(--gold-accent);
   text-decoration: underline;
 }
+
+@media (max-width: 767px) {
+  .game-over__panel {
+    min-width: unset;
+    width: calc(100% - 32px);
+    padding: 28px 20px;
+  }
+
+  .game-over__winner {
+    font-size: 1.5rem;
+  }
+
+  .game-over__scores th,
+  .game-over__scores td {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+
+  .game-over__actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .game-over__btn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+  }
+}
 </style>
