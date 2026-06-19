@@ -53,7 +53,7 @@ async function joinGame() {
 </script>
 
 <template>
-  <div class="flow-page">
+  <div class="flow-page" data-testid="guest-entry">
     <form class="form-card" @submit.prevent="joinGame">
       <h2 class="form-card__title">Join as Guest</h2>
 
