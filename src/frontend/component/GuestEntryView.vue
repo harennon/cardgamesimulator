@@ -53,12 +53,14 @@ async function joinGame() {
 </script>
 
 <template>
-  <div class="guest-entry" data-testid="guest-entry">
-    <h2>Join as Guest</h2>
-    <form @submit.prevent="joinGame">
-      <div>
-        <label for="display-name">Choose a display name:</label>
+  <div class="flow-page" data-testid="guest-entry">
+    <form class="form-card" @submit.prevent="joinGame">
+      <h2 class="form-card__title">Join as Guest</h2>
+
+      <div class="form-card__field">
+        <label class="form-card__label" for="display-name">Display Name</label>
         <input
+          class="form-card__input"
           id="display-name"
           v-model="displayName"
           type="text"
@@ -69,7 +71,9 @@ async function joinGame() {
           data-testid="guest-name-input"
         />
       </div>
-      <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+
+      <p v-if="errorMessage" class="form-card__error">{{ errorMessage }}</p>
+
       <button
         type="submit"
         :disabled="loading"
@@ -78,60 +82,22 @@ async function joinGame() {
       >
         {{ loading ? "Joining..." : "Join Game" }}
       </button>
+
+      <div class="form-card__divider">or</div>
+
+      <router-link
+        :to="`/signup?redirect=/game/${gameId}`"
+        class="btn-secondary"
+      >
+        Sign up for stats &amp; history
+      </router-link>
+
+      <p class="form-card__footer">
+        Already have an account?
+        <router-link :to="`/login?redirect=/game/${gameId}`"
+          >Sign in</router-link
+        >
+      </p>
     </form>
-    <div class="divider">or</div>
-    <router-link :to="`/signup?redirect=/game/${gameId}`" class="btn-secondary">
-      Sign up for stats &amp; history
-    </router-link>
-    <p class="sign-in-link">
-      Already have an account?
-      <router-link :to="`/login?redirect=/game/${gameId}`">Sign in</router-link>
-    </p>
   </div>
 </template>
-
-<style scoped>
-.guest-entry {
-  max-width: 400px;
-  margin: 2rem auto;
-  text-align: center;
-}
-
-form > div {
-  margin: 10px 0;
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-}
-
-label {
-  margin: 5px 0;
-}
-
-.error {
-  color: red;
-}
-
-.btn-primary {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-}
-
-.btn-secondary {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  text-align: center;
-}
-
-.divider {
-  margin: 16px 0;
-  color: #666;
-}
-
-.sign-in-link {
-  margin-top: 16px;
-  font-size: 0.9em;
-}
-</style>

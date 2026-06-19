@@ -200,3 +200,29 @@
   border: none;
   cursor: pointer;
 }
+
+@media (max-width: 767px) {
+  .flow-page {
+    padding: 24px 16px;
+    align-items: flex-start;
+    padding-top: 48px;
+  }
+
+  .form-card__input,
+  .form-card__input[type="email"],
+  .form-card__input[type="password"],
+  .form-card__input[type="text"] {
+    min-height: 44px;
+    padding: 12px 14px;
+    font-size: 16px; /* prevents iOS zoom */
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    min-height: 48px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

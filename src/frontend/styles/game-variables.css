@@ -82,6 +82,10 @@
     --card-selected-hover-lift: -14px;
     --card-select-duration: 0ms;
     --card-select-easing: linear;
+
+    /* Flow screen overrides */
+    --card-panel-padding: 28px 20px;
+    --page-max-width: 100%;
   }
 }
 
