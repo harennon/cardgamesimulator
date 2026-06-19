@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ref } from "vue";
 import type { Card } from "../../src/shared/engine-types.js";
 import { useCardSelection } from "../../src/frontend/composables/useCardSelection.js";
@@ -24,6 +24,20 @@ function makeHand(count: number): Card[] {
     rank: ranks[i % ranks.length],
   }));
 }
+
+// By default, mock requestAnimationFrame to run callbacks synchronously so
+// existing tests remain straightforward. Tests that need to verify batching
+// behaviour override this mock locally.
+beforeEach(() => {
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    cb(0);
+    return 0;
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("useCardSelection", () => {
   describe("initial state", () => {
@@ -193,6 +207,72 @@ describe("useCardSelection", () => {
 
       clearSelection();
       expect(selectionCount.value).toBe(0);
+    });
+  });
+
+  describe("rAF batching", () => {
+    it("batches two rapid toggles within the same frame into one update", () => {
+      // Collect pending rAF callbacks without executing them immediately.
+      const rafQueue: FrameRequestCallback[] = [];
+      vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+        rafQueue.push(cb);
+        return rafQueue.length - 1;
+      });
+
+      const hand = ref<readonly Card[]>(makeHand(5));
+      const { toggleCard, selectedIndices } = useCardSelection(hand);
+
+      // Both calls land before any rAF fires.
+      toggleCard(0);
+      toggleCard(1);
+
+      // Nothing applied yet.
+      expect(selectedIndices.value.size).toBe(0);
+
+      // Fire all pending frames.
+      for (const cb of rafQueue) cb(0);
+
+      expect(selectedIndices.value.has(0)).toBe(true);
+      expect(selectedIndices.value.has(1)).toBe(true);
+    });
+
+    it("toggle-then-untoggle in the same frame results in no selection", () => {
+      const rafQueue: FrameRequestCallback[] = [];
+      vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+        rafQueue.push(cb);
+        return rafQueue.length - 1;
+      });
+
+      const hand = ref<readonly Card[]>(makeHand(5));
+      const { toggleCard, selectedIndices } = useCardSelection(hand);
+
+      toggleCard(0);
+      toggleCard(0); // undo
+
+      for (const cb of rafQueue) cb(0);
+
+      expect(selectedIndices.value.has(0)).toBe(false);
+    });
+
+    it("clearSelection called after toggleCard cancels the pending rAF update", () => {
+      const rafQueue: FrameRequestCallback[] = [];
+      vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+        rafQueue.push(cb);
+        return rafQueue.length - 1;
+      });
+
+      const hand = ref<readonly Card[]>(makeHand(5));
+      const { toggleCard, clearSelection, selectedIndices } =
+        useCardSelection(hand);
+
+      toggleCard(0);
+      clearSelection(); // must nullify pending before rAF fires
+
+      // Fire all pending frames.
+      for (const cb of rafQueue) cb(0);
+
+      // The clear must win — selection must remain empty.
+      expect(selectedIndices.value.size).toBe(0);
     });
   });
 });
