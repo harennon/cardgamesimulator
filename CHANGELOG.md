@@ -8,6 +8,15 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Added
+
+- **LLD 32: Mobile Responsiveness for Non-Game Screens** — all pre-game and post-game screens (Home, Login, Guest Entry, Create Game, Join Game, Game Lobby, Game Over) are now mobile-responsive at 375px viewports with no horizontal overflow and touch-friendly tap targets
+  - `src/frontend/styles/game-variables.css` — added `--card-panel-padding: 28px 20px` and `--page-max-width: 100%` overrides inside existing `@media (max-width: 767px)` block
+  - `src/frontend/styles/flows.css` — appended `@media (max-width: 767px)` block: `.flow-page` padding/alignment, `.form-card__input` min-height 44px + font-size 16px (prevents iOS zoom), `.btn-primary` / `.btn-secondary` min-height 48px + flex centering
+  - `src/frontend/component/GuestEntryView.vue` — refactored template to use `flow-page` + `form-card` + `form-card__field` / `form-card__label` / `form-card__input` / `form-card__error` / `form-card__divider` / `form-card__footer` classes; removed entire `<style scoped>` block
+  - `src/frontend/component/game/GameLobbyView.vue` — added `@media (max-width: 767px)` scoped block: removes `min-width` on `.lobby__panel`, full-width buttons, `.lobby__invite` stacks vertically
+  - `src/frontend/component/game/GameOverView.vue` — added `@media (max-width: 767px)` scoped block: removes `min-width` on `.game-over__panel`, reduces table font/padding, `.game-over__actions` stacks vertically, full-width buttons
+
 ### Fixed
 
 - **LLD 36: Card Selection Animation Feels Slow on Mobile (rAF fix)** — eliminates the 1-frame visual gap between tap and card lift on Firefox Android and lower-end mobile GPUs

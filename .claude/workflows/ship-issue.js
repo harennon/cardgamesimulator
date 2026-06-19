@@ -89,24 +89,6 @@ const GATHER_SCHEMA = {
   ],
 };
 
-const FRONTEND_DECISION_CHECK_SCHEMA = {
-  type: "object",
-  properties: {
-    status: {
-      type: "string",
-      enum: ["decision", "mockups_no_decision", "none"],
-      description:
-        "decision: valid decision exists after latest mockups. mockups_no_decision: mockups posted but no decision after them. none: no mockups or decision.",
-    },
-    decisionText: {
-      type: ["string", "null"],
-      description:
-        "The text of the frontend decision (after 'Frontend decision:'). null unless status is 'decision'.",
-    },
-  },
-  required: ["status"],
-};
-
 const REVIEW_SCHEMA = {
   type: "object",
   properties: {
@@ -192,8 +174,11 @@ Then:
 3. Create a branch name: lld-{number}-{slug} (e.g. "lld-13-railway-sleep-on-idle")
 4. Identify the most relevant source files the architect should read (check files referenced in the issue, or grep for relevant code). List 3-8 paths.
 5. Determine hasFrontend: true if the issue involves UI/frontend changes (Vue components, CSS, layouts, user-facing views), false if backend-only.
-6. If hasFrontend AND this is a GitHub issue, check the issue comments (gh issue view ${issueNum || "N/A"} --comments) for a comment containing "Frontend decision:". If found, extract the decision text into frontendDecision. If not found, set frontendDecision to null.
-7. Check if the LAST comment on the issue starts with "Restart:" prefix. Only if it is the most recent comment (nothing posted after it), extract the text after "Restart:" into restart. If any comment exists after the Restart comment, the restart has already been consumed — set restart to null.
+6. Check the LAST comment on the issue only:
+   gh issue view ${issueNum || "N/A"} --json comments --jq '.comments[-1].body'
+   - If it starts with "Frontend decision:" → set frontendDecision to the full comment body. Set restart to null.
+   - If it starts with "Restart:" → set restart to the text after "Restart:". Set frontendDecision to null.
+   - Otherwise → set both to null.
 
 Return the structured result.`,
   { label: "gather-context", schema: GATHER_SCHEMA },
@@ -289,16 +274,10 @@ This is an isolated git worktree on branch "${context.branchName}".
 
 // Phase 3: Frontend Design (conditional — skipped for backend-only issues)
 let frontendSpec = null;
-// On restart, ignore any prior frontend decision — it was based on wrong diagnosis
-if (context.restart && context.frontendDecision) {
-  log(
-    "Ignoring prior frontend decision due to restart — will produce new mockups",
-  );
-  context.frontendDecision = null;
-}
 if (context.hasFrontend) {
   phase("Frontend Design");
 
+<<<<<<< Updated upstream
   // Belt-and-suspenders: if gather agent missed the decision, check directly with temporal ordering
   if (!context.frontendDecision && issueNum) {
     const decisionCheck = await agent(
@@ -346,6 +325,8 @@ Return status "decision" with decisionText if a valid decision exists, "mockups_
     }
   }
 
+=======
+>>>>>>> Stashed changes
   if (context.frontendDecision) {
     frontendSpec = context.frontendDecision;
     log("Frontend decision found in issue comments — skipping mockup phase");
