@@ -25,6 +25,7 @@ export default defineConfig({
   },
   assetsInclude: ["**/*.cert"],
   server: {
+    host: true,
     proxy: {
       "/api": {
         target: "http://localhost:3000",

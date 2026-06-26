@@ -208,10 +208,45 @@ npm run build            # Build both frontend and backend
 npm run build:frontend   # vue-tsc type-check + vite build
 npm run build:backend    # tspc (ts-patch) compile
 npm run start            # Clean, lint, build, then start backend
-npm run dev              # Serve built frontend via vite
+npm run dev              # Build backend + start backend & vite dev server (LAN-accessible)
 npm run lint:fix         # ESLint with auto-fix (ts + vue)
 docker compose up        # Run full stack with database
 ```
+
+---
+
+## Mobile Testing
+
+### Setup
+
+`npm run dev` starts both the backend and Vite dev server with `--host` (binds to `0.0.0.0`). Any device on the same network can access the app via `http://<machine-ip>:5173`.
+
+If developing on a remote machine (e.g. Cloud Desktop), tunnel port 5173 to a machine on the same WiFi as your phone, then expose it on the LAN:
+
+```powershell
+# Windows — re-expose a localhost-bound tunnel on all interfaces
+netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=5173 connectaddress=127.0.0.1 connectport=5173
+netsh advfirewall firewall add rule name="Vite Dev" dir=in action=allow protocol=TCP localport=5173
+```
+
+If Supabase auth is needed on the phone, also tunnel port 54321 and set `VITE_SUPABASE_URL=http://<lan-ip>:54321` in `.env`.
+
+### Debug Overlay
+
+Add `?debug` to any game URL to enable the on-screen debug overlay (dev builds only, tree-shaken from production).
+
+```
+http://<ip>:5173/game/<id>?debug
+```
+
+The overlay shows:
+- **Current card selection state** — which indices are selected
+- **Timestamped event log** (mm:ss.ms precision):
+  - Pink = touch/click events (when the browser fired them)
+  - Green = reactive state changes (when Vue updated)
+  - Yellow = info events (turn changes)
+
+Tap the "DBG" header to collapse/expand. Compare pink and green timestamps to diagnose animation timing issues.
 
 ---
 
@@ -223,10 +258,10 @@ docker compose up        # Run full stack with database
 # Install dependencies
 npm install
 
-# Start Supabase local stack (once migrated)
+# Start Supabase local stack
 supabase start
 
-# Run Express server in dev mode
+# Start backend + frontend dev server
 npm run dev
 
 # Or run full stack via Docker

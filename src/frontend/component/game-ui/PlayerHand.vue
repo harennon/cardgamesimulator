@@ -12,7 +12,8 @@
         'player-hand__card--first': index === 0,
         'player-hand__card--interactive': interactive,
       }"
-      @click="interactive && emit('toggle-card', index)"
+      @click="onCardClick(index)"
+      @touchstart="onCardTouch(index)"
     />
   </div>
 </template>
@@ -21,7 +22,7 @@
 import type { Card } from "@shared/engine-types";
 import GameCard from "./GameCard.vue";
 
-defineProps<{
+const props = defineProps<{
   cards: readonly Card[];
   selectedIndices: Set<number>;
   interactive: boolean;
@@ -30,6 +31,22 @@ defineProps<{
 const emit = defineEmits<{
   "toggle-card": [index: number];
 }>();
+
+function debugPush(type: "touch" | "state" | "info", msg: string) {
+  const fn = (window as unknown as Record<string, unknown>).__devOverlayPush;
+  if (typeof fn === "function")
+    (fn as (t: string, m: string) => void)(type, msg);
+}
+
+function onCardClick(index: number) {
+  if (!props.interactive) return;
+  debugPush("touch", `click[${index}]`);
+  emit("toggle-card", index);
+}
+
+function onCardTouch(index: number) {
+  debugPush("touch", `touchstart[${index}]`);
+}
 </script>
 
 <style scoped>
@@ -38,7 +55,7 @@ const emit = defineEmits<{
 .player-hand {
   display: flex;
   align-items: flex-end;
-  padding: 8px 16px;
+  padding: 24px 16px 8px;
   overflow-x: auto;
 }
 
@@ -55,14 +72,16 @@ const emit = defineEmits<{
   cursor: pointer;
 }
 
-.player-hand__card--interactive:hover {
-  transform: translateY(var(--card-hover-lift));
-}
+@media (hover: hover) {
+  .player-hand__card--interactive:hover {
+    transform: translateY(var(--card-hover-lift));
+  }
 
-.player-hand__card--interactive.player-hand__card:global(
-    .card--selected
-  ):hover {
-  transform: translateY(var(--card-selected-hover-lift));
+  .player-hand__card--interactive.player-hand__card:global(
+      .card--selected
+    ):hover {
+    transform: translateY(var(--card-selected-hover-lift));
+  }
 }
 
 @media (max-width: 767px) {

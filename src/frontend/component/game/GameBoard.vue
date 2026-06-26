@@ -84,6 +84,12 @@
   >
     &#9776;
   </button>
+
+  <DevOverlay
+    v-if="isDev"
+    :selected-indices="selectedIndices"
+    :is-my-turn="isMyTurn"
+  />
 </template>
 
 <script lang="ts" setup>
@@ -95,6 +101,9 @@ import PlayArea from "@/component/game-ui/PlayArea.vue";
 import PlayerHand from "@/component/game-ui/PlayerHand.vue";
 import GameLog from "@/component/game-ui/GameLog.vue";
 import ActionPanel from "@/component/game-ui/ActionPanel.vue";
+import DevOverlay from "@/component/DevOverlay.vue";
+
+const isDev = import.meta.env.DEV;
 
 const props = defineProps<{
   gameState: EnrichedPlayerView;
