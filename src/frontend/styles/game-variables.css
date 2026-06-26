@@ -80,8 +80,8 @@
     --card-selected-lift: -14px;
     --card-hover-lift: 0px;
     --card-selected-hover-lift: -14px;
-    --card-select-duration: 0ms;
-    --card-select-easing: linear;
+    --card-select-duration: 120ms;
+    --card-select-easing: ease;
 
     /* Flow screen overrides */
     --card-panel-padding: 28px 20px;

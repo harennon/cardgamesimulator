@@ -72,14 +72,16 @@ function onCardTouch(index: number) {
   cursor: pointer;
 }
 
-.player-hand__card--interactive:hover {
-  transform: translateY(var(--card-hover-lift));
-}
+@media (hover: hover) {
+  .player-hand__card--interactive:hover {
+    transform: translateY(var(--card-hover-lift));
+  }
 
-.player-hand__card--interactive.player-hand__card:global(
-    .card--selected
-  ):hover {
-  transform: translateY(var(--card-selected-hover-lift));
+  .player-hand__card--interactive.player-hand__card:global(
+      .card--selected
+    ):hover {
+    transform: translateY(var(--card-selected-hover-lift));
+  }
 }
 
 @media (max-width: 767px) {

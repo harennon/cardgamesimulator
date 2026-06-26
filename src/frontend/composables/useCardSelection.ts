@@ -24,31 +24,17 @@ export function useCardSelection(
 
   const selectionCount = computed(() => selectedIndices.value.size);
 
-  // Accumulates toggles that arrive within the same animation frame so rapid
-  // multi-taps are batched into a single reactive update.
-  let pending: Set<number> | null = null;
-
   function toggleCard(index: number): void {
-    const base = pending ?? selectedIndices.value;
-    const next = new Set(base);
+    const next = new Set(selectedIndices.value);
     if (next.has(index)) {
       next.delete(index);
     } else {
       next.add(index);
     }
-    pending = next;
-    requestAnimationFrame(() => {
-      // Guard: a prior rAF in the same batch may have already flushed pending,
-      // or clearSelection may have nullified it. Only write if still pending.
-      if (pending !== null) {
-        selectedIndices.value = pending;
-        pending = null;
-      }
-    });
+    selectedIndices.value = next;
   }
 
   function clearSelection(): void {
-    pending = null;
     selectedIndices.value = new Set();
   }
 
