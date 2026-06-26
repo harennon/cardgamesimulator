@@ -210,68 +210,36 @@ describe("useCardSelection", () => {
     });
   });
 
-  describe("rAF batching", () => {
-    it("batches two rapid toggles within the same frame into one update", () => {
-      // Collect pending rAF callbacks without executing them immediately.
-      const rafQueue: FrameRequestCallback[] = [];
-      vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-        rafQueue.push(cb);
-        return rafQueue.length - 1;
-      });
-
+  describe("rapid toggles", () => {
+    it("applies two rapid toggles synchronously", () => {
       const hand = ref<readonly Card[]>(makeHand(5));
       const { toggleCard, selectedIndices } = useCardSelection(hand);
 
-      // Both calls land before any rAF fires.
       toggleCard(0);
       toggleCard(1);
-
-      // Nothing applied yet.
-      expect(selectedIndices.value.size).toBe(0);
-
-      // Fire all pending frames.
-      for (const cb of rafQueue) cb(0);
 
       expect(selectedIndices.value.has(0)).toBe(true);
       expect(selectedIndices.value.has(1)).toBe(true);
     });
 
-    it("toggle-then-untoggle in the same frame results in no selection", () => {
-      const rafQueue: FrameRequestCallback[] = [];
-      vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-        rafQueue.push(cb);
-        return rafQueue.length - 1;
-      });
-
+    it("toggle-then-untoggle results in no selection", () => {
       const hand = ref<readonly Card[]>(makeHand(5));
       const { toggleCard, selectedIndices } = useCardSelection(hand);
 
       toggleCard(0);
-      toggleCard(0); // undo
-
-      for (const cb of rafQueue) cb(0);
+      toggleCard(0);
 
       expect(selectedIndices.value.has(0)).toBe(false);
     });
 
-    it("clearSelection called after toggleCard cancels the pending rAF update", () => {
-      const rafQueue: FrameRequestCallback[] = [];
-      vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-        rafQueue.push(cb);
-        return rafQueue.length - 1;
-      });
-
+    it("clearSelection after toggleCard leaves selection empty", () => {
       const hand = ref<readonly Card[]>(makeHand(5));
       const { toggleCard, clearSelection, selectedIndices } =
         useCardSelection(hand);
 
       toggleCard(0);
-      clearSelection(); // must nullify pending before rAF fires
+      clearSelection();
 
-      // Fire all pending frames.
-      for (const cb of rafQueue) cb(0);
-
-      // The clear must win — selection must remain empty.
       expect(selectedIndices.value.size).toBe(0);
     });
   });
