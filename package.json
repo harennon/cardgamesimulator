@@ -13,7 +13,7 @@
     "build": "npm run build:backend && npm run build:frontend",
     "build:frontend": "vue-tsc --build src/frontend/tsconfig.json --noEmit && vite build",
     "build:backend": "tspc --build src/backend/tsconfig.json",
-    "dev": "vite serve build/frontend",
+    "dev": "vite --host",
     "preview": "vite preview",
     "clean": "rm -rf ./build",
     "test": "vitest run",
