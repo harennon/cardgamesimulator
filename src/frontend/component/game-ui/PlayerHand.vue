@@ -55,7 +55,7 @@ function onCardTouch(index: number) {
 .player-hand {
   display: flex;
   align-items: flex-end;
-  padding: 8px 16px;
+  padding: 24px 16px 8px;
   overflow-x: auto;
 }
 
