@@ -10,6 +10,9 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- **LLD 44: Home Buttons Centering** — "Create Game" and "Join Game" buttons now properly centered on home page across all viewport widths by adding `width: 100%` to `.home` scoped style in `HomeView.vue`
+
+
 - **LLD 43: Game Over Screen Delay — Show Final Cards Before Transition** — game over screen no longer appears instantly; a 4-second overlay shows the winner announcement while the final played cards remain visible on the board
   - `src/frontend/component/game/GameView.vue` — added `displayPhase` state machine (`CREATED` / `IN_PROGRESS` / `SHOW_FINAL_PLAY` / `COMPLETED`) that decouples rendered view from raw game status; watcher triggers 4s intermediate state on `IN_PROGRESS -> COMPLETED` transition; overlay with winner text, "Continue to Results" button, and animated progress bar; auto-advances after 4s or on user click; skips delay on reconnect to already-completed game
   - `tests/frontend/gameOverTransition.test.ts` — 9 unit tests: phase transitions, timer auto-advance, skip clears timer, reconnect skips delay, cleanup prevents leaks
