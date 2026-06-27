@@ -61,6 +61,7 @@ onMounted(async () => {
 .home {
   text-align: center;
   max-width: 500px;
+  width: 100%;
 }
 
 .home__title {

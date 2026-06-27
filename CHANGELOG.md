@@ -8,6 +8,10 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Fixed
+
+- **LLD 44: Home Buttons Centering** — "Create Game" and "Join Game" buttons now properly centered on home page across all viewport widths by adding `width: 100%` to `.home` scoped style in `HomeView.vue`
+
 ### Added
 
 - **LLD 40: Admin DELETE Endpoint for Feedback** — admins can now delete individual feedback entries via `DELETE /feedback/:id`
