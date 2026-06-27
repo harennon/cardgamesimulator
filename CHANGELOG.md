@@ -8,6 +8,13 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Added
+
+- **LLD 45: Show Previous Played Cards on the Table** — the play area now displays the last 2 card-plays (before the current `lastPlay`) as faded, scaled-down card groups to the left of the current play, giving players context of recent trick history without opening the log drawer
+  - `src/frontend/component/game-ui/PlayArea.vue` — added `playHistory` prop, `recentPlays` computed (filters passes, shows up to 2 previous plays), new `.play-area__history-zone` layout with CSS transitions and mobile hide
+  - `src/frontend/component/game/GameBoard.vue` — passes `big2State.playHistory` to PlayArea
+  - `tests/frontend/playAreaRecentPlays.test.ts` — 6 unit tests for recentPlays logic
+
 ### Fixed
 
 - **LLD 44: Home Buttons Centering** — "Create Game" and "Join Game" buttons now properly centered on home page across all viewport widths by adding `width: 100%` to `.home` scoped style in `HomeView.vue`

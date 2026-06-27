@@ -7,20 +7,42 @@
       :total-seconds="totalSeconds"
     />
 
-    <div v-if="lastPlay" class="play-area__cards">
-      <div class="play-area__hand-label">
-        {{ handTypeLabel }}
+    <div v-if="lastPlay || recentPlays.length" class="play-area__history-zone">
+      <div
+        v-for="(entry, idx) in recentPlays"
+        :key="`prev-${idx}`"
+        class="play-area__previous-play"
+        :class="
+          recentPlays.length === 2 && idx === 0
+            ? 'play-area__previous-play--older'
+            : 'play-area__previous-play--recent'
+        "
+      >
+        <div class="play-area__card-row">
+          <GameCard
+            v-for="card in entry.cards"
+            :key="`${card.rank}-${card.suit}`"
+            :card="card"
+            size="small"
+          />
+        </div>
       </div>
-      <div class="play-area__card-row">
-        <GameCard
-          v-for="card in lastPlay.cards"
-          :key="`${card.rank}-${card.suit}`"
-          :card="card"
-          size="medium"
-        />
-      </div>
-      <div class="play-area__played-by">
-        played by {{ lastPlayDisplayName }}
+
+      <div v-if="lastPlay" class="play-area__current-play">
+        <div class="play-area__hand-label">
+          {{ handTypeLabel }}
+        </div>
+        <div class="play-area__card-row">
+          <GameCard
+            v-for="card in lastPlay.cards"
+            :key="`${card.rank}-${card.suit}`"
+            :card="card"
+            size="medium"
+          />
+        </div>
+        <div class="play-area__played-by">
+          played by {{ lastPlayDisplayName }}
+        </div>
       </div>
     </div>
 
@@ -31,7 +53,7 @@
 <script lang="ts" setup>
 import { computed } from "vue";
 import type { PlayerPublicInfo } from "@shared/engine-types";
-import type { Big2PublicState } from "@shared/big2-types";
+import type { Big2HistoryEntry, Big2PublicState } from "@shared/big2-types";
 import GameCard from "./GameCard.vue";
 import TurnTimer from "./TurnTimer.vue";
 
@@ -51,7 +73,14 @@ const props = defineProps<{
   players: readonly PlayerPublicInfo[];
   turnDeadline: number | null;
   totalSeconds: number;
+  playHistory: readonly Big2HistoryEntry[];
 }>();
+
+const recentPlays = computed(() => {
+  const plays = props.playHistory.filter((e) => e.action === "play");
+  if (plays.length <= 1) return [];
+  return plays.slice(-3, -1);
+});
 
 const handTypeLabel = computed(() => {
   if (!props.lastPlay) return "";
@@ -83,11 +112,47 @@ const lastPlayDisplayName = computed(() => {
   padding: 16px;
 }
 
-.play-area__cards {
+.play-area__history-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  position: relative;
+}
+
+.play-area__previous-play {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+
+.play-area__previous-play--older {
+  transform: rotate(-3deg) scale(0.65);
+  opacity: 0.35;
+  margin-right: -4px;
+}
+
+.play-area__previous-play--recent {
+  transform: rotate(-1.5deg) scale(0.78);
+  opacity: 0.6;
+  margin-right: 8px;
+}
+
+.play-area__current-play {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
+}
+
+@media (max-width: 767px) {
+  .play-area__previous-play {
+    display: none;
+  }
 }
 
 .play-area__hand-label {

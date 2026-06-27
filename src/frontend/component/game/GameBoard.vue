@@ -17,6 +17,7 @@
     <div class="game-board__table">
       <PlayArea
         :last-play="big2State?.lastPlay ?? null"
+        :play-history="big2State?.playHistory ?? []"
         :is-my-turn="isMyTurn"
         :current-player-name="currentPlayerName"
         :players="gameState.players"
