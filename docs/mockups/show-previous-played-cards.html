@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Play History Trail — Card Game Mockup</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #0a0a0a;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 24px;
+        gap: 48px;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+        color: var(--gold-accent);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      h2 {
+        font-size: 1rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        margin-bottom: 12px;
+      }
+
+      .description {
+        max-width: 700px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+
+      /* ============== GAME TABLE SIMULATION ============== */
+      .game-table {
+        width: 100%;
+        max-width: 900px;
+        height: 320px;
+        position: relative;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        border-radius: 16px;
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Felt texture */
+      .game-table::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+
+      /* ============== PLAY AREA (center of table) ============== */
+      .play-area {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ============== HISTORY TRAIL (left of current play) ============== */
+      .history-trail {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .history-play {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        transition:
+          opacity 0.4s ease,
+          transform 0.4s ease;
+      }
+
+      /* Aging: each older play fades and shrinks */
+      .history-play[data-age="1"] {
+        opacity: 0.55;
+        transform: scale(0.82);
+      }
+
+      .history-play[data-age="2"] {
+        opacity: 0.32;
+        transform: scale(0.68);
+      }
+
+      .history-play[data-age="3"] {
+        opacity: 0.18;
+        transform: scale(0.56);
+      }
+
+      .history-play__cards {
+        display: flex;
+        gap: 2px;
+      }
+
+      .history-play__label {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        text-align: center;
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .history-play__pass {
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        font-style: italic;
+        opacity: 0.7;
+        padding: 8px 12px;
+      }
+
+      /* Separator line between history and current */
+      .history-separator {
+        width: 1px;
+        height: 60px;
+        background: linear-gradient(
+          to bottom,
+          transparent 0%,
+          var(--gold-accent) 30%,
+          var(--gold-accent) 70%,
+          transparent 100%
+        );
+        opacity: 0.35;
+      }
+
+      /* ============== CURRENT PLAY (prominent, center) ============== */
+      .current-play {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .current-play__hand-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .current-play__cards {
+        display: flex;
+        gap: 4px;
+      }
+
+      .current-play__played-by {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      /* ============== CARD COMPONENT ============== */
+      .card {
+        position: relative;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+      }
+
+      .card--medium {
+        width: 64px;
+        height: 90px;
+        font-size: 1rem;
+      }
+
+      .card--small {
+        width: 40px;
+        height: 56px;
+        font-size: 0.7rem;
+      }
+
+      .card--tiny {
+        width: 28px;
+        height: 40px;
+        font-size: 0.55rem;
+      }
+
+      .card__corner {
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card__corner-rank {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.7em;
+        line-height: 1;
+      }
+
+      .card__corner-suit {
+        font-size: 0.65em;
+        line-height: 1;
+      }
+
+      .card__rank {
+        line-height: 1;
+      }
+      .card__suit {
+        line-height: 1;
+        font-size: 1.2em;
+      }
+
+      .card.red .card__rank,
+      .card.red .card__suit,
+      .card.red .card__corner-rank,
+      .card.red .card__corner-suit {
+        color: var(--red-suit);
+      }
+
+      .card.black .card__rank,
+      .card.black .card__suit,
+      .card.black .card__corner-rank,
+      .card.black .card__corner-suit {
+        color: var(--black-suit);
+      }
+
+      /* ============== DIRECTION OPTION LABELS ============== */
+      .option-label {
+        display: inline-block;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 4px;
+        padding: 4px 10px;
+        font-size: 0.7rem;
+        color: var(--gold-accent);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 8px;
+      }
+
+      /* ============== MOBILE VARIANT ============== */
+      .mobile-frame {
+        width: 390px;
+        height: 280px;
+        position: relative;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        border-radius: 12px;
+        border: 4px solid var(--table-rim);
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .mobile-frame::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+
+      .mobile-play-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .mobile-history-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* ============== ANIMATION DEMO ============== */
+      .demo-section {
+        width: 100%;
+        max-width: 900px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .demo-controls {
+        display: flex;
+        gap: 12px;
+      }
+
+      .demo-btn {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 8px 20px;
+        border-radius: 6px;
+        border: 1.5px solid var(--gold-accent);
+        background: transparent;
+        color: var(--gold-accent);
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+
+      .demo-btn:hover {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      /* Slide-in animation for new plays */
+      @keyframes slideInFromRight {
+        from {
+          opacity: 0;
+          transform: translateX(40px) scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0) scale(1);
+        }
+      }
+
+      @keyframes slideToHistory {
+        from {
+          opacity: 1;
+          transform: translateX(0) scale(1);
+        }
+        to {
+          opacity: 0.55;
+          transform: translateX(-80px) scale(0.82);
+        }
+      }
+
+      .play-entering {
+        animation: slideInFromRight 0.35s cubic-bezier(0.22, 1, 0.36, 1)
+          forwards;
+      }
+
+      /* ============== SECTIONS ============== */
+      .section {
+        width: 100%;
+        max-width: 900px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 24px 0;
+        border-top: 1px solid var(--table-rim-light);
+      }
+
+      .notes {
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        padding: 20px 24px;
+        max-width: 700px;
+        width: 100%;
+      }
+
+      .notes ul {
+        list-style: none;
+        padding: 0;
+      }
+
+      .notes li {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.8;
+        padding-left: 16px;
+        position: relative;
+      }
+
+      .notes li::before {
+        content: "\2022";
+        color: var(--gold-accent);
+        position: absolute;
+        left: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Show Previous Played Cards on the Table</h1>
+    <p class="description">
+      A "play history trail" showing the last 2-3 plays directly on the felt,
+      fading and shrinking as they age. The current play remains prominent in
+      center; older plays recede to the left with decreasing opacity and scale.
+    </p>
+
+    <!-- ============== DIRECTION A: HORIZONTAL TRAIL (Desktop) ============== -->
+    <div class="section">
+      <span class="option-label">Direction A — Horizontal Trail (Desktop)</span>
+      <h2>Previous plays fade to the left of the current play</h2>
+
+      <div class="game-table">
+        <div class="play-area">
+          <!-- History trail: older plays to the left -->
+          <div class="history-trail">
+            <!-- 3 plays ago (most faded) -->
+            <div class="history-play" data-age="3">
+              <div class="history-play__cards">
+                <div class="card card--tiny black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">5</span>
+                    <span class="card__corner-suit">&spades;</span>
+                  </div>
+                  <span class="card__rank">5</span>
+                  <span class="card__suit">&spades;</span>
+                </div>
+              </div>
+              <span class="history-play__label">Alice</span>
+            </div>
+
+            <!-- 2 plays ago -->
+            <div class="history-play" data-age="2">
+              <div class="history-play__cards">
+                <div class="card card--tiny black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">9</span>
+                    <span class="card__corner-suit">&clubs;</span>
+                  </div>
+                  <span class="card__rank">9</span>
+                  <span class="card__suit">&clubs;</span>
+                </div>
+              </div>
+              <span class="history-play__label">Charlie</span>
+            </div>
+
+            <!-- 1 play ago -->
+            <div class="history-play" data-age="1">
+              <div class="history-play__cards">
+                <div class="card card--small red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">J</span>
+                    <span class="card__corner-suit">&hearts;</span>
+                  </div>
+                  <span class="card__rank">J</span>
+                  <span class="card__suit">&hearts;</span>
+                </div>
+              </div>
+              <span class="history-play__label">Dave</span>
+            </div>
+          </div>
+
+          <div class="history-separator"></div>
+
+          <!-- Current play: prominent -->
+          <div class="current-play">
+            <span class="current-play__hand-label">Pair</span>
+            <div class="current-play__cards">
+              <div class="card card--medium black">
+                <div class="card__corner">
+                  <span class="card__corner-rank">K</span>
+                  <span class="card__corner-suit">&spades;</span>
+                </div>
+                <span class="card__rank">K</span>
+                <span class="card__suit">&spades;</span>
+              </div>
+              <div class="card card--medium red">
+                <div class="card__corner">
+                  <span class="card__corner-rank">K</span>
+                  <span class="card__corner-suit">&hearts;</span>
+                </div>
+                <span class="card__rank">K</span>
+                <span class="card__suit">&hearts;</span>
+              </div>
+            </div>
+            <span class="current-play__played-by">played by Bob</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== DIRECTION B: STACKED VERTICAL (Mobile-friendly) ============== -->
+    <div class="section">
+      <span class="option-label"
+        >Direction B — Stacked History Below (Mobile)</span
+      >
+      <h2>Previous plays shown as a compact row below the current play</h2>
+
+      <div class="mobile-frame">
+        <div class="mobile-play-area">
+          <!-- Current play -->
+          <div class="current-play">
+            <span class="current-play__hand-label">Pair</span>
+            <div class="current-play__cards">
+              <div class="card card--small black">
+                <div class="card__corner">
+                  <span class="card__corner-rank">K</span>
+                  <span class="card__corner-suit">&spades;</span>
+                </div>
+                <span class="card__rank">K</span>
+                <span class="card__suit">&spades;</span>
+              </div>
+              <div class="card card--small red">
+                <div class="card__corner">
+                  <span class="card__corner-rank">K</span>
+                  <span class="card__corner-suit">&hearts;</span>
+                </div>
+                <span class="card__rank">K</span>
+                <span class="card__suit">&hearts;</span>
+              </div>
+            </div>
+            <span class="current-play__played-by">played by Bob</span>
+          </div>
+
+          <!-- History as inline mini-row -->
+          <div class="mobile-history-row">
+            <div
+              class="history-play"
+              data-age="1"
+              style="transform: scale(0.82)"
+            >
+              <div class="history-play__cards">
+                <div class="card card--tiny red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">J</span>
+                    <span class="card__corner-suit">&hearts;</span>
+                  </div>
+                  <span class="card__rank">J</span>
+                  <span class="card__suit">&hearts;</span>
+                </div>
+              </div>
+              <span class="history-play__label">Dave</span>
+            </div>
+
+            <div
+              class="history-play"
+              data-age="2"
+              style="transform: scale(0.68)"
+            >
+              <div class="history-play__cards">
+                <div class="card card--tiny black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">9</span>
+                    <span class="card__corner-suit">&clubs;</span>
+                  </div>
+                  <span class="card__rank">9</span>
+                  <span class="card__suit">&clubs;</span>
+                </div>
+              </div>
+              <span class="history-play__label">Charlie</span>
+            </div>
+
+            <div
+              class="history-play"
+              data-age="3"
+              style="transform: scale(0.56)"
+            >
+              <span class="history-play__pass">Alice passed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== DIRECTION C: PASS-INCLUSIVE WITH CHIP INDICATORS ============== -->
+    <div class="section">
+      <span class="option-label"
+        >Direction C — Full Trick Context (Desktop)</span
+      >
+      <h2>
+        Shows all plays in the current trick, including passes, left-to-right
+        chronological
+      </h2>
+
+      <div class="game-table">
+        <div class="play-area">
+          <div class="history-trail">
+            <!-- Trick starter -->
+            <div class="history-play" data-age="2">
+              <div class="history-play__cards">
+                <div class="card card--small black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">5</span>
+                    <span class="card__corner-suit">&spades;</span>
+                  </div>
+                  <span class="card__rank">5</span>
+                  <span class="card__suit">&spades;</span>
+                </div>
+              </div>
+              <span class="history-play__label">Alice — Single</span>
+            </div>
+
+            <!-- Pass -->
+            <div class="history-play" data-age="1">
+              <span class="history-play__pass">Charlie passed</span>
+            </div>
+
+            <!-- Pass -->
+            <div class="history-play" data-age="1">
+              <span class="history-play__pass">Dave passed</span>
+            </div>
+          </div>
+
+          <div class="history-separator"></div>
+
+          <!-- Current play (winning so far) -->
+          <div class="current-play">
+            <span class="current-play__hand-label">Single</span>
+            <div class="current-play__cards">
+              <div class="card card--medium black">
+                <div class="card__corner">
+                  <span class="card__corner-rank">K</span>
+                  <span class="card__corner-suit">&spades;</span>
+                </div>
+                <span class="card__rank">K</span>
+                <span class="card__suit">&spades;</span>
+              </div>
+            </div>
+            <span class="current-play__played-by">played by Bob</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== DESIGN NOTES ============== -->
+    <div class="section">
+      <h2>Design Specifications</h2>
+      <div class="notes">
+        <ul>
+          <li>
+            <strong>Opacity progression:</strong> Current = 1.0, age-1 = 0.55,
+            age-2 = 0.32, age-3 = 0.18
+          </li>
+          <li>
+            <strong>Scale progression:</strong> Current = 1.0, age-1 = 0.82,
+            age-2 = 0.68, age-3 = 0.56
+          </li>
+          <li>
+            <strong>Card sizes:</strong> Current uses "medium" (64x90px), age-1
+            uses "small" (40x56px), age-2+ uses "tiny" (28x40px)
+          </li>
+          <li>
+            <strong>Transition timing:</strong> 350ms cubic-bezier(0.22, 1,
+            0.36, 1) for slide-in; 400ms ease for fade-out to history
+          </li>
+          <li>
+            <strong>History depth:</strong> Show last 2-3 plays from the current
+            trick only (resets on new trick)
+          </li>
+          <li>
+            <strong>Passes:</strong> Shown as italicized text labels (no cards)
+            to save horizontal space
+          </li>
+          <li>
+            <strong>Separator:</strong> Subtle vertical gold gradient line
+            divides history from current play
+          </li>
+          <li>
+            <strong>Mobile adaptation:</strong> History moves below the current
+            play in a compact row; only 1-2 previous plays shown
+          </li>
+          <li>
+            <strong>Data source:</strong> Derived from existing
+            <code>playHistory</code> array in Big2PublicState — no backend
+            changes needed
+          </li>
+          <li>
+            <strong>New trick:</strong> When "New Trick" state, history trail
+            shows nothing (or last trick winner for context)
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============== COMPONENT ARCHITECTURE ============== -->
+    <div class="section">
+      <h2>Component Architecture</h2>
+      <div class="notes">
+        <ul>
+          <li>
+            <strong>PlayArea.vue</strong> — Gains a new
+            <code>playHistory</code> prop (readonly Big2HistoryEntry[]). Renders
+            PlayHistoryTrail + current play.
+          </li>
+          <li>
+            <strong>PlayHistoryTrail.vue (new)</strong> — Receives last N
+            history entries, renders mini-cards with aging CSS classes.
+          </li>
+          <li>
+            <strong>Props contract:</strong>
+            <code
+              >{ entries: Big2HistoryEntry[], maxVisible: number, players:
+              PlayerPublicInfo[] }</code
+            >
+          </li>
+          <li>
+            <strong>No new composable needed:</strong> History is derived from
+            the existing <code>big2State.playHistory</code> slice passed down
+            from GameBoard.
+          </li>
+          <li>
+            <strong>Responsive:</strong> Desktop = horizontal trail left of
+            current play. Mobile = compact row below current play.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>
