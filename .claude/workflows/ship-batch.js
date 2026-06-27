@@ -183,6 +183,12 @@ const SELECTION_SCHEMA = {
       items: { type: "integer" },
       description: "Issue numbers to ship, ordered by priority (1-3 items)",
     },
+    decompose: {
+      type: "array",
+      items: { type: "integer" },
+      description:
+        "Issue numbers that are too large to ship as-is and should be broken into sub-issues. These will NOT be shipped this batch — instead sub-issues are created and the first sub-issue is shipped.",
+    },
     implementationNotes: {
       type: "object",
       additionalProperties: { type: "string" },
@@ -202,6 +208,45 @@ const SELECTION_SCHEMA = {
     },
   },
   required: ["selected", "reasoning"],
+};
+
+const DECOMPOSITION_SCHEMA = {
+  type: "object",
+  properties: {
+    parentIssueNumber: { type: "integer" },
+    subIssues: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short, actionable title" },
+          body: {
+            type: "string",
+            description: "Full issue body with acceptance criteria",
+          },
+          order: {
+            type: "integer",
+            description: "Sequence order (1 = first to ship)",
+          },
+          effort: { type: "string", enum: ["small", "medium"] },
+          dependencies: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Titles of sub-issues this one depends on (empty if independent)",
+          },
+        },
+        required: ["title", "body", "order", "effort"],
+      },
+      description: "2-5 sub-issues that together deliver the parent issue",
+    },
+    reasoning: {
+      type: "string",
+      description:
+        "How the decomposition was decided — what is the natural boundary between sub-issues",
+    },
+  },
+  required: ["parentIssueNumber", "subIssues", "reasoning"],
 };
 
 const ISSUE_POOL_SCHEMA = {
@@ -670,9 +715,14 @@ For any prior pool issue where the summary above is insufficient, read it with:
 
 Read docs/execution-plan.md and docs/project-hld.md for strategic context.
 
+## Decomposition
+If an issue is large (multi-day, multi-LLD, or touches many subsystems), do NOT put it in "selected". Instead put it in "decompose" — the architect will break it into shippable sub-issues. Only decompose issues you actually want to pursue; don't decompose something you'd defer.
+
 Select 1-3 issues to ship. If any triage:fix issues should be demoted to triage:defer (stale, lower priority than everything else, unlikely to be selected soon), list them separately.
 
 For each selected issue, also provide implementationNotes — a concise per-issue note on HOW it should be approached (key constraints, approved direction, what previous attempts got wrong, pitfalls to avoid). These notes are passed directly to the architect agent so it builds the right thing. Key the notes by issue number as a string (e.g. "24": "...").
+
+For each issue in "decompose", also provide implementationNotes with strategic guidance for the architect: what the end goal is, what the phases/milestones should roughly look like, any ordering constraints, and what can be deferred vs what's core.
 
 Return the issue numbers to ship in priority order with reasoning.`,
   {
@@ -718,6 +768,103 @@ if (selection.demote && selection.demote.length > 0) {
   log(
     `Demoted ${selection.demote.length} stale issues to triage:defer: ${selection.demote.map((n) => `#${n}`).join(", ")}`,
   );
+}
+
+// Decompose large issues into sub-issues (architect does the splitting)
+if (selection.decompose && selection.decompose.length > 0) {
+  for (const issueNumber of selection.decompose) {
+    const notes = selection.implementationNotes
+      ? selection.implementationNotes[String(issueNumber)]
+      : null;
+
+    const decomposition = await agent(
+      `Decompose GitHub issue #${issueNumber} into shippable sub-issues.
+
+1. Read the issue thoroughly: gh issue view ${issueNumber}
+2. Read docs/architecture-principles.md, docs/execution-plan.md, and docs/project-hld.md
+3. Read relevant source code to understand existing architecture and natural module boundaries
+4. Identify 2-5 sub-issues that together deliver the full parent issue
+
+${notes ? `**Strategic guidance from CEO:**\n${notes}\n` : ""}
+## Decomposition principles
+- Each sub-issue must be independently shippable and testable (delivers a working increment)
+- Respect dependency order — earlier sub-issues should not depend on later ones
+- Each sub-issue should be small or medium effort (under half a day)
+- First sub-issue should be the foundation that later ones build on (types, interfaces, core logic)
+- Last sub-issue should be integration/polish (wiring it together, UI polish, final tests)
+- Include acceptance criteria in each sub-issue body so it's clear when it's done
+- Reference the parent issue number in each sub-issue body
+
+Return the decomposition with titles, full bodies (markdown, with acceptance criteria), ordering, and effort estimates.`,
+      {
+        label: `decompose-${issueNumber}`,
+        model: "opus",
+        agentType: "architect",
+        schema: DECOMPOSITION_SCHEMA,
+      },
+    );
+
+    if (
+      !decomposition ||
+      !decomposition.subIssues ||
+      decomposition.subIssues.length === 0
+    ) {
+      log(`Decomposition failed for #${issueNumber} — skipping`);
+      continue;
+    }
+
+    // Create sub-issues on GitHub
+    const subIssueNumbers = [];
+    for (const sub of decomposition.subIssues.sort(
+      (a, b) => a.order - b.order,
+    )) {
+      const created = await agent(
+        `Create a GitHub sub-issue for parent #${issueNumber}:
+
+Title: ${sub.title}
+Body (use heredoc for safe formatting):
+
+gh issue create --title "${sub.title}" --body "$(cat <<'SUBEOF'
+${sub.body}
+
+---
+**Parent issue:** #${issueNumber}
+**Order:** ${sub.order} of ${decomposition.subIssues.length}
+**Effort:** ${sub.effort}
+${sub.dependencies && sub.dependencies.length > 0 ? `**Depends on:** ${sub.dependencies.join(", ")}` : ""}
+SUBEOF
+)" --label "triage:fix" --label "${fixPool.find((i) => i.number === issueNumber) ? "feature-request" : "improvement"}" --label "priority:medium"
+
+Return the created issue number.`,
+        { label: `create-sub-${issueNumber}-${sub.order}` },
+      );
+      if (created) subIssueNumbers.push(sub.order);
+    }
+
+    // Label parent as epic and remove triage:fix
+    await agent(
+      `Re-label parent issue #${issueNumber} as an epic (it's been decomposed):
+1. gh issue edit ${issueNumber} --remove-label "triage:fix"
+2. gh issue edit ${issueNumber} --add-label "epic"
+3. Comment on the issue with a summary of the decomposition:
+   gh issue comment ${issueNumber} --body "$(cat <<'DECOMPEOF'
+**Decomposed into sub-issues:**
+
+${decomposition.subIssues
+  .sort((a, b) => a.order - b.order)
+  .map((s) => `${s.order}. ${s.title} (${s.effort})`)
+  .join("\n")}
+
+_Reasoning: ${decomposition.reasoning}_
+DECOMPEOF
+)"`,
+      { label: `label-epic-${issueNumber}` },
+    );
+
+    log(
+      `Decomposed #${issueNumber} into ${decomposition.subIssues.length} sub-issues: ${decomposition.subIssues.map((s) => s.title).join(", ")}`,
+    );
+  }
 }
 
 // Phase 4: Ship sequentially
