@@ -5,6 +5,7 @@
     data-testid="game-board"
   >
     <div class="game-board__opponents">
+      <RoomCodeChip :code="displayCode" />
       <OpponentRow
         :players="gameState.players"
         :current-player-index="gameState.currentPlayerIndex"
@@ -97,6 +98,7 @@ import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import type { EnrichedPlayerView } from "@shared/socket-events";
 import type { Big2PublicState } from "@shared/big2-types";
 import OpponentRow from "@/component/game-ui/OpponentRow.vue";
+import RoomCodeChip from "@/component/game-ui/RoomCodeChip.vue";
 import PlayArea from "@/component/game-ui/PlayArea.vue";
 import PlayerHand from "@/component/game-ui/PlayerHand.vue";
 import GameLog from "@/component/game-ui/GameLog.vue";
@@ -112,6 +114,7 @@ const props = defineProps<{
   actionError: string | null;
   actionPending: boolean;
   turnTimerSeconds: number | null;
+  roomCode: string;
 }>();
 
 const emit = defineEmits<{
@@ -144,6 +147,11 @@ const currentPlayerName = computed(() => {
   const player = props.gameState.players[props.gameState.currentPlayerIndex];
   return player?.displayName ?? "";
 });
+
+// Prefer the authoritative live socket value; fall back to the REST-seeded prop.
+const displayCode = computed<string>(
+  () => props.gameState.joinCode ?? props.roomCode,
+);
 
 const isFinished = computed(() => {
   const finishedIndices = big2State.value?.finishedPlayerIndices ?? [];
@@ -255,6 +263,7 @@ watch(logDrawerOpen, (open) => {
 
 .game-board__opponents {
   grid-area: opponents;
+  position: relative;
 }
 
 .game-board__table {

@@ -13,12 +13,32 @@ import { SeededPRNG } from "@/engine/prng";
 import type { StatsService } from "@/service/statsService";
 
 export class GameService {
+  // Read-through cache of the immutable join code per game. The join code is set
+  // once at creation (LLD 28) and never changes, so it is safe to memoize. This
+  // avoids an uncached DB read on the per-broadcast hot path (getGame is not
+  // cache-backed, unlike getGameState) when surfacing the code on game:state.
+  private readonly joinCodeCache: Map<string, string | null> = new Map();
+
   constructor(
     private readonly cache: GameCache,
     private readonly engineFactory: GameEngineFactory,
     private readonly gameRepo: GameRepository,
     private readonly statsService: StatsService,
   ) {}
+
+  /**
+   * Resolve the immutable 4-char join code for a game. Cached after first read.
+   * Returns null if the game has no code (legacy / pre-LLD-28) or does not exist.
+   */
+  async getJoinCode(gameId: string): Promise<string | null> {
+    const cached = this.joinCodeCache.get(gameId);
+    if (cached !== undefined) return cached;
+
+    const game = await this.gameRepo.getGame(gameId);
+    const joinCode = game?.joinCode ?? null;
+    if (game) this.joinCodeCache.set(gameId, joinCode);
+    return joinCode;
+  }
 
   /**
    * Load game state — cache-first, fallback to DB.

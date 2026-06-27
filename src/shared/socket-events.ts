@@ -66,9 +66,10 @@ export interface GameStartResponse {
   error?: string;
 }
 
-/** PlayerView enriched with timer deadline for WebSocket emission. */
+/** PlayerView enriched with timer deadline + room code for WebSocket emission. */
 export interface EnrichedPlayerView extends PlayerView {
   readonly turnDeadline: number | null; // epoch ms, or null if no timer
+  readonly joinCode: string | null; // 4-char room code; null if game has none
 }
 
 /** SpectatorView enriched with timer deadline for WebSocket emission. */

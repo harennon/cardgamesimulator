@@ -54,6 +54,7 @@ export interface SerializableGame {
   status: GameStatus;
   state: SerializableGameState;
   turnTimerSeconds: number | null; // null means no timer
+  joinCode: string | null; // 4-char room code; null if game has none
 }
 
 export type SerializableGameState = Record<string, unknown>;
