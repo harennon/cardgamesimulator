@@ -285,6 +285,104 @@ const ISSUE_STATE_SCHEMA = {
 const MAX_PARALLEL_TRIAGE = 15;
 const DEFER_STALENESS_DAYS = 7;
 
+// Decompose a large issue into shippable sub-issues: ask the CEO for the
+// breakdown, create the sub-issues (labeled triage:fix so the NEXT run ships
+// them), then re-label the parent as an epic. Used by both the normal select
+// path and the deferred-promotion fallback so the logic stays in one place.
+// `category` is the label applied to created sub-issues (e.g. "feature-request"
+// or "improvement"). Returns the number of sub-issues created (0 if it failed).
+async function decomposeIssue(issueNumber, notes, category) {
+  const decomposition = await agent(
+    `Decompose GitHub issue #${issueNumber} into shippable sub-issues.
+
+You are breaking a large feature into independently shippable increments. Each sub-issue will later go through the full design→implement→review→ship cycle with its own LLD, so you don't need to write technical specs — focus on WHAT each increment delivers and WHY it's a natural boundary.
+
+1. Read the issue thoroughly: gh issue view ${issueNumber}
+2. Read docs/execution-plan.md, docs/project-hld.md, and docs/customer-experience.md for product context
+3. Read docs/architecture-principles.md to understand the system's module boundaries
+4. Skim relevant source code to see what exists today (use grep/find to locate related files)
+5. Identify 2-5 sub-issues that together deliver the full parent issue
+
+${notes ? `**Your earlier strategic guidance for this issue:**\n${notes}\n` : ""}
+## Decomposition principles
+- Each sub-issue must be independently shippable and testable (delivers a working increment users can see or developers can build on)
+- Respect dependency order — earlier sub-issues should not depend on later ones
+- Each sub-issue should be small or medium effort (under half a day)
+- First sub-issue should be the foundation that later ones build on (data model, types, core logic)
+- Last sub-issue should be integration/polish (wiring it together, final UX, edge cases)
+- Include clear acceptance criteria in each sub-issue body — "done when X, Y, Z"
+- Reference the parent issue number in each sub-issue body
+- Each sub-issue title should be self-explanatory without reading the parent
+
+Return the decomposition with titles, full bodies (markdown, with acceptance criteria), ordering, effort estimates, and reasoning for how you chose the boundaries.`,
+    {
+      label: `decompose-${issueNumber}`,
+      model: "opus",
+      agentType: "ceo",
+      schema: DECOMPOSITION_SCHEMA,
+    },
+  );
+
+  if (
+    !decomposition ||
+    !decomposition.subIssues ||
+    decomposition.subIssues.length === 0
+  ) {
+    log(`Decomposition failed for #${issueNumber} — skipping`);
+    return 0;
+  }
+
+  // Create sub-issues on GitHub
+  for (const sub of decomposition.subIssues.sort((a, b) => a.order - b.order)) {
+    await agent(
+      `Create a GitHub sub-issue for parent #${issueNumber}:
+
+Title: ${sub.title}
+Body (use heredoc for safe formatting):
+
+gh issue create --title "${sub.title}" --body "$(cat <<'SUBEOF'
+${sub.body}
+
+---
+**Parent issue:** #${issueNumber}
+**Order:** ${sub.order} of ${decomposition.subIssues.length}
+**Effort:** ${sub.effort}
+${sub.dependencies && sub.dependencies.length > 0 ? `**Depends on:** ${sub.dependencies.join(", ")}` : ""}
+SUBEOF
+)" --label "triage:fix" --label "${category}" --label "priority:medium"
+
+Return the created issue number.`,
+      { label: `create-sub-${issueNumber}-${sub.order}` },
+    );
+  }
+
+  // Label parent as epic and remove its current triage label
+  await agent(
+    `Re-label parent issue #${issueNumber} as an epic (it's been decomposed):
+1. gh issue edit ${issueNumber} --remove-label "triage:fix" --remove-label "triage:defer"
+   (ignore errors for whichever label is not present)
+2. gh issue edit ${issueNumber} --add-label "epic"
+3. Comment on the issue with a summary of the decomposition:
+   gh issue comment ${issueNumber} --body "$(cat <<'DECOMPEOF'
+**Decomposed into sub-issues:**
+
+${decomposition.subIssues
+  .sort((a, b) => a.order - b.order)
+  .map((s) => `${s.order}. ${s.title} (${s.effort})`)
+  .join("\n")}
+
+_Reasoning: ${decomposition.reasoning}_
+DECOMPEOF
+)"`,
+    { label: `label-epic-${issueNumber}` },
+  );
+
+  log(
+    `Decomposed #${issueNumber} into ${decomposition.subIssues.length} sub-issues: ${decomposition.subIssues.map((s) => s.title).join(", ")}`,
+  );
+  return decomposition.subIssues.length;
+}
+
 // --- Workflow ---
 
 phase("Triage");
@@ -364,13 +462,37 @@ Return the issues found.`,
     !existingPoolResult.issues ||
     existingPoolResult.issues.length === 0
   ) {
-    log("No triage:fix issues in pool either. Fully idle.");
-    return { status: "idle", message: "No issues to triage or ship" };
-  }
+    // Fix pool is empty, but there may be deferred issues worth promoting.
+    // Check before declaring idle — exclude blocked:frontend-decision (waiting
+    // on human input, can't ship), matching the deferred fetch in the Select phase.
+    const deferredCheck = await agent(
+      `Run: gh issue list --state open --label "triage:defer" --json number,title,labels --limit 20
+Exclude any issue that also has the label "blocked:frontend-decision".
+Return the remaining issues (number and title) — empty array if none.`,
+      { label: "check-deferred-pool", schema: ISSUE_POOL_SCHEMA },
+    );
 
-  log(
-    `Skipping triage — ${existingPoolResult.issues.length} issues already in triage:fix pool`,
-  );
+    if (
+      !deferredCheck ||
+      !deferredCheck.issues ||
+      deferredCheck.issues.length === 0
+    ) {
+      log(
+        "No triage:fix issues and no promotable deferred issues. Fully idle.",
+      );
+      return { status: "idle", message: "No issues to triage or ship" };
+    }
+
+    // Deferred issues exist — fall through to the Select phase, which re-checks
+    // the (empty) fix pool and runs the deferred-promotion fallback.
+    log(
+      `Fix pool empty but ${deferredCheck.issues.length} deferred issue(s) may be promotable — proceeding to selection.`,
+    );
+  } else {
+    log(
+      `Skipping triage — ${existingPoolResult.issues.length} issues already in triage:fix pool`,
+    );
+  }
 }
 
 // Triage in parallel (capped to avoid excessive fan-out)
@@ -548,10 +670,13 @@ For any issue where the summary above is insufficient, read it: gh issue view <n
 - Is anything here small enough to ship as a quick win despite being deferred?
 - Would shipping any of these move the product forward meaningfully?
 
-If yes, select 1-3 to promote and ship. Return their issue numbers.
-If nothing is worth promoting, return an empty selected array with reasoning.
+If yes, select 1-3 to promote and ship. Return their issue numbers in "selected".
 
-For each selected issue, also provide implementationNotes — a concise per-issue note on HOW it should be approached (key constraints, approved direction, what previous attempts got wrong, pitfalls to avoid). These notes are passed directly to the architect agent. Key by issue number as a string (e.g. "24": "...").`,
+If an issue is now worth pursuing but is too large to ship as-is (multi-day, multi-LLD, or touches many subsystems), do NOT put it in "selected". Instead put it in "decompose" — it will be broken into shippable sub-issues (the first of which ships next run) rather than shipped directly. Only decompose something you actually want to pursue now.
+
+If nothing is worth promoting or decomposing, return empty "selected" and "decompose" arrays with reasoning.
+
+For each selected OR decomposed issue, also provide implementationNotes — a concise per-issue note on HOW it should be approached (key constraints, approved direction, what previous attempts got wrong, pitfalls to avoid). For decomposed issues this is strategic guidance for the architect: the end goal, rough milestones, ordering constraints, what's core vs deferrable. Key by issue number as a string (e.g. "24": "...").`,
     {
       label: "ceo-promote-deferred",
       model: "opus",
@@ -560,7 +685,13 @@ For each selected issue, also provide implementationNotes — a concise per-issu
     },
   );
 
-  if (!promotion || !promotion.selected || promotion.selected.length === 0) {
+  const promoteSelected = promotion ? promotion.selected || [] : [];
+  const promoteDecompose = promotion ? promotion.decompose || [] : [];
+
+  if (
+    !promotion ||
+    (promoteSelected.length === 0 && promoteDecompose.length === 0)
+  ) {
     log(
       `CEO declined to promote any deferred issues: ${promotion ? promotion.reasoning : "agent failed"}`,
     );
@@ -569,6 +700,34 @@ For each selected issue, also provide implementationNotes — a concise per-issu
       message: "Fix pool empty and CEO declined to promote deferred items",
       reasoning: promotion ? promotion.reasoning : null,
       triageResults: validResults,
+    };
+  }
+
+  // Decompose any deferred issues the CEO judged too large to ship as-is.
+  // Sub-issues are created with triage:fix so the NEXT run ships them; the
+  // parent becomes an epic. Deferred issues aren't in fixPool, so category
+  // mirrors the main path's else-branch ("improvement").
+  if (promoteDecompose.length > 0) {
+    for (const issueNumber of promoteDecompose) {
+      const notes = promotion.implementationNotes
+        ? promotion.implementationNotes[String(issueNumber)]
+        : null;
+      await decomposeIssue(issueNumber, notes, "improvement");
+    }
+  }
+
+  // If the CEO only decomposed (nothing to ship directly), we're done —
+  // the freshly-created sub-issues will be picked up on the next run.
+  if (promoteSelected.length === 0) {
+    log(
+      `CEO decomposed ${promoteDecompose.length} deferred issue(s); nothing to ship directly this batch.`,
+    );
+    return {
+      status: "complete",
+      decomposed: promoteDecompose,
+      reasoning: promotion.reasoning,
+      source: "promoted-from-defer",
+      results: [],
     };
   }
 
@@ -776,98 +935,10 @@ if (selection.decompose && selection.decompose.length > 0) {
     const notes = selection.implementationNotes
       ? selection.implementationNotes[String(issueNumber)]
       : null;
-
-    const decomposition = await agent(
-      `Decompose GitHub issue #${issueNumber} into shippable sub-issues.
-
-You are breaking a large feature into independently shippable increments. Each sub-issue will later go through the full design→implement→review→ship cycle with its own LLD, so you don't need to write technical specs — focus on WHAT each increment delivers and WHY it's a natural boundary.
-
-1. Read the issue thoroughly: gh issue view ${issueNumber}
-2. Read docs/execution-plan.md, docs/project-hld.md, and docs/customer-experience.md for product context
-3. Read docs/architecture-principles.md to understand the system's module boundaries
-4. Skim relevant source code to see what exists today (use grep/find to locate related files)
-5. Identify 2-5 sub-issues that together deliver the full parent issue
-
-${notes ? `**Your earlier strategic guidance for this issue:**\n${notes}\n` : ""}
-## Decomposition principles
-- Each sub-issue must be independently shippable and testable (delivers a working increment users can see or developers can build on)
-- Respect dependency order — earlier sub-issues should not depend on later ones
-- Each sub-issue should be small or medium effort (under half a day)
-- First sub-issue should be the foundation that later ones build on (data model, types, core logic)
-- Last sub-issue should be integration/polish (wiring it together, final UX, edge cases)
-- Include clear acceptance criteria in each sub-issue body — "done when X, Y, Z"
-- Reference the parent issue number in each sub-issue body
-- Each sub-issue title should be self-explanatory without reading the parent
-
-Return the decomposition with titles, full bodies (markdown, with acceptance criteria), ordering, effort estimates, and reasoning for how you chose the boundaries.`,
-      {
-        label: `decompose-${issueNumber}`,
-        model: "opus",
-        agentType: "ceo",
-        schema: DECOMPOSITION_SCHEMA,
-      },
-    );
-
-    if (
-      !decomposition ||
-      !decomposition.subIssues ||
-      decomposition.subIssues.length === 0
-    ) {
-      log(`Decomposition failed for #${issueNumber} — skipping`);
-      continue;
-    }
-
-    // Create sub-issues on GitHub
-    const subIssueNumbers = [];
-    for (const sub of decomposition.subIssues.sort(
-      (a, b) => a.order - b.order,
-    )) {
-      const created = await agent(
-        `Create a GitHub sub-issue for parent #${issueNumber}:
-
-Title: ${sub.title}
-Body (use heredoc for safe formatting):
-
-gh issue create --title "${sub.title}" --body "$(cat <<'SUBEOF'
-${sub.body}
-
----
-**Parent issue:** #${issueNumber}
-**Order:** ${sub.order} of ${decomposition.subIssues.length}
-**Effort:** ${sub.effort}
-${sub.dependencies && sub.dependencies.length > 0 ? `**Depends on:** ${sub.dependencies.join(", ")}` : ""}
-SUBEOF
-)" --label "triage:fix" --label "${fixPool.find((i) => i.number === issueNumber) ? "feature-request" : "improvement"}" --label "priority:medium"
-
-Return the created issue number.`,
-        { label: `create-sub-${issueNumber}-${sub.order}` },
-      );
-      if (created) subIssueNumbers.push(sub.order);
-    }
-
-    // Label parent as epic and remove triage:fix
-    await agent(
-      `Re-label parent issue #${issueNumber} as an epic (it's been decomposed):
-1. gh issue edit ${issueNumber} --remove-label "triage:fix"
-2. gh issue edit ${issueNumber} --add-label "epic"
-3. Comment on the issue with a summary of the decomposition:
-   gh issue comment ${issueNumber} --body "$(cat <<'DECOMPEOF'
-**Decomposed into sub-issues:**
-
-${decomposition.subIssues
-  .sort((a, b) => a.order - b.order)
-  .map((s) => `${s.order}. ${s.title} (${s.effort})`)
-  .join("\n")}
-
-_Reasoning: ${decomposition.reasoning}_
-DECOMPEOF
-)"`,
-      { label: `label-epic-${issueNumber}` },
-    );
-
-    log(
-      `Decomposed #${issueNumber} into ${decomposition.subIssues.length} sub-issues: ${decomposition.subIssues.map((s) => s.title).join(", ")}`,
-    );
+    const category = fixPool.find((i) => i.number === issueNumber)
+      ? "feature-request"
+      : "improvement";
+    await decomposeIssue(issueNumber, notes, category);
   }
 }
 
