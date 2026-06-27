@@ -44,6 +44,11 @@ async function broadcastGameState(
   const state = await gameService.getGameState(gameId);
   if (!state) return;
 
+  // getGameState returns engine state (InternalGameState), which by design has no
+  // joinCode. Resolve the room code via the cached, immutable join-code lookup so
+  // the per-player view carries it on every broadcast without an uncached DB read.
+  const joinCode = await gameService.getJoinCode(gameId);
+
   const engine = engineFactory.getEngine(state.gameType);
   const playerSockets = connectionManager.getPlayerSockets(gameId);
   const spectatorCount = connectionManager.getSpectatorCount(gameId);
@@ -54,6 +59,7 @@ async function broadcastGameState(
     socket.emit("game:state", {
       ...injectConnectionStatus(view, gameId, connectionManager),
       turnDeadline,
+      joinCode,
     });
   }
 
@@ -216,6 +222,7 @@ async function handleGameJoin(
         socket.emit("game:state", {
           ...injectConnectionStatus(view, gameId, connectionManager),
           turnDeadline,
+          joinCode: game.joinCode ?? null,
         });
       }
 
