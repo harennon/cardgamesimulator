@@ -103,6 +103,11 @@ const GROUPING_SCHEMA = {
             items: { type: "string" },
             description: "User types affected (guest, registered, admin, etc.)",
           },
+          earliestReport: {
+            type: "string",
+            description:
+              "ISO date of the earliest feedback entry in this group (from createdAt field)",
+          },
         },
         required: [
           "title",
@@ -420,16 +425,20 @@ const dedupResults = await parallel(
 Title: "${pair.assessment.title}"
 Category: ${pair.assessment.category}
 Summary: ${pair.assessment.userImpact}
+Earliest report date: ${pair.group ? pair.group.earliestReport || "unknown" : "unknown"}
 
 ## Steps
 1. Search open issues: gh issue list --state open --search "${pair.assessment.title.split(" ").slice(0, 4).join(" ")}" --json number,title,body --limit 10
-2. Also search with keywords: gh issue list --state open --search "${pair.assessment.category} ${(pair.assessment.title.match(/\b\w{4,}\b/g) || []).slice(0, 3).join(" ")}" --json number,title,body --limit 10
-3. Check if any existing issue covers the same root problem (even with different wording)
+2. Search CLOSED issues (recently fixed): gh issue list --state closed --search "${pair.assessment.title.split(" ").slice(0, 4).join(" ")}" --json number,title,body,closedAt --limit 10
+3. Also search with keywords: gh issue list --state all --search "${pair.assessment.category} ${(pair.assessment.title.match(/\b\w{4,}\b/g) || []).slice(0, 3).join(" ")}" --json number,title,body,state --limit 10
+4. Check if any existing issue (open OR closed) covers the same root problem
 
 ## Decision
-- If an existing open issue covers this exactly: action="skip"
-- If an existing issue is related but this adds new signal (more user reports, different angle): action="comment" (we'll add the reports as a comment)
-- If no existing issue covers this: action="create"
+- If a CLOSED issue fixed this problem AND was closed AFTER the earliest report date above: action="skip" (stale feedback — already resolved)
+- If a CLOSED issue was closed BEFORE the earliest report date: this could be a regression — action="create" with a note referencing the old issue
+- If an existing OPEN issue covers this exactly: action="skip"
+- If an existing open issue is related but this adds new signal (more user reports, different angle): action="comment" (we'll add the reports as a comment)
+- If no existing issue (open or closed) covers this: action="create"
 
 Return your assessment.`,
         {
