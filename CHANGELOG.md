@@ -10,6 +10,14 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 40: Admin DELETE Endpoint for Feedback** — admins can now delete individual feedback entries via `DELETE /feedback/:id`
+  - `src/backend/database/database.ts` — added `deleteFeedback(id: string): Promise<boolean>` to `FeedbackRepository` interface
+  - `src/backend/database/supabaseDb.ts` — implemented `deleteFeedback` using service-role client with `.delete().eq("id", id).select("id")` pattern to detect 404
+  - `src/backend/api/feedback/submitFeedback.ts` — added `DELETE /:id` route on `FeedbackHandler` with admin gate (reuses `getAdminIds()`) and 404 handling
+  - `scripts/feedback.mjs` — added `--delete <id>` flag with usage guard
+  - `tests/integration/feedback.test.ts` — 5 new integration tests: 403 for non-admin, 401 without auth, 404 for missing ID, 200 happy path with GET verification, double-delete idempotency
+
+
 - **LLD 38: Post-Match Stats on Game Over Screen** — game over screen now shows per-game performance stats for the current player
   - `src/frontend/component/game/gameOverStats.ts` — stat derivation utility: `deriveBig2Stats` computes Plays Made, Passes, Tricks Won, Best Hand from `playHistory`; `countTricksWon` detects trick-winning sequences; `getBestHand` ranks hand types; placement badge helpers (`getBadgeForPosition`, `getBadgeClass`)
   - `src/frontend/component/game/GameOverView.vue` — enhanced with placement badges (gold/silver/bronze/grey CSS circles), "Total Turns" metadata bar, 2x2 stats grid with staggered slide-up entrance animations, `prefers-reduced-motion` support, mobile responsive
