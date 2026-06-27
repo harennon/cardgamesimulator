@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lifetime Stats - Card Game Simulator</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Design tokens (matching game-variables.css) */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --card-panel-border: #4a2c1e;
+        --card-panel-radius: 12px;
+        --btn-primary-bg: var(--gold-accent);
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-radius: 6px;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: var(--felt);
+        min-height: 100vh;
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        /* Subtle radial glow to simulate table lighting */
+        background-image: radial-gradient(
+          ellipse at 50% 40%,
+          var(--felt-light) 0%,
+          var(--felt) 70%
+        );
+      }
+
+      .stats-page {
+        width: 100%;
+        max-width: 480px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+      }
+
+      /* Back navigation */
+      .stats-page__back {
+        align-self: flex-start;
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: color 0.15s ease;
+      }
+
+      .stats-page__back:hover {
+        color: var(--text-primary);
+      }
+
+      .stats-page__back svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      /* Main panel */
+      .stats-panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        padding: 40px 48px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 32px;
+        /* Subtle inner shadow for depth */
+        box-shadow:
+          inset 0 1px 0 rgba(201, 168, 76, 0.08),
+          0 8px 32px rgba(0, 0, 0, 0.4);
+      }
+
+      /* Header */
+      .stats-panel__header {
+        text-align: center;
+      }
+
+      .stats-panel__title {
+        font-family: var(--font-ui);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+
+      .stats-panel__subtitle {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      /* Hero stat — Win Rate */
+      .stats-hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 20px 0;
+        position: relative;
+      }
+
+      .stats-hero__value {
+        font-family: var(--font-card);
+        font-size: 3.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        line-height: 1;
+        text-shadow: 0 0 32px var(--gold-glow);
+      }
+
+      .stats-hero__label {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      /* Decorative line under hero */
+      .stats-hero::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--gold-accent),
+          transparent
+        );
+      }
+
+      /* Stats grid — W/L/Played/Score */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px 32px;
+        width: 100%;
+      }
+
+      .stats-grid__item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .stats-grid__value {
+        font-family: var(--font-card);
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        line-height: 1.1;
+      }
+
+      .stats-grid__label {
+        font-family: var(--font-ui);
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      /* Accent color for wins */
+      .stats-grid__item--wins .stats-grid__value {
+        color: #5cb85c;
+      }
+
+      /* Accent color for losses */
+      .stats-grid__item--losses .stats-grid__value {
+        color: #c9645c;
+      }
+
+      /* Last played footer */
+      .stats-panel__footer {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-align: center;
+        border-top: 1px solid rgba(74, 44, 30, 0.5);
+        padding-top: 16px;
+        width: 100%;
+      }
+
+      /* Action button */
+      .stats-page__action {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: var(--btn-radius);
+        border: none;
+        cursor: pointer;
+        background: var(--btn-primary-bg);
+        color: var(--btn-primary-text);
+        text-decoration: none;
+        transition: background 0.15s ease;
+        width: 100%;
+        text-align: center;
+        display: block;
+      }
+
+      .stats-page__action:hover {
+        background: var(--btn-primary-hover);
+      }
+
+      /* Loading state */
+      .stats-panel--loading .stats-hero__value,
+      .stats-panel--loading .stats-grid__value {
+        background: rgba(74, 44, 30, 0.5);
+        color: transparent;
+        border-radius: 4px;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.5;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      /* Empty state (no games played) */
+      .stats-empty {
+        text-align: center;
+        padding: 32px 0;
+      }
+
+      .stats-empty__icon {
+        font-size: 2.5rem;
+        margin-bottom: 12px;
+        opacity: 0.6;
+      }
+
+      .stats-empty__message {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+
+      .stats-empty__hint {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        opacity: 0.7;
+      }
+
+      /* Mobile responsive */
+      @media (max-width: 767px) {
+        body {
+          padding: 24px 16px;
+          align-items: flex-start;
+          padding-top: 48px;
+        }
+
+        .stats-panel {
+          padding: 28px 20px;
+        }
+
+        .stats-hero__value {
+          font-size: 2.75rem;
+        }
+
+        .stats-grid__value {
+          font-size: 1.4rem;
+        }
+
+        .stats-grid {
+          gap: 16px 24px;
+        }
+
+        .stats-page__action {
+          min-height: 48px;
+          font-size: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+      }
+
+      /* State switcher (demo only) */
+      .demo-switcher {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        display: flex;
+        gap: 8px;
+        z-index: 100;
+      }
+
+      .demo-switcher button {
+        font-family: var(--font-ui);
+        font-size: 0.75rem;
+        padding: 6px 12px;
+        border-radius: 4px;
+        border: 1px solid var(--card-panel-border);
+        background: var(--panel-bg);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .demo-switcher button:hover,
+      .demo-switcher button.active {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Demo state switcher -->
+    <div class="demo-switcher">
+      <button class="active" onclick="showState('populated')">
+        With Stats
+      </button>
+      <button onclick="showState('empty')">No Games</button>
+      <button onclick="showState('loading')">Loading</button>
+    </div>
+
+    <div class="stats-page" id="stats-page">
+      <!-- Back link -->
+      <a href="#" class="stats-page__back">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        Back to Home
+      </a>
+
+      <!-- Populated state -->
+      <div class="stats-panel" id="state-populated">
+        <div class="stats-panel__header">
+          <h1 class="stats-panel__title">Your Stats</h1>
+          <p class="stats-panel__subtitle">Lifetime performance</p>
+        </div>
+
+        <div class="stats-hero">
+          <span class="stats-hero__value">58%</span>
+          <span class="stats-hero__label">Win Rate</span>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stats-grid__item">
+            <span class="stats-grid__value">24</span>
+            <span class="stats-grid__label">Games Played</span>
+          </div>
+          <div class="stats-grid__item stats-grid__item--wins">
+            <span class="stats-grid__value">14</span>
+            <span class="stats-grid__label">Wins</span>
+          </div>
+          <div class="stats-grid__item stats-grid__item--losses">
+            <span class="stats-grid__value">10</span>
+            <span class="stats-grid__label">Losses</span>
+          </div>
+          <div class="stats-grid__item">
+            <span class="stats-grid__value">82</span>
+            <span class="stats-grid__label">Total Score</span>
+          </div>
+        </div>
+
+        <div class="stats-panel__footer">Last played: 2 hours ago</div>
+      </div>
+
+      <!-- Empty state -->
+      <div class="stats-panel" id="state-empty" style="display: none">
+        <div class="stats-panel__header">
+          <h1 class="stats-panel__title">Your Stats</h1>
+          <p class="stats-panel__subtitle">Lifetime performance</p>
+        </div>
+
+        <div class="stats-empty">
+          <div class="stats-empty__icon">&#9824;</div>
+          <p class="stats-empty__message">No games played yet</p>
+          <p class="stats-empty__hint">
+            Create or join a game to start tracking your stats
+          </p>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div
+        class="stats-panel stats-panel--loading"
+        id="state-loading"
+        style="display: none"
+      >
+        <div class="stats-panel__header">
+          <h1 class="stats-panel__title">Your Stats</h1>
+          <p class="stats-panel__subtitle">Lifetime performance</p>
+        </div>
+
+        <div class="stats-hero">
+          <span class="stats-hero__value">---%</span>
+          <span class="stats-hero__label">Win Rate</span>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stats-grid__item">
+            <span class="stats-grid__value">---</span>
+            <span class="stats-grid__label">Games Played</span>
+          </div>
+          <div class="stats-grid__item stats-grid__item--wins">
+            <span class="stats-grid__value">---</span>
+            <span class="stats-grid__label">Wins</span>
+          </div>
+          <div class="stats-grid__item stats-grid__item--losses">
+            <span class="stats-grid__value">---</span>
+            <span class="stats-grid__label">Losses</span>
+          </div>
+          <div class="stats-grid__item">
+            <span class="stats-grid__value">---</span>
+            <span class="stats-grid__label">Total Score</span>
+          </div>
+        </div>
+
+        <div class="stats-panel__footer">Loading...</div>
+      </div>
+
+      <!-- Action button (shown for all states) -->
+      <a href="#" class="stats-page__action" id="action-btn">Play a Game</a>
+    </div>
+
+    <script>
+      function showState(state) {
+        document.getElementById("state-populated").style.display =
+          state === "populated" ? "flex" : "none";
+        document.getElementById("state-empty").style.display =
+          state === "empty" ? "flex" : "none";
+        document.getElementById("state-loading").style.display =
+          state === "loading" ? "flex" : "none";
+
+        // Update active button
+        document.querySelectorAll(".demo-switcher button").forEach((btn) => {
+          btn.classList.toggle(
+            "active",
+            btn.textContent
+              .toLowerCase()
+              .includes(
+                state === "populated"
+                  ? "with"
+                  : state === "empty"
+                    ? "no"
+                    : "load",
+              ),
+          );
+        });
+      }
+    </script>
+  </body>
+</html>
