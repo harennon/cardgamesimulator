@@ -1,0 +1,1579 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tonk — Game Board UI Mockup</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        /* Tonk-specific tokens */
+        --tonk-red: #c44040;
+        --tonk-red-glow: rgba(196, 64, 64, 0.45);
+        --value-good: #5fae6e; /* low hand value = good */
+        --value-warn: #d4843a; /* high hand value = risky */
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 16px 80px;
+      }
+
+      .page-head {
+        max-width: 1280px;
+        margin: 0 auto 24px;
+      }
+      .page-head h1 {
+        font-family: var(--font-card);
+        font-size: 1.8rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.02em;
+      }
+      .page-head p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-top: 6px;
+        max-width: 760px;
+        line-height: 1.5;
+      }
+      .page-head .rules-note {
+        margin-top: 14px;
+        padding: 12px 16px;
+        background: rgba(196, 64, 64, 0.08);
+        border-left: 3px solid var(--tonk-red);
+        border-radius: 4px;
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        line-height: 1.55;
+      }
+      .page-head .rules-note strong {
+        color: var(--gold-accent);
+      }
+
+      .section-label {
+        max-width: 1280px;
+        margin: 40px auto 12px;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--gold-accent);
+        font-weight: 600;
+        border-bottom: 1px solid var(--table-rim-light);
+        padding-bottom: 6px;
+      }
+      .section-label span {
+        color: var(--text-muted);
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 400;
+      }
+
+      /* ============================================================= */
+      /* GAME BOARD — desktop                                          */
+      /* ============================================================= */
+      .board-frame {
+        max-width: 1280px;
+        margin: 0 auto;
+        height: 760px;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      }
+
+      .game-board {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: grid;
+        grid-template-rows: 80px 1fr 220px 64px;
+        grid-template-columns: 1fr 280px;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+      }
+      .game-board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+      .game-board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        pointer-events: none;
+        z-index: 100;
+      }
+      .game-board > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ---------- opponent row ---------- */
+      .opponent-row {
+        grid-area: opponents;
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 16px;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+      }
+      .opponent {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        position: relative;
+        min-width: 96px;
+      }
+      .opponent--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .opponent__cards {
+        display: flex;
+      }
+      .mini-back {
+        width: 24px;
+        height: 34px;
+        margin-left: -12px;
+        border-radius: 3px;
+        border: 1px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        position: relative;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+      .mini-back:first-child {
+        margin-left: 0;
+      }
+      .mini-back::after {
+        content: "";
+        position: absolute;
+        inset: 2px;
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 2px;
+      }
+      .opponent__name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .opponent__meta {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .opponent__count {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+      }
+      .opponent__score {
+        font-size: 0.68rem;
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+      .opponent__turn-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-accent);
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.3);
+        }
+      }
+
+      /* ---------- center table: stock + discard ---------- */
+      .table-area {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 16px;
+      }
+      .turn-banner {
+        font-size: 0.95rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        padding: 6px 18px;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .turn-banner--you {
+        color: #1a0f06;
+        background: var(--gold-accent);
+        box-shadow: 0 0 20px var(--gold-glow);
+      }
+      .turn-banner--other {
+        color: var(--text-primary);
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--table-rim-light);
+      }
+      .turn-banner__timer {
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+      }
+
+      .piles {
+        display: flex;
+        align-items: flex-start;
+        gap: 56px;
+      }
+      .pile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .pile__label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+      .pile__label--active {
+        color: var(--gold-accent);
+      }
+
+      /* stacked stock pile (card backs) */
+      .stock {
+        position: relative;
+        width: 72px;
+        height: 100px;
+      }
+      .stock__card {
+        position: absolute;
+        width: 72px;
+        height: 100px;
+        border-radius: 6px;
+        border: 1.5px solid #c9a84c;
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        overflow: hidden;
+      }
+      .stock__card::after {
+        content: "";
+        position: absolute;
+        inset: 5px;
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        border-radius: 3px;
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 4px,
+          rgba(201, 168, 76, 0.08) 4px,
+          rgba(201, 168, 76, 0.08) 5px
+        );
+      }
+      .stock__card:nth-child(1) {
+        transform: translate(0, 0);
+      }
+      .stock__card:nth-child(2) {
+        transform: translate(2px, 2px);
+      }
+      .stock__card:nth-child(3) {
+        transform: translate(4px, 4px);
+      }
+      .stock__count {
+        position: absolute;
+        bottom: -4px;
+        right: -10px;
+        z-index: 5;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        color: var(--text-primary);
+        font-size: 0.62rem;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 10px;
+      }
+      .pile--drawable .stock {
+        cursor: pointer;
+      }
+      .pile--drawable .stock__card:nth-child(3) {
+        box-shadow:
+          0 0 0 2px var(--gold-accent),
+          0 0 16px var(--gold-glow);
+      }
+
+      /* discard pile face up */
+      .discard {
+        position: relative;
+        width: 72px;
+        height: 100px;
+      }
+      .discard .discard__under {
+        position: absolute;
+        width: 72px;
+        height: 100px;
+        border-radius: 6px;
+        background: var(--card-face);
+        border: 1.5px solid #c8b89a;
+        opacity: 0.55;
+      }
+      .discard .discard__under:nth-child(1) {
+        transform: rotate(-6deg) translate(-3px, 2px);
+      }
+      .discard .discard__under:nth-child(2) {
+        transform: rotate(4deg) translate(2px, 1px);
+      }
+      .pile--drawable .discard .card {
+        box-shadow:
+          0 0 0 2px var(--gold-accent),
+          0 0 16px var(--gold-glow);
+      }
+
+      /* ---------- card primitive ---------- */
+      .card {
+        position: relative;
+        width: 72px;
+        height: 100px;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+      }
+      .card__corner {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+      }
+      .card__corner .r {
+        font-size: 12px;
+      }
+      .card__corner .s {
+        font-size: 11px;
+        margin-top: -1px;
+      }
+      .card__center-rank {
+        font-size: 1.05rem;
+        line-height: 1;
+      }
+      .card__center-suit {
+        font-size: 1.3rem;
+        line-height: 1;
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+      }
+      .card.red {
+        color: var(--red-suit);
+      }
+      .card.black {
+        color: var(--black-suit);
+      }
+      .card.joker {
+        background: linear-gradient(145deg, #2d1810, #1a0f08);
+        color: var(--gold-accent);
+        border-color: var(--gold-accent);
+        font-family: var(--font-ui);
+      }
+      .card.joker .card__center-rank {
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+      }
+
+      /* per-card value badge (the Tonk signature element) */
+      .card__value {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 5px;
+        border-radius: 10px;
+        background: var(--felt-light);
+        border: 1px solid rgba(0, 0, 0, 0.4);
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        font-size: 0.62rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 6;
+      }
+
+      /* ---------- player hand ---------- */
+      .hand-area {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 6px;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 8px 16px;
+      }
+      .hand-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 4px;
+      }
+      .hand-header__label {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      /* the live hand-value meter */
+      .hand-total {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .hand-total__label {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .hand-total__value {
+        font-family: var(--font-card);
+        font-size: 1.7rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--value-good);
+        transition: color 0.3s ease;
+      }
+      .hand-total__value.high {
+        color: var(--value-warn);
+      }
+      .hand-total__bar {
+        width: 120px;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+      }
+      .hand-total__bar span {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+        background: linear-gradient(
+          90deg,
+          var(--value-good),
+          var(--value-warn)
+        );
+      }
+      .hand-cards {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+        padding: 14px 4px 4px;
+      }
+      .hand-cards .card {
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .hand-cards .card.selected {
+        transform: translateY(-18px);
+        box-shadow:
+          0 10px 28px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* ---------- log ---------- */
+      .log {
+        grid-area: log;
+        background: var(--panel-bg);
+        border-left: 1px solid var(--table-rim-light);
+        display: flex;
+        flex-direction: column;
+      }
+      .log__head {
+        padding: 12px 16px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-bottom: 1px solid var(--table-rim-light);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .log__round {
+        font-size: 0.62rem;
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.12);
+        padding: 2px 8px;
+        border-radius: 10px;
+      }
+      .log__list {
+        padding: 10px 16px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .log__entry {
+        font-size: 0.78rem;
+        color: var(--text-primary);
+        line-height: 1.35;
+      }
+      .log__entry .who {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+      .log__entry .muted {
+        color: var(--text-muted);
+      }
+      .log__entry.tonk {
+        color: var(--tonk-red);
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+
+      /* ---------- actions ---------- */
+      .actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 0 16px;
+        position: relative;
+      }
+      .actions__hint {
+        position: absolute;
+        left: 18px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        max-width: 320px;
+      }
+      .actions__hint b {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.92rem;
+        font-weight: 600;
+        padding: 10px 26px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          box-shadow 0.15s ease,
+          opacity 0.15s ease;
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .btn--gold {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--gold:not(:disabled):hover {
+        background: #d4b45a;
+        box-shadow: 0 4px 16px var(--gold-glow);
+      }
+      .btn--ghost {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+      .btn--ghost:not(:disabled):hover {
+        border-color: var(--text-primary);
+        background: rgba(232, 220, 200, 0.08);
+      }
+      /* TONK — the signature call-to-action */
+      .btn--tonk {
+        background: linear-gradient(180deg, var(--tonk-red), #9c2c2c);
+        color: #fff;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 700;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+          0 4px 14px var(--tonk-red-glow);
+      }
+      .btn--tonk:not(:disabled):hover {
+        background: linear-gradient(180deg, #d44a4a, var(--tonk-red));
+        box-shadow: 0 0 24px var(--tonk-red-glow);
+      }
+
+      /* ============================================================= */
+      /* STATE STRIP — small annotated boards                          */
+      /* ============================================================= */
+      .states {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+      .state-card {
+        background: #111;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .state-card__title {
+        padding: 10px 14px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--gold-accent);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .state-card__body {
+        padding: 18px 14px;
+        background: radial-gradient(
+          ellipse at 50% 50%,
+          var(--felt-light),
+          var(--felt)
+        );
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .state-card__note {
+        padding: 10px 14px;
+        font-size: 0.74rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+      .mini-piles {
+        display: flex;
+        gap: 28px;
+        align-items: center;
+      }
+      .card--sm {
+        width: 52px;
+        height: 73px;
+      }
+      .card--sm .card__center-rank {
+        font-size: 0.85rem;
+      }
+      .card--sm .card__center-suit {
+        font-size: 1rem;
+        bottom: 6px;
+        right: 6px;
+      }
+      .card--sm .card__corner .r {
+        font-size: 9px;
+      }
+      .card--sm .card__corner .s {
+        font-size: 8px;
+      }
+
+      .reveal-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+      }
+      .reveal-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.78rem;
+        padding: 6px 10px;
+        border-radius: 5px;
+        background: rgba(0, 0, 0, 0.25);
+      }
+      .reveal-row.winner {
+        background: rgba(95, 174, 110, 0.18);
+        border: 1px solid var(--value-good);
+      }
+      .reveal-row .name {
+        font-weight: 600;
+      }
+      .reveal-row .val {
+        font-family: var(--font-card);
+        font-weight: 700;
+      }
+      .reveal-row .pts {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+      }
+
+      /* ============================================================= */
+      /* MOBILE preview frame                                          */
+      /* ============================================================= */
+      .mobile-row {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: flex;
+        gap: 28px;
+        flex-wrap: wrap;
+      }
+      .phone {
+        width: 320px;
+        height: 640px;
+        border-radius: 28px;
+        border: 8px solid #1a1a1a;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+      }
+      .phone .game-board {
+        grid-template-rows: 52px 1fr 168px 56px;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand"
+          "actions";
+      }
+      .phone .log {
+        display: none;
+      }
+      .phone .game-board::after {
+        border-width: 4px;
+      }
+      .phone .opponent-row {
+        gap: 4px;
+        padding: 6px 8px;
+      }
+      .phone .opponent {
+        flex-direction: row;
+        padding: 4px 8px;
+        min-width: 0;
+        gap: 8px;
+        border-radius: 16px;
+      }
+      .phone .opponent__cards {
+        display: none;
+      }
+      .phone .opponent__name {
+        font-size: 0.7rem;
+        max-width: 52px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .phone .opponent__meta {
+        flex-direction: column;
+        gap: 1px;
+        align-items: flex-start;
+      }
+      .phone .piles {
+        gap: 32px;
+      }
+      .phone .stock,
+      .phone .stock__card,
+      .phone .discard,
+      .phone .card {
+      }
+      .phone .hand-cards {
+        gap: 6px;
+        justify-content: center;
+      }
+      .phone .hand-cards .card {
+        width: 50px;
+        height: 70px;
+      }
+      .phone .hand-cards .card .card__center-rank {
+        font-size: 0.82rem;
+      }
+      .phone .hand-cards .card .card__center-suit {
+        font-size: 0.95rem;
+        bottom: 6px;
+        right: 5px;
+      }
+      .phone .actions {
+        gap: 8px;
+        padding: 0 8px;
+      }
+      .phone .actions__hint {
+        display: none;
+      }
+      .phone .btn {
+        padding: 9px 14px;
+        font-size: 0.78rem;
+      }
+      .phone .log-fab {
+        position: absolute;
+        top: 58px;
+        right: 8px;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--text-muted);
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        z-index: 120;
+      }
+      .phone-cap {
+        text-align: center;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Tonk — Game Board</h1>
+      <p>
+        UI for the second game type. Tonk is a draw-and-discard game: each
+        player holds
+        <b>5 cards</b> and races to <b>minimize</b> their hand value. The board
+        reuses the existing casino-felt system (opponent row, center table,
+        bottom hand, side log, action bar) but swaps Big2's "last play" trick
+        area for a <b>two-pile center</b> (stock + discard) and adds a
+        <b>live hand-value total</b> and the signature <b>Call TONK</b> action.
+      </p>
+      <div class="rules-note">
+        <strong>Rules note for the architect / CEO:</strong> the attached rules
+        variant is a <strong>value-minimization</strong> game (Aces=1, faces=10,
+        jokers=0, sum your 5 cards). It has
+        <em>no spreads, no melds, and no hitting</em> — unlike the rummy-style
+        Tonk the issue scaffold assumed. The turn is strictly
+        <strong>discard&nbsp;1 → draw&nbsp;1</strong>; "Call TONK" replaces "win
+        by emptying your hand." This mockup is designed to the attached rules.
+        Multi-trick scoring runs to 150 points. Flagging the scope difference
+        for sign-off.
+      </div>
+    </div>
+
+    <!-- ============ PRIMARY BOARD — YOUR TURN ============ -->
+    <div class="section-label">
+      Direction A — Full board, your turn
+      <span>· stock + discard center, live hand total, TONK ready</span>
+    </div>
+    <div class="board-frame">
+      <div class="game-board">
+        <!-- opponents -->
+        <div class="opponent-row">
+          <div class="opponent">
+            <div class="opponent__cards">
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+            </div>
+            <div class="opponent__name">Bea</div>
+            <div class="opponent__meta">
+              <span class="opponent__count">5 cards</span>
+              <span class="opponent__score">42 pts</span>
+            </div>
+          </div>
+          <div class="opponent">
+            <div class="opponent__cards">
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+            </div>
+            <div class="opponent__name">Cole</div>
+            <div class="opponent__meta">
+              <span class="opponent__count">5 cards</span>
+              <span class="opponent__score">88 pts</span>
+            </div>
+          </div>
+          <div class="opponent">
+            <div class="opponent__cards">
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+            </div>
+            <div class="opponent__name">Dev</div>
+            <div class="opponent__meta">
+              <span class="opponent__count">5 cards</span>
+              <span class="opponent__score">15 pts</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- center: stock + discard -->
+        <div class="table-area">
+          <div class="turn-banner turn-banner--you">
+            ◆ Your turn — discard, then draw
+            <span class="turn-banner__timer">0:48</span>
+          </div>
+          <div class="piles">
+            <div class="pile pile--drawable">
+              <div class="pile__label pile__label--active">Stock — draw</div>
+              <div class="stock">
+                <div class="stock__card"></div>
+                <div class="stock__card"></div>
+                <div class="stock__card"></div>
+                <div class="stock__count">31 left</div>
+              </div>
+            </div>
+            <div class="pile pile--drawable">
+              <div class="pile__label pile__label--active">Discard — draw</div>
+              <div class="discard">
+                <div class="discard__under"></div>
+                <div class="discard__under"></div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="r">9</span><span class="s">♠</span>
+                  </div>
+                  <div class="card__center-rank">9</div>
+                  <div class="card__center-suit">♠</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- hand -->
+        <div class="hand-area">
+          <div class="hand-header">
+            <span class="hand-header__label">Your hand (5)</span>
+            <div class="hand-total">
+              <span class="hand-total__label">Hand value</span>
+              <span class="hand-total__value">19</span>
+              <span class="hand-total__bar"
+                ><span style="width: 19%"></span
+              ></span>
+            </div>
+          </div>
+          <div class="hand-cards">
+            <div class="card red selected">
+              <div class="card__value">1</div>
+              <div class="card__corner">
+                <span class="r">A</span><span class="s">♦</span>
+              </div>
+              <div class="card__center-rank">A</div>
+              <div class="card__center-suit">♦</div>
+            </div>
+            <div class="card black">
+              <div class="card__value">3</div>
+              <div class="card__corner">
+                <span class="r">3</span><span class="s">♣</span>
+              </div>
+              <div class="card__center-rank">3</div>
+              <div class="card__center-suit">♣</div>
+            </div>
+            <div class="card red">
+              <div class="card__value">5</div>
+              <div class="card__corner">
+                <span class="r">5</span><span class="s">♥</span>
+              </div>
+              <div class="card__center-rank">5</div>
+              <div class="card__center-suit">♥</div>
+            </div>
+            <div class="card joker">
+              <div class="card__value">0</div>
+              <div class="card__center-rank">JOKER</div>
+            </div>
+            <div class="card black">
+              <div class="card__value">10</div>
+              <div class="card__corner">
+                <span class="r">K</span><span class="s">♠</span>
+              </div>
+              <div class="card__center-rank">K</div>
+              <div class="card__center-suit">♠</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- log -->
+        <div class="log">
+          <div class="log__head">
+            <span>Game Log</span>
+            <span class="log__round">Round 4</span>
+          </div>
+          <div class="log__list">
+            <div class="log__entry">
+              <span class="who">You</span> drew from stock
+            </div>
+            <div class="log__entry">
+              <span class="who">Dev</span> discarded
+              <span class="muted">9♠</span>
+            </div>
+            <div class="log__entry">
+              <span class="who">Dev</span> drew from discard
+              <span class="muted">(7♦)</span>
+            </div>
+            <div class="log__entry">
+              <span class="who">Cole</span> discarded
+              <span class="muted">Q♥</span>
+            </div>
+            <div class="log__entry">
+              <span class="who">Bea</span> discarded
+              <span class="muted">4♣</span>
+            </div>
+            <div class="log__entry tonk">Bea called TONK — lost (held 21)</div>
+            <div class="log__entry">
+              <span class="muted">— New round dealt —</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- actions -->
+        <div class="actions">
+          <div class="actions__hint">
+            Select a card to <b>discard</b>, then tap a pile to <b>draw</b>. Or
+            <b>Call TONK</b> if you think your hand is lowest.
+          </div>
+          <button class="btn btn--ghost" disabled>Draw</button>
+          <button class="btn btn--gold">Discard A♦</button>
+          <button class="btn btn--tonk">Call Tonk</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ KEY STATES ============ -->
+    <div class="section-label">
+      Key states <span>· how the center + actions adapt through a turn</span>
+    </div>
+    <div class="states">
+      <div class="state-card">
+        <div class="state-card__title">1 · Waiting (not your turn)</div>
+        <div class="state-card__body">
+          <div
+            class="turn-banner turn-banner--other"
+            style="margin-bottom: 4px"
+          >
+            Cole's turn <span class="turn-banner__timer">0:33</span>
+          </div>
+          <div class="mini-piles">
+            <div class="stock" style="width: 52px; height: 73px">
+              <div class="stock__card" style="width: 52px; height: 73px"></div>
+              <div class="stock__card" style="width: 52px; height: 73px"></div>
+              <div class="stock__card" style="width: 52px; height: 73px"></div>
+            </div>
+            <div class="card black card--sm">
+              <div class="card__corner">
+                <span class="r">9</span><span class="s">♠</span>
+              </div>
+              <div class="card__center-rank">9</div>
+              <div class="card__center-suit">♠</div>
+            </div>
+          </div>
+        </div>
+        <div class="state-card__note">
+          Piles are visible but not highlighted; all action buttons disabled.
+          Your live hand value stays on screen so you can plan. Drawable glow
+          only appears on your turn.
+        </div>
+      </div>
+
+      <div class="state-card">
+        <div class="state-card__title">2 · Drew — now choose draw source</div>
+        <div class="state-card__body">
+          <div class="turn-banner turn-banner--you" style="margin-bottom: 4px">
+            After discard — draw 1
+          </div>
+          <div class="mini-piles">
+            <div class="pile pile--drawable">
+              <div class="stock" style="width: 52px; height: 73px">
+                <div
+                  class="stock__card"
+                  style="width: 52px; height: 73px"
+                ></div>
+                <div
+                  class="stock__card"
+                  style="width: 52px; height: 73px"
+                ></div>
+                <div
+                  class="stock__card"
+                  style="width: 52px; height: 73px"
+                ></div>
+              </div>
+            </div>
+            <div class="pile pile--drawable">
+              <div class="discard" style="width: 52px; height: 73px">
+                <div class="card red card--sm">
+                  <div class="card__corner">
+                    <span class="r">A</span><span class="s">♦</span>
+                  </div>
+                  <div class="card__center-rank">A</div>
+                  <div class="card__center-suit">♦</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="state-card__note">
+          Both piles glow gold and are clickable. Drawing from
+          <b>discard</b> takes the visible card (the one the previous player
+          threw); drawing from <b>stock</b> is a blind draw. One card only.
+        </div>
+      </div>
+
+      <div class="state-card">
+        <div class="state-card__title">
+          3 · Round reveal (someone called Tonk)
+        </div>
+        <div class="state-card__body" style="justify-content: flex-start">
+          <div class="reveal-grid">
+            <div class="reveal-row winner">
+              <span class="name">Dev — called Tonk ✓</span>
+              <span class="val">11</span>
+              <span class="pts">+0</span>
+            </div>
+            <div class="reveal-row">
+              <span class="name">You</span>
+              <span class="val">19</span>
+              <span class="pts">+19</span>
+            </div>
+            <div class="reveal-row">
+              <span class="name">Bea</span>
+              <span class="val">24</span>
+              <span class="pts">+24</span>
+            </div>
+            <div class="reveal-row">
+              <span class="name">Cole</span>
+              <span class="val">30</span>
+              <span class="pts">+30</span>
+            </div>
+          </div>
+        </div>
+        <div class="state-card__note">
+          All hands reveal. Caller with the truly-lowest hand scores <b>+0</b>;
+          everyone else adds their hand value. A bad call (someone ties/beats
+          them) costs the caller <b>+30</b>. Running totals; first to
+          <b>150</b> loses.
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MOBILE ============ -->
+    <div class="section-label">
+      Mobile (≤767px)
+      <span
+        >· same grid minus side log; log moves to a drawer behind a button</span
+      >
+    </div>
+    <div class="mobile-row">
+      <div>
+        <div class="phone">
+          <div class="game-board">
+            <div class="opponent-row">
+              <div class="opponent opponent--active">
+                <div class="opponent__turn-dot"></div>
+                <div class="opponent__name">Bea</div>
+                <div class="opponent__meta">
+                  <span class="opponent__count">5</span
+                  ><span class="opponent__score">42</span>
+                </div>
+              </div>
+              <div class="opponent">
+                <div class="opponent__name">Cole</div>
+                <div class="opponent__meta">
+                  <span class="opponent__count">5</span
+                  ><span class="opponent__score">88</span>
+                </div>
+              </div>
+              <div class="opponent">
+                <div class="opponent__name">Dev</div>
+                <div class="opponent__meta">
+                  <span class="opponent__count">5</span
+                  ><span class="opponent__score">15</span>
+                </div>
+              </div>
+            </div>
+            <div class="log-fab">☰</div>
+            <div class="table-area" style="gap: 12px">
+              <div class="turn-banner turn-banner--other">
+                Bea's turn <span class="turn-banner__timer">0:21</span>
+              </div>
+              <div class="piles" style="gap: 32px">
+                <div class="pile">
+                  <div class="pile__label">Stock</div>
+                  <div class="stock">
+                    <div class="stock__card"></div>
+                    <div class="stock__card"></div>
+                    <div class="stock__card"></div>
+                    <div class="stock__count">31</div>
+                  </div>
+                </div>
+                <div class="pile">
+                  <div class="pile__label">Discard</div>
+                  <div class="discard">
+                    <div class="card black">
+                      <div class="card__corner">
+                        <span class="r">9</span><span class="s">♠</span>
+                      </div>
+                      <div class="card__center-rank">9</div>
+                      <div class="card__center-suit">♠</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="hand-area">
+              <div class="hand-header">
+                <span class="hand-header__label">Hand (5)</span>
+                <div class="hand-total">
+                  <span class="hand-total__value">19</span>
+                  <span class="hand-total__bar"
+                    ><span style="width: 19%"></span
+                  ></span>
+                </div>
+              </div>
+              <div class="hand-cards">
+                <div class="card red">
+                  <div class="card__value">1</div>
+                  <div class="card__center-rank">A</div>
+                  <div class="card__center-suit">♦</div>
+                </div>
+                <div class="card black">
+                  <div class="card__value">3</div>
+                  <div class="card__center-rank">3</div>
+                  <div class="card__center-suit">♣</div>
+                </div>
+                <div class="card red">
+                  <div class="card__value">5</div>
+                  <div class="card__center-rank">5</div>
+                  <div class="card__center-suit">♥</div>
+                </div>
+                <div class="card joker">
+                  <div class="card__value">0</div>
+                  <div class="card__center-rank">JKR</div>
+                </div>
+                <div class="card black">
+                  <div class="card__value">10</div>
+                  <div class="card__center-rank">K</div>
+                  <div class="card__center-suit">♠</div>
+                </div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn btn--ghost" disabled>Draw</button>
+              <button class="btn btn--gold" disabled>Discard</button>
+              <button class="btn btn--tonk" disabled>Tonk</button>
+            </div>
+          </div>
+        </div>
+        <div class="phone-cap">
+          Waiting state — buttons disabled, value still visible
+        </div>
+      </div>
+
+      <div>
+        <div class="phone">
+          <div class="game-board">
+            <div class="opponent-row">
+              <div class="opponent">
+                <div class="opponent__name">Bea</div>
+                <div class="opponent__meta">
+                  <span class="opponent__count">5</span
+                  ><span class="opponent__score">42</span>
+                </div>
+              </div>
+              <div class="opponent">
+                <div class="opponent__name">Cole</div>
+                <div class="opponent__meta">
+                  <span class="opponent__count">5</span
+                  ><span class="opponent__score">88</span>
+                </div>
+              </div>
+              <div class="opponent">
+                <div class="opponent__name">Dev</div>
+                <div class="opponent__meta">
+                  <span class="opponent__count">5</span
+                  ><span class="opponent__score">15</span>
+                </div>
+              </div>
+            </div>
+            <div class="log-fab">☰</div>
+            <div class="table-area" style="gap: 12px">
+              <div class="turn-banner turn-banner--you">
+                ◆ Your turn — draw 1
+              </div>
+              <div class="piles" style="gap: 32px">
+                <div class="pile pile--drawable">
+                  <div class="pile__label pile__label--active">Stock</div>
+                  <div class="stock">
+                    <div class="stock__card"></div>
+                    <div class="stock__card"></div>
+                    <div class="stock__card"></div>
+                    <div class="stock__count">30</div>
+                  </div>
+                </div>
+                <div class="pile pile--drawable">
+                  <div class="pile__label pile__label--active">Discard</div>
+                  <div class="discard">
+                    <div class="card red">
+                      <div class="card__corner">
+                        <span class="r">A</span><span class="s">♦</span>
+                      </div>
+                      <div class="card__center-rank">A</div>
+                      <div class="card__center-suit">♦</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="hand-area">
+              <div class="hand-header">
+                <span class="hand-header__label">Hand (4) — discarded K♠</span>
+                <div class="hand-total">
+                  <span class="hand-total__value">9</span>
+                  <span class="hand-total__bar"
+                    ><span style="width: 9%"></span
+                  ></span>
+                </div>
+              </div>
+              <div class="hand-cards">
+                <div class="card red">
+                  <div class="card__value">1</div>
+                  <div class="card__center-rank">A</div>
+                  <div class="card__center-suit">♦</div>
+                </div>
+                <div class="card black">
+                  <div class="card__value">3</div>
+                  <div class="card__center-rank">3</div>
+                  <div class="card__center-suit">♣</div>
+                </div>
+                <div class="card red">
+                  <div class="card__value">5</div>
+                  <div class="card__center-rank">5</div>
+                  <div class="card__center-suit">♥</div>
+                </div>
+                <div class="card joker">
+                  <div class="card__value">0</div>
+                  <div class="card__center-rank">JKR</div>
+                </div>
+              </div>
+            </div>
+            <div class="actions">
+              <span
+                style="
+                  position: absolute;
+                  left: 8px;
+                  font-size: 0.62rem;
+                  color: var(--text-muted);
+                "
+                >Tap a pile ↑</span
+              >
+              <button class="btn btn--gold">Draw stock</button>
+              <button class="btn btn--tonk" disabled>Tonk</button>
+            </div>
+          </div>
+        </div>
+        <div class="phone-cap">
+          Mid-turn — discarded, now drawing (piles glow)
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CREATE-GAME + GAME-OVER deltas ============ -->
+    <div class="section-label">
+      Flow deltas
+      <span
+        >· game creation type selector + game-over screen reuse, with Tonk
+        wording</span
+      >
+    </div>
+    <div class="states" style="grid-template-columns: repeat(2, 1fr)">
+      <div class="state-card">
+        <div class="state-card__title">Create Game — type selector</div>
+        <div
+          class="state-card__body"
+          style="background: #15100c; align-items: stretch"
+        >
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 14px;
+              max-width: 300px;
+              margin: 0 auto;
+              width: 100%;
+            "
+          >
+            <label
+              style="
+                font-size: 0.72rem;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+              "
+              >Game Type</label
+            >
+            <div style="display: flex; gap: 10px">
+              <div
+                style="
+                  flex: 1;
+                  padding: 14px;
+                  border-radius: 8px;
+                  border: 1.5px solid var(--table-rim-light);
+                  background: rgba(0, 0, 0, 0.25);
+                  text-align: center;
+                  font-size: 0.85rem;
+                  color: var(--text-muted);
+                "
+              >
+                Big 2<br /><span style="font-size: 0.62rem">2–4 players</span>
+              </div>
+              <div
+                style="
+                  flex: 1;
+                  padding: 14px;
+                  border-radius: 8px;
+                  border: 1.5px solid var(--gold-accent);
+                  background: rgba(201, 168, 76, 0.1);
+                  text-align: center;
+                  font-size: 0.85rem;
+                  color: var(--text-primary);
+                "
+              >
+                Tonk ✓<br /><span style="font-size: 0.62rem">3–5 players</span>
+              </div>
+            </div>
+            <label
+              style="
+                font-size: 0.72rem;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+              "
+              >Players: 4</label
+            >
+            <input
+              type="range"
+              min="3"
+              max="5"
+              value="4"
+              style="accent-color: var(--gold-accent)"
+            />
+            <button class="btn btn--gold" style="width: 100%">
+              Create Game
+            </button>
+          </div>
+        </div>
+        <div class="state-card__note">
+          Type selector becomes a two-card toggle (was a dropdown). Player range
+          and helper text switch per game type (Big2 2–4, Tonk 3–5). Timer
+          control unchanged.
+        </div>
+      </div>
+
+      <div class="state-card">
+        <div class="state-card__title">Game Over — match lost at 150</div>
+        <div class="state-card__body" style="background: #15100c">
+          <div
+            style="
+              font-family: var(--font-card);
+              font-size: 1.3rem;
+              color: var(--gold-accent);
+              margin-bottom: 6px;
+            "
+          >
+            Dev wins the match
+          </div>
+          <div class="reveal-grid">
+            <div class="reveal-row winner">
+              <span class="name">Dev</span><span class="val">38</span
+              ><span class="pts">lowest</span>
+            </div>
+            <div class="reveal-row">
+              <span class="name">You</span><span class="val">96</span
+              ><span class="pts">2nd</span>
+            </div>
+            <div class="reveal-row">
+              <span class="name">Bea</span><span class="val">121</span
+              ><span class="pts">3rd</span>
+            </div>
+            <div class="reveal-row">
+              <span class="name">Cole</span><span class="val">152</span
+              ><span class="pts">over 150 — lost</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 14px">
+            <button class="btn btn--gold">Rematch</button>
+            <button class="btn btn--ghost">Home</button>
+          </div>
+        </div>
+        <div class="state-card__note">
+          Reuses GameOverView shell. Tonk scoring is
+          <b>lowest-total-wins</b> (inverse of Big2), and the match ends when a
+          player crosses 150. Stats map: winner→gamesWon, others→gamesLost,
+          score = final total.
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
