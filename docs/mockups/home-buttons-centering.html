@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Home Buttons Centering Fix — Before/After</title>
+    <style>
+      /* === Design tokens (from game-variables.css) === */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --input-border: var(--table-rim-light);
+        --input-border-focus: var(--gold-accent);
+        --input-text: var(--text-primary);
+        --btn-primary-bg: var(--gold-accent);
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-secondary-bg: transparent;
+        --btn-secondary-border: var(--text-muted);
+        --btn-secondary-text: var(--text-primary);
+        --btn-radius: 6px;
+        --page-max-width: 420px;
+        --card-panel-bg: var(--panel-bg);
+        --card-panel-border: var(--table-rim-light);
+        --card-panel-radius: 12px;
+        --card-panel-padding: 40px 48px;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: var(--font-ui), sans-serif;
+        background: var(--bg-dark);
+        color: var(--text-primary);
+        line-height: 1.5;
+      }
+
+      /* === Mockup layout: side by side comparison === */
+      .mockup-header {
+        background: #1a1a1a;
+        border-bottom: 1px solid var(--table-rim-light);
+        padding: 16px 24px;
+        text-align: center;
+      }
+      .mockup-header h1 {
+        font-size: 1.2rem;
+        color: var(--gold-accent);
+        margin-bottom: 4px;
+      }
+      .mockup-header p {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      .comparison {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+        min-height: calc(100vh - 80px);
+      }
+
+      .comparison__panel {
+        border-right: 1px solid var(--table-rim-light);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .comparison__panel:last-child {
+        border-right: none;
+      }
+
+      .comparison__label {
+        text-align: center;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .comparison__label--bug {
+        background: rgba(224, 85, 85, 0.15);
+        color: #e05555;
+        border: 1px solid rgba(224, 85, 85, 0.3);
+      }
+      .comparison__label--fix {
+        background: rgba(76, 175, 80, 0.15);
+        color: #4caf50;
+        border: 1px solid rgba(76, 175, 80, 0.3);
+      }
+
+      /* === Viewport frame === */
+      .viewport-frame {
+        border: 2px solid var(--table-rim-light);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--bg-dark);
+      }
+      .viewport-frame__label {
+        background: #1a1a1a;
+        padding: 6px 12px;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-align: center;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .viewport-frame__content {
+        position: relative;
+      }
+
+      /* === Simulated flow-page (BEFORE — the bug) === */
+      .flow-page-bug {
+        min-height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+      .flow-page-bug.mobile {
+        align-items: flex-start;
+        padding: 24px 16px;
+        padding-top: 48px;
+      }
+
+      .home-bug {
+        text-align: center;
+        max-width: 500px;
+        /* BUG: No width: 100%, so it shrinks to content width */
+        /* Visual indicator of the issue */
+        outline: 1px dashed rgba(224, 85, 85, 0.5);
+        outline-offset: 4px;
+      }
+
+      /* === Simulated flow-page (AFTER — the fix) === */
+      .flow-page-fix {
+        min-height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+      .flow-page-fix.mobile {
+        align-items: flex-start;
+        padding: 24px 16px;
+        padding-top: 48px;
+      }
+
+      .home-fix {
+        text-align: center;
+        max-width: 500px;
+        width: 100%; /* THE FIX */
+        outline: 1px dashed rgba(76, 175, 80, 0.5);
+        outline-offset: 4px;
+      }
+
+      /* === Shared home component styles === */
+      .home__title {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0 0 8px;
+      }
+      .home__subtitle {
+        font-size: 1rem;
+        color: var(--text-primary);
+        margin: 0 0 32px;
+      }
+      .home__actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+      }
+      .btn-primary {
+        font-family: var(--font-ui), sans-serif;
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: var(--btn-radius);
+        border: none;
+        cursor: pointer;
+        background: var(--btn-primary-bg);
+        color: var(--btn-primary-text);
+        display: block;
+        text-align: center;
+        text-decoration: none;
+        width: 100%;
+      }
+      .btn-primary:hover {
+        background: var(--btn-primary-hover);
+      }
+      .btn-secondary {
+        font-family: var(--font-ui), sans-serif;
+        font-size: 0.9rem;
+        font-weight: 500;
+        padding: 10px 20px;
+        border-radius: var(--btn-radius);
+        border: 1.5px solid var(--btn-secondary-border);
+        background: var(--btn-secondary-bg);
+        color: var(--btn-secondary-text);
+        cursor: pointer;
+        text-decoration: none;
+        text-align: center;
+        display: block;
+        width: 100%;
+      }
+      .btn-secondary:hover {
+        border-color: var(--text-primary);
+        background: rgba(232, 220, 200, 0.08);
+      }
+
+      /* === Annotation overlay === */
+      .annotation {
+        position: absolute;
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        background: rgba(0, 0, 0, 0.8);
+        padding: 2px 6px;
+        border-radius: 3px;
+        white-space: nowrap;
+      }
+      .annotation--top-left {
+        top: 4px;
+        left: 4px;
+      }
+      .annotation--center-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        pointer-events: none;
+      }
+
+      /* === Responsive: stack panels on narrow viewports === */
+      @media (max-width: 900px) {
+        .comparison {
+          grid-template-columns: 1fr;
+        }
+        .comparison__panel {
+          border-right: none;
+          border-bottom: 1px solid var(--table-rim-light);
+        }
+      }
+
+      /* === Code diff section === */
+      .code-section {
+        padding: 24px;
+        border-top: 1px solid var(--table-rim-light);
+        background: #111;
+      }
+      .code-section h2 {
+        font-size: 1rem;
+        color: var(--gold-accent);
+        margin-bottom: 12px;
+      }
+      .code-block {
+        font-family: "JetBrains Mono", "Fira Code", monospace;
+        font-size: 0.8rem;
+        line-height: 1.6;
+        background: #0a0a0a;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        padding: 16px;
+        overflow-x: auto;
+      }
+      .code-block .added {
+        color: #4caf50;
+        background: rgba(76, 175, 80, 0.1);
+        display: block;
+      }
+      .code-block .context {
+        color: var(--text-muted);
+        display: block;
+      }
+
+      /* === Width ruler === */
+      .ruler {
+        height: 12px;
+        position: relative;
+        margin: 0 auto;
+        border-left: 1px solid rgba(255, 255, 255, 0.3);
+        border-right: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      .ruler::after {
+        content: attr(data-width);
+        position: absolute;
+        top: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        background: var(--bg-dark);
+        padding: 0 4px;
+      }
+      .ruler::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.2);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mockup-header">
+      <h1>Issue #46: Home Buttons Not Centered</h1>
+      <p>
+        Before (bug) vs After (fix) — showing the effect of adding
+        <code>width: 100%</code> to <code>.home</code>
+      </p>
+    </div>
+
+    <div class="comparison">
+      <!-- BEFORE panel -->
+      <div class="comparison__panel">
+        <div class="comparison__label comparison__label--bug">
+          Before (Bug) — .home has no width: 100%
+        </div>
+
+        <!-- Desktop viewport -->
+        <div class="viewport-frame">
+          <div class="viewport-frame__label">Desktop — 1280px viewport</div>
+          <div class="viewport-frame__content">
+            <div class="annotation--center-line"></div>
+            <div class="flow-page-bug">
+              <div class="home-bug">
+                <h1 class="home__title">Card Game Simulator</h1>
+                <p class="home__subtitle">Welcome back, Alice</p>
+                <div class="home__actions">
+                  <a class="btn-primary" href="#">Create Game</a>
+                  <a class="btn-secondary" href="#">Join Game</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tablet viewport -->
+        <div class="viewport-frame">
+          <div class="viewport-frame__label">
+            Tablet — 768px viewport (looks OK here due to flex centering)
+          </div>
+          <div class="viewport-frame__content">
+            <div class="annotation--center-line"></div>
+            <div class="flow-page-bug">
+              <div class="home-bug">
+                <h1 class="home__title">Card Game Simulator</h1>
+                <p class="home__subtitle">Welcome back, Alice</p>
+                <div class="home__actions">
+                  <a class="btn-primary" href="#">Create Game</a>
+                  <a class="btn-secondary" href="#">Join Game</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile viewport — the problematic case -->
+        <div class="viewport-frame">
+          <div class="viewport-frame__label">
+            Mobile — 375px viewport (align-items: flex-start kicks in)
+          </div>
+          <div
+            class="viewport-frame__content"
+            style="max-width: 375px; margin: 0 auto"
+          >
+            <div class="annotation--center-line"></div>
+            <div class="flow-page-bug mobile">
+              <div class="home-bug">
+                <h1 class="home__title">Card Game Simulator</h1>
+                <p class="home__subtitle">Welcome back, Alice</p>
+                <div class="home__actions">
+                  <a class="btn-primary" href="#">Create Game</a>
+                  <a class="btn-secondary" href="#">Join Game</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AFTER panel -->
+      <div class="comparison__panel">
+        <div class="comparison__label comparison__label--fix">
+          After (Fix) — .home gets width: 100%
+        </div>
+
+        <!-- Desktop viewport -->
+        <div class="viewport-frame">
+          <div class="viewport-frame__label">Desktop — 1280px viewport</div>
+          <div class="viewport-frame__content">
+            <div class="annotation--center-line"></div>
+            <div class="flow-page-fix">
+              <div class="home-fix">
+                <h1 class="home__title">Card Game Simulator</h1>
+                <p class="home__subtitle">Welcome back, Alice</p>
+                <div class="home__actions">
+                  <a class="btn-primary" href="#">Create Game</a>
+                  <a class="btn-secondary" href="#">Join Game</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tablet viewport -->
+        <div class="viewport-frame">
+          <div class="viewport-frame__label">Tablet — 768px viewport</div>
+          <div class="viewport-frame__content">
+            <div class="annotation--center-line"></div>
+            <div class="flow-page-fix">
+              <div class="home-fix">
+                <h1 class="home__title">Card Game Simulator</h1>
+                <p class="home__subtitle">Welcome back, Alice</p>
+                <div class="home__actions">
+                  <a class="btn-primary" href="#">Create Game</a>
+                  <a class="btn-secondary" href="#">Join Game</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile viewport — fixed -->
+        <div class="viewport-frame">
+          <div class="viewport-frame__label">
+            Mobile — 375px viewport (buttons correctly centered)
+          </div>
+          <div
+            class="viewport-frame__content"
+            style="max-width: 375px; margin: 0 auto"
+          >
+            <div class="annotation--center-line"></div>
+            <div class="flow-page-fix mobile">
+              <div class="home-fix">
+                <h1 class="home__title">Card Game Simulator</h1>
+                <p class="home__subtitle">Welcome back, Alice</p>
+                <div class="home__actions">
+                  <a class="btn-primary" href="#">Create Game</a>
+                  <a class="btn-secondary" href="#">Join Game</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Code diff -->
+    <div class="code-section">
+      <h2>
+        CSS Fix — src/frontend/component/HomeView.vue (&lt;style scoped&gt;)
+      </h2>
+      <pre class="code-block"><span class="context"> .home {</span>
+<span class="context">   text-align: center;</span>
+<span class="context">   max-width: 500px;</span>
+<span class="added">+  width: 100%;</span>
+<span class="context"> }</span></pre>
+      <p style="margin-top: 12px; font-size: 0.8rem; color: var(--text-muted)">
+        <strong>Why this works:</strong> The <code>.flow-page</code> flex
+        container centers its children via <code>justify-content: center</code>.
+        Without <code>width: 100%</code>, the <code>.home</code> div shrinks to
+        its intrinsic content width (about 300px from
+        <code>.home__actions</code>). The <code>margin: 0 auto</code> on
+        <code>.home__actions</code> becomes a no-op because the parent is
+        already content-sized. Adding <code>width: 100%</code> makes
+        <code>.home</code> fill the available space (capped at
+        <code>max-width: 500px</code>), giving <code>margin: 0 auto</code> room
+        to center the buttons within. On mobile, where
+        <code>align-items: flex-start</code> removes cross-axis centering,
+        <code>width: 100%</code> ensures the container spans the full viewport
+        width minus padding, keeping buttons centered via the auto margin.
+      </p>
+    </div>
+
+    <!-- Regression check section -->
+    <div class="code-section">
+      <h2>Regression Check — Other Flow Pages</h2>
+      <p
+        style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px"
+      >
+        The fix only touches <code>.home</code> (scoped style in
+        <code>HomeView.vue</code>). Other flow pages (Login, Signup, CreateGame,
+        JoinGame) use <code>.form-card</code> which already has
+        <code>width: 100%</code> and
+        <code>max-width: var(--page-max-width)</code>. No changes needed — no
+        regressions possible.
+      </p>
+      <pre
+        class="code-block"
+      ><span class="context">/* flows.css — .form-card already correct */</span>
+<span class="context">.form-card {</span>
+<span class="context">  ...
+  width: 100%;            /* already present */</span>
+<span class="context">  max-width: var(--page-max-width);  /* 420px */</span>
+<span class="context">}</span></pre>
+    </div>
+  </body>
+</html>
