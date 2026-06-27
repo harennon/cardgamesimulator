@@ -1,0 +1,1682 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Over Transition — Design Mockup</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --victory-glow: rgba(201, 168, 76, 0.15);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #0a0a0a;
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        overflow-x: hidden;
+      }
+
+      h1 {
+        text-align: center;
+        padding: 24px;
+        font-size: 1.1rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.05em;
+      }
+
+      .design-note {
+        max-width: 900px;
+        margin: 0 auto 32px;
+        padding: 16px 24px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      .design-note strong {
+        color: var(--text-primary);
+      }
+
+      .section-label {
+        text-align: center;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        margin: 56px 0 16px;
+        font-weight: 600;
+      }
+
+      /* ===== SHARED: Game Board Background ===== */
+      .game-board-sim {
+        position: relative;
+        width: 100%;
+        max-width: 1000px;
+        margin: 0 auto 48px;
+        height: 580px;
+        background: radial-gradient(
+          ellipse 80% 70% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        overflow: hidden;
+      }
+
+      .game-board-sim::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+
+      /* Simulated opponents at top */
+      .sim-opponents {
+        display: flex;
+        justify-content: center;
+        gap: 48px;
+        padding: 16px 24px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .sim-opponent {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .sim-opponent__cards {
+        display: flex;
+        gap: -8px;
+      }
+
+      .sim-opponent__name {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      .sim-opponent__count {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        opacity: 0.7;
+      }
+
+      /* Card back mini */
+      .card-back-mini {
+        width: 24px;
+        height: 34px;
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        border-radius: 3px;
+        margin-left: -8px;
+      }
+      .card-back-mini:first-child {
+        margin-left: 0;
+      }
+
+      /* Simulated center play area */
+      .sim-center {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        z-index: 1;
+      }
+
+      .sim-center__label {
+        font-size: 0.7rem;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 500;
+      }
+
+      .sim-center__cards {
+        display: flex;
+        gap: 6px;
+      }
+
+      .sim-center__player {
+        font-size: 0.65rem;
+        color: var(--text-muted);
+      }
+
+      /* Simulated hand at bottom */
+      .sim-hand {
+        position: absolute;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: -12px;
+        z-index: 1;
+      }
+
+      /* ===== PLAYING CARD ===== */
+      .card {
+        position: relative;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+      }
+
+      .card--medium {
+        width: 52px;
+        height: 74px;
+        font-size: 0.95rem;
+      }
+
+      .card--large {
+        width: 72px;
+        height: 102px;
+        font-size: 1.2rem;
+      }
+
+      .card--small {
+        width: 40px;
+        height: 56px;
+        font-size: 0.75rem;
+      }
+
+      .card--hand {
+        width: 48px;
+        height: 68px;
+        font-size: 0.85rem;
+        margin-left: -12px;
+      }
+      .card--hand:first-child {
+        margin-left: 0;
+      }
+
+      .card__rank {
+        line-height: 1;
+      }
+      .card__suit {
+        line-height: 1;
+        font-size: 1.1em;
+        margin-top: 2px;
+      }
+
+      .card--red .card__rank,
+      .card--red .card__suit {
+        color: var(--red-suit);
+      }
+      .card--black .card__rank,
+      .card--black .card__suit {
+        color: var(--black-suit);
+      }
+
+      /* Victory-highlighted card */
+      .card--victory {
+        border-color: var(--gold-accent);
+        box-shadow:
+          0 0 20px var(--gold-glow),
+          0 0 40px rgba(201, 168, 76, 0.15),
+          2px 4px 12px var(--card-shadow);
+        animation: cardGlow 2s ease-in-out infinite alternate;
+      }
+
+      @keyframes cardGlow {
+        from {
+          box-shadow:
+            0 0 20px var(--gold-glow),
+            0 0 40px rgba(201, 168, 76, 0.1),
+            2px 4px 12px var(--card-shadow);
+        }
+        to {
+          box-shadow:
+            0 0 30px var(--gold-glow),
+            0 0 60px rgba(201, 168, 76, 0.2),
+            2px 4px 12px var(--card-shadow);
+        }
+      }
+
+      /* ================================================================
+       OPTION A: Dramatic Center Overlay — "Spotlight Moment"
+       ================================================================ */
+
+      .overlay-a {
+        position: absolute;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: overlayFadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      @keyframes overlayFadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* Radial vignette darkening — board visible but dimmed */
+      .overlay-a__backdrop {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 60% 50% at 50% 50%,
+          rgba(0, 0, 0, 0.4) 0%,
+          rgba(0, 0, 0, 0.75) 100%
+        );
+        pointer-events: none;
+      }
+
+      /* The floating victory card */
+      .overlay-a__content {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        animation: contentSlideUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+      }
+
+      @keyframes contentSlideUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .overlay-a__banner {
+        font-family: var(--font-ui);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        color: var(--gold-accent);
+        font-weight: 600;
+        animation: bannerPulse 2.5s ease-in-out infinite;
+      }
+
+      @keyframes bannerPulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      .overlay-a__winner-name {
+        font-family: var(--font-ui);
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        text-shadow: 0 0 30px var(--gold-glow);
+      }
+
+      .overlay-a__hand-type {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--gold-accent);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .overlay-a__cards {
+        display: flex;
+        gap: 10px;
+        animation: cardsReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+      }
+
+      @keyframes cardsReveal {
+        from {
+          opacity: 0;
+          transform: scale(0.8) translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+
+      .overlay-a__actions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        margin-top: 8px;
+        animation: actionsAppear 0.5s ease 1.2s both;
+      }
+
+      @keyframes actionsAppear {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .overlay-a__countdown {
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        letter-spacing: 0.05em;
+      }
+
+      .overlay-a__countdown-ring {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .countdown-ring {
+        width: 28px;
+        height: 28px;
+        position: relative;
+      }
+
+      .countdown-ring svg {
+        transform: rotate(-90deg);
+        width: 28px;
+        height: 28px;
+      }
+
+      .countdown-ring__track {
+        fill: none;
+        stroke: rgba(201, 168, 76, 0.2);
+        stroke-width: 3;
+      }
+
+      .countdown-ring__fill {
+        fill: none;
+        stroke: var(--gold-accent);
+        stroke-width: 3;
+        stroke-dasharray: 75.4;
+        stroke-dashoffset: 0;
+        stroke-linecap: round;
+        animation: ringDrain 5s linear forwards;
+      }
+
+      @keyframes ringDrain {
+        from {
+          stroke-dashoffset: 0;
+        }
+        to {
+          stroke-dashoffset: 75.4;
+        }
+      }
+
+      .countdown-ring__number {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        font-family: var(--font-ui);
+      }
+
+      .btn-results {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 12px 32px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        transition:
+          background 0.15s ease,
+          transform 0.1s ease;
+        letter-spacing: 0.02em;
+      }
+
+      .btn-results:hover {
+        background: #d4b45a;
+        transform: translateY(-1px);
+      }
+
+      .btn-results:active {
+        transform: translateY(0);
+      }
+
+      /* Particle burst effect (CSS only) */
+      .overlay-a__particles {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        pointer-events: none;
+      }
+
+      .particle {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        background: var(--gold-accent);
+        border-radius: 50%;
+        opacity: 0;
+        animation: particleBurst 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      .particle:nth-child(1) {
+        animation-delay: 0.4s;
+        --px: -80px;
+        --py: -60px;
+      }
+      .particle:nth-child(2) {
+        animation-delay: 0.5s;
+        --px: 90px;
+        --py: -40px;
+      }
+      .particle:nth-child(3) {
+        animation-delay: 0.45s;
+        --px: -50px;
+        --py: 70px;
+      }
+      .particle:nth-child(4) {
+        animation-delay: 0.55s;
+        --px: 70px;
+        --py: 50px;
+      }
+      .particle:nth-child(5) {
+        animation-delay: 0.6s;
+        --px: -100px;
+        --py: 10px;
+      }
+      .particle:nth-child(6) {
+        animation-delay: 0.5s;
+        --px: 40px;
+        --py: -80px;
+      }
+      .particle:nth-child(7) {
+        animation-delay: 0.65s;
+        --px: -30px;
+        --py: -90px;
+      }
+      .particle:nth-child(8) {
+        animation-delay: 0.55s;
+        --px: 110px;
+        --py: 20px;
+      }
+
+      @keyframes particleBurst {
+        0% {
+          opacity: 0;
+          transform: translate(0, 0) scale(0);
+        }
+        30% {
+          opacity: 1;
+          transform: translate(calc(var(--px) * 0.5), calc(var(--py) * 0.5))
+            scale(1.5);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(var(--px), var(--py)) scale(0);
+        }
+      }
+
+      /* ================================================================
+       OPTION B: Bottom-Up Sliding Panel — "Peek Results"
+       ================================================================ */
+
+      .overlay-b {
+        position: absolute;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        pointer-events: none;
+      }
+
+      .overlay-b__top-banner {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 16px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 0.7) 0%,
+          transparent 100%
+        );
+        animation: topBannerSlide 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+        z-index: 3;
+      }
+
+      @keyframes topBannerSlide {
+        from {
+          opacity: 0;
+          transform: translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .overlay-b__top-banner-text {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--gold-accent);
+        letter-spacing: 0.05em;
+      }
+
+      .overlay-b__winning-cards-spotlight {
+        position: absolute;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        z-index: 2;
+        animation: spotlightAppear 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
+      }
+
+      @keyframes spotlightAppear {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+
+      .overlay-b__hand-type {
+        font-family: var(--font-ui);
+        font-size: 0.72rem;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-weight: 500;
+      }
+
+      .overlay-b__cards {
+        display: flex;
+        gap: 8px;
+      }
+
+      .overlay-b__played-by {
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      /* Sliding panel from bottom */
+      .overlay-b__panel {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 220px;
+        background: var(--panel-bg);
+        backdrop-filter: blur(12px);
+        border-top: 2px solid var(--table-rim-light);
+        border-radius: 16px 16px 0 0;
+        padding: 20px 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        pointer-events: all;
+        animation: panelSlideUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.8s both;
+        z-index: 4;
+      }
+
+      @keyframes panelSlideUp {
+        from {
+          transform: translateY(100%);
+        }
+        to {
+          transform: translateY(0);
+        }
+      }
+
+      .overlay-b__panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .overlay-b__panel-title {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .overlay-b__panel-countdown {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      .overlay-b__panel-scores {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr;
+        gap: 4px 12px;
+        font-size: 0.75rem;
+      }
+
+      .overlay-b__panel-scores-header {
+        color: var(--gold-accent);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.65rem;
+        letter-spacing: 0.06em;
+        padding-bottom: 4px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+      }
+
+      .overlay-b__panel-scores-row {
+        display: contents;
+      }
+
+      .overlay-b__panel-scores-row > span {
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.2);
+      }
+
+      .overlay-b__panel-scores-row--winner > span {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      .overlay-b__panel-btn {
+        align-self: center;
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 10px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        transition: background 0.15s ease;
+      }
+
+      .overlay-b__panel-btn:hover {
+        background: #d4b45a;
+      }
+
+      /* Dim the board behind the panel */
+      .overlay-b__board-dim {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+        animation: dimFadeIn 0.4s ease 0.6s both;
+      }
+
+      @keyframes dimFadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* ================================================================
+       MOBILE VIEWPORT SIMULATION
+       ================================================================ */
+      .mobile-frame {
+        width: 390px;
+        height: 660px;
+        margin: 0 auto 48px;
+        border: 3px solid #333;
+        border-radius: 40px;
+        overflow: hidden;
+        position: relative;
+        background: var(--felt);
+      }
+
+      .mobile-frame::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 24px;
+        background: #222;
+        border-radius: 0 0 12px 12px;
+        z-index: 200;
+      }
+
+      .mobile-frame .game-board-sim {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        margin: 0;
+        border-width: 4px;
+      }
+
+      /* Mobile overlay A adjustments */
+      .mobile-frame .overlay-a__winner-name {
+        font-size: 1.3rem;
+      }
+
+      .mobile-frame .card--large {
+        width: 56px;
+        height: 80px;
+        font-size: 1rem;
+      }
+
+      .mobile-frame .overlay-a__cards {
+        gap: 6px;
+      }
+
+      /* Mobile overlay B adjustments */
+      .mobile-frame .overlay-b__panel {
+        height: 200px;
+        padding: 16px 20px;
+      }
+
+      .mobile-frame .overlay-b__panel-scores {
+        font-size: 0.7rem;
+      }
+
+      /* ================================================================
+       INTERACTIVE DEMO CONTROLS
+       ================================================================ */
+      .demo-controls {
+        max-width: 600px;
+        margin: 0 auto 24px;
+        padding: 16px 24px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .demo-controls button {
+        font-family: var(--font-ui);
+        font-size: 0.75rem;
+        padding: 8px 16px;
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-primary);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .demo-controls button:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+
+      .demo-controls button.active {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border-color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      /* ================================================================
+       COMPARISON TABLE
+       ================================================================ */
+      .comparison-table {
+        max-width: 900px;
+        margin: 0 auto 48px;
+        padding: 16px 24px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+      }
+
+      .comparison-table table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+      }
+
+      .comparison-table th {
+        text-align: left;
+        padding: 8px;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+
+      .comparison-table td {
+        padding: 8px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.3);
+        color: var(--text-muted);
+      }
+
+      .comparison-table td strong {
+        color: var(--text-primary);
+      }
+
+      /* ================================================================
+       ARCHITECTURE SPEC
+       ================================================================ */
+      .spec-block {
+        max-width: 900px;
+        margin: 0 auto 32px;
+        padding: 20px 24px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        font-family: "DM Mono", "SF Mono", monospace;
+        font-size: 0.7rem;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        color: var(--text-muted);
+      }
+
+      .spec-block strong {
+        color: var(--gold-accent);
+      }
+      .spec-block em {
+        color: var(--text-primary);
+        font-style: normal;
+      }
+
+      /* Responsive */
+      @media (max-width: 767px) {
+        .game-board-sim {
+          height: 400px;
+          margin: 0 8px 32px;
+        }
+        .sim-opponents {
+          gap: 24px;
+        }
+        .mobile-frame {
+          width: 100%;
+          max-width: 390px;
+          height: 580px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-delay: 0.01ms !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Game Over Screen Delay — Final Cards Visibility</h1>
+
+    <div class="design-note">
+      <strong>Problem:</strong> When a player wins, the UI instantly swaps from
+      game board to game over screen. Players never see the winning cards. This
+      removes the climactic moment.<br /><br />
+      <strong>Solution:</strong> Introduce a 5-second "victory moment"
+      intermediate state. The game board remains visible (dimmed) while the
+      winning play is highlighted. A countdown + button lets users proceed to
+      full results whenever ready. Two directions explored below.<br /><br />
+      <strong>Interaction model:</strong> After the final play arrives via
+      <code>game:state</code> with <code>status: "COMPLETED"</code>, the
+      frontend enters a <code>GAME_ENDING</code> display state (frontend-only,
+      not a server state). After 5 seconds OR user click, it transitions to the
+      full GameOverView.
+    </div>
+
+    <!-- ===== OPTION A ===== -->
+    <div class="section-label">Option A — Center Spotlight Overlay</div>
+    <div class="design-note">
+      The game board stays fully visible but darkened via a radial vignette. The
+      winning play appears center-screen at large scale with a gold glow. A ring
+      countdown timer shows seconds remaining. "View Results" button is
+      immediately available.
+      <strong>This is the dramatic, cinematic option.</strong>
+      The board context (who has what cards remaining) stays visible through the
+      dim overlay.
+    </div>
+
+    <div class="demo-controls">
+      <button class="active" onclick="replayA()">Replay Animation</button>
+    </div>
+
+    <div class="game-board-sim" id="board-a">
+      <!-- Simulated opponents -->
+      <div class="sim-opponents">
+        <div class="sim-opponent">
+          <div class="sim-opponent__cards">
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+          </div>
+          <span class="sim-opponent__name">Bob</span>
+          <span class="sim-opponent__count">5 cards</span>
+        </div>
+        <div class="sim-opponent">
+          <div class="sim-opponent__cards">
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+          </div>
+          <span class="sim-opponent__name">Charlie</span>
+          <span class="sim-opponent__count">8 cards</span>
+        </div>
+        <div class="sim-opponent">
+          <div class="sim-opponent__cards">
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+          </div>
+          <span class="sim-opponent__name">Dave</span>
+          <span class="sim-opponent__count">3 cards</span>
+        </div>
+      </div>
+
+      <!-- Simulated hand (empty — winner played their last cards) -->
+      <div class="sim-hand" style="bottom: 60px">
+        <span
+          style="
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-style: italic;
+          "
+          >No cards remaining</span
+        >
+      </div>
+
+      <!-- OVERLAY A: Victory Spotlight -->
+      <div class="overlay-a" id="overlay-a">
+        <div class="overlay-a__backdrop"></div>
+        <div class="overlay-a__particles">
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+        </div>
+        <div class="overlay-a__content">
+          <span class="overlay-a__banner">Game Over</span>
+          <span class="overlay-a__winner-name">Alice wins!</span>
+          <span class="overlay-a__hand-type">Straight</span>
+          <div class="overlay-a__cards">
+            <div class="card card--large card--black card--victory">
+              <span class="card__rank">10</span>
+              <span class="card__suit">&spades;</span>
+            </div>
+            <div class="card card--large card--black card--victory">
+              <span class="card__rank">J</span>
+              <span class="card__suit">&clubs;</span>
+            </div>
+            <div class="card card--large card--red card--victory">
+              <span class="card__rank">Q</span>
+              <span class="card__suit">&hearts;</span>
+            </div>
+            <div class="card card--large card--black card--victory">
+              <span class="card__rank">K</span>
+              <span class="card__suit">&spades;</span>
+            </div>
+            <div class="card card--large card--red card--victory">
+              <span class="card__rank">A</span>
+              <span class="card__suit">&diams;</span>
+            </div>
+          </div>
+          <div class="overlay-a__actions">
+            <div class="overlay-a__countdown">
+              <div class="overlay-a__countdown-ring">
+                <div class="countdown-ring">
+                  <svg viewBox="0 0 28 28">
+                    <circle
+                      class="countdown-ring__track"
+                      cx="14"
+                      cy="14"
+                      r="12"
+                    ></circle>
+                    <circle
+                      class="countdown-ring__fill"
+                      cx="14"
+                      cy="14"
+                      r="12"
+                    ></circle>
+                  </svg>
+                  <span class="countdown-ring__number" id="countdown-a">5</span>
+                </div>
+                <span>Auto-continue</span>
+              </div>
+            </div>
+            <button class="btn-results">View Results</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== OPTION B ===== -->
+    <div class="section-label">Option B — Bottom Panel with Board Visible</div>
+    <div class="design-note">
+      A panel slides up from the bottom revealing a preview of results (scores
+      table). The winning play remains spotlighted in the center of the
+      still-visible board above. The board is only slightly dimmed so players
+      can see opponent card counts.
+      <strong>This is the informational, peek-ahead option.</strong> Users see
+      both the winning moment AND the results simultaneously. The panel has a
+      "View Full Results" button that completes the transition.
+    </div>
+
+    <div class="demo-controls">
+      <button class="active" onclick="replayB()">Replay Animation</button>
+    </div>
+
+    <div class="game-board-sim" id="board-b">
+      <!-- Simulated opponents -->
+      <div class="sim-opponents">
+        <div class="sim-opponent">
+          <div class="sim-opponent__cards">
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+          </div>
+          <span class="sim-opponent__name">Bob</span>
+          <span class="sim-opponent__count">5 cards</span>
+        </div>
+        <div class="sim-opponent">
+          <div class="sim-opponent__cards">
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+          </div>
+          <span class="sim-opponent__name">Charlie</span>
+          <span class="sim-opponent__count">8 cards</span>
+        </div>
+        <div class="sim-opponent">
+          <div class="sim-opponent__cards">
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+            <div class="card-back-mini"></div>
+          </div>
+          <span class="sim-opponent__name">Dave</span>
+          <span class="sim-opponent__count">3 cards</span>
+        </div>
+      </div>
+
+      <!-- OVERLAY B: Bottom panel + spotlight -->
+      <div class="overlay-b" id="overlay-b">
+        <div class="overlay-b__board-dim"></div>
+
+        <div class="overlay-b__top-banner">
+          <span class="overlay-b__top-banner-text">Alice wins the game!</span>
+        </div>
+
+        <div class="overlay-b__winning-cards-spotlight">
+          <span class="overlay-b__hand-type">Winning Play — Straight</span>
+          <div class="overlay-b__cards">
+            <div class="card card--medium card--black card--victory">
+              <span class="card__rank">10</span>
+              <span class="card__suit">&spades;</span>
+            </div>
+            <div class="card card--medium card--black card--victory">
+              <span class="card__rank">J</span>
+              <span class="card__suit">&clubs;</span>
+            </div>
+            <div class="card card--medium card--red card--victory">
+              <span class="card__rank">Q</span>
+              <span class="card__suit">&hearts;</span>
+            </div>
+            <div class="card card--medium card--black card--victory">
+              <span class="card__rank">K</span>
+              <span class="card__suit">&spades;</span>
+            </div>
+            <div class="card card--medium card--red card--victory">
+              <span class="card__rank">A</span>
+              <span class="card__suit">&diams;</span>
+            </div>
+          </div>
+          <span class="overlay-b__played-by">played by Alice</span>
+        </div>
+
+        <div class="overlay-b__panel">
+          <div class="overlay-b__panel-header">
+            <span class="overlay-b__panel-title">Final Results</span>
+            <div class="overlay-b__panel-countdown">
+              <div class="countdown-ring">
+                <svg viewBox="0 0 28 28">
+                  <circle
+                    class="countdown-ring__track"
+                    cx="14"
+                    cy="14"
+                    r="12"
+                  ></circle>
+                  <circle
+                    class="countdown-ring__fill"
+                    cx="14"
+                    cy="14"
+                    r="12"
+                  ></circle>
+                </svg>
+                <span class="countdown-ring__number" id="countdown-b">5</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="overlay-b__panel-scores">
+            <span class="overlay-b__panel-scores-header">Player</span>
+            <span class="overlay-b__panel-scores-header">Place</span>
+            <span class="overlay-b__panel-scores-header">Cards</span>
+            <span class="overlay-b__panel-scores-header">Pts</span>
+
+            <div
+              class="overlay-b__panel-scores-row overlay-b__panel-scores-row--winner"
+            >
+              <span>Alice</span><span>1st</span><span>0</span><span>5</span>
+            </div>
+            <div class="overlay-b__panel-scores-row">
+              <span>Dave</span><span>2nd</span><span>3</span><span>3</span>
+            </div>
+            <div class="overlay-b__panel-scores-row">
+              <span>Bob</span><span>3rd</span><span>5</span><span>1</span>
+            </div>
+            <div class="overlay-b__panel-scores-row">
+              <span>Charlie</span><span>4th</span><span>8</span><span>0</span>
+            </div>
+          </div>
+
+          <button class="overlay-b__panel-btn">View Full Results</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MOBILE PREVIEWS ===== -->
+    <div class="section-label">Mobile (iPhone 16) — Option A</div>
+    <div class="design-note">
+      Cards scale down slightly on mobile. The overlay still covers the full
+      board. The countdown ring and button are touch-friendly (48px min target).
+      The winner name and cards are the dominant visual — everything else is
+      secondary.
+    </div>
+
+    <div class="mobile-frame">
+      <div class="game-board-sim">
+        <div class="sim-opponents" style="gap: 20px; padding: 28px 12px 8px">
+          <div class="sim-opponent">
+            <div class="sim-opponent__cards">
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+            </div>
+            <span class="sim-opponent__name">Bob (5)</span>
+          </div>
+          <div class="sim-opponent">
+            <div class="sim-opponent__cards">
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+            </div>
+            <span class="sim-opponent__name">Charlie (3)</span>
+          </div>
+        </div>
+
+        <div class="overlay-a" style="animation: none; opacity: 1">
+          <div class="overlay-a__backdrop"></div>
+          <div
+            class="overlay-a__content"
+            style="animation: none; opacity: 1; transform: none"
+          >
+            <span class="overlay-a__banner" style="animation: none"
+              >Game Over</span
+            >
+            <span class="overlay-a__winner-name">Alice wins!</span>
+            <span class="overlay-a__hand-type">Pair</span>
+            <div
+              class="overlay-a__cards"
+              style="animation: none; opacity: 1; transform: none"
+            >
+              <div class="card card--large card--red card--victory">
+                <span class="card__rank">2</span>
+                <span class="card__suit">&hearts;</span>
+              </div>
+              <div class="card card--large card--black card--victory">
+                <span class="card__rank">2</span>
+                <span class="card__suit">&spades;</span>
+              </div>
+            </div>
+            <div
+              class="overlay-a__actions"
+              style="animation: none; opacity: 1; transform: none"
+            >
+              <div class="overlay-a__countdown">
+                <div class="overlay-a__countdown-ring">
+                  <div class="countdown-ring">
+                    <svg viewBox="0 0 28 28">
+                      <circle
+                        class="countdown-ring__track"
+                        cx="14"
+                        cy="14"
+                        r="12"
+                      ></circle>
+                      <circle
+                        class="countdown-ring__fill"
+                        cx="14"
+                        cy="14"
+                        r="12"
+                        style="animation: none; stroke-dashoffset: 30"
+                      ></circle>
+                    </svg>
+                    <span class="countdown-ring__number">3</span>
+                  </div>
+                  <span>Auto-continue</span>
+                </div>
+              </div>
+              <button
+                class="btn-results"
+                style="min-height: 48px; min-width: 180px"
+              >
+                View Results
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MOBILE OPTION B ===== -->
+    <div class="section-label">Mobile (iPhone 16) — Option B</div>
+    <div class="design-note">
+      The bottom panel takes more proportional space on mobile, but the winning
+      cards remain visible above. The scores grid collapses cleanly. Touch
+      target for "View Full Results" meets 48px minimum.
+    </div>
+
+    <div class="mobile-frame">
+      <div class="game-board-sim">
+        <div class="sim-opponents" style="gap: 20px; padding: 28px 12px 8px">
+          <div class="sim-opponent">
+            <div class="sim-opponent__cards">
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+            </div>
+            <span class="sim-opponent__name">Bob (5)</span>
+          </div>
+          <div class="sim-opponent">
+            <div class="sim-opponent__cards">
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+              <div class="card-back-mini"></div>
+            </div>
+            <span class="sim-opponent__name">Charlie (3)</span>
+          </div>
+        </div>
+
+        <div class="overlay-b" style="pointer-events: auto">
+          <div
+            class="overlay-b__board-dim"
+            style="animation: none; opacity: 1"
+          ></div>
+
+          <div
+            class="overlay-b__top-banner"
+            style="animation: none; opacity: 1; transform: none"
+          >
+            <span class="overlay-b__top-banner-text">Alice wins!</span>
+          </div>
+
+          <div
+            class="overlay-b__winning-cards-spotlight"
+            style="
+              animation: none;
+              opacity: 1;
+              transform: translate(-50%, -50%) scale(1);
+              top: 35%;
+            "
+          >
+            <span class="overlay-b__hand-type">Pair</span>
+            <div class="overlay-b__cards">
+              <div class="card card--medium card--red card--victory">
+                <span class="card__rank">2</span>
+                <span class="card__suit">&hearts;</span>
+              </div>
+              <div class="card card--medium card--black card--victory">
+                <span class="card__rank">2</span>
+                <span class="card__suit">&spades;</span>
+              </div>
+            </div>
+            <span class="overlay-b__played-by">played by Alice</span>
+          </div>
+
+          <div
+            class="overlay-b__panel"
+            style="
+              animation: none;
+              transform: none;
+              height: 200px;
+              padding: 14px 16px;
+            "
+          >
+            <div class="overlay-b__panel-header">
+              <span class="overlay-b__panel-title">Results</span>
+              <div class="overlay-b__panel-countdown">
+                <div class="countdown-ring">
+                  <svg viewBox="0 0 28 28">
+                    <circle
+                      class="countdown-ring__track"
+                      cx="14"
+                      cy="14"
+                      r="12"
+                    ></circle>
+                    <circle
+                      class="countdown-ring__fill"
+                      cx="14"
+                      cy="14"
+                      r="12"
+                      style="animation: none; stroke-dashoffset: 45"
+                    ></circle>
+                  </svg>
+                  <span class="countdown-ring__number">2</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="overlay-b__panel-scores" style="font-size: 0.7rem">
+              <span class="overlay-b__panel-scores-header">Player</span>
+              <span class="overlay-b__panel-scores-header">Place</span>
+              <span class="overlay-b__panel-scores-header">Cards</span>
+              <span class="overlay-b__panel-scores-header">Pts</span>
+
+              <div
+                class="overlay-b__panel-scores-row overlay-b__panel-scores-row--winner"
+              >
+                <span>Alice</span><span>1st</span><span>0</span><span>5</span>
+              </div>
+              <div class="overlay-b__panel-scores-row">
+                <span>Dave</span><span>2nd</span><span>3</span><span>3</span>
+              </div>
+              <div class="overlay-b__panel-scores-row">
+                <span>Bob</span><span>3rd</span><span>5</span><span>1</span>
+              </div>
+              <div class="overlay-b__panel-scores-row">
+                <span>Charlie</span><span>4th</span><span>8</span><span>0</span>
+              </div>
+            </div>
+
+            <button
+              class="overlay-b__panel-btn"
+              style="min-height: 48px; width: 100%"
+            >
+              View Full Results
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== COMPARISON ===== -->
+    <div class="section-label">Comparison</div>
+    <div class="comparison-table">
+      <table>
+        <tr>
+          <th>Aspect</th>
+          <th>A — Center Spotlight</th>
+          <th>B — Bottom Panel</th>
+        </tr>
+        <tr>
+          <td><strong>Emotional impact</strong></td>
+          <td>High — cinematic, dramatic reveal</td>
+          <td>Medium — informational, functional</td>
+        </tr>
+        <tr>
+          <td><strong>Information density</strong></td>
+          <td>Low — just winning cards + winner</td>
+          <td>High — cards + scores + placements visible together</td>
+        </tr>
+        <tr>
+          <td><strong>Board visibility</strong></td>
+          <td>Dimmed but fully visible behind overlay</td>
+          <td>Top half visible, bottom half covered by panel</td>
+        </tr>
+        <tr>
+          <td><strong>User control</strong></td>
+          <td>Click button or wait for countdown</td>
+          <td>Click button or wait for countdown</td>
+        </tr>
+        <tr>
+          <td><strong>Mobile</strong></td>
+          <td>Scales naturally — cards shrink, layout stays same</td>
+          <td>Panel takes proportionally more space, cards above it</td>
+        </tr>
+        <tr>
+          <td><strong>Implementation complexity</strong></td>
+          <td>Low — single overlay div with animations</td>
+          <td>Medium — panel + spotlight + grid scoring</td>
+        </tr>
+        <tr>
+          <td><strong>Matches user request</strong></td>
+          <td>
+            "show the last card played with a button that leads to the game over
+            screen"
+          </td>
+          <td>
+            "hover the game over screen over the board with an option to hide
+            it"
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- ===== COMPONENT ARCHITECTURE ===== -->
+    <div class="section-label">Component Architecture</div>
+    <div class="spec-block">
+      <strong>GameView.vue</strong> (modified) - New computed:
+      <em>displayPhase</em> — 'IN_PROGRESS' | 'GAME_ENDING' | 'COMPLETED' - When
+      status transitions to COMPLETED, displayPhase becomes 'GAME_ENDING' -
+      After 5s OR user click, displayPhase becomes 'COMPLETED' (shows
+      GameOverView) - Template: show GameBoard when displayPhase is IN_PROGRESS
+      or GAME_ENDING - Template: show VictoryOverlay when displayPhase is
+      GAME_ENDING - Template: show GameOverView when displayPhase is COMPLETED
+
+      <strong>VictoryOverlay.vue</strong> (NEW component) Props: { winnerName:
+      string, winningCards: Card[], handType: string, countdownSeconds: number
+      // starts at 5, ticks down } Events: { continue: void // user clicked
+      "View Results" } Layout: position: absolute, inset: 0, z-index: 50 State:
+      internal countdown ref (ticked by setInterval) Animation: CSS keyframes
+      for entrance (no JS animation libs)
+
+      <strong>useGameEndTransition</strong> (NEW composable) Input: status ref
+      from useGameState Returns: { displayPhase: Ref&lt;'IN_PROGRESS' |
+      'GAME_ENDING' | 'COMPLETED'&gt;, countdown: Ref&lt;number&gt;,
+      skipToResults: () => void } Behavior: - Watches status; when it changes to
+      'COMPLETED', sets displayPhase to 'GAME_ENDING' - Starts 5s countdown
+      (setInterval, 1s ticks) - When countdown hits 0 OR skipToResults() called,
+      sets displayPhase to 'COMPLETED' - Cleans up interval on unmount
+
+      <strong>Data flow:</strong>
+      Server emits game:state with status='COMPLETED' and winner field set →
+      useGameState updates status ref to 'COMPLETED' → useGameEndTransition
+      detects change, holds in GAME_ENDING for 5s → VictoryOverlay reads final
+      gameState.lastPlay for winning cards → User clicks or timer expires →
+      displayPhase = 'COMPLETED' → GameOverView renders (existing component,
+      unchanged)
+    </div>
+
+    <div class="section-label">State Management</div>
+    <div class="spec-block">
+      <strong>Key insight:</strong> The server status is still 'COMPLETED'. The
+      GAME_ENDING state is purely a frontend display concern. No backend changes
+      needed.
+
+      <strong>gameState</strong> — already contains all needed data at COMPLETED
+      time: - gameState.winner → winner's playerId -
+      gameState.gameSpecificPublicState.lastPlay → the winning cards -
+      gameState.players → displayName lookup - gameState.scores → for Option B
+      panel preview
+
+      <strong>No new WebSocket events needed.</strong> The existing game:state
+      event with status='COMPLETED' already carries the lastPlay and winner
+      fields.
+
+      <strong>Edge cases handled:</strong>
+      - User refreshes during GAME_ENDING → gameState arrives as COMPLETED,
+      displayPhase starts at GAME_ENDING again (countdown restarts) - Multiple
+      game:state events → ignored once in GAME_ENDING/COMPLETED - Spectators →
+      same overlay, same behavior - prefers-reduced-motion → skip animations,
+      still show 5s delay
+    </div>
+
+    <div class="section-label">CSS Layout Strategy</div>
+    <div class="spec-block">
+      <strong>VictoryOverlay positioning:</strong>
+      - position: absolute; inset: 0 (fills GameBoard parent) - GameBoard
+      already has position: fixed; overflow: hidden - Overlay layers above all
+      board content via z-index: 50
+
+      <strong>Option A layout:</strong>
+      - Flexbox column, centered (align-items: center; justify-content: center)
+      - Cards row: flexbox with gap - Countdown + button: flex column below
+      cards
+
+      <strong>Option B layout:</strong>
+      - Flex column with justify-content: space-between - Top: banner (absolute
+      top) - Middle: spotlight cards (absolute center) - Bottom: panel (absolute
+      bottom, slides up) - Panel interior: CSS Grid for scores table
+
+      <strong>Responsive (mobile):</strong>
+      - Cards use --card-play-width/height tokens (already responsive) - Button:
+      min-height 48px for touch - Option B panel height: auto with max-height:
+      50vh - No structural layout changes needed — both options scale naturally
+    </div>
+
+    <script>
+      // Countdown simulation
+      function startCountdown(elementId, duration) {
+        let remaining = duration;
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        el.textContent = remaining;
+        const interval = setInterval(() => {
+          remaining--;
+          el.textContent = remaining;
+          if (remaining <= 0) {
+            clearInterval(interval);
+            el.textContent = "0";
+          }
+        }, 1000);
+        return interval;
+      }
+
+      // Start countdowns on load
+      let intervalA = startCountdown("countdown-a", 5);
+      let intervalB = startCountdown("countdown-b", 5);
+
+      // Replay buttons
+      function replayA() {
+        clearInterval(intervalA);
+        const overlay = document.getElementById("overlay-a");
+        const clone = overlay.cloneNode(true);
+        clone.id = "overlay-a";
+        overlay.parentNode.replaceChild(clone, overlay);
+        intervalA = startCountdown("countdown-a", 5);
+      }
+
+      function replayB() {
+        clearInterval(intervalB);
+        const overlay = document.getElementById("overlay-b");
+        const clone = overlay.cloneNode(true);
+        clone.id = "overlay-b";
+        overlay.parentNode.replaceChild(clone, overlay);
+        intervalB = startCountdown("countdown-b", 5);
+      }
+    </script>
+  </body>
+</html>
