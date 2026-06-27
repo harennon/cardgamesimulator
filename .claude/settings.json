@@ -10,18 +10,27 @@
       "Bash(npm --prefix * run build*)",
       "Bash(npm test*)",
       "Bash(npm --prefix * test*)",
+      "Bash(npm --prefix * run test*)",
       "Bash(npm run lint*)",
       "Bash(npm --prefix * run lint*)",
+      "Bash(npm run start*)",
       "Bash(git *)",
       "Bash(gh *)",
       "Bash(mkdir *)",
       "Bash(python3 -m http.server *)",
       "Bash(pkill -f *http.server 8090*)",
       "Bash(cd /personal-workplace/neijurli/wt-* && *)",
+      "Bash(npx --prefix /personal-workplace/neijurli/wt-* *)",
+      "Bash(which * && npx --prefix /personal-workplace/neijurli/wt-* *)",
       "Bash(find /personal-workplace/neijurli/wt-*)",
       "Bash(ls /personal-workplace/neijurli/wt-*)",
       "Bash(cat /personal-workplace/neijurli/wt-*)",
-      "Bash(grep * /personal-workplace/neijurli/wt-*)"
+      "Bash(grep * /personal-workplace/neijurli/wt-*)",
+      "Bash(cp /personal-workplace/neijurli/*)",
+      "Bash(docker --version*)",
+      "Bash(curl *)",
+      "Bash(lsof *)",
+      "Bash(kill *)"
     ]
   },
   "hooks": {
