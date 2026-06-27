@@ -37,6 +37,28 @@ if (authError || !data.session) {
 
 const token = data.session.access_token;
 
+const [, , ...args] = process.argv;
+
+// Handle --delete <id> flag
+const deleteIdx = args.indexOf("--delete");
+if (deleteIdx !== -1) {
+  const deleteId = args[deleteIdx + 1];
+  if (!deleteId || deleteId.startsWith("--")) {
+    console.error("Usage: node feedback.mjs --delete <id>");
+    process.exit(1);
+  }
+  const delRes = await fetch(`${RAILWAY_URL}/feedback/${deleteId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!delRes.ok) {
+    console.error("DELETE failed:", delRes.status, await delRes.text());
+    process.exit(1);
+  }
+  console.log(`Deleted feedback ${deleteId}`);
+  process.exit(0);
+}
+
 const res = await fetch(`${RAILWAY_URL}/feedback`, {
   headers: { Authorization: `Bearer ${token}` },
 });
@@ -48,7 +70,6 @@ if (!res.ok) {
 
 const rows = await res.json();
 
-const [, , ...args] = process.argv;
 const category = args.find((a) => !a.startsWith("--"));
 const json = args.includes("--json");
 

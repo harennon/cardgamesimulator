@@ -16,6 +16,8 @@ function makeFeedbackRepo(
 ): FeedbackRepository {
   return {
     createFeedback: vi.fn().mockImplementation(async (f: Feedback) => f),
+    getAllFeedback: vi.fn().mockResolvedValue([]),
+    deleteFeedback: vi.fn().mockResolvedValue(true),
     ...overrides,
   };
 }

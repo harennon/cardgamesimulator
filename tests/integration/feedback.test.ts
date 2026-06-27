@@ -166,6 +166,103 @@ describe("Feedback endpoint integration", () => {
     expect(res.status).toBe(401);
   });
 
+  // DELETE /feedback/:id
+
+  it("DELETE /feedback/:id returns 403 when userId is not in FEEDBACK_ADMIN_IDS", async () => {
+    const user = await createTestUser("FeedbackDelNonAdmin");
+
+    const res = await request(ctx.app)
+      .delete("/feedback/some-fake-id")
+      .set("Authorization", `Bearer ${user.accessToken}`);
+
+    expect(res.status).toBe(403);
+    expect((res.body as { error: string }).error).toBe("Forbidden");
+  });
+
+  it("DELETE /feedback/:id returns 401 without auth", async () => {
+    const res = await request(ctx.app).delete("/feedback/some-fake-id");
+
+    expect(res.status).toBe(401);
+  });
+
+  it("DELETE /feedback/:id returns 404 when feedback does not exist", async () => {
+    const admin = await createTestUser("FeedbackDelAdmin404");
+
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
+    try {
+      const res = await request(ctx.app)
+        .delete("/feedback/00000000-0000-0000-0000-000000000000")
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+
+      expect(res.status).toBe(404);
+      expect((res.body as { error: string }).error).toBe("Feedback not found");
+    } finally {
+      delete process.env.FEEDBACK_ADMIN_IDS;
+    }
+  });
+
+  it("DELETE /feedback/:id returns 200 and removes the feedback", async () => {
+    const admin = await createTestUser("FeedbackDelAdmin200");
+
+    // Create feedback first
+    const createRes = await request(ctx.app)
+      .post("/feedback")
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ category: "bug", description: "To be deleted" });
+    expect(createRes.status).toBe(201);
+    const { id } = createRes.body as SubmitFeedbackResponse;
+
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
+    try {
+      // Delete
+      const delRes = await request(ctx.app)
+        .delete(`/feedback/${id}`)
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+
+      expect(delRes.status).toBe(200);
+      expect((delRes.body as { deleted: string }).deleted).toBe(id);
+
+      // Verify it's gone
+      const getRes = await request(ctx.app)
+        .get("/feedback")
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(getRes.status).toBe(200);
+      const items = getRes.body as Array<{ id: string }>;
+      expect(items.find((f) => f.id === id)).toBeUndefined();
+    } finally {
+      delete process.env.FEEDBACK_ADMIN_IDS;
+    }
+  });
+
+  it("DELETE /feedback/:id returns 404 on double-delete", async () => {
+    const admin = await createTestUser("FeedbackDelDouble");
+
+    // Create feedback
+    const createRes = await request(ctx.app)
+      .post("/feedback")
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ category: "other", description: "Double delete test" });
+    expect(createRes.status).toBe(201);
+    const { id } = createRes.body as SubmitFeedbackResponse;
+
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
+    try {
+      // First delete succeeds
+      const delRes1 = await request(ctx.app)
+        .delete(`/feedback/${id}`)
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(delRes1.status).toBe(200);
+
+      // Second delete returns 404
+      const delRes2 = await request(ctx.app)
+        .delete(`/feedback/${id}`)
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(delRes2.status).toBe(404);
+    } finally {
+      delete process.env.FEEDBACK_ADMIN_IDS;
+    }
+  });
+
   it("GET /feedback returns feedback list for admin user", async () => {
     const admin = await createTestUser("FeedbackAdmin");
 

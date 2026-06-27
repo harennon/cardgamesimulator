@@ -178,6 +178,16 @@ export class SupabaseDB
     );
   }
 
+  public async deleteFeedback(id: string): Promise<boolean> {
+    const { data, error } = await this.db
+      .from("feedback")
+      .delete()
+      .eq("id", id)
+      .select("id");
+    if (error) throw new Error(`deleteFeedback failed: ${error.message}`);
+    return (data ?? []).length > 0;
+  }
+
   // --- Row mappers (snake_case DB columns -> camelCase domain objects) ---
 
   private mapGame(row: Record<string, unknown>): Game {

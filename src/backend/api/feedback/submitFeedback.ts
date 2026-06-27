@@ -23,6 +23,7 @@ export class FeedbackHandler extends Handler {
   private constructor() {
     super();
     this.feedbackService = new FeedbackService(feedbackRepo);
+    this.router.delete("/:id", async (req, res) => this.delete(req, res));
   }
 
   public override async get(request: Request, response: Response) {
@@ -43,6 +44,23 @@ export class FeedbackHandler extends Handler {
         createdAt: f.createdAt.toISOString(),
       })),
     );
+  }
+
+  public async delete(request: Request, response: Response) {
+    const userId = request.userId;
+    if (!userId || !getAdminIds().has(userId)) {
+      response.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const { id } = request.params;
+    const deleted = await feedbackRepo.deleteFeedback(id);
+    if (!deleted) {
+      response.status(404).json({ error: "Feedback not found" });
+      return;
+    }
+
+    response.status(200).json({ deleted: id });
   }
 
   public override async post(

@@ -39,4 +39,5 @@ export interface PlayerStatsRepository {
 export interface FeedbackRepository {
   createFeedback(feedback: Feedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
+  deleteFeedback(id: string): Promise<boolean>;
 }
