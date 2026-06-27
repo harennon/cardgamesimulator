@@ -215,12 +215,15 @@ Run these commands in order from ${repoRoot}:
 1. Ensure main is up to date:
    git -C ${repoRoot} fetch origin main
 
-2. Remove stale worktree if it exists from a prior failed run:
-   git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true
+2. Remove stale worktree if it exists from a prior failed run (ignore error if it doesn't exist):
+   git -C ${repoRoot} worktree remove ${wtPath} --force
 
-3. Create the worktree with feature branch (idempotent):
-   Try creating new branch first, fall back to existing:
-     git -C ${repoRoot} worktree add -b ${context.branchName} ${wtPath} origin/main 2>/dev/null || git -C ${repoRoot} worktree add ${wtPath} ${context.branchName}
+3. Create the worktree with feature branch.
+   First try creating a new branch:
+     git -C ${repoRoot} worktree add -b ${context.branchName} ${wtPath} origin/main
+   If that fails (branch already exists), use the existing branch instead:
+     git -C ${repoRoot} worktree add ${wtPath} ${context.branchName}
+   Run these as separate commands — do not chain with || or ;
 
 4. Verify the worktree is on the correct branch:
    git -C ${wtPath} branch --show-current
@@ -334,8 +337,10 @@ MOCKUPEOF
     await agent(
       `Publish the mockup to the gh-pages branch for easy viewing.
 
-1. Create a temporary directory for gh-pages work:
-   git -C ${repoRoot} worktree add /tmp/gh-pages-publish gh-pages 2>/dev/null || (git -C ${repoRoot} worktree remove /tmp/gh-pages-publish --force 2>/dev/null; git -C ${repoRoot} worktree add /tmp/gh-pages-publish gh-pages)
+1. Create a temporary directory for gh-pages work (run each as a separate command):
+   git -C ${repoRoot} worktree remove /tmp/gh-pages-publish --force
+   (ignore any error if it didn't exist)
+   git -C ${repoRoot} worktree add /tmp/gh-pages-publish gh-pages
 
 2. Copy the mockup HTML file(s) from the feature branch:
    cp ${wtPath}/docs/mockups/${context.lldSlug}*.html /tmp/gh-pages-publish/
@@ -350,8 +355,8 @@ MOCKUPEOF
    git -C /tmp/gh-pages-publish commit -m "Add mockup for #${issueNum}: ${context.issueTitle}" --allow-empty
    git -C /tmp/gh-pages-publish push origin gh-pages
 
-5. Clean up:
-   git -C ${repoRoot} worktree remove /tmp/gh-pages-publish --force 2>/dev/null || true`,
+5. Clean up (ignore error if already removed):
+   git -C ${repoRoot} worktree remove /tmp/gh-pages-publish --force`,
       { label: "publish-gh-pages" },
     );
 
@@ -360,7 +365,7 @@ MOCKUPEOF
     );
     // Clean up worktree — branch is pushed, re-run will re-create from remote
     await agent(
-      `Remove the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
+      `Remove the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
       { label: "cleanup-worktree" },
     );
     return {
@@ -476,7 +481,7 @@ Then commit:
 if (!designApproved) {
   log(`Design review failed after ${MAX_DESIGN_ATTEMPTS} attempts. Stopping.`);
   await agent(
-    `Clean up the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
+    `Clean up the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
     { label: "cleanup-worktree" },
   );
   return { status: "failed", phase: "design-review", lldPath };
@@ -595,7 +600,7 @@ After fixing:
 if (!codeApproved) {
   log(`Code review failed after ${MAX_CODE_ATTEMPTS} attempts. Stopping.`);
   await agent(
-    `Clean up the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
+    `Clean up the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
     { label: "cleanup-worktree" },
   );
   return { status: "failed", phase: "code-review", lldPath };
@@ -674,7 +679,7 @@ After fixing:
 if (!qaApproved) {
   log(`QA failed after ${MAX_QA_ATTEMPTS} attempts. Stopping.`);
   await agent(
-    `Clean up the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
+    `Clean up the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
     { label: "cleanup-worktree" },
   );
   return { status: "failed", phase: "qa", lldPath };
@@ -742,7 +747,7 @@ Return the PR URL, commit message summary, and confirm closesIssue is ${issueNum
 if (!shipResult) {
   log("Ship agent failed. Branch is pushed but PR may not exist.");
   await agent(
-    `Clean up the worktree: git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
+    `Clean up the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
     { label: "cleanup-worktree" },
   );
   return { status: "failed", phase: "ship", branchName: context.branchName };
@@ -761,8 +766,10 @@ if (context.hasFrontend && issueNum) {
   await agent(
     `Move the mockup entry for issue #${issueNum} from "Awaiting decision" to "Shipped" on gh-pages.
 
-1. Create gh-pages worktree:
-   git -C ${repoRoot} worktree add /tmp/gh-pages-ship gh-pages 2>/dev/null || (git -C ${repoRoot} worktree remove /tmp/gh-pages-ship --force 2>/dev/null; git -C ${repoRoot} worktree add /tmp/gh-pages-ship gh-pages)
+1. Create gh-pages worktree (run each as a separate command):
+   git -C ${repoRoot} worktree remove /tmp/gh-pages-ship --force
+   (ignore any error if it didn't exist)
+   git -C ${repoRoot} worktree add /tmp/gh-pages-ship gh-pages
 
 2. Edit /tmp/gh-pages-ship/index.html:
    - Find the <a> tag containing "#${issueNum}" in the "Awaiting decision" section
@@ -772,19 +779,22 @@ if (context.hasFrontend && issueNum) {
 
 3. Commit and push (only if there are changes):
    git -C /tmp/gh-pages-ship add index.html
-   git -C /tmp/gh-pages-ship diff --cached --quiet || git -C /tmp/gh-pages-ship commit -m "Move #${issueNum} to shipped"
-   git -C /tmp/gh-pages-ship push origin gh-pages
+   Check if there are staged changes: git -C /tmp/gh-pages-ship diff --cached --quiet
+   If that command FAILS (exit code 1 = there are changes), then commit and push:
+     git -C /tmp/gh-pages-ship commit -m "Move #${issueNum} to shipped"
+     git -C /tmp/gh-pages-ship push origin gh-pages
+   If it succeeds (exit code 0 = no changes), skip commit and push.
 
-4. Clean up:
-   git -C ${repoRoot} worktree remove /tmp/gh-pages-ship --force 2>/dev/null || true`,
+4. Clean up (ignore error if already removed):
+   git -C ${repoRoot} worktree remove /tmp/gh-pages-ship --force`,
     { label: "gh-pages-ship" },
   );
 }
 
 // Clean up worktree
 await agent(
-  `Remove the worktree now that the PR is up:
-git -C ${repoRoot} worktree remove ${wtPath} --force 2>/dev/null || true`,
+  `Remove the worktree now that the PR is up (ignore error if already removed):
+git -C ${repoRoot} worktree remove ${wtPath} --force`,
   { label: "cleanup-worktree" },
 );
 
