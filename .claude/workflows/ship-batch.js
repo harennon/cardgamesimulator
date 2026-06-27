@@ -770,7 +770,7 @@ if (selection.demote && selection.demote.length > 0) {
   );
 }
 
-// Decompose large issues into sub-issues (architect does the splitting)
+// Decompose large issues into sub-issues (CEO scopes, not the architect)
 if (selection.decompose && selection.decompose.length > 0) {
   for (const issueNumber of selection.decompose) {
     const notes = selection.implementationNotes
@@ -780,26 +780,30 @@ if (selection.decompose && selection.decompose.length > 0) {
     const decomposition = await agent(
       `Decompose GitHub issue #${issueNumber} into shippable sub-issues.
 
-1. Read the issue thoroughly: gh issue view ${issueNumber}
-2. Read docs/architecture-principles.md, docs/execution-plan.md, and docs/project-hld.md
-3. Read relevant source code to understand existing architecture and natural module boundaries
-4. Identify 2-5 sub-issues that together deliver the full parent issue
+You are breaking a large feature into independently shippable increments. Each sub-issue will later go through the full design→implement→review→ship cycle with its own LLD, so you don't need to write technical specs — focus on WHAT each increment delivers and WHY it's a natural boundary.
 
-${notes ? `**Strategic guidance from CEO:**\n${notes}\n` : ""}
+1. Read the issue thoroughly: gh issue view ${issueNumber}
+2. Read docs/execution-plan.md, docs/project-hld.md, and docs/customer-experience.md for product context
+3. Read docs/architecture-principles.md to understand the system's module boundaries
+4. Skim relevant source code to see what exists today (use grep/find to locate related files)
+5. Identify 2-5 sub-issues that together deliver the full parent issue
+
+${notes ? `**Your earlier strategic guidance for this issue:**\n${notes}\n` : ""}
 ## Decomposition principles
-- Each sub-issue must be independently shippable and testable (delivers a working increment)
+- Each sub-issue must be independently shippable and testable (delivers a working increment users can see or developers can build on)
 - Respect dependency order — earlier sub-issues should not depend on later ones
 - Each sub-issue should be small or medium effort (under half a day)
-- First sub-issue should be the foundation that later ones build on (types, interfaces, core logic)
-- Last sub-issue should be integration/polish (wiring it together, UI polish, final tests)
-- Include acceptance criteria in each sub-issue body so it's clear when it's done
+- First sub-issue should be the foundation that later ones build on (data model, types, core logic)
+- Last sub-issue should be integration/polish (wiring it together, final UX, edge cases)
+- Include clear acceptance criteria in each sub-issue body — "done when X, Y, Z"
 - Reference the parent issue number in each sub-issue body
+- Each sub-issue title should be self-explanatory without reading the parent
 
-Return the decomposition with titles, full bodies (markdown, with acceptance criteria), ordering, and effort estimates.`,
+Return the decomposition with titles, full bodies (markdown, with acceptance criteria), ordering, effort estimates, and reasoning for how you chose the boundaries.`,
       {
         label: `decompose-${issueNumber}`,
         model: "opus",
-        agentType: "architect",
+        agentType: "ceo",
         schema: DECOMPOSITION_SCHEMA,
       },
     );
