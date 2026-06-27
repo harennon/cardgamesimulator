@@ -316,7 +316,9 @@ Use: gh issue comment ${issueNum} --body "$(cat <<'MOCKUPEOF'
 
 [Summary of design options]
 
-View mockups: docs/mockups/${context.lldSlug}.html on branch \`${context.branchName}\`
+**View mockup:** https://harennon.github.io/cardgamesimulator/${context.lldSlug}.html
+
+Source: docs/mockups/${context.lldSlug}.html on branch \`${context.branchName}\`
 
 Please reply with **Frontend decision: <your choice>** to proceed with implementation.
 MOCKUPEOF
@@ -326,6 +328,31 @@ MOCKUPEOF
         model: "opus",
         agentType: "frontend-architect",
       },
+    );
+
+    // Publish mockup to gh-pages for easy phone/browser viewing
+    await agent(
+      `Publish the mockup to the gh-pages branch for easy viewing.
+
+1. Create a temporary directory for gh-pages work:
+   git -C ${repoRoot} worktree add /tmp/gh-pages-publish gh-pages 2>/dev/null || (git -C ${repoRoot} worktree remove /tmp/gh-pages-publish --force 2>/dev/null; git -C ${repoRoot} worktree add /tmp/gh-pages-publish gh-pages)
+
+2. Copy the mockup HTML file(s) from the feature branch:
+   cp ${wtPath}/docs/mockups/${context.lldSlug}*.html /tmp/gh-pages-publish/
+
+3. Update index.html — read the current file, then add a new entry under "Awaiting decision":
+   The entry should be: <a href="${context.lldSlug}.html">#${issueNum} — ${context.issueTitle}</a>
+   Insert it right after the <h2>Awaiting decision</h2> line.
+   If the entry already exists (from a prior run), do not duplicate it.
+
+4. Commit and push:
+   git -C /tmp/gh-pages-publish add .
+   git -C /tmp/gh-pages-publish commit -m "Add mockup for #${issueNum}: ${context.issueTitle}" --allow-empty
+   git -C /tmp/gh-pages-publish push origin gh-pages
+
+5. Clean up:
+   git -C ${repoRoot} worktree remove /tmp/gh-pages-publish --force 2>/dev/null || true`,
+      { label: "publish-gh-pages" },
     );
 
     log(
@@ -728,6 +755,31 @@ if (issueNum && !shipResult.closesIssue) {
 }
 
 log(`PR raised: ${shipResult.prUrl}`);
+
+// Move mockup from "Awaiting decision" to "Shipped" on gh-pages (if this was a frontend issue)
+if (context.hasFrontend && issueNum) {
+  await agent(
+    `Move the mockup entry for issue #${issueNum} from "Awaiting decision" to "Shipped" on gh-pages.
+
+1. Create gh-pages worktree:
+   git -C ${repoRoot} worktree add /tmp/gh-pages-ship gh-pages 2>/dev/null || (git -C ${repoRoot} worktree remove /tmp/gh-pages-ship --force 2>/dev/null; git -C ${repoRoot} worktree add /tmp/gh-pages-ship gh-pages)
+
+2. Edit /tmp/gh-pages-ship/index.html:
+   - Find the <a> tag containing "#${issueNum}" in the "Awaiting decision" section
+   - Remove it from that section
+   - Insert it at the TOP of the "Shipped" section (right after the <h2>Shipped</h2> line)
+   - If it's already in "Shipped" or doesn't exist, do nothing
+
+3. Commit and push (only if there are changes):
+   git -C /tmp/gh-pages-ship add index.html
+   git -C /tmp/gh-pages-ship diff --cached --quiet || git -C /tmp/gh-pages-ship commit -m "Move #${issueNum} to shipped"
+   git -C /tmp/gh-pages-ship push origin gh-pages
+
+4. Clean up:
+   git -C ${repoRoot} worktree remove /tmp/gh-pages-ship --force 2>/dev/null || true`,
+    { label: "gh-pages-ship" },
+  );
+}
 
 // Clean up worktree
 await agent(
