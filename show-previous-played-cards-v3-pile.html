@@ -1,0 +1,1320 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trick Pile — Collapsed Stack Beside Current Play (v3)</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-back: #6b1f1f;
+        --card-back-2: #511515;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #0a0a0a;
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        line-height: 1.5;
+        padding-bottom: 80px;
+      }
+
+      h1 {
+        text-align: center;
+        padding: 28px 16px 8px;
+        font-size: 1.15rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.05em;
+        font-weight: 600;
+      }
+
+      .subtitle {
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        max-width: 720px;
+        margin: 0 auto 8px;
+        padding: 0 16px;
+      }
+
+      .design-note {
+        max-width: 860px;
+        margin: 16px auto 8px;
+        padding: 16px 22px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+      .design-note strong {
+        color: var(--text-primary);
+      }
+      .design-note ul {
+        margin: 8px 0 0 18px;
+      }
+      .design-note li {
+        margin: 4px 0;
+      }
+      .design-note code {
+        font-family: monospace;
+        color: var(--gold-accent);
+        font-size: 0.78rem;
+      }
+
+      .section-label {
+        text-align: center;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--gold-accent);
+        margin: 44px 0 6px;
+        font-weight: 600;
+      }
+      .section-hint {
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        margin-bottom: 18px;
+      }
+
+      .stage {
+        display: flex;
+        gap: 40px;
+        align-items: flex-start;
+        justify-content: center;
+        flex-wrap: wrap;
+        padding: 0 16px;
+      }
+
+      .stage-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .stage-col__title {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+      }
+
+      /* ===== TABLE (desktop) ===== */
+      .table-area {
+        position: relative;
+        width: 760px;
+        max-width: 100%;
+        height: 360px;
+        background: radial-gradient(
+          ellipse 80% 70% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      .table-area::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+
+      /* opponents around the table for context */
+      .seat {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        z-index: 1;
+      }
+      .seat__avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--table-rim-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: 0.7rem;
+      }
+      .seat--top {
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      .seat--left {
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+      .seat--right {
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+      .seat__count {
+        background: rgba(0, 0, 0, 0.35);
+        border-radius: 10px;
+        padding: 1px 7px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* center cluster: current play + pile beside it */
+      .center-cluster {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        align-items: center;
+        gap: 26px;
+        z-index: 2;
+      }
+
+      .current-play {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .current-play__label {
+        font-size: 0.72rem;
+        color: var(--gold-accent);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .current-play__cards {
+        display: flex;
+        gap: 4px;
+      }
+      .current-play__by {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      /* ===== CARDS ===== */
+      .card {
+        width: 52px;
+        height: 74px;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        position: relative;
+        flex-shrink: 0;
+      }
+      .card__rank {
+        font-size: 1.1rem;
+        line-height: 1;
+      }
+      .card__suit {
+        font-size: 0.95rem;
+        line-height: 1;
+        margin-top: 2px;
+      }
+      .card--red {
+        color: var(--red-suit);
+      }
+      .card--black {
+        color: var(--black-suit);
+      }
+      .card--sm {
+        width: 40px;
+        height: 57px;
+      }
+      .card--sm .card__rank {
+        font-size: 0.85rem;
+      }
+      .card--sm .card__suit {
+        font-size: 0.72rem;
+      }
+
+      /* ===== THE TRICK PILE (collapsed) ===== */
+      .trick-pile {
+        position: relative;
+        width: 64px;
+        height: 86px;
+        cursor: pointer;
+        flex-shrink: 0;
+        background: none;
+        border: none;
+        padding: 0;
+        outline-offset: 4px;
+      }
+      .trick-pile:focus-visible {
+        outline: 2px solid var(--gold-accent);
+        border-radius: 8px;
+      }
+      .trick-pile__label {
+        position: absolute;
+        bottom: -22px;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+      }
+
+      /* each layer is a face-down card back, offset & rotated so it reads as a physical pile */
+      .pile-layer {
+        position: absolute;
+        width: 52px;
+        height: 74px;
+        border-radius: 6px;
+        border: 1.5px solid rgba(0, 0, 0, 0.35);
+        background: repeating-linear-gradient(
+          45deg,
+          var(--card-back) 0,
+          var(--card-back) 4px,
+          var(--card-back-2) 4px,
+          var(--card-back-2) 8px
+        );
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+        transition:
+          transform 0.18s ease,
+          box-shadow 0.18s ease;
+      }
+      .pile-layer::after {
+        content: "";
+        position: absolute;
+        inset: 5px;
+        border: 1px solid rgba(201, 168, 76, 0.35);
+        border-radius: 3px;
+      }
+      /* stagger: each successive card sits slightly up-left, creating a layered deck look */
+      .pile-layer:nth-child(1) {
+        bottom: 0;
+        left: 0;
+        transform: rotate(-5deg);
+        z-index: 1;
+      }
+      .pile-layer:nth-child(2) {
+        bottom: 3px;
+        left: 3px;
+        transform: rotate(-1.5deg);
+        z-index: 2;
+      }
+      .pile-layer:nth-child(3) {
+        bottom: 6px;
+        left: 6px;
+        transform: rotate(2deg);
+        z-index: 3;
+      }
+      /* top layer shows a face so it's obviously "cards", topped by the count badge */
+      .pile-layer--top {
+        bottom: 9px;
+        left: 9px;
+        transform: rotate(5deg);
+        z-index: 4;
+        background: var(--card-face);
+        border-color: #c8b89a;
+      }
+      .pile-layer--top::after {
+        display: none;
+      }
+      .pile-layer--top .pile-face {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.7rem;
+        line-height: 0.9;
+        text-align: left;
+      }
+
+      .trick-pile:hover .pile-layer:nth-child(1) {
+        transform: rotate(-8deg) translate(-2px, 1px);
+      }
+      .trick-pile:hover .pile-layer:nth-child(3) {
+        transform: rotate(4deg);
+      }
+      .trick-pile:hover .pile-layer--top {
+        transform: rotate(8deg) translate(2px, -2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+
+      /* count badge on the pile */
+      .pile-count {
+        position: absolute;
+        top: -8px;
+        right: -10px;
+        z-index: 5;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 5px;
+        border-radius: 11px;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-size: 0.68rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 10px var(--gold-glow);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .pile-empty {
+        position: absolute;
+        inset: 0;
+        border: 1.5px dashed rgba(138, 126, 110, 0.4);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 0.58rem;
+        color: var(--text-muted);
+        font-style: italic;
+        padding: 6px;
+        background: rgba(0, 0, 0, 0.12);
+      }
+
+      /* ===== EXPANDED OVERLAY (desktop = popover anchored to table) ===== */
+      .trick-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 6, 4, 0.78);
+        backdrop-filter: blur(2px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+      .trick-overlay.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .trick-panel {
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 18px 22px 20px;
+        max-width: 90%;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+        transform: scale(0.94) translateY(6px);
+        transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .trick-overlay.open .trick-panel {
+        transform: scale(1) translateY(0);
+      }
+
+      .trick-panel__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+      .trick-panel__title {
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+      .trick-panel__close {
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-primary);
+        border-radius: 6px;
+        width: 26px;
+        height: 26px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        line-height: 1;
+        transition: all 0.15s;
+      }
+      .trick-panel__close:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+
+      /* the expanded plays: a horizontal fan-out of each play in order */
+      .trick-track {
+        display: flex;
+        align-items: flex-end;
+        gap: 18px;
+        overflow-x: auto;
+        padding: 6px 2px 4px;
+      }
+      .trick-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        animation: stepIn 0.3s ease backwards;
+      }
+      .trick-overlay.open .trick-step:nth-child(1) {
+        animation-delay: 0.02s;
+      }
+      .trick-overlay.open .trick-step:nth-child(2) {
+        animation-delay: 0.06s;
+      }
+      .trick-overlay.open .trick-step:nth-child(3) {
+        animation-delay: 0.1s;
+      }
+      .trick-overlay.open .trick-step:nth-child(4) {
+        animation-delay: 0.14s;
+      }
+      .trick-overlay.open .trick-step:nth-child(5) {
+        animation-delay: 0.18s;
+      }
+      @keyframes stepIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .trick-step__order {
+        font-size: 0.62rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .trick-step__player {
+        font-size: 0.68rem;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .trick-step__type {
+        font-size: 0.6rem;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .trick-step__cards {
+        display: flex;
+        gap: 3px;
+        margin-top: 2px;
+      }
+      /* slight overlap fan within a single multi-card play */
+      .trick-step__cards .card:not(:first-child) {
+        margin-left: -14px;
+      }
+
+      .pass-chip {
+        width: 40px;
+        height: 57px;
+        border-radius: 6px;
+        border: 1.5px dashed rgba(138, 126, 110, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.58rem;
+        font-style: italic;
+        color: var(--text-muted);
+        background: rgba(0, 0, 0, 0.18);
+        text-transform: lowercase;
+        letter-spacing: 0.04em;
+      }
+
+      .trick-step--current .trick-step__cards .card {
+        box-shadow:
+          0 0 0 1.5px var(--gold-accent),
+          2px 4px 8px var(--card-shadow);
+      }
+      .trick-step--current .trick-step__type {
+        font-weight: 700;
+      }
+
+      .trick-panel__foot {
+        margin-top: 12px;
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      /* ===== MOBILE FRAME ===== */
+      .phone {
+        width: 320px;
+        height: 540px;
+        border: 10px solid #1a1209;
+        border-radius: 28px;
+        position: relative;
+        overflow: hidden;
+        background: #0a0a0a;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      }
+      .phone__table {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 90% 60% at 50% 45%,
+          var(--felt-light) 0%,
+          var(--felt) 55%,
+          #0f2e1c 100%
+        );
+      }
+      .phone__table::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3C/svg%3E");
+      }
+
+      .phone__seat {
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .phone__center {
+        position: absolute;
+        top: 44%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .phone__center .current-play__label {
+        font-size: 0.66rem;
+      }
+
+      /* mobile pile: smaller, tucked into the corner so it never crowds the play */
+      .phone__pile {
+        position: absolute;
+        bottom: 96px;
+        right: 16px;
+        width: 46px;
+        height: 64px;
+      }
+      .phone__pile .pile-layer {
+        width: 38px;
+        height: 54px;
+      }
+      .phone__pile .pile-layer--top .pile-face {
+        font-size: 0.55rem;
+      }
+      .phone__pile .pile-count {
+        min-width: 18px;
+        height: 18px;
+        font-size: 0.6rem;
+        top: -6px;
+        right: -8px;
+      }
+      .phone__pile .trick-pile__label {
+        bottom: -18px;
+        font-size: 0.52rem;
+      }
+
+      .phone__hand {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+      }
+      .phone__hand .card {
+        width: 38px;
+        height: 54px;
+      }
+      .phone__hand .card:not(:first-child) {
+        margin-left: -16px;
+      }
+      .phone__hand .card__rank {
+        font-size: 0.72rem;
+      }
+      .phone__hand .card__suit {
+        font-size: 0.62rem;
+      }
+
+      /* mobile expansion = bottom sheet */
+      .sheet-scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 6, 4, 0.6);
+        z-index: 30;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+      .sheet-scrim.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .sheet {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 31;
+        background: #170f09;
+        border-top: 1px solid var(--table-rim-light);
+        border-radius: 16px 16px 0 0;
+        padding: 14px 14px 20px;
+        transform: translateY(100%);
+        transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+      }
+      .sheet.open {
+        transform: translateY(0);
+      }
+      .sheet__grip {
+        width: 38px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--text-muted);
+        margin: 0 auto 12px;
+      }
+      .sheet__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .sheet__title {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+      .sheet__close {
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-primary);
+        border-radius: 6px;
+        width: 24px;
+        height: 24px;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+      .sheet .trick-track {
+        gap: 14px;
+      }
+      .sheet .card {
+        width: 34px;
+        height: 48px;
+      }
+      .sheet .card__rank {
+        font-size: 0.66rem;
+      }
+      .sheet .card__suit {
+        font-size: 0.56rem;
+      }
+      .sheet .trick-step__cards .card:not(:first-child) {
+        margin-left: -12px;
+      }
+      .sheet .pass-chip {
+        width: 34px;
+        height: 48px;
+      }
+
+      /* ===== DEMO CONTROLS ===== */
+      .demo-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(13, 9, 6, 0.96);
+        border-top: 1px solid var(--table-rim-light);
+        padding: 12px 16px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        z-index: 100;
+        font-size: 0.78rem;
+      }
+      .demo-bar span {
+        color: var(--text-muted);
+      }
+      .demo-bar button {
+        font-family: var(--font-ui);
+        font-size: 0.76rem;
+        padding: 7px 14px;
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-primary);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .demo-bar button:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+      .demo-bar button.primary {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border-color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      @media (max-width: 820px) {
+        .table-area {
+          width: 100%;
+          height: 320px;
+        }
+        .center-cluster {
+          gap: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Trick Pile — Collapsed Stack Beside the Current Play (v3)</h1>
+    <p class="subtitle">
+      A physical-looking pile of cards sits next to the currently played hand.
+      Click it to fan out and review every play in the <em>current trick</em>,
+      in order. It resets when a new trick starts.
+    </p>
+
+    <div class="design-note">
+      <strong>What this is (per the latest direction):</strong>
+      <ul>
+        <li>
+          A <strong>collapsed stacked pile</strong> (face-down card backs,
+          layered &amp; slightly fanned so it reads as real cards) positioned
+          <strong>beside the current play</strong>. A gold badge shows how many
+          plays are in the trick.
+        </li>
+        <li>
+          <strong>Click / tap the pile to expand</strong> — it reveals
+          <strong>all plays of the current trick</strong> in order, including
+          <strong>pass markers</strong>. Click the close button, tap outside, or
+          press <code>Esc</code> to collapse.
+        </li>
+        <li>
+          <strong>Resets when a new trick starts</strong> (all others pass and
+          the trick winner leads again). Use the demo bar to add plays / passes
+          and to start a new trick.
+        </li>
+        <li>
+          Big2 only. Derived client-side from
+          <code>Big2PublicState.playHistory</code> sliced to the current trick.
+          No backend changes.
+        </li>
+      </ul>
+    </div>
+
+    <!-- ================= DESKTOP ================= -->
+    <div class="section-label">Desktop</div>
+    <div class="section-hint">
+      Click the pile beside the current play. (Pile is to the left of the
+      centered hand.)
+    </div>
+
+    <div class="stage">
+      <div class="table-area" id="desktopTable">
+        <div class="seat seat--top">
+          <div class="seat__avatar">A</div>
+          <span>Alice</span>
+          <span class="seat__count">8</span>
+        </div>
+        <div class="seat seat--left">
+          <div class="seat__avatar">C</div>
+          <span>Charlie</span>
+          <span class="seat__count">11</span>
+        </div>
+        <div class="seat seat--right">
+          <div class="seat__avatar">D</div>
+          <span>Dave</span>
+          <span class="seat__count">6</span>
+        </div>
+
+        <div class="center-cluster">
+          <!-- THE PILE (collapsed) — beside the current play -->
+          <button
+            class="trick-pile"
+            id="desktopPile"
+            aria-haspopup="dialog"
+            aria-label="Open current trick history"
+          >
+            <span class="pile-layer"></span>
+            <span class="pile-layer"></span>
+            <span class="pile-layer"></span>
+            <span class="pile-layer pile-layer--top">
+              <span class="pile-face" id="desktopPileFace"></span>
+            </span>
+            <span class="pile-count" id="desktopPileCount">3</span>
+            <span class="trick-pile__label">Trick history</span>
+          </button>
+
+          <!-- CURRENT PLAY (center) -->
+          <div class="current-play">
+            <span class="current-play__label" id="desktopCurType">Pair</span>
+            <div class="current-play__cards" id="desktopCurCards"></div>
+            <span class="current-play__by" id="desktopCurBy"
+              >played by Bob</span
+            >
+          </div>
+        </div>
+
+        <!-- EXPANDED overlay anchored to the table -->
+        <div class="trick-overlay" id="desktopOverlay">
+          <div class="trick-panel" role="dialog" aria-label="Current trick">
+            <div class="trick-panel__head">
+              <span class="trick-panel__title"
+                >Current trick — in play order</span
+              >
+              <button
+                class="trick-panel__close"
+                id="desktopClose"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div class="trick-track" id="desktopTrack"></div>
+            <div class="trick-panel__foot">
+              Resets when the trick is won. Tap outside or press Esc to close.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= MOBILE ================= -->
+    <div class="section-label">Mobile</div>
+    <div class="section-hint">
+      Smaller pile tucked above the hand so it never crowds the play. Tapping it
+      opens a bottom sheet.
+    </div>
+
+    <div class="stage">
+      <div class="phone">
+        <div class="phone__table"></div>
+        <div class="phone__seat">
+          <div class="seat__avatar" style="width: 26px; height: 26px">A</div>
+          Alice · 8
+        </div>
+
+        <div class="phone__center">
+          <span class="current-play__label">Pair</span>
+          <div class="current-play__cards" id="mobileCurCards"></div>
+          <span class="current-play__by">played by Bob</span>
+        </div>
+
+        <!-- mobile pile -->
+        <button
+          class="trick-pile phone__pile"
+          id="mobilePile"
+          aria-haspopup="dialog"
+          aria-label="Open current trick history"
+        >
+          <span class="pile-layer"></span>
+          <span class="pile-layer"></span>
+          <span class="pile-layer"></span>
+          <span class="pile-layer pile-layer--top">
+            <span class="pile-face" id="mobilePileFace"></span>
+          </span>
+          <span class="pile-count" id="mobilePileCount">3</span>
+          <span class="trick-pile__label">Trick</span>
+        </button>
+
+        <!-- player's own hand for context -->
+        <div class="phone__hand">
+          <div class="card card--black">
+            <span class="card__rank">3</span><span class="card__suit">♠</span>
+          </div>
+          <div class="card card--red">
+            <span class="card__rank">5</span><span class="card__suit">♥</span>
+          </div>
+          <div class="card card--red">
+            <span class="card__rank">9</span><span class="card__suit">♦</span>
+          </div>
+          <div class="card card--black">
+            <span class="card__rank">J</span><span class="card__suit">♣</span>
+          </div>
+          <div class="card card--black">
+            <span class="card__rank">2</span><span class="card__suit">♠</span>
+          </div>
+        </div>
+
+        <!-- bottom sheet -->
+        <div class="sheet-scrim" id="mobileScrim"></div>
+        <div
+          class="sheet"
+          id="mobileSheet"
+          role="dialog"
+          aria-label="Current trick"
+        >
+          <div class="sheet__grip"></div>
+          <div class="sheet__head">
+            <span class="sheet__title">Current trick</span>
+            <button class="sheet__close" id="mobileClose" aria-label="Close">
+              ✕
+            </button>
+          </div>
+          <div class="trick-track" id="mobileTrack"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= EMPTY STATE NOTE ================= -->
+    <div class="design-note" style="margin-top: 36px">
+      <strong>New-trick / empty state:</strong> when a trick has just started
+      (only the current lead exists, no prior plays this trick), the pile shows
+      a slim dashed placeholder reading “No prior plays this trick” and is not
+      clickable — there is nothing to expand yet. Use
+      <em>New trick (reset)</em> below to see it.
+    </div>
+
+    <!-- ================= DEMO BAR ================= -->
+    <div class="demo-bar">
+      <span>Demo:</span>
+      <button id="btnPlay" class="primary">+ Play a hand</button>
+      <button id="btnPass">+ Pass</button>
+      <button id="btnReset">New trick (reset)</button>
+      <span id="status" style="margin-left: 8px"></span>
+    </div>
+
+    <script>
+      // ---- Mock data modeled on Big2HistoryEntry ----
+      // { playerId, displayName, action: 'play'|'pass', cards?, handType? }
+      const SUIT = { s: "♠", h: "♥", d: "♦", c: "♣" };
+      const isRed = (s) => s === "h" || s === "d";
+
+      // A pool of plausible plays to cycle through for the "+ Play" demo button.
+      const PLAY_POOL = [
+        {
+          name: "Bob",
+          type: "Pair",
+          cards: [
+            ["7", "s"],
+            ["7", "h"],
+          ],
+        },
+        {
+          name: "Alice",
+          type: "Pair",
+          cards: [
+            ["9", "d"],
+            ["9", "c"],
+          ],
+        },
+        {
+          name: "Dave",
+          type: "Pair",
+          cards: [
+            ["J", "h"],
+            ["J", "s"],
+          ],
+        },
+        {
+          name: "Charlie",
+          type: "Pair",
+          cards: [
+            ["K", "c"],
+            ["K", "d"],
+          ],
+        },
+        {
+          name: "Bob",
+          type: "Pair",
+          cards: [
+            ["2", "s"],
+            ["2", "h"],
+          ],
+        },
+      ];
+      const PASS_POOL = ["Charlie", "Dave", "Alice", "Bob"];
+
+      // Seed: a trick already underway — a single, a pass, then the current pair.
+      let trick = [
+        { name: "Alice", action: "play", type: "Single", cards: [["8", "d"]] },
+        { name: "Charlie", action: "pass" },
+        {
+          name: "Bob",
+          action: "play",
+          type: "Pair",
+          cards: [
+            ["7", "s"],
+            ["7", "h"],
+          ],
+        },
+      ];
+      let playPtr = 1; // next play to pull from PLAY_POOL
+      let passPtr = 0;
+
+      function cardEl(rank, suit, small) {
+        const el = document.createElement("div");
+        el.className =
+          "card" +
+          (small ? " card--sm" : "") +
+          (isRed(suit) ? " card--red" : " card--black");
+        el.innerHTML = `<span class="card__rank">${rank}</span><span class="card__suit">${SUIT[suit]}</span>`;
+        return el;
+      }
+
+      function currentPlay() {
+        for (let i = trick.length - 1; i >= 0; i--) {
+          if (trick[i].action === "play") return trick[i];
+        }
+        return null;
+      }
+
+      function renderCurrent(containerId, typeId, byId) {
+        const cur = currentPlay();
+        const cont = document.getElementById(containerId);
+        cont.innerHTML = "";
+        if (!cur) return;
+        cur.cards.forEach(([r, s]) => cont.appendChild(cardEl(r, s, false)));
+        if (typeId) document.getElementById(typeId).textContent = cur.type;
+        if (byId)
+          document.getElementById(byId).textContent = "played by " + cur.name;
+      }
+
+      function priorPlaysCount() {
+        // total entries in the trick (plays + passes); badge counts all entries.
+        return trick.length;
+      }
+
+      function renderPile(pileId, faceId, countId, labelEmpty) {
+        const pile = document.getElementById(pileId);
+        const count = priorPlaysCount();
+        const countBadge = document.getElementById(countId);
+        const face = document.getElementById(faceId);
+
+        // empty/new-trick state: only the lead exists OR nothing
+        const plays = trick.filter((t) => t.action === "play");
+        const isEmpty = trick.length <= 1;
+
+        // top face shows the OLDEST play's lead card (the bottom of the pile,
+        // i.e. the first thing dealt onto the table this trick) for flavor
+        const first = trick.find((t) => t.action === "play");
+        if (face && first) {
+          const [r, s] = first.cards[0];
+          face.innerHTML = `<span style="color:${isRed(s) ? "var(--red-suit)" : "var(--black-suit)"}">${r}<br>${SUIT[s]}</span>`;
+        }
+
+        if (isEmpty) {
+          pile.classList.add("is-empty");
+          pile.setAttribute("aria-disabled", "true");
+          // swap in dashed placeholder
+          if (!pile.querySelector(".pile-empty")) {
+            const ph = document.createElement("span");
+            ph.className = "pile-empty";
+            ph.textContent = "No prior plays this trick";
+            pile.appendChild(ph);
+          }
+          countBadge.style.display = "none";
+        } else {
+          pile.classList.remove("is-empty");
+          pile.removeAttribute("aria-disabled");
+          const ph = pile.querySelector(".pile-empty");
+          if (ph) ph.remove();
+          countBadge.style.display = "flex";
+          countBadge.textContent = count;
+        }
+      }
+
+      function renderTrack(trackId, small) {
+        const track = document.getElementById(trackId);
+        track.innerHTML = "";
+        const lastPlayIdx = (() => {
+          for (let i = trick.length - 1; i >= 0; i--)
+            if (trick[i].action === "play") return i;
+          return -1;
+        })();
+
+        trick.forEach((entry, i) => {
+          const step = document.createElement("div");
+          step.className =
+            "trick-step" + (i === lastPlayIdx ? " trick-step--current" : "");
+
+          const order = document.createElement("span");
+          order.className = "trick-step__order";
+          order.textContent = "#" + (i + 1);
+          step.appendChild(order);
+
+          const player = document.createElement("span");
+          player.className = "trick-step__player";
+          player.textContent = entry.name;
+          step.appendChild(player);
+
+          if (entry.action === "pass") {
+            const type = document.createElement("span");
+            type.className = "trick-step__type";
+            type.textContent = "Pass";
+            step.appendChild(type);
+            const chip = document.createElement("div");
+            chip.className = "pass-chip";
+            chip.textContent = "pass";
+            step.appendChild(chip);
+          } else {
+            const type = document.createElement("span");
+            type.className = "trick-step__type";
+            type.textContent = (i === lastPlayIdx ? "▶ " : "") + entry.type;
+            step.appendChild(type);
+            const cards = document.createElement("div");
+            cards.className = "trick-step__cards";
+            entry.cards.forEach(([r, s]) =>
+              cards.appendChild(cardEl(r, s, true)),
+            );
+            step.appendChild(cards);
+          }
+          track.appendChild(step);
+        });
+      }
+
+      function renderAll() {
+        renderCurrent("desktopCurCards", "desktopCurType", "desktopCurBy");
+        renderCurrent("mobileCurCards", null, null);
+        renderPile("desktopPile", "desktopPileFace", "desktopPileCount");
+        renderPile("mobilePile", "mobilePileFace", "mobilePileCount");
+        renderTrack("desktopTrack", false);
+        renderTrack("mobileTrack", true);
+        document.getElementById("status").textContent =
+          trick.length +
+          " entr" +
+          (trick.length === 1 ? "y" : "ies") +
+          " in trick";
+      }
+
+      // ---- expand / collapse ----
+      const dOverlay = document.getElementById("desktopOverlay");
+      const dPile = document.getElementById("desktopPile");
+      function openDesktop() {
+        if (dPile.getAttribute("aria-disabled") === "true") return;
+        renderTrack("desktopTrack", false);
+        dOverlay.classList.add("open");
+      }
+      function closeDesktop() {
+        dOverlay.classList.remove("open");
+      }
+      dPile.addEventListener("click", openDesktop);
+      document
+        .getElementById("desktopClose")
+        .addEventListener("click", closeDesktop);
+      dOverlay.addEventListener("click", (e) => {
+        if (e.target === dOverlay) closeDesktop();
+      });
+
+      const mScrim = document.getElementById("mobileScrim");
+      const mSheet = document.getElementById("mobileSheet");
+      const mPile = document.getElementById("mobilePile");
+      function openMobile() {
+        if (mPile.getAttribute("aria-disabled") === "true") return;
+        renderTrack("mobileTrack", true);
+        mScrim.classList.add("open");
+        mSheet.classList.add("open");
+      }
+      function closeMobile() {
+        mScrim.classList.remove("open");
+        mSheet.classList.remove("open");
+      }
+      mPile.addEventListener("click", openMobile);
+      document
+        .getElementById("mobileClose")
+        .addEventListener("click", closeMobile);
+      mScrim.addEventListener("click", closeMobile);
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeDesktop();
+          closeMobile();
+        }
+      });
+
+      // ---- demo bar ----
+      document.getElementById("btnPlay").addEventListener("click", () => {
+        const p = PLAY_POOL[playPtr % PLAY_POOL.length];
+        playPtr++;
+        trick.push({
+          name: p.name,
+          action: "play",
+          type: p.type,
+          cards: p.cards,
+        });
+        renderAll();
+      });
+      document.getElementById("btnPass").addEventListener("click", () => {
+        const name = PASS_POOL[passPtr % PASS_POOL.length];
+        passPtr++;
+        trick.push({ name, action: "pass" });
+        renderAll();
+      });
+      document.getElementById("btnReset").addEventListener("click", () => {
+        // new trick: only the new lead remains
+        const lead = PLAY_POOL[playPtr % PLAY_POOL.length];
+        playPtr++;
+        trick = [
+          {
+            name: lead.name,
+            action: "play",
+            type: lead.type,
+            cards: lead.cards,
+          },
+        ];
+        closeDesktop();
+        closeMobile();
+        renderAll();
+      });
+
+      renderAll();
+    </script>
+  </body>
+</html>
