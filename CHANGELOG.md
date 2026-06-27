@@ -10,6 +10,18 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- **LLD 48: Game Room ID Not Visible During Gameplay** — the 4-character room (join) code is now shown in-game on the `GameBoard`, anchored to the far-left of the opponents bar, and survives a mid-game refresh/reconnect (when the client loads straight into an `IN_PROGRESS` game and never sees `lobby:state`). Tapping the code copies it to the clipboard, reusing the lobby's copy pattern.
+  - `src/shared/socket-events.ts` — added read-only `joinCode: string | null` to `EnrichedPlayerView` (the `game:state` payload); `EnrichedSpectatorView` intentionally unchanged (spectator display out of scope)
+  - `src/shared/model.ts` — added `joinCode: string | null` to `SerializableGame` (the REST `getGameState` payload)
+  - `src/backend/util/serializer.ts` — `serializeGameForPlayer` now surfaces `game.joinCode`
+  - `src/backend/service/gameService.ts` — added `getJoinCode(gameId)`, a read-through cache of the immutable join code, so the per-broadcast hot path resolves the code without an uncached DB read
+  - `src/backend/websocket/socketHandler.ts` — join-time `game:state` emit includes `game.joinCode` (row already loaded); `broadcastGameState` includes `joinCode` on the per-player emit via the cached `getJoinCode` (spectator emit unchanged)
+  - `src/frontend/component/game-ui/RoomCodeChip.vue` — new component: renders "ROOM CODE" label + code (collapses to "ROOM" on mobile), copies on tap with "Copied!" / "Long-press to copy." feedback, renders nothing when the code is empty/null
+  - `src/frontend/component/game/GameBoard.vue` — accepts a `roomCode` prop and renders `RoomCodeChip` in the opponents bar, preferring the live `gameState.joinCode` over the seeded prop
+  - `src/frontend/component/game/GameView.vue` — owns a `roomCode` ref seeded from the REST response on mount and kept in sync from `lobby:state`, passed to `GameBoard`
+  - **Deviation from LLD (flag for code reviewer/architect):** the LLD prescribed calling `gameService.getGame(gameId)` inside `broadcastGameState`. That call is uncached (unlike the cache-first `getGameState`), adding a real DB round-trip to every broadcast and destabilizing the timing-sensitive abandonment integration tests in `reconnection.test.ts`. Replaced with a read-through `getJoinCode` cache of the immutable code, preserving every LLD invariant (code never in engine state, engine stays pure, every per-player broadcast carries it, spectator payload unchanged, `Game.joinCode` remains the source of truth).
+  - Tests: `tests/util/serializer.test.ts` (joinCode present / null), `tests/service/gameService.test.ts` (getJoinCode read/null/missing/memoization/miss-not-cached), `tests/websocket/socketHandler.test.ts` (join-time `game:state` carries joinCode / null), `tests/frontend/roomCodeChip.test.ts` (render gating + copy success/fallback), `tests/frontend/roomCodeReconciliation.test.ts` (GameBoard prefers live joinCode, GameView seeding), `tests/integration/ingame-room-code.test.ts` (join-time + post-action broadcast carry joinCode, REST returns it, spectator payload omits it, no opponent-hand leak)
+
 - **LLD 44: Home Buttons Centering** — "Create Game" and "Join Game" buttons now properly centered on home page across all viewport widths by adding `width: 100%` to `.home` scoped style in `HomeView.vue`
 
 

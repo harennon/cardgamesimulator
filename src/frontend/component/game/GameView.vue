@@ -36,6 +36,7 @@
       :action-error="actionError"
       :action-pending="actionPending"
       :turn-timer-seconds="turnTimerSeconds"
+      :room-code="roomCode"
       @toggle-card="toggleCard"
       @play="onPlay"
       @pass="onPass"
@@ -134,6 +135,10 @@ const {
 const joinError = ref<string | null>(null);
 const lobbyPlayers = ref<PlayerInfo[]>([]);
 const lobbyJoinCode = ref("");
+// Resolved 4-char room code shown in-game. Seeded from REST on mount, kept in
+// sync from lobby:state, and superseded by game:state.joinCode (GameBoard prefers
+// the live socket value). "" means unknown / no code → chip renders nothing.
+const roomCode = ref("");
 const maxPlayers = ref(4);
 const isHost = ref(false);
 const isGuest = ref(false);
@@ -211,6 +216,7 @@ onMounted(async () => {
     const game = response.data.gameState;
     maxPlayers.value = game.maxPlayers;
     turnTimerSeconds.value = game.turnTimerSeconds;
+    roomCode.value = game.joinCode ?? "";
     initialPlayerIds = game.playerIds;
 
     lobbyPlayers.value = initialPlayerIds.map((id) => ({
@@ -241,6 +247,7 @@ onMounted(async () => {
     lobbyPlayers.value = payload.players;
     maxPlayers.value = payload.maxPlayers;
     lobbyJoinCode.value = payload.joinCode;
+    roomCode.value = payload.joinCode;
   });
 
   s.on("lobby:playerJoined", (payload) => {

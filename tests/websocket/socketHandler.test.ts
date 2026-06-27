@@ -11,6 +11,7 @@ import { Game } from "../../src/backend/database/entities/Game.js";
 import type {
   LobbyStatePayload,
   LobbyPlayerJoinedPayload,
+  EnrichedPlayerView,
 } from "../../src/shared/socket-events.js";
 
 vi.mock("../../src/backend/engine/game-engine-factory.js", () => {
@@ -299,6 +300,7 @@ describe("socketHandler handleGameJoin — CREATED branch", () => {
     turnTimerService = makeTurnTimerService();
     gameService = {
       getGame: vi.fn(),
+      getJoinCode: vi.fn().mockResolvedValue(null),
       getGameState: vi.fn().mockResolvedValue(null),
       getPlayerView: vi.fn().mockResolvedValue(null),
       getSpectatorView: vi.fn().mockResolvedValue(null),
@@ -467,6 +469,7 @@ describe("socketHandler handleGameJoin — timer recovery on wake", () => {
     connectionManager = makeConnectionManager();
     gameService = {
       getGame: vi.fn(),
+      getJoinCode: vi.fn().mockResolvedValue(null),
       getGameState: vi.fn().mockResolvedValue(null),
       getPlayerView: vi.fn().mockResolvedValue(null),
       getSpectatorView: vi.fn().mockResolvedValue(null),
@@ -596,5 +599,71 @@ describe("socketHandler handleGameJoin — timer recovery on wake", () => {
 
     expect(turnTimerService.registerGame).not.toHaveBeenCalled();
     expect(gameService.applyAction).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Join-time game:state joinCode tests (handleGameJoin IN_PROGRESS branch)
+// ---------------------------------------------------------------------------
+
+describe("socketHandler handleGameJoin — join-time game:state joinCode", () => {
+  let gameService: GameService;
+  let connectionManager: ConnectionManager;
+  let turnTimerService: TurnTimerService;
+
+  beforeEach(() => {
+    connectionManager = makeConnectionManager();
+    turnTimerService = makeTurnTimerService();
+    // hasTimer false so the reconnect re-broadcast path stays simple; we assert
+    // the join-time socket.emit("game:state", ...) directly.
+    gameService = {
+      getGame: vi.fn(),
+      getJoinCode: vi.fn().mockResolvedValue(null),
+      getGameState: vi.fn().mockResolvedValue(null),
+      getPlayerView: vi.fn().mockResolvedValue({ players: [] }),
+      getSpectatorView: vi.fn().mockResolvedValue(null),
+      applyAction: vi.fn(),
+      startGame: vi.fn(),
+    } as unknown as GameService;
+  });
+
+  it("includes the game's joinCode in the join-time game:state emit", async () => {
+    const game = makeGame({ status: "IN_PROGRESS", joinCode: "H7K3" });
+    (gameService.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(game);
+
+    const { socket, emitted } = makeSocket("host-id", "Host");
+    const { fireGameJoin } = setupHandlers(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    await fireGameJoin(socket, "game-1", () => {});
+
+    const gameStateArgs = emitted.get("game:state") as
+      | [EnrichedPlayerView]
+      | undefined;
+    expect(gameStateArgs).toBeDefined();
+    expect(gameStateArgs![0].joinCode).toBe("H7K3");
+  });
+
+  it("emits joinCode: null on join-time game:state when the game has no joinCode", async () => {
+    const game = makeGame({ status: "IN_PROGRESS", joinCode: null });
+    (gameService.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(game);
+
+    const { socket, emitted } = makeSocket("host-id", "Host");
+    const { fireGameJoin } = setupHandlers(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    await fireGameJoin(socket, "game-1", () => {});
+
+    const gameStateArgs = emitted.get("game:state") as
+      | [EnrichedPlayerView]
+      | undefined;
+    expect(gameStateArgs).toBeDefined();
+    expect(gameStateArgs![0].joinCode).toBeNull();
   });
 });

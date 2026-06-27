@@ -212,6 +212,73 @@ describe("GameService", () => {
     });
   });
 
+  describe("getJoinCode", () => {
+    it("returns the game's joinCode from the DB on first read", async () => {
+      const cache = new GameCache();
+      const game = makeGame({ joinCode: "H7K3" });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const result = await service.getJoinCode("game-1");
+
+      expect(result).toBe("H7K3");
+    });
+
+    it("returns null when the game has no joinCode", async () => {
+      const cache = new GameCache();
+      const game = makeGame({ joinCode: null });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const result = await service.getJoinCode("game-1");
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null when the game does not exist", async () => {
+      const cache = new GameCache();
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(null) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const result = await service.getJoinCode("game-1");
+
+      expect(result).toBeNull();
+    });
+
+    it("memoizes the immutable join code — only one DB read across repeated calls", async () => {
+      const cache = new GameCache();
+      const game = makeGame({ joinCode: "H7K3" });
+      const getGame = vi.fn().mockResolvedValue(game);
+      const repo = makeGameRepo({ getGame });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await service.getJoinCode("game-1");
+      await service.getJoinCode("game-1");
+      await service.getJoinCode("game-1");
+
+      expect(getGame).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not cache a miss — retries the DB read when the game was absent", async () => {
+      const cache = new GameCache();
+      const getGame = vi
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(makeGame({ joinCode: "H7K3" }));
+      const repo = makeGameRepo({ getGame });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      expect(await service.getJoinCode("game-1")).toBeNull();
+      expect(await service.getJoinCode("game-1")).toBe("H7K3");
+      expect(getGame).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("startGame", () => {
     it("initializes the engine, caches, and returns the initial state", async () => {
       const cache = new GameCache();
