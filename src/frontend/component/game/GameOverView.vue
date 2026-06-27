@@ -3,7 +3,7 @@
     <div class="game-over__panel">
       <h1 class="game-over__winner">{{ winner }} wins!</h1>
 
-      <table class="game-over__scores">
+      <table class="game-over__scores game-over__fade-in">
         <thead>
           <tr>
             <th>Player</th>
@@ -14,13 +14,44 @@
         </thead>
         <tbody>
           <tr v-for="(row, i) in scoreRows" :key="row.playerId">
-            <td>{{ row.displayName }}</td>
+            <td class="game-over__player-cell">
+              <span
+                v-if="row.badge"
+                class="game-over__badge"
+                :class="row.badgeClass"
+                :data-badge="row.badge"
+              ></span>
+              {{ row.displayName }}
+            </td>
             <td>{{ i + 1 }}</td>
             <td>{{ row.cardCount }}</td>
             <td>{{ row.score }}</td>
           </tr>
         </tbody>
       </table>
+
+      <div
+        v-if="totalTurns > 0"
+        class="game-over__metadata game-over__fade-in game-over__fade-in--delay-1"
+      >
+        Total Turns: {{ totalTurns }}
+      </div>
+
+      <div
+        v-if="stats.length > 0"
+        class="game-over__stats"
+        data-testid="game-over-stats"
+      >
+        <div
+          v-for="(stat, i) in stats"
+          :key="stat.label"
+          class="game-over__stat-card game-over__slide-up"
+          :style="{ animationDelay: `${i * 80}ms` }"
+        >
+          <span class="game-over__stat-label">{{ stat.label }}</span>
+          <span class="game-over__stat-value">{{ stat.value }}</span>
+        </div>
+      </div>
 
       <div class="game-over__actions">
         <button
@@ -48,6 +79,12 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import type { PlayerScore, PlayerPublicInfo } from "@shared/engine-types";
+import type { Big2HistoryEntry } from "@shared/big2-types";
+import {
+  deriveBig2Stats,
+  getBadgeForPosition,
+  getBadgeClass,
+} from "./gameOverStats";
 
 const props = defineProps<{
   scores: readonly PlayerScore[];
@@ -55,23 +92,37 @@ const props = defineProps<{
   players: readonly PlayerPublicInfo[];
   isGuest: boolean;
   gameId: string;
+  playHistory?: readonly Big2HistoryEntry[];
+  currentPlayerId?: string;
+  totalTurns?: number;
 }>();
 
 const router = useRouter();
 
 const scoreRows = computed(() => {
+  const totalPlayers = props.scores.length;
   return [...props.scores]
     .sort((a, b) => b.score - a.score)
-    .map((s) => {
+    .map((s, i) => {
       const player = props.players.find((p) => p.playerId === s.playerId);
+      const badge = getBadgeForPosition(i, totalPlayers);
       return {
         playerId: s.playerId,
         displayName: player?.displayName ?? s.playerId,
         cardCount: player?.cardCount ?? 0,
         score: s.score,
+        badge,
+        badgeClass: badge ? getBadgeClass(badge) : null,
       };
     });
 });
+
+const stats = computed(() => {
+  if (!props.playHistory || !props.currentPlayerId) return [];
+  return deriveBig2Stats(props.playHistory, props.currentPlayerId);
+});
+
+const totalTurns = computed(() => props.totalTurns ?? 0);
 
 function goHome(): void {
   router.push("/");
@@ -88,6 +139,7 @@ function goHome(): void {
   align-items: center;
   justify-content: center;
   background: var(--felt);
+  overflow-y: auto;
 }
 
 .game-over__panel {
@@ -100,6 +152,7 @@ function goHome(): void {
   align-items: center;
   gap: 24px;
   min-width: 400px;
+  margin: 24px 0;
 }
 
 .game-over__winner {
@@ -133,6 +186,78 @@ function goHome(): void {
 .game-over__scores td {
   padding: 8px 12px;
   border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+  color: var(--text-primary);
+}
+
+.game-over__player-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-over__badge {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.game-over__badge--gold {
+  background: #c9a84c;
+  box-shadow: 0 0 6px rgba(201, 168, 76, 0.5);
+}
+
+.game-over__badge--silver {
+  background: #a8a8a8;
+  box-shadow: 0 0 6px rgba(168, 168, 168, 0.4);
+}
+
+.game-over__badge--bronze {
+  background: #b87333;
+  box-shadow: 0 0 6px rgba(184, 115, 51, 0.4);
+}
+
+.game-over__badge--grey {
+  background: #5a5a5a;
+}
+
+.game-over__metadata {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.game-over__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.game-over__stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.game-over__stat-label {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.game-over__stat-value {
+  font-family: var(--font-ui);
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -182,6 +307,50 @@ function goHome(): void {
   text-decoration: underline;
 }
 
+/* Animations */
+.game-over__fade-in {
+  animation: fadeIn 200ms ease forwards;
+  opacity: 0;
+}
+
+.game-over__fade-in--delay-1 {
+  animation-delay: 100ms;
+}
+
+.game-over__slide-up {
+  animation: slideUp 300ms ease forwards;
+  opacity: 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-over__fade-in,
+  .game-over__slide-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (max-width: 767px) {
   .game-over__panel {
     min-width: unset;
@@ -199,6 +368,14 @@ function goHome(): void {
     font-size: 0.8rem;
   }
 
+  .game-over__stat-card {
+    padding: 12px;
+  }
+
+  .game-over__stat-value {
+    font-size: 1.1rem;
+  }
+
   .game-over__actions {
     flex-direction: column;
     width: 100%;
@@ -209,6 +386,12 @@ function goHome(): void {
     width: 100%;
     min-height: 48px;
     font-size: 16px;
+  }
+}
+
+@media (max-width: 320px) {
+  .game-over__stats {
+    grid-template-columns: 1fr;
   }
 }
 </style>

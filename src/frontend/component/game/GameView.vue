@@ -42,12 +42,16 @@
     :players="gameState.players"
     :is-guest="isGuest"
     :game-id="gameId"
+    :play-history="gameOverPlayHistory"
+    :current-player-id="gameState.you.playerId"
+    :total-turns="gameState.turnNumber"
   />
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import type { PlayerInfo } from "@shared/engine-types";
+import type { Big2PublicState } from "@shared/big2-types";
 import { axiosInstance } from "@/service/http";
 import type { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
 import type { AxiosResponse } from "axios";
@@ -115,6 +119,13 @@ const winnerDisplayName = computed(() => {
     (p) => p.playerId === gameState.value!.winner,
   );
   return player?.displayName ?? gameState.value.winner;
+});
+
+const gameOverPlayHistory = computed(() => {
+  if (!gameState.value?.gameSpecificPublicState) return undefined;
+  const publicState = gameState.value
+    .gameSpecificPublicState as Big2PublicState;
+  return publicState.playHistory;
 });
 
 onMounted(async () => {
