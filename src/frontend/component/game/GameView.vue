@@ -12,7 +12,7 @@
   </div>
 
   <GameLobbyView
-    v-else-if="effectiveStatus === 'CREATED'"
+    v-else-if="displayPhase === 'CREATED'"
     :game-id="gameId"
     :players="lobbyPlayers"
     :max-players="maxPlayers"
@@ -22,21 +22,50 @@
     @start="onStartGame"
   />
 
-  <GameBoard
-    v-else-if="effectiveStatus === 'IN_PROGRESS' && gameState"
-    :game-state="gameState"
-    :selected-indices="selectedIndices"
-    :selection-count="selectionCount"
-    :action-error="actionError"
-    :action-pending="actionPending"
-    :turn-timer-seconds="turnTimerSeconds"
-    @toggle-card="toggleCard"
-    @play="onPlay"
-    @pass="onPass"
-  />
+  <div
+    v-else-if="
+      (displayPhase === 'IN_PROGRESS' || displayPhase === 'SHOW_FINAL_PLAY') &&
+      gameState
+    "
+    class="game-view__board-container"
+  >
+    <GameBoard
+      :game-state="gameState"
+      :selected-indices="selectedIndices"
+      :selection-count="selectionCount"
+      :action-error="actionError"
+      :action-pending="actionPending"
+      :turn-timer-seconds="turnTimerSeconds"
+      @toggle-card="toggleCard"
+      @play="onPlay"
+      @pass="onPass"
+    />
+
+    <div
+      v-if="displayPhase === 'SHOW_FINAL_PLAY'"
+      class="game-view__final-play-overlay"
+      data-testid="final-play-overlay"
+    >
+      <div class="game-view__final-play-content">
+        <h2 class="game-view__final-play-winner">
+          {{ winnerDisplayName }} wins!
+        </h2>
+        <button
+          class="game-view__final-play-btn"
+          data-testid="continue-to-results"
+          @click="skipToResults"
+        >
+          Continue to Results
+        </button>
+        <div class="game-view__final-play-progress">
+          <div class="game-view__final-play-progress-bar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <GameOverView
-    v-else-if="effectiveStatus === 'COMPLETED' && gameState"
+    v-else-if="displayPhase === 'COMPLETED' && gameState"
     :scores="gameState.scores ?? []"
     :winner="winnerDisplayName"
     :players="gameState.players"
@@ -64,6 +93,8 @@ import { restoreGuestSession } from "@/service/guestService";
 import GameLobbyView from "@/component/game/GameLobbyView.vue";
 import GameBoard from "@/component/game/GameBoard.vue";
 import GameOverView from "@/component/game/GameOverView.vue";
+
+type DisplayPhase = "CREATED" | "IN_PROGRESS" | "SHOW_FINAL_PLAY" | "COMPLETED";
 
 const props = defineProps<{
   gameId: string;
@@ -112,6 +143,33 @@ const turnTimerSeconds = ref<number | null>(null);
 // Once useGameState receives a game:state event, status.value takes precedence.
 const restStatus = ref<string | null>(null);
 const effectiveStatus = computed(() => status.value ?? restStatus.value);
+
+const displayPhase = ref<DisplayPhase>("CREATED");
+const finalPlayTimerId = ref<ReturnType<typeof setTimeout> | null>(null);
+
+watch(effectiveStatus, (newStatus, oldStatus) => {
+  if (newStatus === "COMPLETED" && oldStatus === "IN_PROGRESS") {
+    displayPhase.value = "SHOW_FINAL_PLAY";
+    finalPlayTimerId.value = setTimeout(() => {
+      displayPhase.value = "COMPLETED";
+      finalPlayTimerId.value = null;
+    }, 4000);
+  } else if (newStatus === "COMPLETED") {
+    displayPhase.value = "COMPLETED";
+  } else if (newStatus === "IN_PROGRESS") {
+    displayPhase.value = "IN_PROGRESS";
+  } else if (newStatus === "CREATED") {
+    displayPhase.value = "CREATED";
+  }
+});
+
+function skipToResults(): void {
+  if (finalPlayTimerId.value) {
+    clearTimeout(finalPlayTimerId.value);
+    finalPlayTimerId.value = null;
+  }
+  displayPhase.value = "COMPLETED";
+}
 
 const winnerDisplayName = computed(() => {
   if (!gameState.value?.winner) return "";
@@ -220,6 +278,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  if (finalPlayTimerId.value) clearTimeout(finalPlayTimerId.value);
   unbindState();
   unbindActions();
   disconnect();
@@ -272,5 +331,112 @@ async function onPass(): Promise<void> {
   font-family: var(--font-ui);
   color: var(--text-muted);
   font-size: 1rem;
+}
+
+.game-view__board-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.game-view__final-play-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: overlayFadeIn 200ms ease forwards;
+}
+
+.game-view__final-play-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 32px 48px;
+}
+
+.game-view__final-play-winner {
+  font-family: var(--font-ui);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--gold-accent);
+  margin: 0;
+  text-shadow: 0 0 24px var(--gold-glow);
+}
+
+.game-view__final-play-btn {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 12px 32px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: var(--gold-accent);
+  color: #1a0f06;
+  min-height: 48px;
+  transition: background 0.15s ease;
+}
+
+.game-view__final-play-btn:hover {
+  background: #d4b45a;
+}
+
+.game-view__final-play-progress {
+  width: 200px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.game-view__final-play-progress-bar {
+  width: 100%;
+  height: 100%;
+  background: var(--gold-accent);
+  animation: shrink 4s linear forwards;
+  transform-origin: left;
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-view__final-play-overlay {
+    animation: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .game-view__final-play-winner {
+    font-size: 1.5rem;
+  }
+
+  .game-view__final-play-content {
+    padding: 24px 20px;
+  }
+
+  .game-view__final-play-btn {
+    font-size: 16px;
+  }
 }
 </style>
