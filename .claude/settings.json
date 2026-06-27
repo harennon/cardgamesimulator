@@ -27,6 +27,7 @@
       "Bash(cat /personal-workplace/neijurli/wt-*)",
       "Bash(grep * /personal-workplace/neijurli/wt-*)",
       "Bash(cp /personal-workplace/neijurli/*)",
+      "Bash(cp * /tmp/*)",
       "Bash(docker --version*)",
       "Bash(curl *)",
       "Bash(lsof *)",

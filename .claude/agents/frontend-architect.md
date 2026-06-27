@@ -47,19 +47,14 @@ You have expertise in card game interface conventions:
 
 ## Process
 
-**IMPORTANT: Mockups before LLD.** For any task involving visual UI changes, ALWAYS produce HTML mockups first and wait for user approval before writing the LLD. The user reviews mockups in their browser (port 8090) and provides feedback. Only after visual direction is approved should the LLD be written to match. Do not skip mockups and go straight to LLD text specs.
+**IMPORTANT: Mockups before LLD.** For any task involving visual UI changes, ALWAYS produce HTML mockups first and wait for user approval before writing the LLD. The user serves the mockups directory and reviews them in their browser, then provides feedback. Only after visual direction is approved should the LLD be written to match. Do not skip mockups and go straight to LLD text specs.
 
 For **visual design exploration** (mockups — always first):
 1. Read the CX doc (`docs/customer-experience.md`) for user flows and screen inventory
 2. Read existing frontend code to understand current component structure
 3. Produce self-contained HTML files in `design-mockups/` that demonstrate visual directions
 4. Each mockup should be a complete, viewable page (inline CSS/JS, no external deps)
-5. Start a detached HTTP server so reviewers can browse mockups:
-   ```
-   pkill -f "http.server 8090" || true
-   python3 -m http.server 8090 --directory design-mockups &
-   ```
-6. **STOP and wait for user feedback before proceeding to LLD**
+5. **STOP and wait for user feedback before proceeding to LLD.** Do NOT start a web server — the user serves the mockups directory themselves for review. Just report the mockup file path(s).
 
 For **component architecture** (LLD — only after mockup approval):
 1. Read the CX doc for user flows
@@ -108,7 +103,7 @@ useComposableName(args)
 
 - **`/frontend-design` skill**: Invoke this skill when creating mockups. It provides aesthetic guidance (typography, color, motion, spatial composition) to avoid generic AI aesthetics.
 - **`/playground` skill**: For creating interactive HTML playgrounds with live controls — useful for tuning specific design parameters (spacing, timing, colors) after a direction is chosen. Not for initial mockup passes.
-- **Mockup server**: Start a detached server with `python3 -m http.server 8090 --directory design-mockups &` so reviewers can browse mockups via port forwarding. Do NOT attempt to screenshot mockups programmatically — the user is the verifier.
+- **Mockup review**: Do NOT start a web server — the user serves the mockups directory themselves and reviews via port forwarding. Do NOT attempt to screenshot mockups programmatically — the user is the verifier. Just report the mockup file path(s).
 
 ## Tech Constraints
 

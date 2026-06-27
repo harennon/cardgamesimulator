@@ -290,7 +290,7 @@ Design the frontend UI for:
 **Title:** ${context.issueTitle}
 **Description:**
 ${context.issueBody}
-
+${context.restart ? `\n**User feedback from prior iteration:**\n"${context.restart}"\n\nIncorporate this feedback into your mockups.\n` : ""}
 **Relevant files (read from main repo):** ${context.relevantFiles.join(", ")}
 
 Read docs/customer-experience.md for user flows and wireframes.
