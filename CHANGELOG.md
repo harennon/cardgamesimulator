@@ -10,6 +10,12 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 38: Post-Match Stats on Game Over Screen** — game over screen now shows per-game performance stats for the current player
+  - `src/frontend/component/game/gameOverStats.ts` — stat derivation utility: `deriveBig2Stats` computes Plays Made, Passes, Tricks Won, Best Hand from `playHistory`; `countTricksWon` detects trick-winning sequences; `getBestHand` ranks hand types; placement badge helpers (`getBadgeForPosition`, `getBadgeClass`)
+  - `src/frontend/component/game/GameOverView.vue` — enhanced with placement badges (gold/silver/bronze/grey CSS circles), "Total Turns" metadata bar, 2x2 stats grid with staggered slide-up entrance animations, `prefers-reduced-motion` support, mobile responsive
+  - `src/frontend/component/game/GameView.vue` — passes `playHistory`, `currentPlayerId`, and `totalTurns` props to `GameOverView` from `gameSpecificPublicState`
+  - `tests/frontend/gameOverStats.test.ts` — 13 unit tests: play/pass counting, trick detection, hand type ranking, empty history, player isolation, placement badge mapping
+
 - **LLD 32: Mobile Responsiveness for Non-Game Screens** — all pre-game and post-game screens (Home, Login, Guest Entry, Create Game, Join Game, Game Lobby, Game Over) are now mobile-responsive at 375px viewports with no horizontal overflow and touch-friendly tap targets
   - `src/frontend/styles/game-variables.css` — added `--card-panel-padding: 28px 20px` and `--page-max-width: 100%` overrides inside existing `@media (max-width: 767px)` block
   - `src/frontend/styles/flows.css` — appended `@media (max-width: 767px)` block: `.flow-page` padding/alignment, `.form-card__input` min-height 44px + font-size 16px (prevents iOS zoom), `.btn-primary` / `.btn-secondary` min-height 48px + flex centering
