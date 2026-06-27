@@ -134,6 +134,18 @@ Every commit must include an update to `CHANGELOG.md`. Add your entry under `[Un
 - Lint: `npm run lint:fix` before committing
 - Manual test: for UI changes, run `docker compose up` and verify in browser
 
+### Iterating on Workflows
+
+The orchestration workflows live in `.claude/workflows/` (`ship-batch`, `ship-issue`, `triage-feedback`).
+
+**Gotcha when testing edits in an interactive session:** launching by name (`/ship-batch` or `Workflow({name: "ship-batch"})`) runs the version from the skill registry, which only refreshes on session start / skill reload — **not** on every launch. So edits you just made on disk may not run. When iterating within a session, launch by file path instead so the current file is always used:
+
+```
+Workflow({ scriptPath: "/absolute/path/to/.claude/workflows/ship-batch.js" })
+```
+
+The scheduled (cron) runs are unaffected: each `claude -p "/ship-batch"` invocation is a fresh session that reads the workflow files from disk at startup, so committed/working-tree edits are picked up automatically.
+
 ---
 
 ## Architecture Rules (Quick Reference)
