@@ -1,0 +1,1155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>In-Game Room Code Display — Mockups</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-mono: "JetBrains Mono", "Courier New", monospace;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 24px 80px;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 28px;
+      }
+      .page-head h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin-top: 8px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 760px;
+        line-height: 1.5;
+      }
+
+      .direction {
+        max-width: 1180px;
+        margin: 0 auto 56px;
+      }
+      .direction__head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 4px;
+      }
+      .direction__tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #0a0a0a;
+        background: var(--gold-accent);
+        padding: 3px 9px;
+        border-radius: 4px;
+      }
+      .direction__head h2 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .direction__desc {
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        line-height: 1.5;
+        margin: 8px 0 20px;
+        max-width: 820px;
+      }
+      .direction__desc strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .frames {
+        display: grid;
+        grid-template-columns: 1fr 290px;
+        gap: 24px;
+        align-items: start;
+      }
+      @media (max-width: 900px) {
+        .frames {
+          grid-template-columns: 1fr;
+        }
+      }
+      .frame-label {
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+
+      /* ========== GAME BOARD (desktop frame) ========== */
+      .board-frame {
+        height: 420px;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+      }
+      .board-frame--mobile {
+        height: 560px;
+        width: 290px;
+        border-radius: 22px;
+        border: 8px solid #15100b;
+      }
+
+      .game-board {
+        position: relative;
+        height: 100%;
+        display: grid;
+        grid-template-rows: 68px 1fr 150px 52px;
+        grid-template-columns: 1fr 220px;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+      }
+      .game-board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+      .game-board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 9px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        pointer-events: none;
+        z-index: 100;
+      }
+      .game-board > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* mobile board grid */
+      .game-board--mobile {
+        grid-template-rows: 46px 1fr 132px 50px;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand"
+          "actions";
+      }
+      .game-board--mobile::after {
+        border-width: 4px;
+      }
+      .game-board--mobile .game-board__log {
+        display: none;
+      }
+
+      /* ===== opponent row ===== */
+      .opponent-row {
+        grid-area: opponents;
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 14px;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+        position: relative;
+      }
+      .game-board--mobile .opponent-row {
+        gap: 4px;
+        padding: 5px 8px;
+      }
+      .opponent {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 5px 9px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        position: relative;
+      }
+      .game-board--mobile .opponent {
+        flex-direction: row;
+        gap: 6px;
+        padding: 4px 9px;
+        border-radius: 16px;
+        border-width: 1.5px;
+      }
+      .opponent--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .opponent__cards {
+        display: flex;
+      }
+      .game-board--mobile .opponent__cards {
+        display: none;
+      }
+      .opponent__cards .card-back {
+        width: 22px;
+        height: 31px;
+        margin-left: -8px;
+        border-radius: 3px;
+        border: 1px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+      }
+      .opponent__cards .card-back:first-child {
+        margin-left: 0;
+      }
+      .opponent__name {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .opponent__count {
+        font-size: 0.62rem;
+        color: var(--text-muted);
+      }
+      .game-board--mobile .opponent__count {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 1px 5px;
+        border-radius: 8px;
+      }
+
+      /* ===== play area ===== */
+      .play-area {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        min-height: 0;
+      }
+      .play-area__label {
+        font-size: 0.62rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .play-area__cards {
+        display: flex;
+        gap: 6px;
+      }
+      .pcard {
+        width: 46px;
+        height: 64px;
+        border-radius: 5px;
+        background: var(--card-face);
+        border: 1px solid rgba(0, 0, 0, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.95rem;
+        box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.4);
+      }
+      .pcard--red {
+        color: var(--red-suit);
+      }
+      .pcard--black {
+        color: var(--black-suit);
+      }
+      .turn-banner {
+        margin-top: 4px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--gold-accent);
+      }
+
+      /* ===== hand ===== */
+      .hand {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 6px 0;
+      }
+      .hand__label {
+        font-size: 0.55rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        padding-left: 12px;
+        margin-bottom: 4px;
+      }
+      .hand__cards {
+        display: flex;
+        padding-left: 16px;
+        align-items: flex-end;
+      }
+      .hcard {
+        width: 44px;
+        height: 62px;
+        border-radius: 5px;
+        background: var(--card-face);
+        border: 1px solid rgba(0, 0, 0, 0.25);
+        margin-left: -16px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 4px;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.78rem;
+        box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.35);
+        flex-shrink: 0;
+      }
+      .hcard:first-child {
+        margin-left: 0;
+      }
+      .hcard--red {
+        color: var(--red-suit);
+      }
+      .hcard--black {
+        color: var(--black-suit);
+      }
+      .hcard--sel {
+        transform: translateY(-12px);
+        border-color: var(--gold-accent);
+        box-shadow: 0 6px 18px var(--gold-glow);
+      }
+
+      /* ===== log ===== */
+      .game-board__log {
+        grid-area: log;
+        background: var(--panel-bg);
+        border-left: 1px solid var(--table-rim-light);
+        padding: 10px 12px;
+        font-size: 0.66rem;
+        color: var(--text-muted);
+        line-height: 1.9;
+      }
+      .game-board__log b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* ===== actions ===== */
+      .actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+      }
+      .actions__btn {
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 8px 26px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+      }
+      .actions__btn--play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .actions__btn--pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+
+      /* =====================================================
+         ROOM CODE ELEMENT — shared base + per-direction skins
+         ===================================================== */
+
+      /* tiny "Copied!" toast shared by all */
+      .rc-toast {
+        position: absolute;
+        font-size: 0.6rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: var(--gold-accent);
+        background: rgba(10, 8, 5, 0.92);
+        border: 1px solid var(--gold-accent);
+        padding: 3px 8px;
+        border-radius: 5px;
+        white-space: nowrap;
+        opacity: 0;
+        transform: translateY(4px);
+        transition:
+          opacity 0.18s ease,
+          transform 0.18s ease;
+        pointer-events: none;
+        z-index: 120;
+      }
+      .rc-toast--show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* ----- DIRECTION A: corner tab (inline in opponent row, far right) ----- */
+      .rc-tab {
+        position: absolute;
+        top: 50%;
+        right: 14px;
+        transform: translateY(-50%);
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: rgba(10, 8, 5, 0.55);
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        border-radius: 7px;
+        padding: 5px 9px 5px 10px;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .rc-tab:hover {
+        background: rgba(201, 168, 76, 0.12);
+        border-color: var(--gold-accent);
+      }
+      .rc-tab__label {
+        font-size: 0.52rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        line-height: 1;
+      }
+      .rc-tab__code {
+        font-family: var(--font-mono);
+        font-size: 0.92rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        color: var(--gold-accent);
+        line-height: 1;
+      }
+      .rc-tab__copy {
+        width: 12px;
+        height: 12px;
+        opacity: 0.6;
+      }
+      .rc-tab:hover .rc-tab__copy {
+        opacity: 1;
+      }
+      .rc-tab .rc-toast {
+        top: calc(100% + 6px);
+        right: 0;
+      }
+      /* mobile: tab condenses to just label-over-code, smaller, hugs corner */
+      .game-board--mobile .rc-tab {
+        right: 8px;
+        gap: 5px;
+        padding: 3px 7px;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 1px;
+      }
+      .game-board--mobile .rc-tab__label {
+        font-size: 0.44rem;
+      }
+      .game-board--mobile .rc-tab__code {
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+      }
+      .game-board--mobile .rc-tab__copy {
+        display: none;
+      }
+
+      /* ----- DIRECTION B: felt-engraved chip (bottom-left, sunk into felt) ----- */
+      .rc-chip {
+        position: absolute;
+        left: 14px;
+        bottom: 60px;
+        z-index: 30;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: linear-gradient(
+          180deg,
+          rgba(0, 0, 0, 0.28),
+          rgba(0, 0, 0, 0.14)
+        );
+        border: 1px solid rgba(0, 0, 0, 0.35);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.06),
+          inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+        cursor: pointer;
+        transition: box-shadow 0.15s ease;
+      }
+      .rc-chip:hover {
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          0 0 0 1px var(--gold-accent);
+      }
+      .rc-chip__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 6px var(--gold-glow);
+      }
+      .rc-chip__text {
+        font-size: 0.62rem;
+        color: var(--text-muted);
+        letter-spacing: 0.04em;
+      }
+      .rc-chip__code {
+        font-family: var(--font-mono);
+        font-weight: 700;
+        font-size: 0.82rem;
+        letter-spacing: 0.16em;
+        color: var(--gold-accent);
+      }
+      .rc-chip .rc-toast {
+        bottom: calc(100% + 6px);
+        left: 0;
+      }
+      .game-board--mobile .rc-chip {
+        bottom: 56px;
+        left: 8px;
+        padding: 5px 10px;
+      }
+      .game-board--mobile .rc-chip__text {
+        display: none;
+      }
+      .game-board--mobile .rc-chip__code {
+        font-size: 0.72rem;
+      }
+
+      /* ----- DIRECTION C: header bar slot (sits left of opponents, mirrors timer) ----- */
+      .rc-slot {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1px;
+        cursor: pointer;
+        padding: 4px 6px;
+        border-radius: 6px;
+        transition: background 0.15s ease;
+      }
+      .rc-slot:hover {
+        background: rgba(201, 168, 76, 0.1);
+      }
+      .rc-slot__label {
+        font-size: 0.5rem;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .rc-slot__copy {
+        width: 9px;
+        height: 9px;
+        opacity: 0.5;
+      }
+      .rc-slot:hover .rc-slot__copy {
+        opacity: 1;
+      }
+      .rc-slot__code {
+        font-family: var(--font-mono);
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        color: var(--gold-accent);
+        line-height: 1;
+      }
+      .rc-slot .rc-toast {
+        top: calc(100% + 4px);
+        left: 0;
+      }
+      .game-board--mobile .rc-slot {
+        left: 7px;
+        padding: 2px 4px;
+      }
+      .game-board--mobile .rc-slot__label {
+        font-size: 0.4rem;
+      }
+      .game-board--mobile .rc-slot__code {
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+      }
+
+      .legend {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 18px 20px;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        background: rgba(20, 12, 8, 0.4);
+        font-size: 0.84rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      .legend b {
+        color: var(--text-primary);
+      }
+      .legend code {
+        font-family: var(--font-mono);
+        color: var(--gold-accent);
+        font-size: 0.8rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>In-Game Room Code Display</h1>
+      <p>
+        Three distinct placements for surfacing the 4-character room code during
+        active gameplay (IN_PROGRESS). Each shows the desktop board (left) and a
+        phone (right). The code is always visible, never overlaps the cards or
+        action buttons, and copies to clipboard on tap. Click any code element
+        to see the copy feedback.
+      </p>
+    </div>
+
+    <!-- ============ DIRECTION A ============ -->
+    <section class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option A</span>
+        <h2>Opponents-bar corner tab</h2>
+      </div>
+      <p class="direction__desc">
+        A compact pill anchored to the
+        <strong>far-right of the opponents bar</strong>
+        — the one strip of the board that never holds cards. Label "ROOM" sits
+        beside the monospace code with a small copy glyph that brightens on
+        hover. Reuses dead space in the top bar; zero new vertical chrome. On
+        mobile it collapses into a stacked label/code that hugs the top-right
+        corner.
+      </p>
+      <div class="frames">
+        <div>
+          <div class="frame-label">Desktop — 1280px board</div>
+          <div class="board-frame">
+            <div class="game-board">
+              <div class="opponent-row">
+                <div class="opponent">
+                  <div class="opponent__cards">
+                    <span class="card-back"></span
+                    ><span class="card-back"></span
+                    ><span class="card-back"></span>
+                  </div>
+                  <span class="opponent__name">Bob</span>
+                  <span class="opponent__count">9 cards</span>
+                </div>
+                <div class="opponent opponent--active">
+                  <div class="opponent__cards">
+                    <span class="card-back"></span
+                    ><span class="card-back"></span
+                    ><span class="card-back"></span
+                    ><span class="card-back"></span>
+                  </div>
+                  <span class="opponent__name">Charlie</span>
+                  <span class="opponent__count">11 cards</span>
+                </div>
+                <div class="opponent">
+                  <div class="opponent__cards">
+                    <span class="card-back"></span
+                    ><span class="card-back"></span>
+                  </div>
+                  <span class="opponent__name">Dave</span>
+                  <span class="opponent__count">8 cards</span>
+                </div>
+
+                <div class="rc-tab" onclick="copyCode(this)">
+                  <span class="rc-tab__label">Room</span>
+                  <span class="rc-tab__code">H7K3</span>
+                  <svg
+                    class="rc-tab__copy"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--gold-accent)"
+                    stroke-width="2"
+                  >
+                    <rect x="9" y="9" width="11" height="11" rx="2" />
+                    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                  </svg>
+                  <span class="rc-toast">Copied!</span>
+                </div>
+              </div>
+
+              <div class="play-area">
+                <span class="play-area__label">Last Play — Bob, Pair</span>
+                <div class="play-area__cards">
+                  <span class="pcard pcard--black">7♠</span>
+                  <span class="pcard pcard--red">7♥</span>
+                </div>
+                <span class="turn-banner">Charlie's turn · 0:42</span>
+              </div>
+
+              <div class="hand">
+                <div class="hand__label">Your hand (13)</div>
+                <div class="hand__cards">
+                  <span class="hcard hcard--black">3♣</span>
+                  <span class="hcard hcard--red">4♦</span>
+                  <span class="hcard hcard--red hcard--sel">5♥</span>
+                  <span class="hcard hcard--black">5♠</span>
+                  <span class="hcard hcard--red">7♦</span>
+                  <span class="hcard hcard--black">9♣</span>
+                  <span class="hcard hcard--red">J♥</span>
+                  <span class="hcard hcard--black">Q♠</span>
+                  <span class="hcard hcard--red">K♦</span>
+                  <span class="hcard hcard--black">A♣</span>
+                </div>
+              </div>
+
+              <div class="game-board__log">
+                <div><b>Bob</b> · Pair 7♠ 7♥</div>
+                <div><b>Charlie</b> · Pass</div>
+                <div><b>Dave</b> · Pass</div>
+              </div>
+
+              <div class="actions">
+                <button class="actions__btn actions__btn--play">Play</button>
+                <button class="actions__btn actions__btn--pass">Pass</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="frame-label">Mobile — 375px</div>
+          <div class="board-frame board-frame--mobile">
+            <div class="game-board game-board--mobile">
+              <div class="opponent-row">
+                <div class="opponent">
+                  <span class="opponent__name">Bob</span>
+                  <span class="opponent__count">9</span>
+                </div>
+                <div class="opponent opponent--active">
+                  <span class="opponent__name">Char…</span>
+                  <span class="opponent__count">11</span>
+                </div>
+                <div class="rc-tab" onclick="copyCode(this)">
+                  <span class="rc-tab__label">Room</span>
+                  <span class="rc-tab__code">H7K3</span>
+                  <span class="rc-toast">Copied!</span>
+                </div>
+              </div>
+              <div class="play-area">
+                <span class="play-area__label">Last — Pair</span>
+                <div class="play-area__cards">
+                  <span class="pcard pcard--black">7♠</span>
+                  <span class="pcard pcard--red">7♥</span>
+                </div>
+                <span class="turn-banner">Charlie · 0:42</span>
+              </div>
+              <div class="hand">
+                <div class="hand__label">Your hand (13)</div>
+                <div class="hand__cards">
+                  <span class="hcard hcard--black">3♣</span>
+                  <span class="hcard hcard--red">4♦</span>
+                  <span class="hcard hcard--red hcard--sel">5♥</span>
+                  <span class="hcard hcard--black">5♠</span>
+                  <span class="hcard hcard--red">7♦</span>
+                  <span class="hcard hcard--black">9♣</span>
+                  <span class="hcard hcard--red">J♥</span>
+                </div>
+              </div>
+              <div class="actions">
+                <button class="actions__btn actions__btn--play">Play</button>
+                <button class="actions__btn actions__btn--pass">Pass</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DIRECTION B ============ -->
+    <section class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option B</span>
+        <h2>Felt-engraved chip (lower-left)</h2>
+      </div>
+      <p class="direction__desc">
+        An inset "engraved into the felt" pill floating at the
+        <strong>lower-left of the play area</strong>, above the hand. A small
+        gold dot, the literal code, and the word "Room". Treated as part of the
+        table surface (inset shadow, no hard border) so it recedes until looked
+        for. Sits clear of cards and the centered last-play. On mobile it
+        shrinks and drops the helper text.
+      </p>
+      <div class="frames">
+        <div>
+          <div class="frame-label">Desktop — 1280px board</div>
+          <div class="board-frame">
+            <div class="game-board">
+              <div class="opponent-row">
+                <div class="opponent">
+                  <div class="opponent__cards">
+                    <span class="card-back"></span
+                    ><span class="card-back"></span
+                    ><span class="card-back"></span>
+                  </div>
+                  <span class="opponent__name">Bob</span>
+                  <span class="opponent__count">9 cards</span>
+                </div>
+                <div class="opponent opponent--active">
+                  <div class="opponent__cards">
+                    <span class="card-back"></span
+                    ><span class="card-back"></span
+                    ><span class="card-back"></span
+                    ><span class="card-back"></span>
+                  </div>
+                  <span class="opponent__name">Charlie</span>
+                  <span class="opponent__count">11 cards</span>
+                </div>
+                <div class="opponent">
+                  <div class="opponent__cards">
+                    <span class="card-back"></span
+                    ><span class="card-back"></span>
+                  </div>
+                  <span class="opponent__name">Dave</span>
+                  <span class="opponent__count">8 cards</span>
+                </div>
+              </div>
+
+              <div class="play-area">
+                <span class="play-area__label">Last Play — Bob, Pair</span>
+                <div class="play-area__cards">
+                  <span class="pcard pcard--black">7♠</span>
+                  <span class="pcard pcard--red">7♥</span>
+                </div>
+                <span class="turn-banner">Charlie's turn · 0:42</span>
+
+                <div class="rc-chip" onclick="copyCode(this)">
+                  <span class="rc-chip__dot"></span>
+                  <span class="rc-chip__text">Room</span>
+                  <span class="rc-chip__code">H7K3</span>
+                  <span class="rc-toast">Copied!</span>
+                </div>
+              </div>
+
+              <div class="hand">
+                <div class="hand__label">Your hand (13)</div>
+                <div class="hand__cards">
+                  <span class="hcard hcard--black">3♣</span>
+                  <span class="hcard hcard--red">4♦</span>
+                  <span class="hcard hcard--red hcard--sel">5♥</span>
+                  <span class="hcard hcard--black">5♠</span>
+                  <span class="hcard hcard--red">7♦</span>
+                  <span class="hcard hcard--black">9♣</span>
+                  <span class="hcard hcard--red">J♥</span>
+                  <span class="hcard hcard--black">Q♠</span>
+                  <span class="hcard hcard--red">K♦</span>
+                  <span class="hcard hcard--black">A♣</span>
+                </div>
+              </div>
+
+              <div class="game-board__log">
+                <div><b>Bob</b> · Pair 7♠ 7♥</div>
+                <div><b>Charlie</b> · Pass</div>
+                <div><b>Dave</b> · Pass</div>
+              </div>
+
+              <div class="actions">
+                <button class="actions__btn actions__btn--play">Play</button>
+                <button class="actions__btn actions__btn--pass">Pass</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="frame-label">Mobile — 375px</div>
+          <div class="board-frame board-frame--mobile">
+            <div class="game-board game-board--mobile">
+              <div class="opponent-row">
+                <div class="opponent">
+                  <span class="opponent__name">Bob</span>
+                  <span class="opponent__count">9</span>
+                </div>
+                <div class="opponent opponent--active">
+                  <span class="opponent__name">Char…</span>
+                  <span class="opponent__count">11</span>
+                </div>
+                <div class="opponent">
+                  <span class="opponent__name">Dave</span>
+                  <span class="opponent__count">8</span>
+                </div>
+              </div>
+              <div class="play-area">
+                <span class="play-area__label">Last — Pair</span>
+                <div class="play-area__cards">
+                  <span class="pcard pcard--black">7♠</span>
+                  <span class="pcard pcard--red">7♥</span>
+                </div>
+                <span class="turn-banner">Charlie · 0:42</span>
+                <div class="rc-chip" onclick="copyCode(this)">
+                  <span class="rc-chip__dot"></span>
+                  <span class="rc-chip__code">H7K3</span>
+                  <span class="rc-toast">Copied!</span>
+                </div>
+              </div>
+              <div class="hand">
+                <div class="hand__label">Your hand (13)</div>
+                <div class="hand__cards">
+                  <span class="hcard hcard--black">3♣</span>
+                  <span class="hcard hcard--red">4♦</span>
+                  <span class="hcard hcard--red hcard--sel">5♥</span>
+                  <span class="hcard hcard--black">5♠</span>
+                  <span class="hcard hcard--red">7♦</span>
+                  <span class="hcard hcard--black">9♣</span>
+                  <span class="hcard hcard--red">J♥</span>
+                </div>
+              </div>
+              <div class="actions">
+                <button class="actions__btn actions__btn--play">Play</button>
+                <button class="actions__btn actions__btn--pass">Pass</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DIRECTION C ============ -->
+    <section class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option C</span>
+        <h2>Opponents-bar left slot (label + code)</h2>
+      </div>
+      <p class="direction__desc">
+        A stacked <strong>"ROOM CODE" label over the code</strong> anchored to
+        the <strong>far-left of the opponents bar</strong>, mirroring the
+        lobby's chip styling at miniature scale. More explicit and discoverable
+        than A (full "ROOM CODE" label, larger code, wider letter-spacing) while
+        still living in the dead space of the top bar. Balances the active-turn
+        timer that appears on the right.
+      </p>
+      <div class="frames">
+        <div>
+          <div class="frame-label">Desktop — 1280px board</div>
+          <div class="board-frame">
+            <div class="game-board">
+              <div class="opponent-row">
+                <div class="rc-slot" onclick="copyCode(this)">
+                  <span class="rc-slot__label"
+                    >Room Code
+                    <svg
+                      class="rc-slot__copy"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--text-muted)"
+                      stroke-width="2"
+                    >
+                      <rect x="9" y="9" width="11" height="11" rx="2" />
+                      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                    </svg>
+                  </span>
+                  <span class="rc-slot__code">H7K3</span>
+                  <span class="rc-toast">Copied!</span>
+                </div>
+
+                <div class="opponent">
+                  <div class="opponent__cards">
+                    <span class="card-back"></span
+                    ><span class="card-back"></span
+                    ><span class="card-back"></span>
+                  </div>
+                  <span class="opponent__name">Bob</span>
+                  <span class="opponent__count">9 cards</span>
+                </div>
+                <div class="opponent opponent--active">
+                  <div class="opponent__cards">
+                    <span class="card-back"></span
+                    ><span class="card-back"></span
+                    ><span class="card-back"></span
+                    ><span class="card-back"></span>
+                  </div>
+                  <span class="opponent__name">Charlie</span>
+                  <span class="opponent__count">11 cards</span>
+                </div>
+                <div class="opponent">
+                  <div class="opponent__cards">
+                    <span class="card-back"></span
+                    ><span class="card-back"></span>
+                  </div>
+                  <span class="opponent__name">Dave</span>
+                  <span class="opponent__count">8 cards</span>
+                </div>
+              </div>
+
+              <div class="play-area">
+                <span class="play-area__label">Last Play — Bob, Pair</span>
+                <div class="play-area__cards">
+                  <span class="pcard pcard--black">7♠</span>
+                  <span class="pcard pcard--red">7♥</span>
+                </div>
+                <span class="turn-banner">Charlie's turn · 0:42</span>
+              </div>
+
+              <div class="hand">
+                <div class="hand__label">Your hand (13)</div>
+                <div class="hand__cards">
+                  <span class="hcard hcard--black">3♣</span>
+                  <span class="hcard hcard--red">4♦</span>
+                  <span class="hcard hcard--red hcard--sel">5♥</span>
+                  <span class="hcard hcard--black">5♠</span>
+                  <span class="hcard hcard--red">7♦</span>
+                  <span class="hcard hcard--black">9♣</span>
+                  <span class="hcard hcard--red">J♥</span>
+                  <span class="hcard hcard--black">Q♠</span>
+                  <span class="hcard hcard--red">K♦</span>
+                  <span class="hcard hcard--black">A♣</span>
+                </div>
+              </div>
+
+              <div class="game-board__log">
+                <div><b>Bob</b> · Pair 7♠ 7♥</div>
+                <div><b>Charlie</b> · Pass</div>
+                <div><b>Dave</b> · Pass</div>
+              </div>
+
+              <div class="actions">
+                <button class="actions__btn actions__btn--play">Play</button>
+                <button class="actions__btn actions__btn--pass">Pass</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="frame-label">Mobile — 375px</div>
+          <div class="board-frame board-frame--mobile">
+            <div class="game-board game-board--mobile">
+              <div class="opponent-row">
+                <div class="rc-slot" onclick="copyCode(this)">
+                  <span class="rc-slot__label">Room</span>
+                  <span class="rc-slot__code">H7K3</span>
+                  <span class="rc-toast">Copied!</span>
+                </div>
+                <div class="opponent">
+                  <span class="opponent__name">Bob</span>
+                  <span class="opponent__count">9</span>
+                </div>
+                <div class="opponent opponent--active">
+                  <span class="opponent__name">Cha…</span>
+                  <span class="opponent__count">11</span>
+                </div>
+              </div>
+              <div class="play-area">
+                <span class="play-area__label">Last — Pair</span>
+                <div class="play-area__cards">
+                  <span class="pcard pcard--black">7♠</span>
+                  <span class="pcard pcard--red">7♥</span>
+                </div>
+                <span class="turn-banner">Charlie · 0:42</span>
+              </div>
+              <div class="hand">
+                <div class="hand__label">Your hand (13)</div>
+                <div class="hand__cards">
+                  <span class="hcard hcard--black">3♣</span>
+                  <span class="hcard hcard--red">4♦</span>
+                  <span class="hcard hcard--red hcard--sel">5♥</span>
+                  <span class="hcard hcard--black">5♠</span>
+                  <span class="hcard hcard--red">7♦</span>
+                  <span class="hcard hcard--black">9♣</span>
+                  <span class="hcard hcard--red">J♥</span>
+                </div>
+              </div>
+              <div class="actions">
+                <button class="actions__btn actions__btn--play">Play</button>
+                <button class="actions__btn actions__btn--pass">Pass</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="legend">
+      <p>
+        <b>Recommendation:</b> Option A (opponents-bar corner tab). It reuses
+        the one zone guaranteed to be card-free, adds zero vertical chrome to a
+        viewport-locked board, and reads as a peer to the per-opponent timer
+        already living in that bar. Option C is the most discoverable if we want
+        the code to be obvious to new users; Option B has the most character but
+        floats over the play surface and risks crowding on 2-player layouts.
+      </p>
+      <p style="margin-top: 10px">
+        All three: tap copies to clipboard (reuses lobby's
+        <code>navigator.clipboard.writeText</code> + "Copied!" toast pattern),
+        with a <code>title</code>/<code>aria-label</code> of "Room code H7K3.
+        Tap to copy." and a clipboard fallback ("Long-press to copy.") matching
+        <code>GameLobbyView.vue</code>.
+      </p>
+    </div>
+
+    <script>
+      function copyCode(el) {
+        const toast = el.querySelector(".rc-toast");
+        const code = el.querySelector("[class$='__code']").textContent.trim();
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(code).catch(() => {});
+        }
+        if (!toast) return;
+        toast.classList.add("rc-toast--show");
+        clearTimeout(el._t);
+        el._t = setTimeout(
+          () => toast.classList.remove("rc-toast--show"),
+          1600,
+        );
+      }
+    </script>
+  </body>
+</html>
