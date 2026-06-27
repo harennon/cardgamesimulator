@@ -109,6 +109,18 @@ const TRIAGE_SCHEMA = {
         "testability",
       ],
     },
+    category: {
+      type: "string",
+      enum: ["bug", "feature-request", "improvement"],
+      description:
+        "bug: broken behavior, feature-request: new capability, improvement: polish/refactor of existing",
+    },
+    priority: {
+      type: "string",
+      enum: ["high", "medium", "low"],
+      description:
+        "high: blocks users or core functionality, medium: noticeable but workaround exists, low: nice-to-have or cosmetic",
+    },
     recommendation: {
       type: "string",
       enum: ["fix", "defer", "close", "needs-info"],
@@ -123,6 +135,8 @@ const TRIAGE_SCHEMA = {
     "issueTitle",
     "realProblem",
     "effort",
+    "category",
+    "priority",
     "risks",
     "recommendation",
     "reasoning",
@@ -335,6 +349,8 @@ if (issuesToTriage.length > 0) {
 3. Read docs/architecture-principles.md, docs/execution-plan.md, and docs/customer-experience.md for context
 4. Assess:
    - Is this a real problem that needs fixing, or is it stale/invalid/duplicate?
+   - Categorize: bug (broken behavior), feature-request (new capability), or improvement (polish/refactor)
+   - Priority: high (blocks users or core functionality), medium (noticeable but workaround exists), low (nice-to-have or cosmetic)
    - How much effort to fix? (small: <1hr, medium: 1-4hrs, large: half-day+)
    - Rate each risk dimension (low/medium/high)
    - Recommend: fix, defer, close, or needs-info
@@ -365,13 +381,16 @@ if (validResults.length > 0) {
   await parallel(
     validResults.map((result) => () => {
       const label = `triage:${result.recommendation}`;
+      const categoryLabel = result.category || "improvement";
+      const priorityLabel = `priority:${result.priority || "medium"}`;
+      const labelsToAdd = `"${label}","${categoryLabel}","${priorityLabel}"`;
 
       if (result.recommendation === "close") {
         return agent(
           `For issue #${result.issueNumber}:
 1. First, check if a comment already exists containing "Triage recommendation: close" — if so, skip commenting:
    gh issue view ${result.issueNumber} --json comments --jq '.comments[].body' | grep -q "Triage recommendation: close" && echo "ALREADY_COMMENTED"
-2. Add the label "triage:close": gh issue edit ${result.issueNumber} --add-label "triage:close"
+2. Add the labels: gh issue edit ${result.issueNumber} --add-label ${labelsToAdd}
 3. If NOT already commented, post a comment using a heredoc to avoid shell escaping issues:
    gh issue comment ${result.issueNumber} --body "$(cat <<'TRIAGEEOF'
 **Triage recommendation: close**
@@ -390,7 +409,7 @@ Do NOT close the issue — only label and comment (if not already commented).`,
           `For issue #${result.issueNumber}:
 1. First, check if a comment already exists containing "Triage: needs more information" — if so, skip commenting:
    gh issue view ${result.issueNumber} --json comments --jq '.comments[].body' | grep -q "Triage: needs more information" && echo "ALREADY_COMMENTED"
-2. Add the label "triage:needs-info": gh issue edit ${result.issueNumber} --add-label "triage:needs-info"
+2. Add the labels: gh issue edit ${result.issueNumber} --add-label ${labelsToAdd}
 3. If NOT already commented, post a comment using a heredoc:
    gh issue comment ${result.issueNumber} --body "$(cat <<'TRIAGEEOF'
 **Triage: needs more information**
@@ -404,8 +423,8 @@ TRIAGEEOF
         );
       } else {
         return agent(
-          `Add the label "${label}" to issue #${result.issueNumber}:
-gh issue edit ${result.issueNumber} --add-label "${label}"`,
+          `Add the labels to issue #${result.issueNumber}:
+gh issue edit ${result.issueNumber} --add-label ${labelsToAdd}`,
           { label: `label-${result.issueNumber}`, phase: "Label" },
         );
       }
@@ -603,7 +622,7 @@ const currentRunContext = validResults
   .filter((r) => r.recommendation === "fix")
   .map(
     (r) =>
-      `#${r.issueNumber} "${r.issueTitle}" | effort: ${r.effort} | risks: ${
+      `#${r.issueNumber} "${r.issueTitle}" | priority: ${r.priority || "medium"} | category: ${r.category || "improvement"} | effort: ${r.effort} | risks: ${
         Object.entries(r.risks)
           .filter(([, v]) => v !== "low")
           .map(([k, v]) => `${k}:${v}`)
@@ -642,6 +661,7 @@ For any prior pool issue where the summary above is insufficient, read it with:
   gh issue view <number>
 
 ## Selection principles
+- **Priority first** — priority:high issues should be shipped before medium/low unless effort makes them infeasible in this batch
 - **Maximize shipped value per batch** — prefer issues that meaningfully improve the product
 - **Respect effort budget** — a batch should be completable: 2-3 smalls, or 1 medium + 1 small, or 1 large solo
 - **De-risk the batch** — avoid stacking multiple high-risk changes; one risky + one safe > two risky
