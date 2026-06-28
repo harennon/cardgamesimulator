@@ -4,19 +4,20 @@ Multiplayer card game simulator — hosts preset card games (Big2 first, Tonk la
 
 ## Project Structure
 
-- `src/backend/` — Express 5 API server (TypeScript, compiled with ts-patch)
+- `src/backend/` — Express 5 API + Socket.IO server (TypeScript, compiled with ts-patch)
 - `src/frontend/` — Vue 3 SPA (TypeScript, built with Vite)
 - `src/shared/` — Types and utilities shared between frontend and backend
-- `docker-compose.yml` — Full stack: nginx frontend, Express backend, PostgreSQL 17
+- `supabase/migrations/` — SQL migrations applied by the Supabase CLI (`supabase start`)
+- `docker-compose.yml` — nginx frontend + Express backend, joined to an external Supabase network (Postgres + Auth run via the Supabase CLI)
 
 ## Tech Stack (Current)
 
-- **Backend:** Express 5, TypeORM, PostgreSQL, JWT auth (argon2 for passwords)
-- **Frontend:** Vue 3, Vue Router, Vite, Axios
+- **Backend:** Express 5, Socket.IO, Supabase (`@supabase/supabase-js` + Supabase Postgres), JWT auth (verifies Supabase-issued tokens via JWKS; guest tokens signed with `SUPABASE_JWT_SECRET`)
+- **Frontend:** Vue 3, Vue Router, Vite, Axios, Socket.IO client
 - **Shared:** TypeScript with path aliases (`@/*` → `./src/*`)
-- **Infra:** Docker Compose (nginx reverse proxy, express, postgres)
+- **Infra:** Docker Compose (nginx reverse proxy, express) + Supabase (external network, started via the Supabase CLI)
 
-**Planned migration:** Auth + DB moving to Supabase, SSE replacing with Socket.IO. See `docs/execution-plan.md`.
+**Migration complete:** Auth + DB are on Supabase and real-time is on Socket.IO (formerly TypeORM/standalone Postgres + SSE). See `docs/execution-plan.md`.
 
 ## Required Reading
 
