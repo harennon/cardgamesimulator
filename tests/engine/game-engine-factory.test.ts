@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { GameEngineFactory } from "../../src/backend/engine/game-engine-factory.js";
+import {
+  GameEngineFactory,
+  engineFactory,
+} from "../../src/backend/engine/game-engine-factory.js";
 import type {
   GameEngine,
   GameEngineConfig,
@@ -137,6 +140,14 @@ describe("GameEngineFactory", () => {
       factory.register(makeMockEngine("big2"));
       const types = factory.getRegisteredTypes();
       expect(types.filter((t) => t === "big2")).toHaveLength(1);
+    });
+  });
+
+  describe("singleton engineFactory", () => {
+    it("has both big2 and tonk engines registered", () => {
+      expect(engineFactory.hasEngine("big2")).toBe(true);
+      expect(engineFactory.hasEngine("tonk")).toBe(true);
+      expect(engineFactory.getEngine("tonk").gameType).toBe("tonk");
     });
   });
 });
