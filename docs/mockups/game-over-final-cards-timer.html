@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Over — Final Cards & Reveal Timer — Mockup</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        line-height: 1.5;
+        padding: 32px 20px 80px;
+      }
+
+      /* ===== Mockup chrome (not part of the product) ===== */
+      .mock-header {
+        max-width: 980px;
+        margin: 0 auto 28px;
+      }
+      .mock-header h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: -0.01em;
+      }
+      .mock-header p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-top: 8px;
+        max-width: 760px;
+      }
+      .mock-section {
+        max-width: 980px;
+        margin: 0 auto 52px;
+      }
+      .mock-section > h2 {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--gold-accent);
+        border-bottom: 1px solid var(--table-rim-light);
+        padding-bottom: 8px;
+        margin-bottom: 6px;
+      }
+      .mock-section > .sub {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 20px;
+      }
+      .mock-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin: 0 0 10px;
+      }
+      .mock-grid {
+        display: grid;
+        gap: 28px;
+      }
+      @media (min-width: 880px) {
+        .mock-grid--2 {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .mock-note {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        background: rgba(201, 168, 76, 0.06);
+        border-left: 2px solid var(--gold-accent);
+        padding: 10px 14px;
+        border-radius: 4px;
+        margin-top: 14px;
+      }
+      .mock-note strong {
+        color: var(--text-primary);
+      }
+
+      /* ===== Shared card primitive (mirrors GameCard.vue) ===== */
+      .card {
+        position: relative;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+        width: 64px;
+        height: 90px;
+        font-size: 1rem;
+      }
+      .card--sm {
+        width: 44px;
+        height: 62px;
+        font-size: 0.72rem;
+        border-radius: 5px;
+      }
+      .card__corner {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .card--sm .card__corner {
+        top: 3px;
+        left: 3px;
+      }
+      .card__corner-rank {
+        font-size: 11px;
+        line-height: 1;
+      }
+      .card--sm .card__corner-rank {
+        font-size: 8px;
+      }
+      .card__corner-suit {
+        font-size: 10px;
+        line-height: 1;
+        margin-top: -2px;
+      }
+      .card--sm .card__corner-suit {
+        font-size: 8px;
+      }
+      .card__rank {
+        line-height: 1;
+      }
+      .card__suit {
+        line-height: 1;
+        font-size: 1.2em;
+      }
+      .card.red .card__rank,
+      .card.red .card__suit,
+      .card.red .card__corner-rank,
+      .card.red .card__corner-suit {
+        color: var(--red-suit);
+      }
+      .card.black .card__rank,
+      .card.black .card__suit,
+      .card.black .card__corner-rank,
+      .card.black .card__corner-suit {
+        color: var(--black-suit);
+      }
+      .card-back {
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1.5px solid #c9a84c;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* ===== Mini game board backdrop (so overlay reads in context) ===== */
+      .board {
+        position: relative;
+        height: 360px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        border: 8px solid var(--table-rim);
+      }
+      .board--mobile {
+        max-width: 300px;
+        margin: 0 auto;
+      }
+      .board__opponents {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        align-items: center;
+        height: 52px;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+        font-size: 0.72rem;
+      }
+      .board__opp {
+        background: rgba(0, 0, 0, 0.25);
+        padding: 4px 10px;
+        border-radius: 14px;
+        border: 1.5px solid transparent;
+        color: var(--text-primary);
+      }
+      .board__opp .ct {
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .board__center {
+        height: calc(100% - 52px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .board__hand-label {
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .card-row {
+        display: flex;
+        gap: 4px;
+      }
+      .board__played-by {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      /* ===== Reveal overlay (the SHOW_FINAL_PLAY state) ===== */
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+      /* DIM variant: full dark scrim (current shipped behaviour). */
+      .overlay--dim {
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(2px);
+      }
+      /* SPOTLIGHT variant: scrim with a transparent hole over the cards so the
+         final play is never obscured (fixes the "cards not visible" report). */
+      .overlay--spotlight {
+        background: radial-gradient(
+          ellipse 60% 46% at 50% 62%,
+          rgba(0, 0, 0, 0) 0%,
+          rgba(0, 0, 0, 0.18) 45%,
+          rgba(0, 0, 0, 0.74) 80%
+        );
+      }
+      .overlay__content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding: 24px 36px;
+      }
+      .overlay--spotlight .overlay__content {
+        /* push announcement to top so it never covers the cards */
+        align-self: flex-start;
+        margin-top: 4px;
+        padding: 14px 24px 0;
+      }
+      .overlay__winner {
+        font-size: 1.7rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-shadow: 0 0 24px var(--gold-glow);
+        text-align: center;
+      }
+      .overlay__winner .crown {
+        margin-right: 6px;
+      }
+      .overlay__sub {
+        font-size: 0.82rem;
+        color: var(--text-primary);
+        opacity: 0.85;
+        margin-top: -6px;
+        text-align: center;
+      }
+      .overlay__btns {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 11px 26px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        min-height: 44px;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease,
+          color 0.15s ease;
+      }
+      .btn--gold {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--gold:hover {
+        background: #d4b45a;
+      }
+      .btn--ghost {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+      .btn--ghost:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+
+      /* countdown row: progress bar + paused affordance */
+      .countdown {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        width: 220px;
+      }
+      .countdown__track {
+        width: 100%;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .countdown__bar {
+        height: 100%;
+        background: var(--gold-accent);
+        transform-origin: left;
+        animation: shrink 8s linear forwards;
+      }
+      .countdown__bar--paused {
+        animation-play-state: paused;
+        transform: scaleX(0.62);
+        background: var(--text-muted);
+      }
+      .countdown__text {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+      }
+      @keyframes shrink {
+        from {
+          transform: scaleX(1);
+        }
+        to {
+          transform: scaleX(0);
+        }
+      }
+
+      /* ===== GameOverView results panel ===== */
+      .results-wrap {
+        display: flex;
+        justify-content: center;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 60%,
+          #0f2e1c 100%
+        );
+        padding: 28px;
+        border-radius: 10px;
+      }
+      .panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 32px 36px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        min-width: 380px;
+        max-width: 440px;
+        width: 100%;
+      }
+      .panel__winner {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-shadow: 0 0 24px var(--gold-glow);
+      }
+
+      /* Final Play row — the new element on GameOverView */
+      .final-play {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.22);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 14px 16px 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .final-play__label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--gold-accent);
+        align-self: center;
+      }
+      .final-play__meta {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+      }
+      .final-play__meta b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .scores {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+      .scores th {
+        color: var(--gold-accent);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--table-rim-light);
+        text-align: left;
+      }
+      .scores td {
+        padding: 8px 12px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+      }
+      .player-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .badge {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .badge--gold {
+        background: #c9a84c;
+        box-shadow: 0 0 6px rgba(201, 168, 76, 0.5);
+      }
+      .badge--silver {
+        background: #a8a8a8;
+      }
+      .badge--bronze {
+        background: #b87333;
+      }
+      .badge--grey {
+        background: #5a5a5a;
+      }
+      .metadata {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        width: 100%;
+      }
+      .stat {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+      .stat__label {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .stat__value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+      }
+      .btn--home {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--rematch {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1.5px solid var(--text-muted);
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-header">
+      <h1>Game Over — Final Cards &amp; Reveal Timer</h1>
+      <p>
+        Two related problems from issue #65: (1) the post-game reveal pause is a
+        forced 4s and one user wanted longer; (2) the results screen never shows
+        the final played cards (and on mobile the cards may not even be visible
+        during the 4s reveal). Below: three options for the reveal pause
+        behaviour, the new "Final Play" row on the results screen, and the
+        mobile variants. The shipped reveal mechanism (SHOW_FINAL_PLAY) stays —
+        we only change <em>how long it lingers</em> and
+        <em>where the cards stay reviewable</em>.
+      </p>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- PART 1: REVEAL PAUSE — THREE OPTIONS                          -->
+    <!-- ============================================================= -->
+    <div class="mock-section">
+      <h2>Part 1 · The reveal pause (over the board, desktop)</h2>
+      <p class="sub">
+        State machine is unchanged: IN_PROGRESS → SHOW_FINAL_PLAY → COMPLETED.
+        The question is what SHOW_FINAL_PLAY does. The current build dims the
+        whole board, which is why cards "disappear" behind the scrim. All three
+        options replace the literal <code>4000</code> with a named constant.
+      </p>
+
+      <div class="mock-grid mock-grid--2">
+        <!-- Option A: longer auto-advance + spotlight -->
+        <div>
+          <p class="mock-label">
+            Option A — Longer auto-advance (8s) + spotlight scrim
+          </p>
+          <div class="board">
+            <div class="board__opponents">
+              <span class="board__opp">Bob <span class="ct">3</span></span>
+              <span class="board__opp">Charlie <span class="ct">7</span></span>
+              <span class="board__opp">Dave <span class="ct">12</span></span>
+            </div>
+            <div class="board__center">
+              <div class="board__hand-label">Full House</div>
+              <div class="card-row">
+                <div class="card red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♥</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♥</span>
+                </div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♠</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♠</span>
+                </div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♣</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♣</span>
+                </div>
+                <div class="card red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">7</span
+                    ><span class="card__corner-suit">♦</span>
+                  </div>
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♦</span>
+                </div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">7</span
+                    ><span class="card__corner-suit">♠</span>
+                  </div>
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♠</span>
+                </div>
+              </div>
+              <div class="board__played-by">played by Alice</div>
+            </div>
+            <div class="overlay overlay--spotlight">
+              <div class="overlay__content">
+                <div class="overlay__winner">
+                  <span class="crown">&#127894;</span>Alice wins!
+                </div>
+                <div class="overlay__btns">
+                  <button class="btn btn--gold">Continue to Results</button>
+                </div>
+                <div class="countdown">
+                  <div class="countdown__track">
+                    <div class="countdown__bar"></div>
+                  </div>
+                  <div class="countdown__text">
+                    Continuing in a few seconds…
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mock-note">
+            Auto-advances after a named
+            <strong>REVEAL_AUTO_ADVANCE_MS = 8000</strong>. The scrim is a
+            radial <strong>spotlight</strong> — fully transparent over the
+            cards, dark at the edges — so the final play is always legible
+            (fixes the mobile "can't see the cards" report). Winner banner sits
+            at the top, never on the cards.
+          </div>
+        </div>
+
+        <!-- Option B: no auto-advance, wait for click -->
+        <div>
+          <p class="mock-label">
+            Option B — No timer: wait for the user (recommended)
+          </p>
+          <div class="board">
+            <div class="board__opponents">
+              <span class="board__opp">Bob <span class="ct">3</span></span>
+              <span class="board__opp">Charlie <span class="ct">7</span></span>
+              <span class="board__opp">Dave <span class="ct">12</span></span>
+            </div>
+            <div class="board__center">
+              <div class="board__hand-label">Full House</div>
+              <div class="card-row">
+                <div class="card red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♥</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♥</span>
+                </div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♠</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♠</span>
+                </div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♣</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♣</span>
+                </div>
+                <div class="card red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">7</span
+                    ><span class="card__corner-suit">♦</span>
+                  </div>
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♦</span>
+                </div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">7</span
+                    ><span class="card__corner-suit">♠</span>
+                  </div>
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♠</span>
+                </div>
+              </div>
+              <div class="board__played-by">played by Alice</div>
+            </div>
+            <div class="overlay overlay--spotlight">
+              <div class="overlay__content">
+                <div class="overlay__winner">
+                  <span class="crown">&#127894;</span>Alice wins!
+                </div>
+                <div class="overlay__sub">
+                  Review the final play, then continue when ready.
+                </div>
+                <div class="overlay__btns">
+                  <button class="btn btn--gold">Continue to Results</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mock-note">
+            <strong>No countdown at all.</strong> The board lingers indefinitely
+            until the player taps Continue. This fully satisfies "I want longer"
+            with zero timer pressure, and is the simplest to reason about. Same
+            spotlight scrim keeps the cards visible. Since the cards also live
+            on the results screen now (Part 2), there is no risk of losing them.
+          </div>
+        </div>
+      </div>
+
+      <!-- Option C full width -->
+      <div style="margin-top: 28px">
+        <p class="mock-label">
+          Option C — Auto-advance with a "Stay longer" pause toggle
+        </p>
+        <div class="mock-grid mock-grid--2">
+          <div class="board">
+            <div class="board__opponents">
+              <span class="board__opp">Bob <span class="ct">3</span></span>
+              <span class="board__opp">Charlie <span class="ct">7</span></span>
+              <span class="board__opp">Dave <span class="ct">12</span></span>
+            </div>
+            <div class="board__center">
+              <div class="board__hand-label">Full House</div>
+              <div class="card-row">
+                <div class="card red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♥</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♥</span>
+                </div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♠</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♠</span>
+                </div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♣</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♣</span>
+                </div>
+                <div class="card red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">7</span
+                    ><span class="card__corner-suit">♦</span>
+                  </div>
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♦</span>
+                </div>
+                <div class="card black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">7</span
+                    ><span class="card__corner-suit">♠</span>
+                  </div>
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♠</span>
+                </div>
+              </div>
+              <div class="board__played-by">played by Alice</div>
+            </div>
+            <div class="overlay overlay--spotlight">
+              <div class="overlay__content">
+                <div class="overlay__winner">
+                  <span class="crown">&#127894;</span>Alice wins!
+                </div>
+                <div class="overlay__btns">
+                  <button class="btn btn--gold">Continue to Results</button>
+                  <button class="btn btn--ghost">Stay &amp; review</button>
+                </div>
+                <div class="countdown">
+                  <div class="countdown__track">
+                    <div class="countdown__bar countdown__bar--paused"></div>
+                  </div>
+                  <div class="countdown__text">
+                    Paused — review as long as you like
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mock-note">
+            Default behaves like Option A (auto-advance after
+            <strong>REVEAL_AUTO_ADVANCE_MS</strong>), but a
+            <strong>"Stay &amp; review"</strong> button cancels the timer (shown
+            here in its paused state — bar greys and freezes). After pausing,
+            only "Continue to Results" remains. Best of both: hands-off players
+            are not stuck, and studiers get unlimited time. Most code of the
+            three.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- PART 2: FINAL PLAY ROW ON GAMEOVERVIEW                        -->
+    <!-- ============================================================= -->
+    <div class="mock-section">
+      <h2>Part 2 · Final play row on the results screen (desktop)</h2>
+      <p class="sub">
+        A compact "Final Play" block is inserted on
+        <code>GameOverView</code> between the winner heading and the scores
+        table. It renders the winning cards (<code>lastPlay.cards</code>) with
+        the hand-type label and who played them — so the cards stay reviewable
+        <em>after</em> the board phase ends. This directly answers "game over
+        screen does not display final cards played," and means even if the
+        reveal phase is skipped (or cards weren't seen on mobile), the cards are
+        still right there.
+      </p>
+
+      <div class="results-wrap">
+        <div class="panel">
+          <div class="panel__winner">Alice wins!</div>
+
+          <div class="final-play">
+            <div class="final-play__label">Final Play — Full House</div>
+            <div class="card-row">
+              <div class="card card--sm red">
+                <div class="card__corner">
+                  <span class="card__corner-rank">Q</span
+                  ><span class="card__corner-suit">♥</span>
+                </div>
+                <span class="card__rank">Q</span
+                ><span class="card__suit">♥</span>
+              </div>
+              <div class="card card--sm black">
+                <div class="card__corner">
+                  <span class="card__corner-rank">Q</span
+                  ><span class="card__corner-suit">♠</span>
+                </div>
+                <span class="card__rank">Q</span
+                ><span class="card__suit">♠</span>
+              </div>
+              <div class="card card--sm black">
+                <div class="card__corner">
+                  <span class="card__corner-rank">Q</span
+                  ><span class="card__corner-suit">♣</span>
+                </div>
+                <span class="card__rank">Q</span
+                ><span class="card__suit">♣</span>
+              </div>
+              <div class="card card--sm red">
+                <div class="card__corner">
+                  <span class="card__corner-rank">7</span
+                  ><span class="card__corner-suit">♦</span>
+                </div>
+                <span class="card__rank">7</span
+                ><span class="card__suit">♦</span>
+              </div>
+              <div class="card card--sm black">
+                <div class="card__corner">
+                  <span class="card__corner-rank">7</span
+                  ><span class="card__corner-suit">♠</span>
+                </div>
+                <span class="card__rank">7</span
+                ><span class="card__suit">♠</span>
+              </div>
+            </div>
+            <div class="final-play__meta">played by <b>Alice</b> to win</div>
+          </div>
+
+          <table class="scores">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Place</th>
+                <th>Cards Left</th>
+                <th>Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="player-cell">
+                  <span class="badge badge--gold"></span>Alice
+                </td>
+                <td>1</td>
+                <td>0</td>
+                <td>5</td>
+              </tr>
+              <tr>
+                <td class="player-cell">
+                  <span class="badge badge--silver"></span>Bob
+                </td>
+                <td>2</td>
+                <td>3</td>
+                <td>3</td>
+              </tr>
+              <tr>
+                <td class="player-cell">
+                  <span class="badge badge--bronze"></span>Charlie
+                </td>
+                <td>3</td>
+                <td>7</td>
+                <td>1</td>
+              </tr>
+              <tr>
+                <td class="player-cell">
+                  <span class="badge badge--grey"></span>Dave
+                </td>
+                <td>4</td>
+                <td>12</td>
+                <td>0</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="metadata">Total Turns: 34</div>
+
+          <div class="stats">
+            <div class="stat">
+              <span class="stat__label">Plays Made</span
+              ><span class="stat__value">9</span>
+            </div>
+            <div class="stat">
+              <span class="stat__label">Passes</span
+              ><span class="stat__value">4</span>
+            </div>
+            <div class="stat">
+              <span class="stat__label">Tricks Won</span
+              ><span class="stat__value">5</span>
+            </div>
+            <div class="stat">
+              <span class="stat__label">Best Hand</span
+              ><span class="stat__value">Full House</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn--rematch">Rematch</button>
+            <button class="btn btn--home">Back to Home</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mock-note">
+        <strong>Edge case — forfeit / disconnect with no final play.</strong> If
+        the game ended without a card play (e.g. everyone passed out a
+        disconnected player), <code>lastPlay</code> may be null. In that case
+        the Final Play block is omitted entirely (no empty box). The reveal
+        overlay already shows whatever the board's last state was.
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- PART 3: MOBILE                                                -->
+    <!-- ============================================================= -->
+    <div class="mock-section">
+      <h2>Part 3 · Mobile (≤767px)</h2>
+      <p class="sub">
+        The key reported defect is mobile: on the dim scrim the cards weren't
+        readable. Left shows the reveal with the spotlight scrim on a
+        phone-width board; right shows the results panel with the Final Play row
+        stacked.
+      </p>
+
+      <div class="mock-grid mock-grid--2">
+        <div>
+          <p class="mock-label">Reveal — mobile (spotlight keeps cards lit)</p>
+          <div class="board board--mobile">
+            <div class="board__opponents" style="gap: 8px; font-size: 0.62rem">
+              <span class="board__opp">Bob <span class="ct">3</span></span>
+              <span class="board__opp">Cha… <span class="ct">7</span></span>
+              <span class="board__opp">Dave <span class="ct">12</span></span>
+            </div>
+            <div class="board__center">
+              <div class="board__hand-label">Full House</div>
+              <div class="card-row">
+                <div class="card card--sm red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♥</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♥</span>
+                </div>
+                <div class="card card--sm black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♠</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♠</span>
+                </div>
+                <div class="card card--sm black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">Q</span
+                    ><span class="card__corner-suit">♣</span>
+                  </div>
+                  <span class="card__rank">Q</span
+                  ><span class="card__suit">♣</span>
+                </div>
+                <div class="card card--sm red">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">7</span
+                    ><span class="card__corner-suit">♦</span>
+                  </div>
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♦</span>
+                </div>
+                <div class="card card--sm black">
+                  <div class="card__corner">
+                    <span class="card__corner-rank">7</span
+                    ><span class="card__corner-suit">♠</span>
+                  </div>
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♠</span>
+                </div>
+              </div>
+              <div class="board__played-by">played by Alice</div>
+            </div>
+            <div class="overlay overlay--spotlight">
+              <div class="overlay__content">
+                <div class="overlay__winner" style="font-size: 1.3rem">
+                  <span class="crown">&#127894;</span>Alice wins!
+                </div>
+                <div class="overlay__btns">
+                  <button class="btn btn--gold" style="font-size: 16px">
+                    Continue to Results
+                  </button>
+                </div>
+                <div class="countdown" style="width: 180px">
+                  <div class="countdown__track">
+                    <div class="countdown__bar"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mock-note">
+            On mobile the announcement is pinned to the top and the cards sit in
+            the transparent center of the spotlight — readable the whole time.
+            Buttons keep a 44px+ touch target and 16px font (no iOS zoom).
+          </div>
+        </div>
+
+        <div>
+          <p class="mock-label">Results — mobile (Final Play row stacked)</p>
+          <div class="results-wrap" style="padding: 16px">
+            <div
+              class="panel"
+              style="min-width: 0; padding: 24px 18px; gap: 16px"
+            >
+              <div class="panel__winner" style="font-size: 1.4rem">
+                Alice wins!
+              </div>
+              <div class="final-play">
+                <div class="final-play__label">Final Play — Full House</div>
+                <div class="card-row">
+                  <div class="card card--sm red">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">Q</span
+                      ><span class="card__corner-suit">♥</span>
+                    </div>
+                    <span class="card__rank">Q</span
+                    ><span class="card__suit">♥</span>
+                  </div>
+                  <div class="card card--sm black">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">Q</span
+                      ><span class="card__corner-suit">♠</span>
+                    </div>
+                    <span class="card__rank">Q</span
+                    ><span class="card__suit">♠</span>
+                  </div>
+                  <div class="card card--sm black">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">Q</span
+                      ><span class="card__corner-suit">♣</span>
+                    </div>
+                    <span class="card__rank">Q</span
+                    ><span class="card__suit">♣</span>
+                  </div>
+                  <div class="card card--sm red">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">7</span
+                      ><span class="card__corner-suit">♦</span>
+                    </div>
+                    <span class="card__rank">7</span
+                    ><span class="card__suit">♦</span>
+                  </div>
+                  <div class="card card--sm black">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">7</span
+                      ><span class="card__corner-suit">♠</span>
+                    </div>
+                    <span class="card__rank">7</span
+                    ><span class="card__suit">♠</span>
+                  </div>
+                </div>
+                <div class="final-play__meta">
+                  played by <b>Alice</b> to win
+                </div>
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Pl</th>
+                    <th>Left</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="player-cell">
+                      <span class="badge badge--gold"></span>Alice
+                    </td>
+                    <td>1</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td class="player-cell">
+                      <span class="badge badge--silver"></span>Bob
+                    </td>
+                    <td>2</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td class="player-cell">
+                      <span class="badge badge--bronze"></span>Charlie
+                    </td>
+                    <td>3</td>
+                    <td>7</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td class="player-cell">
+                      <span class="badge badge--grey"></span>Dave
+                    </td>
+                    <td>4</td>
+                    <td>12</td>
+                    <td>0</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions" style="flex-direction: column; width: 100%">
+                <button
+                  class="btn btn--home"
+                  style="width: 100%; font-size: 16px"
+                >
+                  Back to Home
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="mock-note">
+            If horizontal space is tight, the Final Play card row can scroll
+            horizontally (Big2 winning plays are ≤5 cards, so it rarely needs
+            to). The block reuses the same small-card sizing as the board.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mock-header" style="margin-top: 8px">
+      <h2
+        style="
+          font-size: 0.78rem;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          color: var(--gold-accent);
+          border-bottom: 1px solid var(--table-rim-light);
+          padding-bottom: 8px;
+          margin-bottom: 12px;
+        "
+      >
+        Recommendation
+      </h2>
+      <p>
+        <strong style="color: var(--text-primary)"
+          >Part 2 (Final Play row on results) ships regardless of which Part 1
+          option is chosen</strong
+        >
+        — it is the load-bearing fix for both the literal complaint and the
+        mobile case. For Part 1, the recommendation is
+        <strong style="color: var(--text-primary)"
+          >Option B (no timer, wait for Continue)</strong
+        >: it fully removes timer pressure, is the least code, and the
+        results-screen cards remove any risk of "losing" the final play. If a
+        hands-off auto-advance is still wanted (e.g. so an idle game eventually
+        frees the screen),
+        <strong style="color: var(--text-primary)">Option C</strong> is the
+        fallback. All options switch the dim scrim to the spotlight scrim so
+        cards stay visible during the reveal.
+      </p>
+    </div>
+  </body>
+</html>
