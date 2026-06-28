@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Feedback Rendered-View Context — Mockups</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0a0a0a;
+        --bg-card: #1a1008;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-mono: "JetBrains Mono", "Courier New", monospace;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: var(--bg-dark);
+        color: var(--text-primary);
+        padding: 32px 24px 96px;
+      }
+
+      .page-head {
+        max-width: 1220px;
+        margin: 0 auto 32px;
+      }
+      .page-head h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin-top: 8px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 880px;
+        line-height: 1.55;
+      }
+      .page-head .note {
+        margin-top: 14px;
+        padding: 12px 16px;
+        border-left: 3px solid var(--gold-accent);
+        background: rgba(201, 168, 76, 0.07);
+        border-radius: 0 6px 6px 0;
+        font-size: 0.86rem;
+        line-height: 1.5;
+        max-width: 880px;
+      }
+      .page-head .note code {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--gold-accent);
+      }
+
+      .direction {
+        max-width: 1220px;
+        margin: 0 auto 64px;
+      }
+      .direction__head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 4px;
+      }
+      .direction__tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--bg-dark);
+        background: var(--gold-accent);
+        padding: 3px 9px;
+        border-radius: 4px;
+      }
+      .direction__head h2 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .direction__desc {
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        line-height: 1.55;
+        margin: 8px 0 22px;
+        max-width: 880px;
+      }
+      .direction__desc strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* Scene grid: each "scene" is the felt background showing the widget in a state */
+      .scenes {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 20px;
+      }
+      .scene {
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid var(--table-rim-light);
+        min-height: 380px;
+        background: radial-gradient(
+          120% 90% at 50% 0%,
+          var(--felt-light) 0%,
+          var(--felt) 55%,
+          #123320 100%
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .scene__label {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-primary);
+        background: rgba(0, 0, 0, 0.45);
+        padding: 4px 8px;
+        border-radius: 4px;
+        z-index: 5;
+      }
+      .scene__route {
+        position: absolute;
+        bottom: 10px;
+        left: 12px;
+        right: 12px;
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        color: rgba(232, 220, 200, 0.65);
+        z-index: 5;
+      }
+
+      /* ---- Feedback modal (shared base, mirrors FeedbackWidget.vue) ---- */
+      .fw-overlay {
+        position: relative;
+        width: 100%;
+        max-width: 400px;
+      }
+      .fw-modal {
+        background: var(--bg-card);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+      }
+      .fw-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+      }
+      .fw-label {
+        font-size: 0.82rem;
+        color: var(--text-primary);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .fw-select,
+      .fw-textarea {
+        font-family: var(--font-ui);
+        font-size: 0.88rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 4px;
+        color: var(--text-primary);
+        padding: 8px;
+      }
+      .fw-textarea {
+        resize: vertical;
+        min-height: 64px;
+      }
+      .fw-charcount {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-align: right;
+      }
+      .fw-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      .fw-btn {
+        font-size: 0.84rem;
+        border-radius: 4px;
+        padding: 8px 18px;
+        cursor: pointer;
+      }
+      .fw-btn--cancel {
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-muted);
+      }
+      .fw-btn--submit {
+        background: var(--gold-accent);
+        border: 1px solid var(--gold-accent);
+        color: var(--bg-dark);
+        font-weight: 600;
+      }
+
+      /* The floating trigger button (resting state, Direction A) */
+      .fw-trigger {
+        font-size: 0.85rem;
+        background: var(--table-rim);
+        color: var(--gold-accent);
+        border: 1px solid var(--gold-accent);
+        border-radius: 6px;
+        padding: 8px 16px;
+        cursor: pointer;
+      }
+
+      /* ---- Context chip (Direction B + C) ---- */
+      .ctx {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 9px 11px;
+        background: rgba(201, 168, 76, 0.07);
+        border: 1px solid rgba(201, 168, 76, 0.28);
+        border-radius: 6px;
+        font-size: 0.78rem;
+      }
+      .ctx__lead {
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-right: 2px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.35);
+        color: var(--text-primary);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .pill__dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 6px var(--gold-glow);
+      }
+      .pill--phase .pill__dot {
+        background: #5bb98c;
+        box-shadow: 0 0 6px rgba(91, 185, 140, 0.5);
+      }
+      .pill--auth .pill__dot {
+        background: #6aa6e0;
+        box-shadow: 0 0 6px rgba(106, 166, 224, 0.5);
+      }
+      .pill--anon .pill__dot {
+        background: var(--text-muted);
+        box-shadow: none;
+      }
+
+      /* ---- Direction A debug expander ---- */
+      .dbg {
+        margin-top: 2px;
+        border-top: 1px solid var(--table-rim-light);
+        padding-top: 10px;
+      }
+      .dbg__toggle {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        font-family: var(--font-mono);
+        cursor: pointer;
+        padding: 0;
+      }
+      .dbg__body {
+        margin-top: 8px;
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 5px;
+        padding: 10px 12px;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        line-height: 1.7;
+        color: var(--text-muted);
+      }
+      .dbg__body .k {
+        color: #6aa6e0;
+      }
+      .dbg__body .v {
+        color: var(--gold-accent);
+      }
+      .dbg__body .new {
+        color: #5bb98c;
+      }
+
+      /* ---- Direction C editable select for correcting phase ---- */
+      .ctx-edit {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 11px;
+        background: rgba(201, 168, 76, 0.07);
+        border: 1px solid rgba(201, 168, 76, 0.28);
+        border-radius: 6px;
+      }
+      .ctx-edit__row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+      }
+      .ctx-edit__row label {
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        min-width: 92px;
+      }
+      .ctx-edit__select {
+        flex: 1;
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 5px;
+        color: var(--text-primary);
+        padding: 5px 7px;
+      }
+      .ctx-edit__auto {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+      .legend {
+        max-width: 1220px;
+        margin: 0 auto 40px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+      }
+      .legend__card {
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        padding: 14px 16px;
+        background: var(--bg-card);
+      }
+      .legend__card h3 {
+        font-size: 0.82rem;
+        color: var(--gold-accent);
+        margin-bottom: 8px;
+        font-family: var(--font-mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .legend__card p {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+      .legend__card code {
+        font-family: var(--font-mono);
+        color: var(--gold-accent);
+        font-size: 0.78rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-head">
+      <h1>Feedback — Rendered-View Context Capture</h1>
+      <p>
+        The feedback widget currently records only <code>route.fullPath</code>,
+        which collides when one route renders several screens. We add two
+        metadata fields: <code>gamePhase</code> (lobby / in-progress /
+        game-over) and <code>authState</code>
+        (authenticated / anonymous). The three directions below differ only in
+        <strong>how much of this context is shown to the user</strong> — the
+        captured data is identical.
+      </p>
+      <div class="note">
+        Both new fields are <strong>derived client-side at submit time</strong>.
+        <code>authState</code> reads the live Supabase session vs. guest cookie;
+        <code>gamePhase</code> needs the live in-game phase (<code
+          >CREATED</code
+        >
+        / <code>IN_PROGRESS</code> / <code>SHOW_FINAL_PLAY</code> +
+        <code>COMPLETED</code>), which today lives as local state inside
+        <code>GameView.vue</code> and is <strong>not reachable</strong> from the
+        global FeedbackWidget. Surfacing it needs a small shared
+        store/composable — flagged for the architect in the LLD.
+      </div>
+    </header>
+
+    <!-- ============ DIRECTION A ============ -->
+    <section class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option A</span>
+        <h2>Silent capture — no visible change</h2>
+      </div>
+      <p class="direction__desc">
+        Ship the metadata fields with <strong>zero UI change</strong>. The modal
+        looks exactly as it does today; <code>gamePhase</code> and
+        <code>authState</code> are attached invisibly. Lowest risk, smallest
+        diff, fastest to ship. The only optional affordance is a collapsed
+        <strong>"what gets sent"</strong> disclosure for transparency (shown
+        expanded in the second scene). Triage gets full context; the player sees
+        nothing new.
+      </p>
+      <div class="scenes">
+        <!-- A: untouched modal on game-over -->
+        <div class="scene">
+          <span class="scene__label"
+            >Game-over screen · same modal as today</span
+          >
+          <span class="scene__route"
+            >route: /game/b41acc3b · phase=game-over (captured silently)</span
+          >
+          <div class="fw-overlay">
+            <div class="fw-modal">
+              <div class="fw-title">Send Feedback</div>
+              <label class="fw-label">
+                Category
+                <select class="fw-select">
+                  <option>Bug</option>
+                </select>
+              </label>
+              <label class="fw-label">
+                Description
+                <textarea
+                  class="fw-textarea"
+                  placeholder="Describe what happened..."
+                >
+game-over doesn't show final cards</textarea
+                >
+                <span class="fw-charcount">32/500</span>
+              </label>
+              <div class="fw-actions">
+                <button class="fw-btn fw-btn--cancel">Cancel</button>
+                <button class="fw-btn fw-btn--submit">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- A: optional debug disclosure expanded -->
+        <div class="scene">
+          <span class="scene__label">Optional "what gets sent" disclosure</span>
+          <span class="scene__route">in-progress · authenticated</span>
+          <div class="fw-overlay">
+            <div class="fw-modal">
+              <div class="fw-title">Send Feedback</div>
+              <label class="fw-label">
+                Description
+                <textarea
+                  class="fw-textarea"
+                  placeholder="Describe what happened..."
+                >
+cards stay raised after pass</textarea
+                >
+                <span class="fw-charcount">28/500</span>
+              </label>
+              <div class="dbg">
+                <button class="dbg__toggle">
+                  ▾ Hide context attached to this report
+                </button>
+                <div class="dbg__body">
+                  <span class="k">route</span>:
+                  <span class="v">/game/b41acc3b</span><br />
+                  <span class="k">gamePhase</span>:
+                  <span class="new">"in-progress"</span> ← new<br />
+                  <span class="k">authState</span>:
+                  <span class="new">"authenticated"</span> ← new<br />
+                  <span class="k">userType</span>:
+                  <span class="v">registered</span><br />
+                  <span class="k">viewport</span>:
+                  <span class="v">1280×800</span>
+                </div>
+              </div>
+              <div class="fw-actions">
+                <button class="fw-btn fw-btn--cancel">Cancel</button>
+                <button class="fw-btn fw-btn--submit">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DIRECTION B ============ -->
+    <section class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option B</span>
+        <h2>Context chip — passive confirmation</h2>
+      </div>
+      <p class="direction__desc">
+        A compact, read-only <strong>"Reporting from"</strong> chip sits above
+        the actions, showing the auto-detected screen as labelled pills. The
+        player sees that the report knows where they are (builds trust: "it
+        captured the game-over screen, good"), but cannot edit it. Pills are
+        colour- and dot-coded by axis — phase (green), auth (blue) — and never
+        rely on colour alone (text labels + dot shape). Scenes below show the
+        two real collisions from the issue.
+      </p>
+      <div class="scenes">
+        <!-- B: game-over phase -->
+        <div class="scene">
+          <span class="scene__label">Collision 1 · game-over phase</span>
+          <span class="scene__route"
+            >route: /game/b41acc3b (same as in-progress)</span
+          >
+          <div class="fw-overlay">
+            <div class="fw-modal">
+              <div class="fw-title">Send Feedback</div>
+              <label class="fw-label">
+                Description
+                <textarea class="fw-textarea">
+game-over doesn't show final cards</textarea
+                >
+                <span class="fw-charcount">32/500</span>
+              </label>
+              <div class="ctx">
+                <span class="ctx__lead">Reporting from</span>
+                <span class="pill pill--phase"
+                  ><span class="pill__dot"></span>Game over</span
+                >
+                <span class="pill pill--auth"
+                  ><span class="pill__dot"></span>Signed in</span
+                >
+              </div>
+              <div class="fw-actions">
+                <button class="fw-btn fw-btn--cancel">Cancel</button>
+                <button class="fw-btn fw-btn--submit">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- B: in-progress phase -->
+        <div class="scene">
+          <span class="scene__label">Collision 1 · in-progress phase</span>
+          <span class="scene__route"
+            >route: /game/b41acc3b (same as game-over)</span
+          >
+          <div class="fw-overlay">
+            <div class="fw-modal">
+              <div class="fw-title">Send Feedback</div>
+              <label class="fw-label">
+                Description
+                <textarea class="fw-textarea">
+cards stay raised after pass</textarea
+                >
+                <span class="fw-charcount">28/500</span>
+              </label>
+              <div class="ctx">
+                <span class="ctx__lead">Reporting from</span>
+                <span class="pill pill--phase"
+                  ><span class="pill__dot"></span>In progress</span
+                >
+                <span class="pill pill--auth"
+                  ><span class="pill__dot"></span>Signed in</span
+                >
+              </div>
+              <div class="fw-actions">
+                <button class="fw-btn fw-btn--cancel">Cancel</button>
+                <button class="fw-btn fw-btn--submit">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- B: auth collision on home route, anonymous -->
+        <div class="scene">
+          <span class="scene__label"
+            >Collision 2 · public route, signed out</span
+          >
+          <span class="scene__route">route: / (no gamePhase)</span>
+          <div class="fw-overlay">
+            <div class="fw-modal">
+              <div class="fw-title">Send Feedback</div>
+              <label class="fw-label">
+                Description
+                <textarea class="fw-textarea">
+"Welcome back" header missing on home</textarea
+                >
+                <span class="fw-charcount">38/500</span>
+              </label>
+              <div class="ctx">
+                <span class="ctx__lead">Reporting from</span>
+                <span class="pill pill--auth pill--anon"
+                  ><span class="pill__dot"></span>Signed out</span
+                >
+              </div>
+              <div class="fw-actions">
+                <button class="fw-btn fw-btn--cancel">Cancel</button>
+                <button class="fw-btn fw-btn--submit">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- B: auth collision on home route, authenticated (the #66 case) -->
+        <div class="scene">
+          <span class="scene__label"
+            >Collision 2 · same route, signed in (#66)</span
+          >
+          <span class="scene__route">route: / (no gamePhase)</span>
+          <div class="fw-overlay">
+            <div class="fw-modal">
+              <div class="fw-title">Send Feedback</div>
+              <label class="fw-label">
+                Description
+                <textarea class="fw-textarea">
+"Welcome back" header missing on home</textarea
+                >
+                <span class="fw-charcount">38/500</span>
+              </label>
+              <div class="ctx">
+                <span class="ctx__lead">Reporting from</span>
+                <span class="pill pill--auth"
+                  ><span class="pill__dot"></span>Signed in</span
+                >
+              </div>
+              <div class="fw-actions">
+                <button class="fw-btn fw-btn--cancel">Cancel</button>
+                <button class="fw-btn fw-btn--submit">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DIRECTION C ============ -->
+    <section class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option C</span>
+        <h2>Confirmable context — auto-detected, user-correctable</h2>
+      </div>
+      <p class="direction__desc">
+        Same auto-detected pills as B, but the player can
+        <strong>correct them</strong> if detection is wrong (e.g. a stale phase
+        after a fast transition). Submitted metadata records both the detected
+        value and any override (<code>gamePhaseSource: "auto" | "user"</code>).
+        Highest fidelity for triage, but adds UI surface, a code path that can
+        contradict the real state, and a new metadata field. Likely
+        over-engineered for a derived-from-live-state value — included to show
+        the trade-off.
+      </p>
+      <div class="scenes">
+        <!-- C: collapsed (auto), looks like B -->
+        <div class="scene">
+          <span class="scene__label">Default · auto-detected (collapsed)</span>
+          <span class="scene__route"
+            >route: /game/b41acc3b · phase auto = game-over</span
+          >
+          <div class="fw-overlay">
+            <div class="fw-modal">
+              <div class="fw-title">Send Feedback</div>
+              <label class="fw-label">
+                Description
+                <textarea class="fw-textarea">
+game-over doesn't show final cards</textarea
+                >
+                <span class="fw-charcount">32/500</span>
+              </label>
+              <div class="ctx">
+                <span class="ctx__lead">Reporting from</span>
+                <span class="pill pill--phase"
+                  ><span class="pill__dot"></span>Game over</span
+                >
+                <span class="pill pill--auth"
+                  ><span class="pill__dot"></span>Signed in</span
+                >
+                <span
+                  style="
+                    margin-left: auto;
+                    font-size: 0.72rem;
+                    color: var(--gold-accent);
+                    cursor: pointer;
+                    text-decoration: underline;
+                  "
+                  >Not right?</span
+                >
+              </div>
+              <div class="fw-actions">
+                <button class="fw-btn fw-btn--cancel">Cancel</button>
+                <button class="fw-btn fw-btn--submit">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- C: expanded edit -->
+        <div class="scene">
+          <span class="scene__label"
+            >"Not right?" expanded · user override</span
+          >
+          <span class="scene__route"
+            >user corrects phase → gamePhaseSource: "user"</span
+          >
+          <div class="fw-overlay">
+            <div class="fw-modal">
+              <div class="fw-title">Send Feedback</div>
+              <label class="fw-label">
+                Description
+                <textarea class="fw-textarea">
+game-over doesn't show final cards</textarea
+                >
+                <span class="fw-charcount">32/500</span>
+              </label>
+              <div class="ctx-edit">
+                <div class="ctx-edit__row">
+                  <label>Screen phase</label>
+                  <select class="ctx-edit__select">
+                    <option>Lobby</option>
+                    <option selected>Game over</option>
+                    <option>In progress</option>
+                  </select>
+                </div>
+                <div class="ctx-edit__row">
+                  <label>Auth state</label>
+                  <select class="ctx-edit__select">
+                    <option selected>Signed in</option>
+                    <option>Signed out</option>
+                  </select>
+                </div>
+                <div class="ctx-edit__auto">
+                  Auto-detected: Game over · Signed in
+                </div>
+              </div>
+              <div class="fw-actions">
+                <button class="fw-btn fw-btn--cancel">Cancel</button>
+                <button class="fw-btn fw-btn--submit">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="legend">
+      <div class="legend__card">
+        <h3>gamePhase</h3>
+        <p>
+          <code>"lobby" | "in-progress" | "game-over" | undefined</code>.
+          Derived from GameView's <code>displayPhase</code>:
+          <code>CREATED</code>→lobby, <code>IN_PROGRESS</code>→in-progress,
+          <code>SHOW_FINAL_PLAY</code> + <code>COMPLETED</code>→game-over.
+          <code>undefined</code> off <code>/game/:gameId</code>.
+        </p>
+      </div>
+      <div class="legend__card">
+        <h3>authState</h3>
+        <p>
+          <code>"authenticated" | "anonymous"</code>. Reads the live Supabase
+          session (authed) vs. a guest cookie / no session (anonymous). Distinct
+          from <code>userType</code> (guest vs. registered) — auth state is the
+          rendered variant, not the account class.
+        </p>
+      </div>
+      <div class="legend__card">
+        <h3>Recommendation</h3>
+        <p>
+          <strong>Option B (context chip)</strong>. It satisfies the
+          "distinguishable in metadata" goal, adds light but real value to the
+          player (confirmation of what's attached), and stays low-risk. A is the
+          fallback if any visible chrome is unwanted; C is over-engineered for a
+          live-derived value.
+        </p>
+      </div>
+    </section>
+  </body>
+</html>
