@@ -47,7 +47,7 @@ This LLD pins down the EXACT Tonk (Tunk) variant we will implement. Tonk has man
 | Card values | Aces = **1**, face cards (J/Q/K) = **10**, number cards 2–10 = **face value**, Jokers = **0**. |
 | Hand value | Sum of the point values of all cards currently in hand. Lower is better. |
 | Turn | **Discard first, then draw.** You may discard *multiples of the same rank* in one discard, but still draw exactly **1**. |
-| Draw source | Trick-1 first player: stock only. Every other turn (2nd player onward, and the trick-2+ starter via the face-up start card): stock **OR** the single most-recent card discarded by the immediately-preceding player. If that player discarded multiples, only 1 may be taken. |
+| Draw source | Trick-1 first player: stock only. Every other turn (2nd player onward, and the trick-2+ starter via the face-up start card): stock **OR** the **drawable-discard snapshot** — the single most-recent card the immediately-preceding player had on top *before the current player discarded* (captured at turn start as `drawableDiscard`; §3.3, §4.2). Because this variant discards before drawing, this is **not** the live pile top once the current player has discarded; a player can never draw back their own just-discarded card. If the preceding player discarded multiples, only the single top 1 is drawable. |
 | Going out | **Call TONK** at the *beginning* of your turn, before discarding. Only allowed after every player has had ≥1 turn. |
 | Trick end | TONK called, **or** stock exhausted. |
 | Trick scoring | See §5.1 (TONK correct / caught / stock-out). Ascending tally; lower is better. |
@@ -82,8 +82,8 @@ This LLD pins down the EXACT Tonk (Tunk) variant we will implement. Tonk has man
 2. **Deal.** 5 cards face down to each player.
 3. **Stock.** Remaining cards form the face-down stock in the center.
 4. **Discard pile.**
-   - **Trick 1:** discard pile starts **empty**.
-   - **Trick 2+:** flip **1** card face up from the stock into the discard pile before play starts (gives the trick starter a draw option — the ruleset's "slight advantage to the highest score" player).
+   - **Trick 1:** discard pile starts **empty**; the trick-1 first player's `drawableDiscard` (§4.2) is `null` (no draw-from-discard option).
+   - **Trick 2+:** flip **1** card face up from the stock into the discard pile before play starts. This face-up card is the trick starter's initial `drawableDiscard` snapshot (§3.3, §4.2) — it gives the trick starter a draw option (the ruleset's "slight advantage to the highest score" player). Because the starter discards before drawing, this snapshot is captured at the starter's turn start so it survives being buried under the starter's own discard; the starter still cannot draw back their own discard.
 5. **First player.**
    - **Trick 1:** the player at seat index 0 (game creator's seat / lobby order) starts. (The ruleset does not specify the trick-1 starter; default to seat 0 — confirm at sign-off, §9.3.)
    - **Trick 2+:** the player with the **overall highest tally** starts (and is the dealer). Ties broken by lowest seat index (§8.7).
@@ -106,7 +106,15 @@ A turn has two mandatory phases in this order:
 1. **Discard phase.** The player discards 1 **or more** cards of the **same rank** (e.g. three Queens) face up onto the discard pile. (Jokers: a player may discard a Joker; "same rank" for multiples means same rank — Jokers only group with Jokers.) You **must** discard before drawing.
 2. **Draw phase.** The player draws exactly **1** card and adds it to their hand:
    - **Trick-1 first player:** from the **stock** only.
-   - **Every other turn (2nd player onward, and the trick-2+ starter):** from the **stock**, OR the single most-recent card on top of the discard pile that was placed by the **immediately preceding** player (or, for the trick-2+ starter, the face-up start card). If that preceding player discarded multiples, only the **top 1** may be taken.
+   - **Every other turn (2nd player onward, and the trick-2+ starter):** from the **stock**, OR the **drawable discard** — see below.
+
+> **Drawable discard is a turn-start snapshot, NOT the live pile top.** Because this variant discards *before* drawing, by the time the current player reaches the draw phase the discard-pile top is **their own just-discarded card(s)**, not the immediately-preceding player's discard. The card that is legally drawable from the discard is therefore captured as a **snapshot at the start of the current player's turn** — the single most-recent card the immediately-preceding player placed, which is the pile top *as it stood before the current player discarded*. We track this in state as `drawableDiscard: Card | null` (§4.2), set when the turn begins and distinct from the live `discardPile` top. Concretely:
+> - At the **start of a turn**, `drawableDiscard` = the single top-most card placed by the immediately-preceding active player (the pre-discard pile top). If the immediately-preceding player discarded multiples, only that **single top 1** is the snapshot; the buried cards are never drawable.
+> - For the **trick-2+ starter**, `drawableDiscard` = the face-up start card flipped at setup (§3.1.4).
+> - For the **trick-1 first player**, `drawableDiscard` = `null` (pile started empty; no preceding discard).
+> - The current player's own discard (now the live pile top) is **never** drawable: it is not the snapshot. A player can therefore never draw back a card they just discarded.
+
+When the draw phase reads from the discard, it consumes `drawableDiscard` (the snapshot), not the live pile top.
 
 Hand size returns to its pre-turn count each turn when 1 is discarded (discard 1, draw 1 → stay at 5); discarding multiples shrinks the hand. Hands therefore monotonically shrink or stay equal across a trick; this is fine — winning is by TONK, not by emptying.
 
@@ -146,9 +154,10 @@ If the stock empties (a player must draw but the stock has 0 cards) before any T
 | --- | --- |
 | `hands: Card[][]` | Each player's hand (indexed like `players`). **Hidden** per-player. |
 | `stock: Card[]` | Face-down draw pile. **Hidden** (only its count is public). |
-| `discardPile: Card[]` | Face-up discards, top = most recent. **Public.** |
-| `lastDiscardCount: number` | How many cards the immediately-preceding player discarded (so the next player knows how many of the top are "theirs"; only 1 is ever drawable). |
-| `lastDiscardPlayerIndex: number \| null` | Who made the current top discard (draw-from-discard is only the *immediately* preceding player). |
+| `discardPile: Card[]` | Face-up discards, top = most recent (the **live** pile top — i.e. the current player's own just-discarded card(s) once they have discarded). **Public.** This is the visual pile and is **not** what draw-from-discard reads. |
+| `drawableDiscard: Card \| null` | **Snapshot taken at the start of the current player's turn** of the single card that is legally drawable from the discard this turn: the top-most card placed by the immediately-preceding active player as the pile stood *before* the current player discarded (or the trick-2+ face-up start card; or `null` for the trick-1 first player). Distinct from the live `discardPile` top — see §3.3. The draw phase reads from this, never from `discardPile`. Cleared to the new snapshot at each turn hand-off. **Public** (it is a face-up card). |
+| `lastDiscardCount: number` | How many cards the **most recent** discard placed onto `discardPile` (so views can show how many of the live top are the current player's). Display/log only — does **not** govern draw legality (that is `drawableDiscard`). |
+| `lastDiscardPlayerIndex: number \| null` | Who placed the current live `discardPile` top. Display/log only — does **not** govern draw legality. |
 | `turnPhase: "discard" \| "draw"` | Which phase of the current player's turn we're in. |
 | `trickNumber: number` | 1-based trick counter within the match. |
 | `trickTurnCount: number` | Turns taken in the current trick; TONK gate = `trickTurnCount >= players.length`. |
@@ -166,7 +175,7 @@ Same model as Big2/LLD 04: the full `InternalGameState` (including `TonkState`) 
 
 When a trick ends (TONK or stock-out) and the match is **not** over:
 - **Carry:** `tallies`, `players`, `randomSeed`, `trickNumber` (incremented).
-- **Reset:** `hands`, `stock`, `discardPile`, `lastDiscard*`, `turnPhase` → `"discard"`, `trickTurnCount` → 0, `tonkCallerIndex` → null. New deck is rebuilt and cut deterministically (sub-seed derived from `randomSeed` + `trickNumber`, §8.1).
+- **Reset:** `hands`, `stock`, `discardPile`, `lastDiscard*`, `drawableDiscard` (→ the trick's initial drawable snapshot per §3.1.4 — `null` for trick 1, the face-up start card for trick 2+), `turnPhase` → `"discard"`, `trickTurnCount` → 0, `tonkCallerIndex` → null. New deck is rebuilt and cut deterministically (sub-seed derived from `randomSeed` + `trickNumber`, §8.1).
 - **Next starter:** highest-tally player (§3.1.5).
 
 ---
@@ -216,17 +225,17 @@ Every method of `GameEngine` (`src/backend/engine/game-engine.ts`) maps as follo
 | `initialize(gameId, players, config, prng)` | Validate `3 ≤ players.length ≤ 5`. Build + cut the deck deterministically (§8.1) using `prng` and `config.options` (optional `deckTargetRounds`, `extraDecks`). Deal 5 each; rest → stock; trick-1 discard empty. `currentPlayerIndex` = 0. `status = IN_PROGRESS`, `version = 1`, `tallies` all 0, `trickNumber = 1`, `turnPhase = "discard"`. |
 | `validateAction(state, action)` | Pure predicate: true iff `applyAction` would succeed (Big2 pattern — delegate). |
 | `applyAction(state, action)` | Dispatch on `action.type ∈ {discard, draw, callTonk}` and `turnPhase`. Deterministic; no PRNG param. **All inter-trick and end-game randomness (new deck cut, TRUE-LOSER draw) uses a PRNG re-seeded deterministically from `randomSeed` — see ⚠-A.** Returns immutable new state, `version + 1`. |
-| `getPlayerView(state, playerId)` | Your hand only; opponents as counts; public discard top + count, stock **count** (not cards), tallies, trickNumber, turnPhase, log, winner/scores. `validActions` populated only on your turn (§6.2). |
+| `getPlayerView(state, playerId)` | Your hand only; opponents as counts; public discard top + count, `drawableDiscard` (the turn-start snapshot, so the current player and spectators can see what is drawable from the discard — distinct from the live top), stock **count** (not cards), tallies, trickNumber, turnPhase, log, winner/scores. `validActions` populated only on your turn (§6.2). |
 | `getValidActions(state, playerId)` | Empty unless `IN_PROGRESS` and your turn. Else by phase: see §6.2. |
 | `isGameOver(state)` | `state.status === "COMPLETED"`. |
 | `getAutoTimeoutAction(state)` | The timeout auto-action for a discard-then-draw turn — see §7. |
-| `getSpectatorView(state, n)` | Public only: no hands, no stock contents. Counts, discard top, tallies, turn info, log. |
+| `getSpectatorView(state, n)` | Public only: no hands, no stock contents. Counts, discard top, `drawableDiscard` (turn-start snapshot), tallies, turn info, log. |
 
 ### 6.2 `validActions` by turn phase
 
 - **`turnPhase = "discard"`, TONK gate open** (`trickTurnCount >= players.length`): `[{ type: "discard" }, { type: "callTonk" }]`.
 - **`turnPhase = "discard"`, TONK gate closed:** `[{ type: "discard" }]`.
-- **`turnPhase = "draw"`:** `[{ type: "draw" }]` (the payload carries the source: `"stock"` or `"discard"`; `"discard"` only offered when a drawable immediately-preceding discard exists).
+- **`turnPhase = "draw"`:** `[{ type: "draw" }]` (the payload carries the source: `"stock"` or `"discard"`; `"discard"` only offered when `drawableDiscard !== null`, i.e. the turn-start snapshot exists — §8.3, **not** when the live `discardPile` is merely non-empty).
 - Per the interface contract, `getValidActions` returns action **types**, not every legal discard combination. The specific cards in a `discard` payload (which must be same-rank and in-hand) are validated in `applyAction` (mirrors Big2's "validActions is types, applyAction validates the payload").
 
 ⚠ **Leaking-abstraction note (turn phases).** The `GameEngine` interface and Big2 assume **one action per turn**. Tonk needs **two phases per turn** (discard then draw) plus a turn-start-only `callTonk`. We model this entirely **inside** `gameSpecificState.turnPhase` without changing the interface — `currentPlayerIndex` stays the same player across both phases, and the turn only hands off after the draw. This maps cleanly; flagged so #57 expects a two-phase turn and the frontend action panel renders phase-appropriately. **No interface change required.**
@@ -283,14 +292,18 @@ The turn timer (LLD 07) calls `getAutoTimeoutAction(state)` when a player's cloc
 
 - A discard payload may contain **>1 card** only if **all are the same rank**, all in hand. Mixed ranks → reject (`"Discard must be a single rank"`). Jokers group only with Jokers.
 - Regardless of count discarded, the draw phase draws exactly **1**.
-- Only the **single top** card of a multi-discard is drawable by the next player.
+- Only the **single top** card of a multi-discard becomes the next player's `drawableDiscard` snapshot (§4.2); the buried cards of the multi-discard are never drawable.
 
 ### 8.3 Draw-source legality
 
-- `draw` from `"discard"` is legal **only** when the top discard was placed by the immediately-preceding active player (or is the trick-2+ face-up start card) **and** the discard pile is non-empty.
-- Trick-1 first player: `"discard"` source is **illegal** (pile empty); only `"stock"`.
-- Trick 2+ starter: `"discard"` source legal (the trick-start face-up card), per ruleset.
-- Reject `draw` with an out-of-band source.
+Draw legality is governed by the **turn-start snapshot** `drawableDiscard` (§4.2), **not** by the live `discardPile` top. (Because discard happens before draw, the live top is the current player's own card by the time they draw; reading the live top would make draw-from-discard either impossible or self-drawing — see §3.3.)
+
+- `draw` from `"discard"` is legal **only** when `drawableDiscard !== null`. The drawn card is exactly `drawableDiscard`.
+- `drawableDiscard` is the single top-most card the immediately-preceding active player placed *before* the current player discarded (or the trick-2+ face-up start card). It is captured at turn start and is **never** the current player's own just-discarded card — a player can therefore **never** draw back a card they just discarded.
+- If the immediately-preceding player discarded multiples, `drawableDiscard` is only the **single top 1**; buried cards are never drawable.
+- **Trick-1 first player:** `drawableDiscard === null` (pile started empty, no preceding discard) → `"discard"` source is **illegal**; only `"stock"`.
+- **Trick 2+ starter:** `drawableDiscard` = the trick-start face-up card → `"discard"` source legal, per ruleset.
+- Reject `draw` with an out-of-band / arbitrary source (anything other than `"stock"` or `"discard"`), and reject `draw` from `"discard"` when `drawableDiscard === null`.
 
 ### 8.4 TONK gate & timing
 
@@ -379,8 +392,16 @@ On sign-off, record the date and any overrides at the top of this section, then 
 ### Unit — turn phases (discard → draw)
 - `validActions` correct per phase and per TONK gate (§6.2).
 - Discard: single card OK; multiples same-rank OK; mixed-rank rejected; not-in-hand rejected; empty rejected.
-- Draw: from stock OK; from discard only when immediately-preceding & pile non-empty; out-of-band source rejected; trick-1 first player cannot draw from (empty) discard.
+- Draw: from stock OK; from discard only when the turn-start snapshot `drawableDiscard !== null`; out-of-band/arbitrary source rejected; trick-1 first player cannot draw from discard (`drawableDiscard === null`).
 - Turn hands off only **after** the draw phase, to the next seat.
+
+### Unit — drawable-discard snapshot (discard-before-draw sequencing)
+- **Buried preceding discard is still drawable:** after the current player discards (so the immediately-preceding player's card is no longer the live pile top), `draw` from `"discard"` still succeeds and yields exactly the immediately-preceding player's top card (the turn-start `drawableDiscard` snapshot), **not** the live pile top.
+- **No self-draw:** the current player can **never** draw back a card they just discarded — `draw` from `"discard"` never returns the current player's own just-discarded card, even when it is the live pile top.
+- **Snapshot captured at turn start:** `drawableDiscard` is set to the immediately-preceding player's single top card at the moment the turn begins, and is unchanged by the current player's own discard.
+- **Multiples:** if the immediately-preceding player discarded multiples, only the single top card is the snapshot; buried cards of that multi-discard are never drawable.
+- **Trick-2+ start card:** the face-up start card is the trick starter's initial `drawableDiscard`; it remains drawable after the starter discards (buries it) and is never confused with the starter's own discard.
+- After drawing from `"discard"`, the snapshot is consumed (the card leaves the pile and enters the hand) and the next player's snapshot is recomputed at their turn start.
 
 ### Unit — TONK
 - Rejected before everyone has had a turn; rejected outside discard phase / after discarding.
@@ -412,7 +433,7 @@ On sign-off, record the date and any overrides at the top of this section, then 
 - At trick end, revealed hands appear only in the public log/result, not as ongoing hidden state leakage.
 
 ### Invariants — assert after every action (testing-principles #8)
-- **Card conservation:** Σ hands + stock + discard = the trick's deck size (no cards created/destroyed within a trick).
+- **Card conservation:** Σ hands + stock + discard = the trick's deck size (no cards created/destroyed within a trick). `drawableDiscard` is a **snapshot reference** to a card still physically present in `discardPile` (until drawn) — it is **not** counted separately, so it must never break conservation. When a player draws the snapshot, that card moves from `discardPile` to the hand (conservation preserved) and `drawableDiscard` is recomputed at the next turn start.
 - `currentPlayerIndex` is a valid active seat while `IN_PROGRESS` (or `-1` when `COMPLETED`).
 - `validActions` non-empty for the current player while `IN_PROGRESS` (no deadlock).
 - `status` only advances forward (never `COMPLETED` → `IN_PROGRESS`).
