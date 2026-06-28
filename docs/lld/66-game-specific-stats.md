@@ -65,33 +65,70 @@ Two new migration files. **Neither edits `001`/`002`/`003` in place** (those are
 
 ### 3.1 `004_player_stats_game_type.sql` — column + composite PK + backfill
 
-Design (SQL is illustrative; the implementer owns exact syntax):
+> **Mandatory precondition before writing `004` (constraint-name verification).** The drop in step 4 below names the PK constraint explicitly. `player_stats_pkey` is *Postgres's conventional default* for an inline `PRIMARY KEY` on a table created as `player_stats` (`001:19`), but the migration must not assume it blindly. **Before authoring `004`, the implementer MUST verify the actual PK constraint name against the live/target DB** with either `\d player_stats` (psql) or:
+> ```sql
+> SELECT conname FROM pg_constraint
+> WHERE conrelid = 'player_stats'::regclass AND contype = 'p';
+> ```
+> If the returned name is not `player_stats_pkey`, substitute the real name in step 4. This is a hard precondition, not a footnote: a wrong constraint name makes `004` fail at apply time.
+
+The migration must be **idempotent / safely re-runnable if partially applied**, matching the discipline of `001`–`003` (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`). Each step uses `IF EXISTS` / `IF NOT EXISTS` guards so a re-run after a partial apply is a no-op rather than an error.
+
+Design (SQL is illustrative; the implementer owns exact syntax, but the idempotency guards and the explicit constraint name are required):
 
 ```sql
 -- 004: Make player_stats game-specific.
 -- Adds game_type, backfills existing (Big2-only) rows, and repoints the PK
--- to the composite (user_id, game_type).
+-- to the composite (user_id, game_type). Idempotent: safe to re-run if a prior
+-- apply was interrupted (matches the IF [NOT] EXISTS discipline of 001-003).
 
--- 1. Add the column with a one-shot backfill default.
+-- 1. Backfill-safety guard: abort loudly if any non-big2 game has completed,
+--    which would make the 'big2' backfill mis-attribute results (see §8.2 / edge
+--    case #9). Placed FIRST so the migration aborts before mutating anything.
+DO $$
+BEGIN
+  IF (SELECT COUNT(*) FROM games
+      WHERE game_type <> 'big2' AND status = 'COMPLETED') > 0 THEN
+    RAISE EXCEPTION
+      'Migration 004 aborted: % completed non-big2 game(s) exist. Backfilling player_stats as ''big2'' would mis-attribute their results. See LLD 66 §8.2.',
+      (SELECT COUNT(*) FROM games WHERE game_type <> 'big2' AND status = 'COMPLETED');
+  END IF;
+END $$;
+
+-- 2. Add the column with a one-shot backfill default.
 --    Postgres fills all existing rows with 'big2' atomically (Big2 is the
---    only game shipped to date — see LLD 66 §2.2 decision 2). NOT NULL is safe
---    because the default covers every existing row.
+--    only game shipped to date — see §2.2 decision 2). NOT NULL is safe
+--    because the default covers every existing row. IF NOT EXISTS makes the
+--    add re-runnable.
 ALTER TABLE player_stats
-  ADD COLUMN game_type VARCHAR(50) NOT NULL DEFAULT 'big2';
+  ADD COLUMN IF NOT EXISTS game_type VARCHAR(50) NOT NULL DEFAULT 'big2';
 
--- 2. Drop the default so future inserts MUST specify game_type explicitly
+-- 3. Drop the default so future inserts MUST specify game_type explicitly
 --    (the RPC always does). The default was only a backfill device.
+--    DROP DEFAULT is a no-op if already dropped, so this is naturally re-runnable.
 ALTER TABLE player_stats
   ALTER COLUMN game_type DROP DEFAULT;
 
--- 3. Repoint the primary key from (user_id) to (user_id, game_type).
-ALTER TABLE player_stats DROP CONSTRAINT player_stats_pkey;
-ALTER TABLE player_stats
-  ADD CONSTRAINT player_stats_pkey PRIMARY KEY (user_id, game_type);
+-- 4. Repoint the primary key from (user_id) to (user_id, game_type).
+--    DROP CONSTRAINT IF EXISTS makes the drop re-runnable; the ADD is guarded by
+--    a NOT-EXISTS check so a re-run after the PK is already composite is a no-op.
+--    NOTE: 'player_stats_pkey' MUST be the name verified by the precondition above.
+ALTER TABLE player_stats DROP CONSTRAINT IF EXISTS player_stats_pkey;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'player_stats'::regclass AND contype = 'p'
+  ) THEN
+    ALTER TABLE player_stats
+      ADD CONSTRAINT player_stats_pkey PRIMARY KEY (user_id, game_type);
+  END IF;
+END $$;
 ```
 
 Notes:
-- The PK constraint name `player_stats_pkey` is Postgres's default for `PRIMARY KEY (user_id)` declared inline in `001`. The implementer must **verify the actual constraint name** in the target DB (`\d player_stats` / `pg_constraint`) before relying on it; if it differs, use the real name.
+- **Backfill-safety guard (step 1):** the `DO $$ ... RAISE EXCEPTION ... $$` block is the enforcement mechanism for the §8.2 precondition — see §8.2 for the decision rationale. It converts the silent-corruption hazard (edge case #9) into a loud, safe abort: if a non-`big2` game has completed, `004` aborts before adding the column or touching any data, leaving the schema untouched.
+- **Constraint name (step 4):** the explicit name `player_stats_pkey` must match the verified name from the precondition above. The `DROP CONSTRAINT IF EXISTS` + guarded `ADD` pair is idempotent: re-running after a partial apply (PK already dropped, or already recreated as composite) is a safe no-op.
 - RLS: `002`'s policy `auth.uid() = user_id` (`002:22-24`) still applies unchanged — it filters on `user_id`, which is still a column. Adding `game_type` to the PK does **not** weaken or change the policy. No RLS migration needed.
 - Grants from `001` (`GRANT ... ON player_stats TO service_role/authenticated/anon`) are table-level and survive the column/PK change. No re-grant needed.
 - Existing GIN/index objects on `player_stats`: there are none beyond the PK; nothing else to rebuild.
@@ -330,7 +367,25 @@ This LLD is **fully compatible** with that mapping:
 
 ### 8.2 Is the backfill safe and correct?
 
-**Yes, given Big2 is the only game ever run in production.** Every existing `player_stats` row was produced solely by Big2 completions (Tonk is docs-only, gated, never executed). Backfilling `game_type = 'big2'` therefore attributes each historical row to the exact game that produced it — **lossless**. The implementer must verify this precondition before running `004` in production: **confirm no Tonk games have completed** (e.g. `SELECT COUNT(*) FROM games WHERE game_type <> 'big2' AND status = 'COMPLETED';` should be `0`). If that count is ever non-zero at migration time, the backfill assumption is violated and the migration strategy must be revisited (those rows' contributions would be wrongly attributed to Big2). Today it is `0`.
+**Yes, given Big2 is the only game ever run in production.** Every existing `player_stats` row was produced solely by Big2 completions (Tonk is docs-only, gated, never executed). Backfilling `game_type = 'big2'` therefore attributes each historical row to the exact game that produced it — **lossless**. The precondition is: **no non-`big2` game has ever completed** (`SELECT COUNT(*) FROM games WHERE game_type <> 'big2' AND status = 'COMPLETED'` must be `0`). Today it is `0` (Tonk gated). If that count is ever non-zero at migration time, the backfill assumption is violated — those rows' contributions would be wrongly attributed to Big2.
+
+**Enforcement decision: encode the check inside `004` itself as a hard guard (not a runbook step).** The migration runs a `DO $$ ... RAISE EXCEPTION ... $$` block (shown as step 1 in §3.1) *before* adding the column or backfilling. If the count is non-zero the migration **aborts loudly** with a clear message and mutates nothing; if it is zero the migration proceeds.
+
+Exact guard SQL (this is the authoritative spec; §3.1 step 1 embeds the same block):
+
+```sql
+DO $$
+BEGIN
+  IF (SELECT COUNT(*) FROM games
+      WHERE game_type <> 'big2' AND status = 'COMPLETED') > 0 THEN
+    RAISE EXCEPTION
+      'Migration 004 aborted: % completed non-big2 game(s) exist. Backfilling player_stats as ''big2'' would mis-attribute their results. See LLD 66 §8.2.',
+      (SELECT COUNT(*) FROM games WHERE game_type <> 'big2' AND status = 'COMPLETED');
+  END IF;
+END $$;
+```
+
+Rationale for in-migration guard over a runbook gate: this is a **silent, non-self-healing data-corruption hazard** (once mis-attributed, the rows are indistinguishable — there is no later signal to detect or repair it). A manual prose precondition can be skipped or forgotten; an in-migration guard makes skipping impossible. The migration becomes self-protecting and fails closed: a non-zero count produces a loud abort instead of silently corrupting historical attribution. The check is cheap (one indexed count on `games.status`, `idx_games_status` from `001:38`) and runs once. Because the whole migration is idempotent (§3.1), a post-fix re-run after the precondition is satisfied is safe.
 
 ### 8.3 What breaks if deployed half-applied?
 
@@ -363,7 +418,7 @@ If `004`/`005` must be rolled back: a `down` migration would `DROP FUNCTION` the
 | 6 | Existing global rows at migration time | Backfilled to `'big2'` by the column default (§3.1). Verified lossless because Big2 is the only shipped game (§8.2). |
 | 7 | `game_type` value not in the `GameType` union | Cannot occur via the write path — `gameType` always originates from `state.gameType`, which is typed `GameType`. No DB-level CHECK is added (§2.2 decision 6); the type system is the boundary. |
 | 8 | `getAllStats` for a user who has played nothing | Returns `[]`; endpoint returns `{ userId, games: [] }`. No error. |
-| 9 | Migration run when a Tonk game has already completed (precondition violated) | The backfill would mis-attribute those Tonk results to `'big2'`. Mitigation: the §8.2 precondition check (`COUNT` of completed non-big2 games = 0) must pass before running `004` in prod. Today it is 0 (Tonk gated). Flagged as the one unsafe scenario. |
+| 9 | Migration run when a Tonk game has already completed (precondition violated) | Backfilling would mis-attribute those results to `'big2'`. **Enforced, not just flagged:** `004`'s in-migration guard (§3.1 step 1 / §8.2) runs `RAISE EXCEPTION` if `COUNT(*)` of completed non-`big2` games is non-zero, aborting the migration before any column add or backfill — the schema is left untouched. Converts the silent-corruption hazard into a loud, safe abort. Today the count is 0 (Tonk gated), so `004` proceeds. |
 | 10 | Old 5-arg RPC still referenced after `005` drops it | Backend stats write fails fire-and-forget (logged, game unaffected). Resolved by deploying the backend RPC-call change with the migration (§8.3). |
 | 11 | Server restart between game completion and stats write | Unchanged from LLD 7b: fire-and-forget, stats for that game lost. Acceptable (informational, not transactional). |
 
@@ -407,11 +462,18 @@ Approach: mock `PlayerStatsRepository` and `GuestSessionStore`; construct `Inter
 | A4 | `winRate` per entry | Each entry's `winRate` = round(gamesWon/gamesPlayed, 3); 0 when `gamesPlayed` is 0. |
 | A5 | 401 without auth | Unchanged — unauthenticated request rejected. |
 
-### Test infrastructure notes
+### Test infrastructure notes — how migrations are applied (resolved)
 
-- The existing integration test DB/setup must apply migrations `004`+`005` (the test harness already runs `001`–`003`; add the new files to whatever applies them).
+**Application mechanism (verified):** migrations are applied **by the Supabase CLI, not by any in-tree code**. `supabase start` (configured by `supabase/config.toml`) brings up the local Postgres and applies every file in `supabase/migrations/` **in filename order**. This is the only application path:
+- **CI:** `.github/workflows/ci.yml` runs `supabase start` in both the `integration-tests` (`:34`) and `e2e-tests` (`:56`) jobs before `npm run test:integration` / Playwright.
+- **Local:** `DEVELOPMENT.md` (Environment Setup) instructs `supabase start` before `npm run dev` / integration tests.
+- The integration test harness itself (`vitest.integration.config.ts` → `tests/integration/helpers/setupEnv.ts`) does **not** apply migrations — it only loads env and connects to the already-running Supabase DB. A grep for the migration filenames returns nothing in test/app code precisely because the application path is the CLI driven by the directory contents.
+
+**Therefore the entire hook for `004`/`005` is: drop the two files into `supabase/migrations/` with the next free sequential names.** The next free numbers on this branch are `004` and `005` (only `001`–`003` are tracked here — verify with `git ls-files supabase/migrations/` at implementation time, since a `004_join_codes.sql` existed earlier in history before being folded into `001`, and confirm no collision). Once present, `supabase start` applies them automatically in CI and locally before any test runs — no harness change, no bootstrap script, no extra wiring needed. This is the concrete hook for the **I7 RPC-signature test** (it just calls the 6-arg `increment_player_stats` against the started DB, and negative-checks the 5-arg overload is gone) and for the **A1–A5 read-API tests**.
+
+**I4 (backfill) is the one exception — it cannot use the standard harness.** A clean `supabase start` already applies `004`, so the live DB never exhibits the *pre-migration* single-PK schema that I4 must exercise. I4 must therefore **materialize the old schema state itself** rather than rely on the started DB: e.g. open a transaction (or a throwaway/temporary schema/DB), recreate the pre-`004` `player_stats` shape (single `user_id` PK, no `game_type`) and seed a row, then execute the `004` SQL and assert (a) the row now has `game_type = 'big2'`, (b) the PK is composite `(user_id, game_type)`, and (c) no row has a null/empty `game_type`. The implementer owns the exact harness for this (a wrapped transaction that is rolled back, or a dedicated temp schema, keeps it self-contained per testing-principles).
+
 - A3 deliberately records a `'tonk'` result directly via the stats path (state with `gameType: "tonk"`) rather than playing a real Tonk game, so these tests do **not** depend on LLD 65 / the Tonk engine being implemented.
-- I4 (backfill) needs a way to materialize the old single-PK schema state; the implementer should test the `004` SQL against a row inserted before the migration in a throwaway test DB.
 
 ---
 
@@ -439,6 +501,6 @@ These do not block the design but should be confirmed (most are CEO/product-shap
 
 1. **API breaking change for a contract with no consumer.** `GetStatsResponse` changes from a flat object to `{ userId, games: GameStatsEntry[] }`. Since **no frontend consumes it today** (§6.1), this is a safe, non-breaking-in-practice change. Confirm no out-of-tree consumer (e.g. a manual tool) relies on the flat shape. *(Low risk — recommend proceed.)*
 2. **`total_score` semantics across games.** Big2's `total_score` is achievement (higher better); Tonk's is penalty (lower better) per LLD 65 §6.3. Segmenting by game makes each meaningful in isolation, but any **future leaderboard or combined total** must not naively sum/compare across game types. Flagged for whoever designs leaderboards (out of scope here). *(No action now.)*
-3. **Implementer precondition (not a design question):** before running `004` in production, verify zero completed non-Big2 games exist (§8.2). Today this holds (Tonk gated); the implementer must re-check at deploy time.
+3. **Backfill precondition (now enforced in-migration, not a manual step):** zero completed non-Big2 games must exist before the backfill (§8.2). This is enforced by `004`'s own `RAISE EXCEPTION` guard (§3.1 step 1 / §8.2), so a violation aborts the migration loudly rather than silently corrupting attribution. Today the precondition holds (Tonk gated); no manual re-check is required because the migration self-checks.
 
 No items required CEO escalation during design: the change cleanly supports the stated product intent (separate Big2/Tonk records) and every customer flow (there is no current stats UX flow to contradict — the only stats surface, the post-match screen, is client-derived and untouched). If the product later wants a *combined* lifetime total surfaced as a headline number, that is a CX decision to route to the CEO, but it is explicitly out of scope here.
