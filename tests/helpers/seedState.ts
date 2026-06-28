@@ -76,6 +76,7 @@ export function buildGameState(options: SeedGameOptions): InternalGameState {
     isFirstPlayOfGame: true,
     playHistory: [],
     finishedPlayerIndices: [],
+    trickStartIndex: 0,
   };
 
   const big2State: Big2State = {

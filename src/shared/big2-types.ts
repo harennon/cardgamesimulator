@@ -36,4 +36,9 @@ export interface Big2PublicState {
   readonly isFirstPlayOfGame: boolean;
   readonly playHistory: readonly Big2HistoryEntry[];
   readonly finishedPlayerIndices: readonly number[];
+  /** Index into playHistory where the current (in-progress) trick begins.
+   *  currentTrick === playHistory.slice(trickStartIndex). Set by the engine
+   *  at game start (0) and on every trick close. Append-only history means
+   *  0 <= trickStartIndex <= playHistory.length. */
+  readonly trickStartIndex: number;
 }
