@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLD 54 — Signed-in Home Vertical Centering Fix</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Libre+Baskerville:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+     Real app design tokens (from game-variables.css)
+     ============================================================ */
+      :root {
+        --felt: #1a4a2e;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --btn-primary-bg: var(--gold-accent);
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-secondary-bg: transparent;
+        --btn-secondary-border: var(--text-muted);
+        --btn-secondary-text: var(--text-primary);
+        --btn-radius: 6px;
+
+        /* Mockup chrome */
+        --doc-bg: #14110d;
+        --doc-ink: #e8dcc8;
+        --doc-dim: #8a7e6e;
+        --doc-line: #322a20;
+        --bad: #e0683c;
+        --good: #5fae6b;
+        --mono: "IBM Plex Mono", monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            1200px 600px at 80% -10%,
+            rgba(201, 168, 76, 0.06),
+            transparent 60%
+          ),
+          var(--doc-bg);
+        color: var(--doc-ink);
+        font-family: var(--font-ui);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ---------- Document header ---------- */
+      .doc-head {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 48px 32px 8px;
+      }
+      .doc-eyebrow {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        margin: 0 0 14px;
+      }
+      .doc-title {
+        font-family: "Libre Baskerville", serif;
+        font-weight: 700;
+        font-size: clamp(1.8rem, 3.4vw, 2.7rem);
+        line-height: 1.1;
+        margin: 0 0 16px;
+        letter-spacing: -0.01em;
+      }
+      .doc-lede {
+        max-width: 720px;
+        font-size: 1rem;
+        line-height: 1.6;
+        color: var(--text-primary);
+        margin: 0 0 6px;
+      }
+      .doc-lede strong {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      /* ---------- Control bar ---------- */
+      .controls {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(20, 17, 13, 0.86);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid var(--doc-line);
+        border-bottom: 1px solid var(--doc-line);
+        margin-top: 28px;
+      }
+      .controls__inner {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 14px 32px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 26px;
+        align-items: center;
+      }
+      .ctrl-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .ctrl-label {
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--doc-dim);
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--doc-line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.25);
+      }
+      .seg button {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 500;
+        padding: 7px 15px;
+        background: transparent;
+        border: none;
+        color: var(--doc-dim);
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .seg button + button {
+        border-left: 1px solid var(--doc-line);
+      }
+      .seg button:hover {
+        color: var(--text-primary);
+      }
+      .seg button.active {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-weight: 600;
+      }
+
+      /* ---------- Layout: 3 panels ---------- */
+      .stage {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px 32px 80px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 28px;
+      }
+      @media (max-width: 980px) {
+        .stage {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .panel__head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .panel__badge {
+        font-family: var(--mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+      .badge--bad {
+        background: rgba(224, 104, 60, 0.16);
+        color: var(--bad);
+        border: 1px solid rgba(224, 104, 60, 0.4);
+      }
+      .badge--good {
+        background: rgba(95, 174, 107, 0.14);
+        color: var(--good);
+        border: 1px solid rgba(95, 174, 107, 0.4);
+      }
+      .panel__title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin: 0;
+        color: var(--text-primary);
+      }
+      .panel__note {
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: var(--doc-dim);
+        margin: 0;
+        min-height: 2.5em;
+      }
+
+      /* ---------- Device frame (the "viewport") ---------- */
+      .device {
+        --vp-h: 540px; /* simulated visible viewport height */
+        --nav-h: 49px; /* real nav height (signed in) */
+        position: relative;
+        margin: 0 auto;
+        width: 100%;
+        border-radius: 14px;
+        border: 1px solid var(--doc-line);
+        background: #000;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+      }
+      /* the "viewport" clips like a real screen would; overflow shows the scroll bar */
+      .viewport {
+        position: relative;
+        height: var(--vp-h);
+        overflow-y: auto;
+        overflow-x: hidden;
+        background: var(--bg-dark);
+        scrollbar-width: thin;
+        scrollbar-color: var(--bad) transparent;
+      }
+      .viewport::-webkit-scrollbar {
+        width: 10px;
+      }
+      .viewport::-webkit-scrollbar-thumb {
+        background: var(--bad);
+        border-radius: 6px;
+        border: 2px solid var(--bg-dark);
+      }
+      /* when there is NO overflow, dim/hide the scrollbar to read as "clean" */
+      .viewport--clean::-webkit-scrollbar-thumb {
+        background: transparent;
+      }
+      .viewport--clean {
+        scrollbar-color: transparent transparent;
+      }
+
+      /* ---------- The real app shell being simulated ---------- */
+      .app-shell {
+        min-height: 100%; /* maps to 100vh inside the clipped viewport */
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-dark);
+      }
+      .app-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        background: rgba(20, 12, 8, 0.95);
+        border-bottom: 1px solid var(--table-rim-light);
+        flex-shrink: 0;
+      }
+      .app-nav__logo {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-decoration: none;
+      }
+      .app-nav__links {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .app-nav__user {
+        font-size: 0.8rem;
+        color: var(--text-primary);
+      }
+      .app-nav__logout {
+        font-size: 0.72rem;
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        border-radius: 4px;
+        padding: 4px 10px;
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+      .app-nav__links a {
+        font-size: 0.8rem;
+        color: var(--text-primary);
+        text-decoration: none;
+        padding: 4px 6px;
+      }
+
+      /* The flow-page — the element whose CSS we are fixing.
+     Mode is driven by a class on .device. */
+      .flow-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+
+      /* BROKEN: keeps full 100vh even beneath the nav */
+      .device.is-broken .flow-page {
+        min-height: 100%;
+      }
+      /* OPTION A (preferred): flex:1 + min-height:0 — fills remaining column space */
+      .device.is-fixA .flow-page {
+        flex: 1;
+        min-height: 0;
+      }
+      /* OPTION B: subtract nav height with calc */
+      .device.is-fixB .flow-page {
+        min-height: calc(100% - var(--nav-h));
+      }
+
+      /* signed-out: no nav rendered, flow-page is the only child */
+      .device.signed-out .app-nav {
+        display: none;
+      }
+      .device.signed-out.is-broken .flow-page,
+      .device.signed-out.is-fixB .flow-page {
+        min-height: 100%;
+      }
+
+      /* ---------- Home content (real .home markup) ---------- */
+      .home {
+        text-align: center;
+        max-width: 500px;
+        width: 100%;
+      }
+      .home__title {
+        font-family: var(--font-ui);
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0 0 8px;
+      }
+      .home__subtitle {
+        font-family: var(--font-ui);
+        font-size: 1rem;
+        color: var(--text-primary);
+        margin: 0 0 32px;
+      }
+      .home__description {
+        font-size: 0.92rem;
+        color: var(--text-muted);
+        margin: 0 0 24px;
+        line-height: 1.5;
+      }
+      .home__actions,
+      .home__auth-prompt {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+      }
+      .home__auth-prompt {
+        align-items: center;
+      }
+      .btn-primary {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: var(--btn-radius);
+        border: none;
+        cursor: pointer;
+        background: var(--btn-primary-bg);
+        color: var(--btn-primary-text);
+        width: 100%;
+        text-decoration: none;
+        display: block;
+        text-align: center;
+      }
+      .btn-primary:hover {
+        background: var(--btn-primary-hover);
+      }
+      .btn-secondary {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 500;
+        padding: 10px 20px;
+        border-radius: var(--btn-radius);
+        border: 1.5px solid var(--btn-secondary-border);
+        background: var(--btn-secondary-bg);
+        color: var(--btn-secondary-text);
+        cursor: pointer;
+        text-decoration: none;
+        text-align: center;
+        display: block;
+        width: 100%;
+      }
+      .btn-secondary:hover {
+        border-color: var(--text-primary);
+      }
+
+      /* ---------- Measurement overlay (toggleable) ---------- */
+      .device .gap-top,
+      .device .gap-bot,
+      .device .overflow-tag {
+        display: none;
+      }
+      .device.show-guides .gap-top,
+      .device.show-guides .gap-bot {
+        display: flex;
+      }
+
+      /* center line of the VISIBLE viewport */
+      .device.show-guides .viewport::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 0;
+        border-top: 1px dashed rgba(201, 168, 76, 0.55);
+        z-index: 30;
+        pointer-events: none;
+      }
+      .center-flag {
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        transform: translateY(-50%);
+        z-index: 31;
+        font-family: var(--mono);
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+        color: rgba(201, 168, 76, 0.85);
+        background: rgba(13, 13, 13, 0.7);
+        padding: 2px 6px;
+        border-radius: 3px;
+        pointer-events: none;
+        display: none;
+      }
+      .device.show-guides .center-flag {
+        display: block;
+      }
+
+      .footnote {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 0 32px 90px;
+      }
+      .fn-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      @media (max-width: 760px) {
+        .fn-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .card {
+        border: 1px solid var(--doc-line);
+        border-radius: 12px;
+        padding: 24px 26px;
+        background: rgba(0, 0, 0, 0.22);
+      }
+      .card h3 {
+        font-size: 0.78rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        margin: 0 0 16px;
+        font-family: var(--mono);
+        font-weight: 500;
+      }
+      pre {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        line-height: 1.65;
+        color: var(--text-primary);
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid var(--doc-line);
+        border-radius: 8px;
+        padding: 16px 18px;
+        overflow-x: auto;
+        margin: 0 0 16px;
+      }
+      pre .c {
+        color: var(--doc-dim);
+      }
+      pre .add {
+        color: var(--good);
+      }
+      pre .del {
+        color: var(--bad);
+        text-decoration: line-through;
+        opacity: 0.8;
+      }
+      pre .k {
+        color: var(--gold-accent);
+      }
+      .card p {
+        font-size: 0.88rem;
+        line-height: 1.6;
+        color: var(--text-primary);
+        margin: 0 0 10px;
+      }
+      .card ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .card li {
+        font-size: 0.86rem;
+        line-height: 1.6;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+      }
+      .pill {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: rgba(201, 168, 76, 0.14);
+        color: var(--gold-accent);
+        border: 1px solid rgba(201, 168, 76, 0.3);
+      }
+      .legend {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 0 32px;
+        font-size: 0.78rem;
+        color: var(--doc-dim);
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .swatch {
+        width: 22px;
+        height: 0;
+        border-top: 1px dashed var(--gold-accent);
+      }
+      .swatch--scroll {
+        width: 10px;
+        height: 14px;
+        border-top: 0;
+        background: var(--bad);
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="doc-head">
+      <p class="doc-eyebrow">LLD 54 · Frontend Mockup · Issue #66</p>
+      <h1 class="doc-title">
+        Signed-in home: vertical centering &amp; viewport overflow
+      </h1>
+      <p class="doc-lede">
+        The signed-in home page sits <strong>above true center</strong> and the
+        page <strong>overflows the viewport</strong> by roughly the nav's
+        height, producing a stray scrollbar. Root cause:
+        <code>.flow-page</code> keeps <code>min-height: 100vh</code> even when
+        it is a flex child <em>beneath</em> the nav, so the shell totals
+        <code>100vh + navHeight</code>.
+      </p>
+      <p class="doc-lede" style="color: var(--doc-dim); font-size: 0.9rem">
+        Use the controls to compare the broken state against the two proposed
+        fixes. Toggle the device width and auth state — the bug only reproduces
+        when <strong>signed in</strong> (signed-out has no nav, so
+        <code>.flow-page</code> ≈ viewport).
+      </p>
+    </header>
+
+    <div class="controls">
+      <div class="controls__inner">
+        <div class="ctrl-group">
+          <span class="ctrl-label">Auth</span>
+          <div class="seg" id="auth-seg">
+            <button data-auth="signed-in" class="active">Signed in</button>
+            <button data-auth="signed-out">Signed out</button>
+          </div>
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">Width</span>
+          <div class="seg" id="width-seg">
+            <button data-w="375" class="active">Mobile 375</button>
+            <button data-w="1440">Desktop 1440</button>
+          </div>
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">Guides</span>
+          <div class="seg" id="guide-seg">
+            <button data-g="on" class="active">Show</button>
+            <button data-g="off">Hide</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span
+        ><i class="swatch"></i> dashed line = true center of the visible
+        viewport</span
+      >
+      <span
+        ><i class="swatch swatch--scroll"></i> orange scrollbar = page overflows
+        / scrolls</span
+      >
+    </div>
+
+    <main class="stage" id="stage">
+      <!-- Panel 1: BROKEN -->
+      <section class="panel">
+        <div class="panel__head">
+          <span class="panel__badge badge--bad">Current</span>
+          <h2 class="panel__title">Broken</h2>
+        </div>
+        <p class="panel__note" data-note="broken">
+          <code>.flow-page { min-height: 100vh }</code> + nav ⇒ shell is taller
+          than the viewport. Content centers inside the 100vh box, which is
+          pushed down by the nav — reads as off-center, and the page scrolls.
+        </p>
+        <div class="device is-broken" data-role="device"></div>
+      </section>
+
+      <!-- Panel 2: OPTION A -->
+      <section class="panel">
+        <div class="panel__head">
+          <span class="panel__badge badge--good">Preferred</span>
+          <h2 class="panel__title">Option A · flex fill</h2>
+        </div>
+        <p class="panel__note" data-note="fixA">
+          <code>.flow-page { flex: 1; min-height: 0 }</code>. The column flex of
+          <code>.app-shell</code> hands the flow-page exactly the leftover
+          height. No magic number, no overflow, content centered in the visible
+          area.
+        </p>
+        <div class="device is-fixA" data-role="device"></div>
+      </section>
+
+      <!-- Panel 3: OPTION B -->
+      <section class="panel">
+        <div class="panel__head">
+          <span class="panel__badge badge--good">Alternative</span>
+          <h2 class="panel__title">Option B · calc()</h2>
+        </div>
+        <p class="panel__note" data-note="fixB">
+          <code>.flow-page { min-height: calc(100vh - navHeight) }</code>.
+          Works, but depends on a hard-coded nav height — drifts if the nav
+          wraps or fonts shift its height.
+        </p>
+        <div class="device is-fixB" data-role="device"></div>
+      </section>
+    </main>
+
+    <div class="footnote">
+      <div class="fn-grid">
+        <div class="card">
+          <h3>The single-line change</h3>
+          <pre><span class="c">/* src/frontend/styles/flows.css */</span>
+.flow-page {
+<span class="del">  min-height: 100vh;</span>
+<span class="add">  flex: 1;</span>
+<span class="add">  min-height: 0;</span>
+  <span class="k">display</span>: flex;
+  <span class="k">align-items</span>: center;
+  <span class="k">justify-content</span>: center;
+  padding: 40px 20px;
+}</pre>
+          <p style="font-size: 0.84rem; color: var(--doc-dim); margin: 0">
+            <span class="pill">Option A</span> Requires
+            <code>.app-shell</code> to be the flex parent — it already is (<code
+              >display:flex; flex-direction:column</code
+            >
+            in <code>App.vue</code>). The router-view's single root
+            <code>.flow-page</code> becomes the growing child. Signed-out is
+            unaffected (still fills 100% with no nav).
+          </p>
+        </div>
+        <div class="card">
+          <h3>Why Option A over B / mobile note</h3>
+          <ul>
+            <li>
+              <strong>No magic number.</strong> Option B's
+              <code>calc(100vh - 49px)</code> breaks if the nav height changes
+              (font load, longer display name wrapping, future nav items).
+            </li>
+            <li>
+              <strong>Mobile override needs review.</strong> The current
+              <code>@media (max-width:767px)</code> rule sets
+              <code>.flow-page</code> to
+              <code>align-items: flex-start; padding-top: 48px</code>. With
+              <code>flex:1</code> the page no longer overflows; keep top-aligned
+              for tall forms, but the home screen is short enough to center —
+              recommend <code>align-items:center</code> here (decision flagged
+              below).
+            </li>
+            <li>
+              <strong>Regression surface.</strong> Every flow screen (login,
+              signup, create, join, guest, lobby, game-over) uses
+              <code>.flow-page</code>. Fix is shared — verify all of them still
+              center and tall forms still scroll internally.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const HOME_SIGNED_IN = `
+    <div class="flow-page">
+      <div class="home">
+        <h1 class="home__title">Card Game Simulator</h1>
+        <p class="home__subtitle">Welcome back, Alice</p>
+        <div class="home__actions">
+          <a class="btn-primary">Create Game</a>
+          <a class="btn-secondary">Join Game</a>
+        </div>
+      </div>
+    </div>`;
+
+      const HOME_SIGNED_OUT = `
+    <div class="flow-page">
+      <div class="home">
+        <h1 class="home__title">Card Game Simulator</h1>
+        <div class="home__auth-prompt">
+          <p class="home__description">Play Big2 with friends. Create an account to host games, or join via an invite link as a guest.</p>
+          <a class="btn-primary">Log In</a>
+          <a class="btn-secondary">Sign Up</a>
+        </div>
+      </div>
+    </div>`;
+
+      const NAV = `
+    <nav class="app-nav">
+      <a class="app-nav__logo">Card Game Simulator</a>
+      <div class="app-nav__links">
+        <span class="app-nav__user">Alice</span>
+        <button class="app-nav__logout">Log out</button>
+      </div>
+    </nav>`;
+
+      const state = { auth: "signed-in", width: 375, guides: true };
+
+      // Map the chosen viewport width to a believable visible HEIGHT so overflow is
+      // visually obvious. 375x667 phone -> ~540px usable; 1440x900 -> ~600px usable here.
+      const VP_HEIGHT = { 375: 540, 1440: 600 };
+
+      function render() {
+        const devices = document.querySelectorAll('[data-role="device"]');
+        const signedIn = state.auth === "signed-in";
+        const home = signedIn ? HOME_SIGNED_IN : HOME_SIGNED_OUT;
+        const navHtml = signedIn ? NAV : "";
+
+        devices.forEach((d) => {
+          d.classList.toggle("signed-out", !signedIn);
+          d.classList.toggle("show-guides", state.guides);
+          d.style.setProperty("--vp-h", VP_HEIGHT[state.width] + "px");
+          // device max width mirrors viewport (capped so 3 fit side by side; ratio preserved enough to read)
+          d.style.maxWidth = state.width === 375 ? "300px" : "100%";
+
+          d.innerHTML = `
+        <div class="viewport">
+          <div class="app-shell">
+            ${navHtml}
+            ${home}
+          </div>
+          <div class="center-flag">visible center</div>
+        </div>`;
+        });
+
+        // After paint, mark viewports that don't overflow as "clean" (dim scrollbar)
+        requestAnimationFrame(() => {
+          devices.forEach((d) => {
+            const vp = d.querySelector(".viewport");
+            const overflowing = vp.scrollHeight > vp.clientHeight + 1;
+            vp.classList.toggle("viewport--clean", !overflowing);
+          });
+        });
+      }
+
+      function wireSeg(id, key, parse) {
+        const seg = document.getElementById(id);
+        seg.addEventListener("click", (e) => {
+          const btn = e.target.closest("button");
+          if (!btn) return;
+          seg
+            .querySelectorAll("button")
+            .forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          state[key] = parse(btn);
+          render();
+        });
+      }
+
+      wireSeg("auth-seg", "auth", (b) => b.dataset.auth);
+      wireSeg("width-seg", "width", (b) => Number(b.dataset.w));
+      wireSeg("guide-seg", "guides", (b) => b.dataset.g === "on");
+
+      render();
+    </script>
+  </body>
+</html>
