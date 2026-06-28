@@ -149,7 +149,7 @@ describe("RLS: player_stats SELECT isolation", () => {
     const { client: otherClient } = await makeAuthenticatedClient();
 
     // Seed stats for ownerUserId via service-role
-    await SupabaseDB.INSTANCE.incrementStats(ownerUserId, {
+    await SupabaseDB.INSTANCE.incrementStats(ownerUserId, "big2", {
       gamesPlayed: 1,
       gamesWon: 1,
       gamesLost: 0,
@@ -202,6 +202,7 @@ describe("Security: increment_player_stats RPC restricted to service_role", () =
 
     const { data, error } = await client.rpc("increment_player_stats", {
       p_user_id: userId,
+      p_game_type: "big2",
       p_games_played: 1,
       p_games_won: 1,
       p_games_lost: 0,
@@ -215,7 +216,7 @@ describe("Security: increment_player_stats RPC restricted to service_role", () =
       expect(error).not.toBeNull();
     } else {
       // PostgREST may swallow the error — verify no stats were written
-      const stats = await SupabaseDB.INSTANCE.getStats(userId);
+      const stats = await SupabaseDB.INSTANCE.getStats(userId, "big2");
       expect(stats).toBeNull();
     }
   });

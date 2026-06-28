@@ -10,6 +10,7 @@ import {
 } from "./helpers/testServer.js";
 import { createTestUser } from "./helpers/supabaseUser.js";
 import { createTestGuest } from "./helpers/guestUser.js";
+import { makePgClient, readMigrationSql } from "./helpers/pgClient.js";
 import {
   createAuthenticatedSocket,
   disconnectSocket,
@@ -214,6 +215,16 @@ async function playGameToCompletion(
   }
 }
 
+/**
+ * Builds a unique UUID-shaped user id for self-contained repo-level tests.
+ * The `tag` (<=4 hex chars) plus a timestamp keep each test's rows isolated
+ * so tests don't collide across runs or with each other.
+ */
+function makeTestUserId(tag: string): string {
+  const ts = Date.now().toString(16).padStart(12, "0").slice(-12);
+  return `eeeeeeee-0000-0000-${tag.padStart(4, "0")}-${ts}`;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -229,7 +240,8 @@ describe("Player stats integration", () => {
     await ctx.close();
   });
 
-  it("GET /stats returns zeroed stats for a new user with no games", async () => {
+  // A1: New user → { userId, games: [] }.
+  it("GET /stats returns an empty games array for a new user with no games", async () => {
     const user = await createTestUser("StatsNewUser");
 
     const res = await request(ctx.app)
@@ -239,14 +251,10 @@ describe("Player stats integration", () => {
     expect(res.status).toBe(200);
     const body = res.body as GetStatsResponse;
     expect(body.userId).toBe(user.id);
-    expect(body.gamesPlayed).toBe(0);
-    expect(body.gamesWon).toBe(0);
-    expect(body.gamesLost).toBe(0);
-    expect(body.totalScore).toBe(0);
-    expect(body.winRate).toBe(0);
-    expect(body.lastPlayedAt).toBeNull();
+    expect(body.games).toEqual([]);
   });
 
+  // A5: unauthenticated request rejected.
   it("GET /stats returns 401 without an auth token", async () => {
     const res = await request(ctx.app).get("/stats");
     expect(res.status).toBe(401);
@@ -271,13 +279,11 @@ describe("Player stats integration", () => {
     expect(res.status).toBe(200);
     const body = res.body as GetStatsResponse;
     expect(body.userId).toBe(guest.guestId);
-    expect(body.gamesPlayed).toBe(0);
-    expect(body.gamesWon).toBe(0);
-    expect(body.winRate).toBe(0);
-    expect(body.lastPlayedAt).toBeNull();
+    expect(body.games).toEqual([]);
   });
 
-  it("stats show gamesPlayed: 1 after a completed game", async () => {
+  // A2: after a Big2 completion, games has one entry { gameType: "big2", gamesPlayed: 1 }.
+  it("stats show one big2 entry with gamesPlayed: 1 after a completed game", async () => {
     const users = await Promise.all([
       createTestUser("StatsPlay1"),
       createTestUser("StatsPlay2"),
@@ -301,15 +307,18 @@ describe("Player stats integration", () => {
 
     await playGameToCompletion(ctx, users, gameId);
 
-    // Every player should have gamesPlayed = 1
+    // Every player should have exactly one big2 entry with gamesPlayed = 1
     for (const user of users) {
       const res = await request(ctx.app)
         .get("/stats")
         .set("Authorization", `Bearer ${user.accessToken}`);
       expect(res.status).toBe(200);
       const body = res.body as GetStatsResponse;
-      expect(body.gamesPlayed).toBe(1);
-      expect(body.lastPlayedAt).not.toBeNull();
+      expect(body.games).toHaveLength(1);
+      const entry = body.games[0]!;
+      expect(entry.gameType).toBe("big2");
+      expect(entry.gamesPlayed).toBe(1);
+      expect(entry.lastPlayedAt).not.toBeNull();
     }
   });
 
@@ -346,10 +355,12 @@ describe("Player stats integration", () => {
         .set("Authorization", `Bearer ${user.accessToken}`);
       expect(res.status).toBe(200);
       const body = res.body as GetStatsResponse;
-      totalWins += body.gamesWon;
-      totalLosses += body.gamesLost;
+      const entry = body.games.find((g) => g.gameType === "big2")!;
+      expect(entry).toBeDefined();
+      totalWins += entry.gamesWon;
+      totalLosses += entry.gamesLost;
       // Each player has exactly 1 win or 1 loss
-      expect(body.gamesWon + body.gamesLost).toBe(1);
+      expect(entry.gamesWon + entry.gamesLost).toBe(1);
     }
 
     // Exactly 1 winner and 3 losers across all players
@@ -511,14 +522,13 @@ describe("Player stats integration", () => {
       // Give fire-and-forget stats recording time to settle
       await new Promise((r) => setTimeout(r, 100));
 
-      // Guest's GET /stats should return zeroed stats
+      // Guest's GET /stats should return no game entries (no row created)
       const guestStatsRes = await request(ctx.app)
         .get("/stats")
         .set("Authorization", `Bearer ${guest.token}`);
       expect(guestStatsRes.status).toBe(200);
       const guestBody = guestStatsRes.body as GetStatsResponse;
-      expect(guestBody.gamesPlayed).toBe(0);
-      expect(guestBody.lastPlayedAt).toBeNull();
+      expect(guestBody.games).toEqual([]);
     } finally {
       sockets.forEach(disconnectSocket);
     }
@@ -560,15 +570,69 @@ describe("Player stats integration", () => {
     expect(res.status).toBe(200);
     const body = res.body as GetStatsResponse;
 
-    expect(body.gamesPlayed).toBe(2);
-    expect(body.gamesWon + body.gamesLost).toBe(2);
+    const entry = body.games.find((g) => g.gameType === "big2")!;
+    expect(entry).toBeDefined();
+    expect(entry.gamesPlayed).toBe(2);
+    expect(entry.gamesWon + entry.gamesLost).toBe(2);
 
     // winRate must equal gamesWon / gamesPlayed rounded to 3 decimal places
     const expectedWinRate =
-      body.gamesPlayed > 0
-        ? Math.round((body.gamesWon / body.gamesPlayed) * 1000) / 1000
+      entry.gamesPlayed > 0
+        ? Math.round((entry.gamesWon / entry.gamesPlayed) * 1000) / 1000
         : 0;
-    expect(body.winRate).toBe(expectedWinRate);
+    expect(entry.winRate).toBe(expectedWinRate);
+  });
+
+  // A3: after a Big2 and a Tonk completion, GET /stats returns two entries,
+  // each with its own counters that do not bleed across entries. The Tonk
+  // completion is recorded directly via the stats path (gameType: "tonk"),
+  // so this does NOT depend on the Tonk engine (LLD 65) being implemented.
+  it("GET /stats returns separate big2 and tonk entries with non-bleeding counters", async () => {
+    const user = await createTestUser("StatsBig2AndTonk");
+
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+
+    // Record a big2 result and a tonk result for the same user.
+    await db.incrementStats(user.id, "big2", {
+      gamesPlayed: 1,
+      gamesWon: 1,
+      gamesLost: 0,
+      totalScore: 5,
+    });
+    await db.incrementStats(user.id, "tonk", {
+      gamesPlayed: 1,
+      gamesWon: 0,
+      gamesLost: 1,
+      totalScore: 40,
+    });
+
+    const res = await request(ctx.app)
+      .get("/stats")
+      .set("Authorization", `Bearer ${user.accessToken}`);
+    expect(res.status).toBe(200);
+    const body = res.body as GetStatsResponse;
+
+    expect(body.userId).toBe(user.id);
+    expect(body.games).toHaveLength(2);
+
+    const big2 = body.games.find((g) => g.gameType === "big2")!;
+    const tonk = body.games.find((g) => g.gameType === "tonk")!;
+    expect(big2).toBeDefined();
+    expect(tonk).toBeDefined();
+
+    expect(big2.gamesPlayed).toBe(1);
+    expect(big2.gamesWon).toBe(1);
+    expect(big2.gamesLost).toBe(0);
+    expect(big2.totalScore).toBe(5);
+    expect(big2.winRate).toBe(1);
+
+    expect(tonk.gamesPlayed).toBe(1);
+    expect(tonk.gamesWon).toBe(0);
+    expect(tonk.gamesLost).toBe(1);
+    expect(tonk.totalScore).toBe(40);
+    expect(tonk.winRate).toBe(0);
   });
 
   it("totalScore matches Big2 placement scoring after game completion", async () => {
@@ -606,15 +670,19 @@ describe("Player stats integration", () => {
         .set("Authorization", `Bearer ${user.accessToken}`);
       expect(res.status).toBe(200);
       const body = res.body as GetStatsResponse;
+      const entry = body.games.find((g) => g.gameType === "big2")!;
+      expect(entry).toBeDefined();
       // Each player's totalScore must be one of the placement values
-      expect([0, 1, 3, 5]).toContain(body.totalScore);
-      totalScoreSum += body.totalScore;
+      expect([0, 1, 3, 5]).toContain(entry.totalScore);
+      totalScoreSum += entry.totalScore;
     }
     // Across all 4 players the scores must sum to 5+3+1+0 = 9
     expect(totalScoreSum).toBe(9);
   });
 
-  it("incrementStats is atomic — concurrent upserts both succeed and values are summed", async () => {
+  // I3: two concurrent incrementStats for the same composite key both succeed;
+  // final values are the sum (no lost update).
+  it("incrementStats is atomic — concurrent upserts on the same (user, game_type) sum", async () => {
     // Direct repository-level test using SupabaseDB.INSTANCE (already initialized by testServer)
     const { SupabaseDB } =
       await import("../../src/backend/database/supabaseDb.js");
@@ -631,15 +699,264 @@ describe("Player stats integration", () => {
 
     // Fire two concurrent upserts
     await Promise.all([
-      db.incrementStats(testUserId, delta1),
-      db.incrementStats(testUserId, delta2),
+      db.incrementStats(testUserId, "big2", delta1),
+      db.incrementStats(testUserId, "big2", delta2),
     ]);
 
-    const stats = await db.getStats(testUserId);
+    const stats = await db.getStats(testUserId, "big2");
     expect(stats).not.toBeNull();
+    expect(stats!.gameType).toBe("big2");
     expect(stats!.gamesPlayed).toBe(2);
     expect(stats!.gamesWon).toBe(1);
     expect(stats!.gamesLost).toBe(1);
     expect(stats!.totalScore).toBe(15);
+  });
+
+  // I1: per-game isolation — a big2 increment leaves the tonk row untouched.
+  it("per-game isolation — a big2 increment does not create or alter a tonk row", async () => {
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+    const userId = makeTestUserId("aaaa");
+
+    await db.incrementStats(userId, "big2", {
+      gamesPlayed: 1,
+      gamesWon: 1,
+      gamesLost: 0,
+      totalScore: 7,
+    });
+
+    const big2 = await db.getStats(userId, "big2");
+    const tonk = await db.getStats(userId, "tonk");
+
+    expect(big2).not.toBeNull();
+    expect(big2!.gamesPlayed).toBe(1);
+    expect(big2!.gamesWon).toBe(1);
+    expect(big2!.totalScore).toBe(7);
+    // The tonk row was never touched
+    expect(tonk).toBeNull();
+  });
+
+  // I2: composite-key upsert — two big2 calls sum into one row; a tonk call
+  // creates a SECOND row. getAllStats returns exactly the two expected entries.
+  it("composite-key upsert — big2 rows sum, tonk creates a second row", async () => {
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+    const userId = makeTestUserId("bbbb");
+
+    await db.incrementStats(userId, "big2", {
+      gamesPlayed: 1,
+      gamesWon: 1,
+      gamesLost: 0,
+      totalScore: 5,
+    });
+    await db.incrementStats(userId, "big2", {
+      gamesPlayed: 1,
+      gamesWon: 0,
+      gamesLost: 1,
+      totalScore: 3,
+    });
+    await db.incrementStats(userId, "tonk", {
+      gamesPlayed: 1,
+      gamesWon: 0,
+      gamesLost: 1,
+      totalScore: 42,
+    });
+
+    const all = await db.getAllStats(userId);
+    expect(all).toHaveLength(2);
+
+    const big2 = all.find((s) => s.gameType === "big2")!;
+    const tonk = all.find((s) => s.gameType === "tonk")!;
+    expect(big2).toBeDefined();
+    expect(tonk).toBeDefined();
+
+    // big2 summed
+    expect(big2.gamesPlayed).toBe(2);
+    expect(big2.gamesWon).toBe(1);
+    expect(big2.gamesLost).toBe(1);
+    expect(big2.totalScore).toBe(8);
+
+    // tonk independent
+    expect(tonk.gamesPlayed).toBe(1);
+    expect(tonk.gamesWon).toBe(0);
+    expect(tonk.gamesLost).toBe(1);
+    expect(tonk.totalScore).toBe(42);
+  });
+
+  // I5: getAllStats for a user who has played nothing → [].
+  it("getAllStats returns [] for a user who has played nothing", async () => {
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+    const userId = makeTestUserId("cccc");
+
+    const all = await db.getAllStats(userId);
+    expect(all).toEqual([]);
+  });
+
+  // I6: getStats(user, type) returns exactly the matching row or null, never
+  // bleeding another game type's counters.
+  it("getStats(user, type) returns only the matching game type's row", async () => {
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+    const userId = makeTestUserId("dddd");
+
+    await db.incrementStats(userId, "big2", {
+      gamesPlayed: 2,
+      gamesWon: 2,
+      gamesLost: 0,
+      totalScore: 11,
+    });
+    await db.incrementStats(userId, "tonk", {
+      gamesPlayed: 5,
+      gamesWon: 0,
+      gamesLost: 5,
+      totalScore: 99,
+    });
+
+    const big2 = await db.getStats(userId, "big2");
+    expect(big2).not.toBeNull();
+    expect(big2!.gameType).toBe("big2");
+    expect(big2!.gamesPlayed).toBe(2);
+    expect(big2!.totalScore).toBe(11);
+
+    const tonk = await db.getStats(userId, "tonk");
+    expect(tonk).not.toBeNull();
+    expect(tonk!.gameType).toBe("tonk");
+    expect(tonk!.gamesPlayed).toBe(5);
+    expect(tonk!.totalScore).toBe(99);
+  });
+
+  // I7: the 6-arg increment_player_stats succeeds, and the old 5-arg overload
+  // no longer exists after 005.
+  it("RPC signature — 6-arg increment_player_stats works; old 5-arg overload is gone", async () => {
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+    const userId = makeTestUserId("eeee");
+
+    // The 6-arg call (via the repo) succeeds.
+    await expect(
+      db.incrementStats(userId, "big2", {
+        gamesPlayed: 1,
+        gamesWon: 1,
+        gamesLost: 0,
+        totalScore: 1,
+      }),
+    ).resolves.toBeUndefined();
+
+    // Negative check: confirm exactly one increment_player_stats function exists
+    // and it has 6 arguments (the 5-arg overload was dropped by 005).
+    const pg = makePgClient();
+    await pg.connect();
+    try {
+      const { rows } = await pg.query<{ nargs: number }>(
+        `SELECT pronargs AS nargs FROM pg_proc WHERE proname = 'increment_player_stats';`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.nargs).toBe(6);
+    } finally {
+      await pg.end();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// I4: Backfill correctness.
+//
+// A clean `supabase start` already applies 004, so the live DB never exhibits
+// the pre-004 single-PK schema this test must exercise. Per LLD 66 §10.1, I4
+// self-materializes the pre-004 state in a dedicated throwaway schema, runs the
+// REAL 004 SQL against it (search_path-scoped), and asserts the backfill.
+// Self-contained: the schema is created and dropped within the test.
+// ---------------------------------------------------------------------------
+
+describe("Migration 004 backfill (I4)", () => {
+  it("backfills existing pre-004 rows to game_type='big2' and repoints the PK to composite", async () => {
+    const schema = `lld66_i4_${Date.now().toString(36)}`;
+    const seededUserId = "22222222-2222-2222-2222-222222222222";
+    const pg = makePgClient();
+    await pg.connect();
+
+    try {
+      // 1. Materialize the pre-004 state in an isolated schema:
+      //    - games (the 004 guard counts completed non-big2 games)
+      //    - player_stats with the OLD single-column PK and no game_type
+      //    - one seeded row (as if produced by Big2 before the migration)
+      await pg.query(`CREATE SCHEMA "${schema}";`);
+      await pg.query(`SET search_path TO "${schema}", public;`);
+      await pg.query(
+        `CREATE TABLE games (
+           game_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+           game_type VARCHAR(50) NOT NULL DEFAULT 'big2',
+           status VARCHAR(20) NOT NULL DEFAULT 'CREATED'
+         );`,
+      );
+      await pg.query(
+        `CREATE TABLE player_stats (
+           user_id UUID PRIMARY KEY,
+           games_played INT NOT NULL DEFAULT 0,
+           games_won INT NOT NULL DEFAULT 0,
+           games_lost INT NOT NULL DEFAULT 0,
+           total_score INT NOT NULL DEFAULT 0,
+           last_played_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+         );`,
+      );
+      await pg.query(
+        `INSERT INTO player_stats (user_id, games_played, games_won, games_lost, total_score)
+         VALUES ($1, 4, 3, 1, 25);`,
+        [seededUserId],
+      );
+
+      // Sanity: the PK starts as single-column (user_id).
+      const prePk = await pg.query<{ def: string }>(
+        `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+         WHERE conrelid = '${schema}.player_stats'::regclass AND contype = 'p';`,
+      );
+      expect(prePk.rows[0]!.def).toBe("PRIMARY KEY (user_id)");
+
+      // 2. Run the REAL 004 migration SQL against this schema.
+      //    search_path is already set so the unqualified names resolve here.
+      await pg.query(readMigrationSql("004_player_stats_game_type.sql"));
+
+      // 3a. The seeded row is backfilled to 'big2', counters preserved.
+      const row = await pg.query<{
+        game_type: string;
+        games_played: number;
+        games_won: number;
+        total_score: number;
+      }>(
+        `SELECT game_type, games_played, games_won, total_score
+         FROM player_stats WHERE user_id = $1;`,
+        [seededUserId],
+      );
+      expect(row.rows).toHaveLength(1);
+      expect(row.rows[0]!.game_type).toBe("big2");
+      expect(row.rows[0]!.games_played).toBe(4);
+      expect(row.rows[0]!.games_won).toBe(3);
+      expect(row.rows[0]!.total_score).toBe(25);
+
+      // 3b. The PK is now the composite (user_id, game_type).
+      const postPk = await pg.query<{ def: string }>(
+        `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+         WHERE conrelid = '${schema}.player_stats'::regclass AND contype = 'p';`,
+      );
+      expect(postPk.rows[0]!.def).toBe("PRIMARY KEY (user_id, game_type)");
+
+      // 3c. No row has a null/empty game_type.
+      const nulls = await pg.query<{ n: string }>(
+        `SELECT COUNT(*)::text AS n FROM player_stats
+         WHERE game_type IS NULL OR game_type = '';`,
+      );
+      expect(nulls.rows[0]!.n).toBe("0");
+    } finally {
+      // Reset search_path before dropping the schema, then clean up.
+      await pg.query(`SET search_path TO public;`);
+      await pg.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE;`);
+      await pg.end();
+    }
   });
 });

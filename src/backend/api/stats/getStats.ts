@@ -1,6 +1,6 @@
 import { type Request, type Response } from "@/util/types";
 import { Handler } from "@/api/handler";
-import type { GetStatsResponse } from "@shared/model";
+import type { GameStatsEntry, GetStatsResponse } from "@shared/model";
 import { statsRepo } from "@/database";
 
 export class GetStatsHandler extends Handler {
@@ -14,20 +14,22 @@ export class GetStatsHandler extends Handler {
     response: Response<GetStatsResponse>,
   ) {
     const userId = request.userId!;
-    const stats = await statsRepo.getStats(userId);
+    const allStats = await statsRepo.getAllStats(userId);
 
-    const result: GetStatsResponse = {
-      userId,
-      gamesPlayed: stats?.gamesPlayed ?? 0,
-      gamesWon: stats?.gamesWon ?? 0,
-      gamesLost: stats?.gamesLost ?? 0,
-      totalScore: stats?.totalScore ?? 0,
+    const games: GameStatsEntry[] = allStats.map((stats) => ({
+      gameType: stats.gameType,
+      gamesPlayed: stats.gamesPlayed,
+      gamesWon: stats.gamesWon,
+      gamesLost: stats.gamesLost,
+      totalScore: stats.totalScore,
       winRate:
-        stats && stats.gamesPlayed > 0
+        stats.gamesPlayed > 0
           ? Math.round((stats.gamesWon / stats.gamesPlayed) * 1000) / 1000
           : 0,
-      lastPlayedAt: stats?.lastPlayedAt?.toISOString() ?? null,
-    };
+      lastPlayedAt: stats.lastPlayedAt?.toISOString() ?? null,
+    }));
+
+    const result: GetStatsResponse = { userId, games };
 
     response.status(200).json(result);
   }
