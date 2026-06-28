@@ -42,7 +42,7 @@ This LLD pins down the EXACT Tonk (Tunk) variant we will implement. Tonk has man
 | --- | --- |
 | Deck | 1+ standard 52-card decks **with jokers included**. Variable size — cut down so the stock lasts ~7–9 rounds. |
 | Jokers | Present in the deck; worth **0 points**. Also used as the tiebreak token for TRUE LOSER (§5.3). |
-| Players | 3–5 with one deck; 6+ with two or more decks. **We support `minPlayers: 3`, `maxPlayers: 5` for v1** (single-deck only — see §8.1; multi-deck deferred, presented as a default for sign-off). |
+| Players | 3–5 with one deck; 6+ with two or more decks. **Proposed default (awaiting sign-off): `minPlayers: 3`, `maxPlayers: 6`** — ≤5 = single deck (54 cards, no cut), 6 = two decks then cut (see §8.1). Multi-deck is now proposed as an adopted default, not deferred. |
 | Deal | **5 cards** face down to each player. Remainder is the face-down **stock** in the center. |
 | Card values | Aces = **1**, face cards (J/Q/K) = **10**, number cards 2–10 = **face value**, Jokers = **0**. |
 | Hand value | Sum of the point values of all cards currently in hand. Lower is better. |
@@ -68,7 +68,7 @@ This LLD pins down the EXACT Tonk (Tunk) variant we will implement. Tonk has man
 
 ### 2.3 Alternatives considered
 
-- **Multi-deck (6+ players) in v1** — rejected for v1. Adds deck-multiplicity bookkeeping and changes the Joker-count math for the TRUE LOSER draw, for a player count the rest of the stack (lobby max, frontend seating) is not built for. Deferred; `maxPlayers` cap of 5 keeps us single-deck. **Recommended default — confirm at sign-off (§9.1).**
+- **Multi-deck (6+ players) in v1** — now **adopted as a proposed default** (was previously deferred; that deferral is reversed here). It adds modest deck-multiplicity bookkeeping (`numDecks = ceil(players / 5)`) and `2 * numDecks` Jokers for the TRUE-LOSER draw, but the rest of the stack already supports it: the backend has **no hard player cap** (`createGame.ts` passes `maxPlayers` through with only a truthy check; engines self-validate via `GameEngineConfig.minPlayers/maxPlayers` — verified), and the frontend `OpponentRow.vue` is an uncapped `v-for` flex row that renders any count (6+ is only visually cramped — CSS polish, not a blocker). We therefore propose `maxPlayers: 6` (the ruleset's own single→multi-deck cutoff): ≤5 stays single-deck (no cut), 6 triggers two decks then a cut. **Proposed default — confirm at sign-off (§9.1).**
 - **Treating each trick as a separate `InternalGameState` / game record** — rejected. Stats and the 150-point match span multiple tricks; one persistent game state across tricks matches the cache/persistence model (architecture-principles #5) and the existing `Game` row.
 - **Auto-win on a low dealt hand ("instant tonk on deal")** — rejected; not in the user's ruleset. TONK is gated to "after every player has had ≥1 turn."
 
@@ -78,7 +78,7 @@ This LLD pins down the EXACT Tonk (Tunk) variant we will implement. Tonk has man
 
 ### 3.1 Setup (per trick)
 
-1. **Deck build.** Compose the deck (§8.1): 1 standard 52-card deck **+ 2 jokers** (54 cards) for 3–5 players, then cut it down to a target size so the stock lasts ~7–9 rounds. The cut is deterministic given the seed.
+1. **Deck build.** Compose the deck (§8.1): for **≤5 players**, exactly 1 standard 52-card deck **+ 2 Jokers** (54 cards) and **no cut** — all 54 cards are in play every trick. For **6+ players**, `ceil(players / 5)` decks (each 52 + 2 Jokers) shuffled together, **then cut** down to a target size so the stock lasts ~7–9 rounds after dealing. The cut (when it applies) is deterministic given the seed.
 2. **Deal.** 5 cards face down to each player.
 3. **Stock.** Remaining cards form the face-down stock in the center.
 4. **Discard pile.**
@@ -145,7 +145,7 @@ If the stock empties (a player must draw but the stock has 0 cards) before any T
 | `turnNumber` | Increments on every applied action (per existing convention). |
 | `winner` | Set at `COMPLETED` to the player with the lowest final tally (stats adapter, §6.3). |
 | `scores` | At `COMPLETED`: one `PlayerScore` per player. `score` = final running tally (lower is better). `breakdown` carries `{ lost: 0|1, trueLoser: 0|1, finalTally }`. |
-| `randomSeed` | The seed; deck build, every per-trick cut, and the TRUE-LOSER joker draw all derive from a PRNG seeded by it (deterministic replay). |
+| `randomSeed` | The seed; deck build, every per-trick reshuffle (and the cut at 6+ players, §8.1), and the TRUE-LOSER joker draw all derive from a PRNG seeded by it (deterministic replay). |
 | `gameSpecificState` | `TonkState` (below). |
 
 ### 4.2 `TonkState` (conceptual — exact types in #57)
@@ -209,7 +209,7 @@ Let `caller` = the player who called TONK (if any), and `hv(p)` = hand value of 
 ### 5.3 TRUE LOSER determination
 
 - If exactly **one** player has tally ≥150 → that player is automatically the **TRUE LOSER**.
-- If **more than one** player has lost: shuffle a fresh full deck (with jokers) via the PRNG, then the lost players draw one card at a time in seat order, repeating, until a **Joker** is drawn. The player who draws the Joker is the **TRUE LOSER**. (Deterministic given seed; §8.5.)
+- If **more than one** player has lost: shuffle a fresh full pool (consistent with the game's deck count — `numDecks` decks, i.e. `2 * numDecks` Jokers) via the PRNG, then the lost players draw one card at a time in seat order, repeating, until a **Joker** is drawn. The player who draws the Joker is the **TRUE LOSER**. (Deterministic given seed; §8.5.) More decks only add more Jokers, so termination remains guaranteed.
 - `state.status` → `COMPLETED`; `trueLoserIndex` set; `winner`/`scores` populated per §6.3.
 
 ---
@@ -222,7 +222,7 @@ Every method of `GameEngine` (`src/backend/engine/game-engine.ts`) maps as follo
 
 | Method | Tonk behavior |
 | --- | --- |
-| `initialize(gameId, players, config, prng)` | Validate `3 ≤ players.length ≤ 5`. Build + cut the deck deterministically (§8.1) using `prng` and `config.options` (optional `deckTargetRounds`, `extraDecks`). Deal 5 each; rest → stock; trick-1 discard empty. `currentPlayerIndex` = 0. `status = IN_PROGRESS`, `version = 1`, `tallies` all 0, `trickNumber = 1`, `turnPhase = "discard"`. |
+| `initialize(gameId, players, config, prng)` | Validate `3 ≤ players.length ≤ 6` (proposed range — §9.1). Build the deck deterministically (§8.1) using `prng` and `config.options` (optional `deckTargetRounds`, `extraDecks`): ≤5 players → 1 deck (54), no cut; 6+ → `ceil(players/5)` decks shuffled then cut. Deal 5 each; rest → stock; trick-1 discard empty. `currentPlayerIndex` = 0. `status = IN_PROGRESS`, `version = 1`, `tallies` all 0, `trickNumber = 1`, `turnPhase = "discard"`. |
 | `validateAction(state, action)` | Pure predicate: true iff `applyAction` would succeed (Big2 pattern — delegate). |
 | `applyAction(state, action)` | Dispatch on `action.type ∈ {discard, draw, callTonk}` and `turnPhase`. Deterministic; no PRNG param. **All inter-trick and end-game randomness (new deck cut, TRUE-LOSER draw) uses a PRNG re-seeded deterministically from `randomSeed` — see ⚠-A.** Returns immutable new state, `version + 1`. |
 | `getPlayerView(state, playerId)` | Your hand only; opponents as counts; public discard top + count, `drawableDiscard` (the turn-start snapshot, so the current player and spectators can see what is drawable from the discard — distinct from the live top), stock **count** (not cards), tallies, trickNumber, turnPhase, log, winner/scores. `validActions` populated only on your turn (§6.2). |
@@ -280,13 +280,21 @@ The turn timer (LLD 07) calls `getAutoTimeoutAction(state)` when a player's cloc
 
 ## 8. Edge Cases (resolved — no TBDs that block the engine)
 
-### 8.1 Deck size & joker count selection (engine-critical, resolved)
+### 8.1 Deck composition, cut, and joker count selection (engine-critical, resolved — proposed defaults)
 
-- **Composition (v1, 3–5 players):** exactly **1 standard 52-card deck + 2 Jokers = 54 cards** before cutting. (`Card` type in `engine-types.ts` has no Joker rank — see ⚠ §8.6.)
-- **Target stock life:** the ruleset says "~7–9 rounds." We make this deterministic: `targetCards = handCardsDealt + roundsTarget * players.length`, where `handCardsDealt = 5 * players.length` and `roundsTarget` defaults to **8**. Clamp `targetCards` to `[handCardsDealt + players.length, 54]`. Example (4 players): `20 + 8*4 = 52`, so cut 2 cards from the 54.
-- **The cut:** shuffle the 54-card deck with the PRNG, then **remove the top `(54 - targetCards)` cards** (the "cut"). The cut is **blind** — cards removed may include Jokers. This is intentional and deterministic and honors the ruleset's "the cards used changes every trick." (If a trick's deck ends up with 0 Jokers it has no effect on that trick — Jokers only matter for hand value, 0, and the end-of-game draw, which uses a **fresh full deck**, §8.5.)
-- **Override:** `config.options.deckTargetRounds` (number) and `config.options.extraDecks` (number, default 0) allow tuning; v1 lobby may not expose these (defaults used). `GameEngineConfig.options` is already `Record<string, unknown>` (**verified in `game-engine.ts`**) — no plumbing change.
-- **Determinism:** the per-trick deck uses sub-seed `hashSeed(randomSeed + ":trick:" + trickNumber)`; same seed + trick → identical deck and cut (testing-principles #2; can be fixed via `FixedPRNG`).
+**Deck count.** `numDecks = ceil(players.length / 5)` (proposed default; `+ config.options.extraDecks`, default 0). 3–5 players → 1 deck; 6 players → 2 decks. **6 MUST trigger 2 decks** — this is the ruleset's own single→multi-deck cutoff. Each deck contributes **52 standard cards + 2 Jokers**, so the pool has `54 * numDecks` cards and `2 * numDecks` Jokers. (`Card` type in `engine-types.ts` has no Joker rank — see ⚠ §8.6.)
+
+**≤5 players (single deck): NO CUT.** The deck is exactly **1 deck = 52 + 2 Jokers = 54 cards**, and **all 54 cards are used every trick** — there is no cut. The per-trick reshuffle (deterministic from the sub-seed) changes the **draw ORDER** only; the **card SET is the identical 54 cards every trick**. The ruleset's "the cards used changes every trick" property is a **6+ multi-deck feature, NOT a ≤5 single-deck feature** — at ≤5 players the set is intentionally the same 54 each trick and only the order varies by seed. This is the intended behavior.
+
+**6+ players (multi-deck): cut to target rounds.** Shuffle all `numDecks` decks together with the PRNG, **then cut** the pool down to a target size so it lasts ~7–9 rounds after dealing:
+- `targetCards = handCardsDealt + roundsTarget * players.length`, where `handCardsDealt = 5 * players.length` and `roundsTarget` defaults to **8** (the 7–9-round heuristic).
+- Clamp `targetCards` to `[handCardsDealt + players.length, 54 * numDecks]` (never cut below one post-deal round; never exceed the available pool).
+- **The cut** removes the top `(54 * numDecks - targetCards)` cards from the shuffled pool. The cut is **blind** — removed cards may include Jokers. Because the cut takes a different subset from the 108+-card pool each trick (sub-seed varies by trick), the **card set genuinely changes every trick** here — this is where the ruleset's changing-cards property lives. (If a trick's cut deck ends up with 0 Jokers it has no effect on that trick — Jokers only matter for hand value, 0, and the end-of-game draw, which uses a **fresh full pool**, §8.5.)
+- Example (6 players, 2 decks → 108-card pool): `handCardsDealt = 30`, `targetCards = 30 + 8*6 = 78`, so cut `108 - 78 = 30` cards.
+
+**Overrides.** `config.options.deckTargetRounds` (number) and `config.options.extraDecks` (number, default 0) allow tuning; v1 lobby may not expose these (defaults used). `GameEngineConfig.options` is already `Record<string, unknown>` (**verified in `game-engine.ts`**) — no plumbing change.
+
+**Determinism.** The per-trick deck uses sub-seed `hashSeed(randomSeed + ":trick:" + trickNumber)`; same seed + trick → identical shuffle (and identical cut for 6+) (testing-principles #2; can be fixed via `FixedPRNG`).
 
 ### 8.2 Discarding multiples
 
@@ -313,8 +321,8 @@ Draw legality is governed by the **turn-start snapshot** `drawableDiscard` (§4.
 
 ### 8.5 TRUE LOSER draw
 
-- Uses a **fresh full deck** (52 + 2 Jokers), shuffled via sub-seed `hashSeed(randomSeed + ":trueloser:" + trickNumber)`.
-- Lost players draw in ascending seat order, looping, until a Joker is drawn; that player is TRUE LOSER. With 2 Jokers in 54 cards, termination is guaranteed (a Joker is always reachable). Single lost player → automatic TRUE LOSER (no draw).
+- Uses a **fresh full pool** consistent with the game's deck count: `numDecks` decks = `54 * numDecks` cards including `2 * numDecks` Jokers (so 54 / 2 Jokers at ≤5 players; 108 / 4 Jokers at 6 players), shuffled via sub-seed `hashSeed(randomSeed + ":trueloser:" + trickNumber)`.
+- Lost players draw in ascending seat order, looping, until a Joker is drawn; that player is TRUE LOSER. With `2 * numDecks ≥ 2` Jokers in the pool, termination is guaranteed (a Joker is always reachable — more Jokers only makes one reachable sooner). Single lost player → automatic TRUE LOSER (no draw).
 
 ### 8.6 Joker representation ⚠ (type gap, resolved by deferral to #57)
 
@@ -336,22 +344,22 @@ Draw legality is governed by the **turn-start snapshot** `drawableDiscard` (§4.
 | Tie at match end for lowest tally (the "winner") | Lowest seat index among the tied (deterministic). |
 | Multiple players ≥150 simultaneously | All marked lost; TRUE LOSER by joker draw (§5.3). |
 | Player ≥150 but also lowest tally | Still "lost" (any ≥150 has lost, per ruleset); cannot be the `winner`. If *all* players are ≥150, `winner` = lowest tally among them but they are still all "lost"; TRUE LOSER decides. (Confirm at §9.8 whether `winner` should be null in an all-lost game.) |
-| Initialize with <3 or >5 players | `initialize` throws `"Tonk requires 3-5 players"`. |
+| Initialize with <3 or >6 players | `initialize` throws `"Tonk requires 3-6 players"` (proposed range — §9.1). |
 | Reconnection / spectator mid-trick | Standard `getPlayerView`/`getSpectatorView`; revealed hands only exist transiently in the log at trick end. |
 
 ---
 
 ## 9. Variant Sign-Off (HARD GATE)
 
-**Engine sub-issue #57 MUST NOT begin until the user explicitly signs off on the points below.** This spec is transcribed from the user's authoritative `TONK.Rules.md` (verified faithful); the items marked **(default)** are engine-critical points the ruleset's prose left open, resolved here with a concrete default for confirmation. The three items the prose most clearly leaves open are **§9.1 (single-deck / maxPlayers = 5), §9.3 (trick-1 starter = seat 0), and §9.7 (Case-C tie handling)** — these are the primary questions to put to the user.
+**Engine sub-issue #57 MUST NOT begin until the user explicitly signs off on the points below.** This spec is transcribed from the user's authoritative `TONK.Rules.md` (verified faithful); the items marked **(default)** are engine-critical points the ruleset's prose left open, resolved here with a concrete default for confirmation. The three items the prose most clearly leaves open are **§9.1 (player range now proposed as 3–6: ≤5 = single deck with no cut, 6 = two decks then cut to ~7–9 rounds), §9.3 (trick-1 starter = seat 0), and §9.7 (Case-C tie handling)** — these are the primary questions to put to the user. Note §9.1 reverses the earlier "multi-deck deferred" stance: multi-deck is now a proposed default, with 6+ frontend seating flagged as a downstream **non-blocking** CSS-polish cost (`OpponentRow.vue` already renders any count; backend has no hard cap — see §2.3).
 
 Confirm:
 
-1. **Player range = 3–5, single deck (52 + 2 Jokers), v1.** Multi-deck / 6+ players deferred. **(default)**
-2. **Deck-size heuristic:** `roundsTarget = 8`, deterministic blind cut via seed; jokers may be cut from a trick's deck. **(default)**
+1. **Player range = 3–6.** ≤5 players → 1 deck (52 + 2 Jokers = 54), **no cut** (all 54 cards every trick; only draw order varies by seed). 6 players → `ceil(players/5)` = 2 decks shuffled together, **then cut** to ~7–9 rounds. Multi-deck is now adopted as a proposed default (reverses the earlier deferral). 6+ frontend seating is a downstream **non-blocking** CSS-polish cost (§2.3). **(default — confirm)**
+2. **Deck-size heuristic (6+ only):** `roundsTarget = 8`, `numDecks = ceil(players/5)`, deterministic blind cut via seed; Jokers may be cut from a trick's deck. At ≤5 players there is **no cut** (the heuristic does not apply). **(default)**
 3. **Trick-1 starter = seat 0** (ruleset specifies the starter only for trick 2+). **(default)**
 4. **Turn timer auto-action:** discard-phase → discard single highest card (never auto-TONK); draw-phase → draw from stock. Timer re-arms per phase. **(default)**
-5. **Joker = value 0 and the TRUE-LOSER token; TRUE-LOSER draw uses a fresh full 54-card deck.** (From ruleset; confirming Joker count = 2.) **(default for joker count)**
+5. **Joker = value 0 and the TRUE-LOSER token; TRUE-LOSER draw uses a fresh full pool of `numDecks` decks** (`2 * numDecks` Jokers — 2 at ≤5 players, 4 at 6 players). (From ruleset; confirming Joker count = `2 * numDecks`.) **(default for joker count)**
 6. **Stats mapping:** `winner` = lowest final tally; TRUE LOSER recorded via `breakdown.trueLoser`; recommend the small `StatsService` change (option 2, §6.3) so only the TRUE LOSER counts as a loss. **(default — recommendation)**
 7. **Case C tie (multiple lowest hands at stock-out):** each tied-lowest player adds 30. **(default)**
 8. **All-players-lost edge:** `winner` = lowest tally among them (vs `null`). **(default — confirm)**
@@ -385,9 +393,9 @@ On sign-off, record the date and any overrides at the top of this section, then 
 - Ace=1, J/Q/K=10, 2–10=face, Joker=0; hand value = sum.
 
 ### Unit — deck build & cut (determinism)
-- Same seed + trick → identical deck and identical cut.
-- Deck size honors `roundsTarget` math and clamps; player-count-driven composition.
-- Cut is reproducible and may remove jokers.
+- Same seed + trick → identical deck (and, for 6+, identical cut).
+- **≤5 players → NO cut:** the deck is exactly the 54 cards (52 + 2 Jokers) every trick; across tricks the **card set is identical** and only the draw **ORDER** varies by seed (assert set equality across tricks, order inequality for distinct sub-seeds). Joker count = `2 * numDecks` = 2.
+- **6+ players → multi-deck cut:** `numDecks = ceil(players/5)` (6 → 2 decks); pool = `54 * numDecks` with `2 * numDecks` Jokers; cut down to `targetCards` honoring `roundsTarget` math and the clamp; **different subset per trick** (assert distinct card sets across tricks for distinct sub-seeds); cut is reproducible and may remove Jokers.
 
 ### Unit — turn phases (discard → draw)
 - `validActions` correct per phase and per TONK gate (§6.2).
@@ -414,7 +422,7 @@ On sign-off, record the date and any overrides at the top of this section, then 
 ### Unit — match end & TRUE LOSER
 - Tally ≥150 → that player lost; new trick otherwise.
 - Single lost player → auto TRUE LOSER.
-- Multiple lost → joker-draw (deterministic via seed) picks TRUE LOSER; termination guaranteed.
+- Multiple lost → joker-draw from a fresh pool of `numDecks` decks (`2 * numDecks` Jokers; deterministic via seed) picks TRUE LOSER; termination guaranteed even with multiple Jokers (more Jokers only ends the draw sooner).
 - `winner` = lowest final tally; `breakdown.trueLoser` set on the true loser.
 
 ### Unit — invalid actions (testing-principles #6)
