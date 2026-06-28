@@ -16,7 +16,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flow-page">
+  <div class="flow-page flow-page--center">
     <div class="home">
       <h1 class="home__title" data-testid="home-title">Card Game Simulator</h1>
 
@@ -98,6 +98,8 @@ onMounted(async () => {
 
 .home__btn {
   display: block;
+  width: 100%;
+  box-sizing: border-box;
   text-align: center;
   text-decoration: none;
 }
