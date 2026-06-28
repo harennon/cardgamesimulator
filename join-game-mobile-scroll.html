@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Join Game — Mobile Scroll Fix — Mockups</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        /* App theme tokens (mirrored from game-variables.css) */
+        --felt: #1a4a2e;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+
+        --font-ui: "DM Sans", sans-serif;
+        --font-mono: "JetBrains Mono", "Courier New", monospace;
+
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --input-border: var(--table-rim-light);
+        --input-border-focus: var(--gold-accent);
+        --input-text: var(--text-primary);
+        --input-placeholder: var(--text-muted);
+        --input-radius: 6px;
+
+        --btn-primary-bg: var(--gold-accent);
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-radius: 6px;
+        --btn-disabled-opacity: 0.4;
+
+        --card-panel-bg: var(--panel-bg);
+        --card-panel-border: var(--table-rim-light);
+        --card-panel-radius: 12px;
+        --link-color: var(--gold-accent);
+        --error-text: #e05555;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background:
+          radial-gradient(
+            circle at 20% -10%,
+            rgba(201, 168, 76, 0.06),
+            transparent 55%
+          ),
+          #080808;
+        color: var(--text-primary);
+        padding: 36px 24px 96px;
+        line-height: 1.5;
+      }
+
+      /* ───────── Page chrome ───────── */
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 8px;
+      }
+      .page-head__kicker {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        margin-bottom: 10px;
+      }
+      .page-head h1 {
+        font-size: 1.7rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin-top: 10px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 820px;
+      }
+      .page-head code {
+        font-family: var(--font-mono);
+        font-size: 0.84em;
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      .rule {
+        max-width: 1180px;
+        margin: 28px auto;
+        border: none;
+        border-top: 1px solid rgba(74, 44, 30, 0.6);
+      }
+
+      /* ───────── Direction blocks ───────── */
+      .direction {
+        max-width: 1180px;
+        margin: 0 auto 56px;
+      }
+      .direction__head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 4px;
+      }
+      .direction__tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #0a0a0a;
+        background: var(--gold-accent);
+        padding: 3px 9px;
+        border-radius: 4px;
+      }
+      .direction__tag--muted {
+        color: var(--text-primary);
+        background: rgba(139, 26, 26, 0.6);
+      }
+      .direction__tag--rec {
+        background: #3f7d4f;
+        color: #f3fff6;
+      }
+      .direction__head h2 {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .direction__desc {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin: 10px 0 24px;
+        max-width: 880px;
+      }
+      .direction__desc strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* ───────── Device gallery ───────── */
+      .gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 40px 56px;
+        align-items: flex-start;
+      }
+      .device {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .device__label {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .device__label .dims {
+        color: var(--gold-accent);
+      }
+      .badge {
+        font-family: var(--font-mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-weight: 700;
+      }
+      .badge--bad {
+        background: rgba(224, 85, 85, 0.16);
+        color: #ff8b8b;
+        border: 1px solid rgba(224, 85, 85, 0.4);
+      }
+      .badge--good {
+        background: rgba(63, 125, 79, 0.18);
+        color: #8fe0a3;
+        border: 1px solid rgba(63, 125, 79, 0.5);
+      }
+
+      /* Phone bezel — fixed visual viewport; we scroll the inner content */
+      .phone {
+        width: 390px;
+        height: 720px; /* visible viewport (chrome subtracted) */
+        border-radius: 38px;
+        padding: 12px;
+        background: linear-gradient(160deg, #2a2a2a, #111);
+        box-shadow:
+          0 0 0 2px #000,
+          0 24px 60px rgba(0, 0, 0, 0.6);
+        position: relative;
+      }
+      .phone::before {
+        /* notch */
+        content: "";
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 22px;
+        background: #000;
+        border-radius: 0 0 14px 14px;
+        z-index: 5;
+      }
+      .phone__screen {
+        width: 100%;
+        height: 100%;
+        border-radius: 28px;
+        overflow: hidden;
+        position: relative;
+        background: var(--bg-dark);
+      }
+
+      /* Desktop bezel */
+      .desktop {
+        width: 720px;
+        max-width: 100%;
+      }
+      .desktop__bar {
+        height: 34px;
+        background: #1b1b1b;
+        border-radius: 10px 10px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 14px;
+        border: 1px solid #000;
+        border-bottom: none;
+      }
+      .desktop__dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #444;
+      }
+      .desktop__screen {
+        height: 460px;
+        border: 1px solid #000;
+        border-radius: 0 0 10px 10px;
+        overflow: hidden;
+        position: relative;
+        background: var(--bg-dark);
+      }
+
+      /* ───────── The actual app screen (scaled-down replica) ───────── */
+      .app-shell {
+        min-height: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-dark);
+        overflow-y: auto;
+      }
+      /* The phone screen scrolls only when content exceeds the visible viewport.
+         A scrollbar appearing = the bug. No scrollbar = fixed. */
+
+      .app-nav {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        background: rgba(20, 12, 8, 0.95);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .app-nav__logo {
+        font-family: var(--font-ui);
+        font-size: 1.02rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-decoration: none;
+      }
+      .app-nav__links {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .app-nav__links a {
+        font-size: 0.86rem;
+        color: var(--text-primary);
+        text-decoration: none;
+      }
+
+      /* Flow page — the part we are fixing */
+      .flow-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+
+      /* BEFORE: the bug — second hard 100vh stacked under the nav */
+      .flow-page--before {
+        min-height: 100vh; /* offending rule */
+      }
+
+      /* AFTER option A: fill remaining space inside app-shell */
+      .flow-page--flex {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      /* AFTER option B: dvh-aware min-height that subtracts nav */
+      .flow-page--dvh {
+        min-height: 100%;
+      }
+
+      /* Within the device frames, the visible viewport is the screen box,
+         so 100vh inside the iframe-like replica is emulated by 100% of the
+         scrollable .app-shell. The phone screen height = visible viewport. */
+
+      .form-card {
+        background: var(--card-panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        padding: 28px 20px;
+        width: 100%;
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .form-card__title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-align: center;
+      }
+      .form-card__field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .form-card__label {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .form-card__input {
+        font-size: 16px;
+        padding: 12px 14px;
+        min-height: 44px;
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: var(--input-radius);
+        color: var(--input-text);
+        outline: none;
+        text-transform: uppercase;
+        width: 100%;
+      }
+      .form-card__input::placeholder {
+        color: var(--input-placeholder);
+        text-transform: none;
+      }
+      .form-card__input:focus {
+        border-color: var(--input-border-focus);
+      }
+      .btn-primary {
+        font-size: 16px;
+        font-weight: 600;
+        padding: 12px 28px;
+        min-height: 48px;
+        border-radius: var(--btn-radius);
+        border: none;
+        cursor: pointer;
+        background: var(--btn-primary-bg);
+        color: var(--btn-primary-text);
+        width: 100%;
+      }
+      .form-card__footer {
+        font-size: 0.84rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      /* On mobile width, anchor flow content to top (mirrors @media rule) */
+      .phone .flow-page {
+        align-items: flex-start;
+        padding: 24px 16px;
+        padding-top: 48px;
+      }
+
+      /* Floating feedback widget (position:fixed in app — does not add height) */
+      .fab {
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.1rem;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+        z-index: 4;
+      }
+
+      /* Scroll-overflow indicator: a dashed marker showing where 100vh ends */
+      .vh-marker {
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 2px dashed rgba(224, 85, 85, 0.7);
+        font-family: var(--font-mono);
+        font-size: 0.6rem;
+        letter-spacing: 0.06em;
+        color: #ff8b8b;
+        text-transform: uppercase;
+        padding: 3px 8px;
+        z-index: 3;
+        pointer-events: none;
+      }
+
+      .callouts {
+        margin-top: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 390px;
+      }
+      .callout {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .callout::before {
+        content: "▸";
+        color: var(--gold-accent);
+        flex: 0 0 auto;
+      }
+      .callout--bad::before {
+        content: "✕";
+        color: #ff8b8b;
+      }
+      .callout--good::before {
+        content: "✓";
+        color: #8fe0a3;
+      }
+
+      /* ───────── CSS diff block ───────── */
+      .codeblock {
+        max-width: 1180px;
+        margin: 0 auto;
+        background: #0c0c0c;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 18px 20px;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.7;
+        overflow-x: auto;
+      }
+      .codeblock .file {
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 10px;
+      }
+      .code-del {
+        color: #ff8b8b;
+        background: rgba(224, 85, 85, 0.08);
+        display: block;
+      }
+      .code-add {
+        color: #8fe0a3;
+        background: rgba(63, 125, 79, 0.1);
+        display: block;
+      }
+      .code-ctx {
+        color: var(--text-muted);
+        display: block;
+      }
+      .code-cmt {
+        color: #6a6055;
+        display: block;
+      }
+
+      .shared {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .shared h3 {
+        font-size: 0.95rem;
+        color: var(--gold-accent);
+        margin-bottom: 12px;
+      }
+      .shared ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .shared li {
+        font-size: 0.86rem;
+        color: var(--text-muted);
+        padding-left: 18px;
+        position: relative;
+      }
+      .shared li::before {
+        content: "—";
+        position: absolute;
+        left: 0;
+        color: var(--gold-accent);
+      }
+      .shared code {
+        font-family: var(--font-mono);
+        font-size: 0.82em;
+        color: var(--gold-accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <div class="page-head__kicker">LLD 53 · Frontend Mockup</div>
+      <h1>Join Game — Mobile Scroll Fix</h1>
+      <p>
+        The <code>/join-game</code> form has almost no content, yet it scrolls
+        on mobile. Root cause: two stacked full-viewport-height containers —
+        <code>.app-shell</code> (<code>min-height: 100vh</code>) holds the nav
+        bar <em>and</em> a <code>.flow-page</code> that is <em>also</em>
+        <code>min-height: 100vh</code>. Document height becomes
+        <code>nav + 100vh</code>, which always overflows by the nav's height; on
+        mobile <code>100vh</code> also includes the area behind the URL/toolbar
+        chrome, making the overflow worse. The content does not change — only
+        the sizing strategy of <code>.flow-page</code>. Below are the current
+        (broken) behavior and two fix options. The phone frames have a
+        <strong>fixed visible-viewport height</strong>: if the inner screen
+        scrolls, the bug is present.
+      </p>
+    </div>
+
+    <hr class="rule" />
+
+    <!-- ═══════════ BEFORE ═══════════ -->
+    <section class="direction">
+      <div class="direction__head">
+        <span class="direction__tag direction__tag--muted">Before</span>
+        <h2>Current behavior — double 100vh</h2>
+      </div>
+      <p class="direction__desc">
+        <code>.flow-page { min-height: 100vh }</code> renders below the ~50px
+        nav but is itself forced to a full viewport height. The dashed red line
+        marks where the second <code>100vh</code> block ends — everything is
+        pushed below the visible viewport, forcing a scroll for a one-field
+        form.
+      </p>
+
+      <div class="gallery">
+        <div class="device">
+          <div class="device__label">
+            iPhone-class · <span class="dims">390 × 720 visible</span>
+            <span class="badge badge--bad">Scrolls</span>
+          </div>
+          <div class="phone">
+            <div class="phone__screen">
+              <div class="app-shell" id="before-shell">
+                <nav class="app-nav">
+                  <a class="app-nav__logo">Card Game Simulator</a>
+                  <div class="app-nav__links"><a>Log out</a></div>
+                </nav>
+                <div class="flow-page flow-page--before">
+                  <form class="form-card">
+                    <h2 class="form-card__title">Join a Game</h2>
+                    <div class="form-card__field">
+                      <label class="form-card__label">Game Code</label>
+                      <input
+                        class="form-card__input"
+                        placeholder="Enter 4-letter room code"
+                      />
+                    </div>
+                    <button class="btn-primary">Join Game</button>
+                    <p class="form-card__footer">
+                      Or paste an invite link directly in your browser address
+                      bar.
+                    </p>
+                  </form>
+                  <div class="vh-marker" style="top: 100%">
+                    ↑ end of 2nd 100vh — content below scrolls off-screen
+                  </div>
+                </div>
+                <div class="fab">?</div>
+              </div>
+            </div>
+          </div>
+          <div class="callouts">
+            <div class="callout callout--bad">
+              Scrollbar present: document height = nav (~50px) + 100vh.
+            </div>
+            <div class="callout callout--bad">
+              On a real device, mobile <code>100vh</code> also spans behind the
+              URL bar, so the overflow is even larger than the nav height.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="rule" />
+
+    <!-- ═══════════ OPTION A ═══════════ -->
+    <section class="direction">
+      <div class="direction__head">
+        <span class="direction__tag direction__tag--rec">Recommended</span>
+        <span class="direction__tag">Option A</span>
+        <h2>Flex-fill: <code>.flow-page</code> fills remaining space</h2>
+      </div>
+      <p class="direction__desc">
+        <strong>Let the existing flex column do the work.</strong>
+        <code>.app-shell</code> is already
+        <code>display: flex; flex-direction: column</code> at
+        <code>min-height: 100vh</code>. Give <code>.flow-page</code>
+        <code>flex: 1; min-height: 0</code> so it consumes exactly the space
+        left after the nav — no second viewport unit, no double-counting, no
+        nav-height math to maintain. Pairing <code>.app-shell</code> with
+        <code>min-height: 100dvh</code> makes the whole shell respect the
+        dynamic mobile viewport (excludes URL chrome). Desktop centering is
+        unchanged because the flow-page still centers its card and now fills the
+        full height.
+      </p>
+
+      <div class="gallery">
+        <div class="device">
+          <div class="device__label">
+            iPhone-class · <span class="dims">390 × 720 visible</span>
+            <span class="badge badge--good">No scroll</span>
+          </div>
+          <div class="phone">
+            <div class="phone__screen">
+              <div class="app-shell">
+                <nav class="app-nav">
+                  <a class="app-nav__logo">Card Game Simulator</a>
+                  <div class="app-nav__links"><a>Log out</a></div>
+                </nav>
+                <div class="flow-page flow-page--flex">
+                  <form class="form-card">
+                    <h2 class="form-card__title">Join a Game</h2>
+                    <div class="form-card__field">
+                      <label class="form-card__label">Game Code</label>
+                      <input
+                        class="form-card__input"
+                        placeholder="Enter 4-letter room code"
+                      />
+                    </div>
+                    <button class="btn-primary">Join Game</button>
+                    <p class="form-card__footer">
+                      Or paste an invite link directly in your browser address
+                      bar.
+                    </p>
+                  </form>
+                </div>
+                <div class="fab">?</div>
+              </div>
+            </div>
+          </div>
+          <div class="callouts">
+            <div class="callout callout--good">
+              No scrollbar — form anchored to top (mobile rule preserved).
+            </div>
+            <div class="callout callout--good">
+              No hard-coded nav height; resilient if the nav grows or wraps.
+            </div>
+          </div>
+        </div>
+
+        <div class="device">
+          <div class="device__label">
+            Desktop · <span class="dims">≥ 1280px</span>
+            <span class="badge badge--good">Centered</span>
+          </div>
+          <div class="desktop">
+            <div class="desktop__bar">
+              <span class="desktop__dot"></span>
+              <span class="desktop__dot"></span>
+              <span class="desktop__dot"></span>
+            </div>
+            <div class="desktop__screen">
+              <div class="app-shell">
+                <nav class="app-nav">
+                  <a class="app-nav__logo">Card Game Simulator</a>
+                  <div class="app-nav__links"><a>Log out</a></div>
+                </nav>
+                <div
+                  class="flow-page flow-page--flex"
+                  style="align-items: center; padding: 40px 20px"
+                >
+                  <form class="form-card">
+                    <h2 class="form-card__title">Join a Game</h2>
+                    <div class="form-card__field">
+                      <label class="form-card__label">Game Code</label>
+                      <input
+                        class="form-card__input"
+                        placeholder="Enter 4-letter room code"
+                      />
+                    </div>
+                    <button class="btn-primary">Join Game</button>
+                    <p class="form-card__footer">
+                      Or paste an invite link directly in your browser address
+                      bar.
+                    </p>
+                  </form>
+                </div>
+                <div class="fab">?</div>
+              </div>
+            </div>
+          </div>
+          <div class="callouts">
+            <div class="callout callout--good">
+              Card stays vertically + horizontally centered in remaining space.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="codeblock" style="margin-top: 12px">
+        <div class="file">src/frontend/styles/flows.css</div>
+        <span class="code-ctx">.flow-page {</span>
+        <span class="code-del">- &nbsp;min-height: 100vh;</span>
+        <span class="code-add">+ &nbsp;flex: 1 1 auto;</span>
+        <span class="code-add">+ &nbsp;min-height: 0;</span>
+        <span class="code-ctx">&nbsp;&nbsp;display: flex;</span>
+        <span class="code-ctx">&nbsp;&nbsp;align-items: center;</span>
+        <span class="code-ctx">&nbsp;&nbsp;justify-content: center;</span>
+        <span class="code-ctx">&nbsp;&nbsp;padding: 40px 20px;</span>
+        <span class="code-ctx">}</span>
+        <span class="code-cmt"
+          >/* App.vue — make the shell respect the dynamic mobile viewport
+          */</span
+        >
+        <span class="code-ctx">.app-shell {</span>
+        <span class="code-del">- &nbsp;min-height: 100vh;</span>
+        <span class="code-add"
+          >+ &nbsp;min-height: 100dvh; /* falls back to 100vh on old browsers
+          */</span
+        >
+        <span class="code-ctx">}</span>
+      </div>
+    </section>
+
+    <hr class="rule" />
+
+    <!-- ═══════════ OPTION B ═══════════ -->
+    <section class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option B</span>
+        <h2>
+          Calc-subtract: <code>min-height: calc(100dvh − navHeight)</code>
+        </h2>
+      </div>
+      <p class="direction__desc">
+        <strong>Keep <code>.flow-page</code> self-sizing</strong>, but subtract
+        the nav so the two heights stop adding up. Use a
+        <code>--nav-height</code> variable and <code>100dvh</code> for
+        mobile-safe sizing:
+        <code>min-height: calc(100dvh − var(--nav-height))</code>. This works
+        without relying on the parent flex context — useful if a flow screen is
+        ever rendered outside <code>.app-shell</code> — but it reintroduces a
+        magic number that must track the real nav height (the nav uses
+        <code>12px</code> padding + content, so the variable has to be kept in
+        sync). Visually identical to Option A.
+      </p>
+
+      <div class="gallery">
+        <div class="device">
+          <div class="device__label">
+            iPhone-class · <span class="dims">390 × 720 visible</span>
+            <span class="badge badge--good">No scroll</span>
+          </div>
+          <div class="phone">
+            <div class="phone__screen">
+              <div class="app-shell" style="min-height: 100%">
+                <nav class="app-nav">
+                  <a class="app-nav__logo">Card Game Simulator</a>
+                  <div class="app-nav__links"><a>Log out</a></div>
+                </nav>
+                <div class="flow-page flow-page--dvh">
+                  <form class="form-card">
+                    <h2 class="form-card__title">Join a Game</h2>
+                    <div class="form-card__field">
+                      <label class="form-card__label">Game Code</label>
+                      <input
+                        class="form-card__input"
+                        placeholder="Enter 4-letter room code"
+                      />
+                    </div>
+                    <button class="btn-primary">Join Game</button>
+                    <p class="form-card__footer">
+                      Or paste an invite link directly in your browser address
+                      bar.
+                    </p>
+                  </form>
+                </div>
+                <div class="fab">?</div>
+              </div>
+            </div>
+          </div>
+          <div class="callouts">
+            <div class="callout callout--good">
+              No scrollbar — <code>calc()</code> reserves the nav's height.
+            </div>
+            <div class="callout">
+              Trade-off: <code>--nav-height</code> is a magic number to
+              maintain.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="codeblock" style="margin-top: 12px">
+        <div class="file">src/frontend/styles/flows.css</div>
+        <span class="code-cmt"
+          >/* :root — single source of truth for nav height */</span
+        >
+        <span class="code-add">+ :root { --nav-height: 50px; }</span>
+        <span class="code-ctx">.flow-page {</span>
+        <span class="code-del">- &nbsp;min-height: 100vh;</span>
+        <span class="code-add"
+          >+ &nbsp;min-height: calc(100dvh - var(--nav-height));</span
+        >
+        <span class="code-ctx">&nbsp;&nbsp;display: flex;</span>
+        <span class="code-ctx">&nbsp;&nbsp;align-items: center;</span>
+        <span class="code-ctx">&nbsp;&nbsp;justify-content: center;</span>
+        <span class="code-ctx">}</span>
+      </div>
+    </section>
+
+    <hr class="rule" />
+
+    <!-- ═══════════ Shared notes ═══════════ -->
+    <section class="shared">
+      <h3>Applies to all shared flow screens</h3>
+      <ul>
+        <li>
+          <code>.flow-page</code> is shared by <code>JoinGameView</code>,
+          <code>LoginView</code>, <code>SignupView</code>,
+          <code>CreateGameView</code>, and <code>HomeView</code>. The fix is a
+          pure CSS change in <code>flows.css</code> (plus one line in
+          <code>App.vue</code> for <code>100dvh</code>) — no template or
+          component changes.
+        </li>
+        <li>
+          Taller forms (Signup has 3 fields) still grow naturally and scroll
+          <em>only</em> when they genuinely exceed the viewport — which is
+          correct behavior, not the bug.
+        </li>
+        <li>
+          Desktop vertical centering is preserved: the card centers within the
+          full remaining height in both options.
+        </li>
+        <li>
+          <code>100dvh</code> is supported in all current evergreen mobile
+          browsers; <code>100vh</code> remains a safe implicit fallback for any
+          legacy engine (the layout just reverts to today's behavior there).
+        </li>
+        <li>
+          Acceptance check: on a 390×844 device with browser chrome, the
+          one-field join form fits with no vertical scroll.
+        </li>
+      </ul>
+    </section>
+  </body>
+</html>
