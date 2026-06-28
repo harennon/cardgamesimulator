@@ -4,7 +4,8 @@
 @import "./game-variables.css";
 
 .flow-page {
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -206,6 +207,12 @@
     padding: 24px 16px;
     align-items: flex-start;
     padding-top: 48px;
+  }
+
+  /* Home is short; center it. Tall forms keep flex-start so they don't clip. */
+  .flow-page--center {
+    align-items: center;
+    padding-top: 24px;
   }
 
   .form-card__input,
