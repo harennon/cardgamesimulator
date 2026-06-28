@@ -387,6 +387,8 @@ END $$;
 
 Rationale for in-migration guard over a runbook gate: this is a **silent, non-self-healing data-corruption hazard** (once mis-attributed, the rows are indistinguishable — there is no later signal to detect or repair it). A manual prose precondition can be skipped or forgotten; an in-migration guard makes skipping impossible. The migration becomes self-protecting and fails closed: a non-zero count produces a loud abort instead of silently corrupting historical attribution. The check is cheap (one indexed count on `games.status`, `idx_games_status` from `001:38`) and runs once. Because the whole migration is idempotent (§3.1), a post-fix re-run after the precondition is satisfied is safe.
 
+> **The guard's real target is the production `db push` (§10.2), not the CI/local DBs.** The CI and local databases are spun up empty by `supabase start` every run, so the `games` table is always empty there and the guard always trivially passes — it does nothing for them. The scenario the guard actually protects against is applying `004` to the **prod** Supabase database that holds real completed games: if a real Tonk (or any non-`big2`) game has completed in prod, the guard aborts the prod `db push` loudly instead of mis-attributing those rows to `'big2'`. Keep this in mind when reading §8.3/§10.2: the guard is the last-line defence for the manual prod migration step.
+
 ### 8.3 What breaks if deployed half-applied?
 
 The backend's RPC call and the DB function signature must change **together**:
@@ -395,6 +397,18 @@ The backend's RPC call and the DB function signature must change **together**:
 - **Backend deployed (calls 6-arg RPC) but DB not migrated:** the 6-arg function doesn't exist yet → same fire-and-forget failure, stats lost for the window, no gameplay impact. Reads against the old single-PK table still return rows (the new `getAllStats` works against the old schema too — it's a `user_id` filter).
 
 **Conclusion:** the failure mode of a half-applied deploy is **lost stats during the window, never lost games and never corrupted data.** Recommended rollout: apply migrations `004`+`005` first (they are backward-compatible with the *old* backend only on the read path — writes break either way during the gap), then deploy the backend. To minimize the stats-loss window, run migrations and deploy backend close together. Because stats are informational and fire-and-forget (LLD 7b decision), a brief window of lost stats is acceptable and self-heals on the next game.
+
+**Production ordering rule (Railway auto-deploys backend on merge to `main`).** Prod has a structural ordering hazard that CI/local do not: per §10.2, Railway **auto-deploys the backend on merge to `main`**, but **nothing in the pipeline applies the migrations to the prod Supabase DB** — that is a separate manual step (§10.2). So if the consuming backend code merges first, Railway ships a backend that expects the composite-PK schema and the 6-arg `increment_player_stats` RPC, while the prod DB still has the old single-PK schema and 5-arg RPC. The result is the "backend ahead of DB" case above: every `incrementStats` call fails against the missing 6-arg function. **Crucially this is silent** — `recordGameCompletion` is fire-and-forget with a `catch` (`gameService.ts:144-148`), so there is no crash, no error response, no health-check failure; stats simply stop being recorded and nothing in monitoring makes it obvious. It self-heals only once the prod migration is finally applied.
+
+Therefore: **the prod migration (`004`+`005`) MUST be applied to the prod Supabase DB BEFORE the merge-to-`main` that ships the consuming backend code.** Concretely, the design splits cleanly into two PRs (or two merges): (1) the migration files land and are applied to prod first; (2) the backend RPC-call/repo change merges second, at which point Railway auto-deploys it against an already-migrated DB. If both must ship in one merge, the operator must apply the prod migration manually *immediately before* merging, accepting that the auto-deploy follows within minutes.
+
+**Release checklist (ordered — do not reorder):**
+
+1. **Apply the prod migration first.** Run `supabase link --project-ref <prod-ref>` then `supabase db push` against the prod Supabase project (or apply `004`+`005` SQL via the Supabase dashboard). This is the manual step from §10.2 — it is **not** triggered by Railway.
+2. **Verify the guard passed and the schema is correct.** Confirm `004` did not abort (the §8.2 `RAISE EXCEPTION` guard fires if a non-`big2` game has completed in prod) and that `player_stats` now has the composite PK `(user_id, game_type)` and the 6-arg `increment_player_stats` exists with the 5-arg overload gone (`\d player_stats` / `\df increment_player_stats`).
+3. **Only then merge the consuming backend code to `main`.** Railway auto-deploys it; because the DB is already migrated, the new 6-arg RPC calls succeed from the first request and no stats window is lost.
+
+If step 1/2 reveal the guard aborted (a real non-`big2` game completed in prod), **stop** — do not merge the backend; the backfill strategy must be revisited per §8.2 before proceeding.
 
 ### 8.4 Relationship to Tonk ordering
 
@@ -462,18 +476,39 @@ Approach: mock `PlayerStatsRepository` and `GuestSessionStore`; construct `Inter
 | A4 | `winRate` per entry | Each entry's `winRate` = round(gamesWon/gamesPlayed, 3); 0 when `gamesPlayed` is 0. |
 | A5 | 401 without auth | Unchanged — unauthenticated request rejected. |
 
-### Test infrastructure notes — how migrations are applied (resolved)
+### 10.1 Test infrastructure — how migrations are applied in CI/local (resolved)
 
-**Application mechanism (verified):** migrations are applied **by the Supabase CLI, not by any in-tree code**. `supabase start` (configured by `supabase/config.toml`) brings up the local Postgres and applies every file in `supabase/migrations/` **in filename order**. This is the only application path:
+**Application mechanism (verified):** in CI and local dev, migrations are applied **by the Supabase CLI, not by any in-tree code**. `supabase start` (configured by `supabase/config.toml`) brings up an **ephemeral** local Postgres and applies every file in `supabase/migrations/` **in filename order**. This is the only application path for tests/local:
 - **CI:** `.github/workflows/ci.yml` runs `supabase start` in both the `integration-tests` (`:34`) and `e2e-tests` (`:56`) jobs before `npm run test:integration` / Playwright.
 - **Local:** `DEVELOPMENT.md` (Environment Setup) instructs `supabase start` before `npm run dev` / integration tests.
 - The integration test harness itself (`vitest.integration.config.ts` → `tests/integration/helpers/setupEnv.ts`) does **not** apply migrations — it only loads env and connects to the already-running Supabase DB. A grep for the migration filenames returns nothing in test/app code precisely because the application path is the CLI driven by the directory contents.
+- These DBs are **thrown away and recreated empty every run**, so they hold no real game data (relevant to the §8.2 guard, which is a no-op here — see §10.2).
 
 **Therefore the entire hook for `004`/`005` is: drop the two files into `supabase/migrations/` with the next free sequential names.** The next free numbers on this branch are `004` and `005` (only `001`–`003` are tracked here — verify with `git ls-files supabase/migrations/` at implementation time, since a `004_join_codes.sql` existed earlier in history before being folded into `001`, and confirm no collision). Once present, `supabase start` applies them automatically in CI and locally before any test runs — no harness change, no bootstrap script, no extra wiring needed. This is the concrete hook for the **I7 RPC-signature test** (it just calls the 6-arg `increment_player_stats` against the started DB, and negative-checks the 5-arg overload is gone) and for the **A1–A5 read-API tests**.
 
 **I4 (backfill) is the one exception — it cannot use the standard harness.** A clean `supabase start` already applies `004`, so the live DB never exhibits the *pre-migration* single-PK schema that I4 must exercise. I4 must therefore **materialize the old schema state itself** rather than rely on the started DB: e.g. open a transaction (or a throwaway/temporary schema/DB), recreate the pre-`004` `player_stats` shape (single `user_id` PK, no `game_type`) and seed a row, then execute the `004` SQL and assert (a) the row now has `game_type = 'big2'`, (b) the PK is composite `(user_id, game_type)`, and (c) no row has a null/empty `game_type`. The implementer owns the exact harness for this (a wrapped transaction that is rolled back, or a dedicated temp schema, keeps it self-contained per testing-principles).
 
 - A3 deliberately records a `'tonk'` result directly via the stats path (state with `gameType: "tonk"`) rather than playing a real Tonk game, so these tests do **not** depend on LLD 65 / the Tonk engine being implemented.
+
+### 10.2 Production migration application (verified — distinct from §10.1)
+
+The §10.1 `supabase start` path applies migrations only to the **ephemeral CI/local DBs**. It **never touches the prod Supabase database.** The prod path was traced against the repo and confirmed:
+
+- Prod deploys via **Railway**, which **auto-deploys on push/merge to `main`**. Config: `railway.json` → `build.dockerfilePath = "Dockerfile.production"`.
+- `Dockerfile.production` builds frontend+backend and runs `docker-entrypoint.sh`, which **only** starts nginx + `node build/backend/index.js` (verified: `docker-entrypoint.sh` lines 8–15). It has **zero** migration/db logic — no `supabase db push`, no `psql`, no `.sql`, no `supabase link`.
+- There is **no linked Supabase project** in `supabase/config.toml` (no `project_id`/ref) and **no deploy or migrate step anywhere in the pipeline** — `.github/workflows/ci.yml` contains only the `unit-tests`, `integration-tests`, and `e2e-tests` jobs (no deploy job). A grep for `db push` / `supabase link` / `project-ref` / `psql` / `.sql` across `railway.json`, `Dockerfile.production`, `docker-entrypoint.sh`, `ci.yml`, and `config.toml` returns nothing.
+- The prod backend reaches the prod Supabase project **at runtime** using the prod anon key / JWT secret / service-role key supplied as Railway env vars.
+
+**Conclusion (bake this in):** Railway automatically deploys application *code* on merge to `main`, but **nothing in the pipeline applies `supabase/migrations/*` to the prod Supabase DB.** Prod schema migration is a **manual** step, owned by **whoever performs the release** — it is **not** triggered by the Railway deploy. The concrete mechanism:
+
+```
+supabase link --project-ref <prod-ref>   # one-time link to the prod project
+supabase db push                          # applies any unapplied migrations (004, 005) in order
+```
+
+or, equivalently, apply the `004`/`005` SQL directly via the **Supabase dashboard SQL editor**.
+
+Because this manual step is decoupled from the auto-deploy, the **ordering rule and release checklist in §8.3 are mandatory**: apply the prod migration (and confirm the §8.2 guard passed) **before** merging the consuming backend code, or Railway will ship a backend ahead of its schema and silently lose stats until the migration is applied (§8.3).
 
 ---
 
