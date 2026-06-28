@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pass Auto-Deselect — Card Game UI Mockup</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        /* Card sizing / motion tokens (match game-variables.css) */
+        --card-hand-width: 64px;
+        --card-hand-height: 90px;
+        --card-overlap: -20px;
+        --card-selected-lift: -20px;
+        --card-hover-lift: -8px;
+        --card-selected-hover-lift: -24px;
+        --card-select-duration: 150ms;
+        --card-select-easing: ease;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background:
+          radial-gradient(
+            ellipse 60% 50% at 50% 0%,
+            rgba(201, 168, 76, 0.06) 0%,
+            transparent 60%
+          ),
+          #0a0a0a;
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 32px 24px 80px;
+      }
+
+      /* ========== PAGE HEADER ========== */
+      .page-header {
+        max-width: 1280px;
+        margin: 0 auto 28px;
+      }
+
+      .page-header__eyebrow {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        color: var(--gold-accent);
+        margin-bottom: 8px;
+      }
+
+      .page-header__title {
+        font-family: var(--font-card);
+        font-size: 1.9rem;
+        font-weight: 700;
+        line-height: 1.15;
+        letter-spacing: -0.01em;
+      }
+
+      .page-header__sub {
+        margin-top: 10px;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        max-width: 720px;
+        line-height: 1.55;
+      }
+
+      .page-header__issue {
+        display: inline-block;
+        margin-top: 12px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: var(--text-primary);
+        background: rgba(201, 168, 76, 0.12);
+        border: 1px solid rgba(201, 168, 76, 0.35);
+        border-radius: 999px;
+        padding: 4px 12px;
+      }
+
+      /* ========== BEFORE / AFTER SPLIT ========== */
+      .compare {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+
+      @media (max-width: 900px) {
+        .compare {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid var(--table-rim-light);
+        background: var(--table-rim);
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+      }
+
+      .panel__tag {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+
+      .panel__tag-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .panel--before .panel__tag {
+        color: #e0a0a0;
+        background: rgba(196, 64, 64, 0.12);
+      }
+      .panel--before .panel__tag-dot {
+        background: #c44040;
+        box-shadow: 0 0 8px rgba(196, 64, 64, 0.6);
+      }
+
+      .panel--after .panel__tag {
+        color: #9fd6a8;
+        background: rgba(64, 150, 80, 0.12);
+      }
+      .panel--after .panel__tag-dot {
+        background: #4fae62;
+        box-shadow: 0 0 8px rgba(79, 174, 98, 0.6);
+      }
+
+      .panel__caption {
+        padding: 0 16px 12px;
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+        background: var(--table-rim);
+      }
+      .panel__caption strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* ========== MINI GAME BOARD ========== */
+      .board {
+        position: relative;
+        background: radial-gradient(
+          ellipse 90% 70% at 50% 40%,
+          var(--felt-light) 0%,
+          var(--felt) 55%,
+          #0f2e1c 100%
+        );
+        display: grid;
+        grid-template-rows: auto 1fr auto auto;
+      }
+
+      .board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .board > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* opponent strip */
+      .board__opponents {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+      }
+
+      .opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 5px 9px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+      }
+      .opp--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .opp__backs {
+        display: flex;
+      }
+      .opp__back {
+        width: 18px;
+        height: 26px;
+        margin-left: -8px;
+        border-radius: 3px;
+        border: 1px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a, #5c1010);
+        flex-shrink: 0;
+      }
+      .opp__back:first-child {
+        margin-left: 0;
+      }
+      .opp__name {
+        font-size: 0.72rem;
+        font-weight: 600;
+      }
+      .opp__count {
+        font-size: 0.62rem;
+        color: var(--text-muted);
+      }
+
+      /* center play area */
+      .board__table {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 22px 12px;
+        min-height: 150px;
+      }
+
+      .turn-chip {
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 6px 16px;
+        border-radius: 20px;
+        background: var(--panel-bg);
+        border: 1px solid rgba(138, 126, 110, 0.3);
+        transition:
+          color 0.25s ease,
+          border-color 0.25s ease,
+          box-shadow 0.25s ease;
+      }
+      .turn-chip--mine {
+        color: var(--gold-accent);
+        border-color: var(--gold-accent);
+        box-shadow: 0 0 14px var(--gold-glow);
+      }
+
+      .last-play-label {
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--gold-accent);
+        margin-top: 6px;
+      }
+      .last-play-row {
+        display: flex;
+        gap: 4px;
+      }
+      .last-play-by {
+        font-size: 0.64rem;
+        color: var(--text-muted);
+      }
+
+      /* hand */
+      .board__hand-wrap {
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 6px 0 4px;
+      }
+      .board__hand-label {
+        font-size: 0.58rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        padding-left: 16px;
+        margin-bottom: 2px;
+      }
+      .hand {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 24px 16px 8px;
+      }
+
+      /* ===== CARD ===== */
+      .card {
+        position: relative;
+        width: var(--card-hand-width);
+        height: var(--card-hand-height);
+        margin-left: var(--card-overlap);
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        transition:
+          transform var(--card-select-duration) var(--card-select-easing),
+          box-shadow var(--card-select-duration) var(--card-select-easing),
+          border-color var(--card-select-duration) var(--card-select-easing);
+        cursor: pointer;
+      }
+      .card:first-child {
+        margin-left: 0;
+      }
+      .card__corner {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+      }
+      .card__corner-rank {
+        font-size: 11px;
+      }
+      .card__corner-suit {
+        font-size: 10px;
+        margin-top: -2px;
+      }
+      .card__center {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+      }
+      .card__center .suit {
+        font-size: 1.32em;
+      }
+      .card.red {
+        color: var(--red-suit);
+      }
+      .card.black {
+        color: var(--black-suit);
+      }
+
+      .card.selected {
+        transform: translateY(var(--card-selected-lift));
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* interactive hover only on the live "my turn" board */
+      .board--interactive .card:hover {
+        transform: translateY(var(--card-hover-lift));
+      }
+      .board--interactive .card.selected:hover {
+        transform: translateY(var(--card-selected-hover-lift));
+      }
+
+      /* When not my turn, cards are not clickable */
+      .board--locked .card {
+        cursor: default;
+      }
+
+      /* actions */
+      .board__actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+      }
+      .act-btn {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 9px 26px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+      .act-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .act-btn--play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .act-btn--play:not(:disabled):hover {
+        background: #d4b45a;
+        box-shadow: 0 4px 16px var(--gold-glow);
+      }
+      .act-btn--pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+      .act-btn--pass:not(:disabled):hover {
+        border-color: var(--text-primary);
+        background: rgba(232, 220, 200, 0.08);
+      }
+
+      /* the "stuck" pointer hint on the broken board */
+      .stuck-flag {
+        position: absolute;
+        z-index: 5;
+        top: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.62rem;
+        font-weight: 600;
+        color: #e0a0a0;
+        background: rgba(40, 8, 8, 0.85);
+        border: 1px solid rgba(196, 64, 64, 0.5);
+        padding: 4px 10px;
+        border-radius: 999px;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+        pointer-events: none;
+      }
+      .stuck-flag--show {
+        opacity: 1;
+      }
+
+      /* ========== INTERACTIVE DEMO STRIP ========== */
+      .demo {
+        max-width: 1280px;
+        margin: 28px auto 0;
+        background: var(--table-rim);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+      }
+      .demo__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .demo__title {
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+      .demo__title span {
+        color: var(--gold-accent);
+      }
+      .demo__hint {
+        font-size: 0.74rem;
+        color: var(--text-muted);
+      }
+      .demo__controls {
+        display: flex;
+        gap: 10px;
+      }
+      .ctrl-btn {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 6px;
+        border: 1px solid var(--table-rim-light);
+        background: rgba(0, 0, 0, 0.25);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .ctrl-btn:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+
+      .demo__board {
+        position: relative;
+      }
+
+      /* status line below interactive board */
+      .demo__status {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        padding: 12px 18px;
+        border-top: 1px solid var(--table-rim-light);
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .demo__status b {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      /* code note footer */
+      .note {
+        max-width: 1280px;
+        margin: 28px auto 0;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+        border-left: 2px solid var(--gold-accent);
+        padding: 4px 0 4px 16px;
+      }
+      .note code {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 0.72rem;
+        color: var(--text-primary);
+        background: rgba(201, 168, 76, 0.1);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .note b {
+        color: var(--text-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-header">
+      <div class="page-header__eyebrow">Frontend Mockup · Big2 Game Board</div>
+      <h1 class="page-header__title">
+        Cards lower back into the hand when you Pass
+      </h1>
+      <p class="page-header__sub">
+        Today, selecting cards and then pressing <b>Pass</b> leaves those cards
+        stuck raised out of the hand — and because cards can only be toggled on
+        your own turn, you can't click them back down until your next turn. The
+        fix mirrors the existing play-flow behavior: clear the selection on
+        pass, so raised cards animate smoothly back to rest.
+      </p>
+      <span class="page-header__issue"
+        >Issue #62 · Visual / interaction fix</span
+      >
+    </header>
+
+    <!-- BEFORE / AFTER -->
+    <section class="compare">
+      <!-- BEFORE -->
+      <div class="panel panel--before">
+        <div class="panel__tag">
+          <span class="panel__tag-dot"></span> BEFORE · cards stay stuck raised
+        </div>
+        <div class="board board--locked" data-board="before">
+          <span class="stuck-flag stuck-flag--show">
+            ▲ Still raised — can't click down until your next turn
+          </span>
+          <div class="board__opponents">
+            <div class="opp opp--active">
+              <div class="opp__backs">
+                <i class="opp__back"></i><i class="opp__back"></i
+                ><i class="opp__back"></i><i class="opp__back"></i
+                ><i class="opp__back"></i>
+              </div>
+              <span class="opp__name">Bob</span>
+              <span class="opp__count">9 cards</span>
+            </div>
+            <div class="opp">
+              <div class="opp__backs">
+                <i class="opp__back"></i><i class="opp__back"></i
+                ><i class="opp__back"></i><i class="opp__back"></i>
+              </div>
+              <span class="opp__name">Charlie</span>
+              <span class="opp__count">11 cards</span>
+            </div>
+          </div>
+
+          <div class="board__table">
+            <div class="turn-chip">Bob's turn</div>
+            <div class="last-play-label">Last play · Pair</div>
+            <div class="last-play-row">
+              <span class="mini-card" data-card="6♣"></span>
+            </div>
+            <div class="last-play-by">played by you</div>
+          </div>
+
+          <div class="board__hand-wrap">
+            <div class="board__hand-label">Your hand (8)</div>
+            <div class="hand" data-hand="before"></div>
+          </div>
+
+          <div class="board__actions">
+            <button class="act-btn act-btn--pass" disabled>Pass</button>
+            <button class="act-btn act-btn--play" disabled>Play</button>
+          </div>
+        </div>
+        <div class="panel__caption">
+          You selected <strong>5♠ and 7♦</strong>, reconsidered, then pressed
+          Pass. The turn moved to Bob — and your two cards are
+          <strong>frozen mid-air</strong>. Actions are disabled, so there's no
+          way to put them back until your turn comes around again.
+        </div>
+      </div>
+
+      <!-- AFTER -->
+      <div class="panel panel--after">
+        <div class="panel__tag">
+          <span class="panel__tag-dot"></span> AFTER · selection clears on Pass
+        </div>
+        <div class="board board--locked" data-board="after">
+          <div class="board__opponents">
+            <div class="opp opp--active">
+              <div class="opp__backs">
+                <i class="opp__back"></i><i class="opp__back"></i
+                ><i class="opp__back"></i><i class="opp__back"></i
+                ><i class="opp__back"></i>
+              </div>
+              <span class="opp__name">Bob</span>
+              <span class="opp__count">9 cards</span>
+            </div>
+            <div class="opp">
+              <div class="opp__backs">
+                <i class="opp__back"></i><i class="opp__back"></i
+                ><i class="opp__back"></i><i class="opp__back"></i>
+              </div>
+              <span class="opp__name">Charlie</span>
+              <span class="opp__count">11 cards</span>
+            </div>
+          </div>
+
+          <div class="board__table">
+            <div class="turn-chip">Bob's turn</div>
+            <div class="last-play-label">Last play · Pair</div>
+            <div class="last-play-row">
+              <span class="mini-card" data-card="6♣"></span>
+            </div>
+            <div class="last-play-by">played by you</div>
+          </div>
+
+          <div class="board__hand-wrap">
+            <div class="board__hand-label">Your hand (8)</div>
+            <div class="hand" data-hand="after"></div>
+          </div>
+
+          <div class="board__actions">
+            <button class="act-btn act-btn--pass" disabled>Pass</button>
+            <button class="act-btn act-btn--play" disabled>Play</button>
+          </div>
+        </div>
+        <div class="panel__caption">
+          Same flow — selected, reconsidered, pressed Pass. The selection is
+          <strong>cleared</strong> the moment you pass, so every card sits flush
+          in the hand. Clean resting state, ready for your next turn.
+        </div>
+      </div>
+    </section>
+
+    <!-- INTERACTIVE DEMO -->
+    <section class="demo">
+      <div class="demo__head">
+        <div>
+          <div class="demo__title">Try it <span>— it's your turn</span></div>
+          <div class="demo__hint">
+            Click cards to select (they raise), then press Pass to watch them
+            lower back into the hand.
+          </div>
+        </div>
+        <div class="demo__controls">
+          <button class="ctrl-btn" id="preselect">Select 3 cards</button>
+          <button class="ctrl-btn" id="reset">Reset turn</button>
+        </div>
+      </div>
+
+      <div class="board board--interactive" data-board="live">
+        <div class="board__opponents">
+          <div class="opp">
+            <div class="opp__backs">
+              <i class="opp__back"></i><i class="opp__back"></i
+              ><i class="opp__back"></i><i class="opp__back"></i
+              ><i class="opp__back"></i>
+            </div>
+            <span class="opp__name">Bob</span>
+            <span class="opp__count">9 cards</span>
+          </div>
+          <div class="opp">
+            <div class="opp__backs">
+              <i class="opp__back"></i><i class="opp__back"></i
+              ><i class="opp__back"></i><i class="opp__back"></i>
+            </div>
+            <span class="opp__name">Charlie</span>
+            <span class="opp__count">11 cards</span>
+          </div>
+        </div>
+
+        <div class="board__table">
+          <div class="turn-chip turn-chip--mine" id="live-turn">Your turn</div>
+          <div class="last-play-label">Last play · Pair</div>
+          <div class="last-play-row">
+            <span class="mini-card" data-card="6♣"></span>
+          </div>
+          <div class="last-play-by">played by Charlie</div>
+        </div>
+
+        <div class="board__hand-wrap">
+          <div class="board__hand-label">Your hand (8)</div>
+          <div class="hand" data-hand="live"></div>
+        </div>
+
+        <div class="board__actions">
+          <button class="act-btn act-btn--pass" id="live-pass">Pass</button>
+          <button class="act-btn act-btn--play" id="live-play" disabled>
+            Play
+          </button>
+        </div>
+      </div>
+
+      <div class="demo__status" id="live-status">
+        It's your turn. Nothing selected yet.
+      </div>
+    </section>
+
+    <p class="note">
+      <b>Implementation note (mirrors the existing play flow):</b> The raised
+      state is driven entirely by the selection set (<code
+        >selectedIndices</code
+      >
+      → <code>card--selected</code>). The fix adds
+      <code>clearSelection()</code> to <code>onPass()</code> in
+      <code>GameView.vue</code>, exactly as <code>onPlay()</code> already does
+      on a successful play. No new transition is introduced — cards fall back
+      using the existing <code>--card-select-duration</code> /
+      <code>--card-select-easing</code> tokens on the card's
+      <code>transform</code>. No change to pass/play server behavior.
+    </p>
+
+    <script>
+      const SUIT_COLOR = { "♠": "black", "♣": "black", "♥": "red", "♦": "red" };
+
+      function parseCard(token) {
+        // token like "5♠"
+        const suit = token.slice(-1);
+        const rank = token.slice(0, -1);
+        return { rank, suit, color: SUIT_COLOR[suit] };
+      }
+
+      function cardEl({ rank, suit, color }, selected) {
+        const el = document.createElement("div");
+        el.className = "card " + color + (selected ? " selected" : "");
+        el.innerHTML = `
+          <div class="card__corner">
+            <span class="card__corner-rank">${rank}</span>
+            <span class="card__corner-suit">${suit}</span>
+          </div>
+          <div class="card__center">
+            <span class="rank">${rank}</span>
+            <span class="suit">${suit}</span>
+          </div>`;
+        return el;
+      }
+
+      // A representative 8-card hand for all three boards.
+      const HAND = ["3♣", "4♦", "5♠", "7♦", "9♣", "J♥", "Q♠", "2♠"];
+
+      function renderHand(selector, selectedIdx) {
+        const wrap = document.querySelector(`[data-hand="${selector}"]`);
+        wrap.innerHTML = "";
+        HAND.forEach((tok, i) => {
+          wrap.appendChild(parseCardInto(tok, selectedIdx.has(i)));
+        });
+      }
+      function parseCardInto(tok, selected) {
+        return cardEl(parseCard(tok), selected);
+      }
+
+      // BEFORE: 5♠ (idx 2) and 7♦ (idx 3) stuck raised.
+      renderHand("before", new Set([2, 3]));
+      // AFTER: nothing raised.
+      renderHand("after", new Set());
+
+      // mini last-play card render
+      document.querySelectorAll(".mini-card").forEach((m) => {
+        const { rank, suit, color } = parseCard(m.dataset.card);
+        m.className = "card " + color;
+        m.style.cursor = "default";
+        m.innerHTML = `
+          <div class="card__corner">
+            <span class="card__corner-rank">${rank}</span>
+            <span class="card__corner-suit">${suit}</span>
+          </div>
+          <div class="card__center">
+            <span class="rank">${rank}</span>
+            <span class="suit">${suit}</span>
+          </div>`;
+      });
+
+      /* ===== Interactive live board ===== */
+      const liveHandWrap = document.querySelector('[data-hand="live"]');
+      const liveStatus = document.getElementById("live-status");
+      const livePlay = document.getElementById("live-play");
+      const livePass = document.getElementById("live-pass");
+      const liveTurn = document.getElementById("live-turn");
+      let selected = new Set();
+      let myTurn = true;
+
+      function renderLive() {
+        liveHandWrap.innerHTML = "";
+        HAND.forEach((tok, i) => {
+          const el = cardEl(parseCard(tok), selected.has(i));
+          el.addEventListener("click", () => {
+            if (!myTurn) return; // cards only toggle on your turn
+            if (selected.has(i)) selected.delete(i);
+            else selected.add(i);
+            renderLive();
+            updateStatus();
+          });
+          liveHandWrap.appendChild(el);
+        });
+        livePlay.disabled = !myTurn || selected.size === 0;
+        livePass.disabled = !myTurn;
+      }
+
+      function selectedTokens() {
+        return [...selected]
+          .sort((a, b) => a - b)
+          .map((i) => HAND[i])
+          .join(" ");
+      }
+
+      function updateStatus() {
+        if (!myTurn) return;
+        if (selected.size === 0) {
+          liveStatus.innerHTML = "It's your turn. Nothing selected yet.";
+        } else {
+          liveStatus.innerHTML = `Selected <b>${selectedTokens()}</b> — raised out of the hand. Press Pass to put them back.`;
+        }
+      }
+
+      livePass.addEventListener("click", () => {
+        // THE FIX: clearSelection() runs on pass, then the turn advances.
+        selected = new Set();
+        myTurn = false;
+        renderLive();
+        liveTurn.classList.remove("turn-chip--mine");
+        liveTurn.textContent = "Bob's turn";
+        document
+          .querySelector('[data-board="live"]')
+          .classList.add("board--locked");
+        liveStatus.innerHTML =
+          "You passed — selection cleared, every card lowered back to rest. " +
+          "Turn moved to Bob. <b>Use “Reset turn” to try again.</b>";
+      });
+
+      livePlay.addEventListener("click", () => {
+        // Existing behavior, shown for parity: play also clears selection.
+        if (selected.size === 0) return;
+        const played = selectedTokens();
+        selected = new Set();
+        myTurn = false;
+        renderLive();
+        liveTurn.classList.remove("turn-chip--mine");
+        liveTurn.textContent = "Bob's turn";
+        document
+          .querySelector('[data-board="live"]')
+          .classList.add("board--locked");
+        liveStatus.innerHTML =
+          `You played <b>${played}</b> — selection cleared (existing behavior). ` +
+          "Turn moved to Bob. <b>Use “Reset turn” to try again.</b>";
+      });
+
+      document.getElementById("preselect").addEventListener("click", () => {
+        if (!myTurn) return;
+        selected = new Set([2, 3, 6]); // 5♠ 7♦ Q♠
+        renderLive();
+        updateStatus();
+      });
+
+      document.getElementById("reset").addEventListener("click", () => {
+        selected = new Set();
+        myTurn = true;
+        liveTurn.classList.add("turn-chip--mine");
+        liveTurn.textContent = "Your turn";
+        document
+          .querySelector('[data-board="live"]')
+          .classList.remove("board--locked");
+        renderLive();
+        updateStatus();
+      });
+
+      renderLive();
+      updateStatus();
+    </script>
+  </body>
+</html>
