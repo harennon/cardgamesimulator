@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Signed-in Home — Vertical Centering Fix — Mockups</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --btn-primary-bg: var(--gold-accent);
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-secondary-bg: transparent;
+        --btn-secondary-border: var(--text-muted);
+        --btn-secondary-text: var(--text-primary);
+        --btn-radius: 6px;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 24px 80px;
+        background-image: radial-gradient(
+          ellipse 80% 60% at 50% -10%,
+          rgba(201, 168, 76, 0.05),
+          transparent
+        );
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 8px;
+      }
+      .page-head h1 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin-top: 10px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 820px;
+        line-height: 1.55;
+      }
+      .page-head code {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 0.82em;
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      /* ---------- Controls ---------- */
+      .controls {
+        max-width: 1180px;
+        margin: 24px auto 28px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 22px;
+        align-items: flex-end;
+        padding: 16px 20px;
+        background: rgba(20, 12, 8, 0.6);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+      }
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .control-group > span {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 7px;
+        overflow: hidden;
+      }
+      .seg button {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 500;
+        padding: 7px 13px;
+        background: transparent;
+        color: var(--text-muted);
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
+        border-right: 1px solid var(--table-rim-light);
+      }
+      .seg button:last-child {
+        border-right: none;
+      }
+      .seg button:hover {
+        color: var(--text-primary);
+      }
+      .seg button.active {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-weight: 600;
+      }
+      .legend {
+        max-width: 1180px;
+        margin: 0 auto 20px;
+        display: flex;
+        gap: 26px;
+        flex-wrap: wrap;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .legend .swatch {
+        display: inline-block;
+        width: 22px;
+        height: 12px;
+        border-radius: 2px;
+        margin-right: 7px;
+        vertical-align: middle;
+      }
+
+      /* ---------- Comparison stage ---------- */
+      .stage {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+        align-items: start;
+      }
+      .stage.single {
+        grid-template-columns: 1fr;
+        max-width: 640px;
+      }
+      .frame-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .frame-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .frame-label h2 {
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+      }
+      .frame-label .badge {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 3px 9px;
+        border-radius: 20px;
+      }
+      .badge.bad {
+        background: rgba(224, 85, 85, 0.16);
+        color: #e07a7a;
+        border: 1px solid rgba(224, 85, 85, 0.4);
+      }
+      .badge.good {
+        background: rgba(86, 176, 110, 0.16);
+        color: #7fcf99;
+        border: 1px solid rgba(86, 176, 110, 0.4);
+      }
+
+      /* The "device viewport" outline. The .app-shell renders inside it,
+         and may overflow it (scrollbar) to demonstrate the bug. */
+      .viewport {
+        position: relative;
+        margin: 0 auto;
+        border: 2px solid var(--gold-accent);
+        border-radius: 14px;
+        box-shadow:
+          0 0 0 1px rgba(0, 0, 0, 0.6),
+          0 18px 50px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        background: var(--bg-dark);
+      }
+      /* The visible viewport box has fixed height = the "screen".
+         The scrollport sits inside and scrolls if app-shell is taller. */
+      .scrollport {
+        width: 100%;
+        height: 100%;
+        overflow-y: auto;
+        position: relative;
+      }
+      .scrollport::-webkit-scrollbar {
+        width: 10px;
+      }
+      .scrollport::-webkit-scrollbar-thumb {
+        background: var(--gold-accent);
+        border-radius: 5px;
+      }
+      .scrollport::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      /* ---------- The actual app structure being demonstrated ---------- */
+      .app-shell {
+        min-height: 100%; /* fills the device when content is short */
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-dark);
+        background-image: radial-gradient(
+          ellipse 90% 55% at 50% 42%,
+          rgba(26, 74, 46, 0.28),
+          transparent 70%
+        );
+      }
+
+      .app-nav {
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 24px;
+        background: rgba(20, 12, 8, 0.95);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .app-nav__logo {
+        font-family: var(--font-ui);
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-decoration: none;
+      }
+      .app-nav__links {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .app-nav__user {
+        font-size: 0.85rem;
+        color: var(--text-primary);
+      }
+      .app-nav__logout {
+        font-size: 0.8rem;
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        border-radius: 4px;
+        padding: 4px 11px;
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+      .app-nav__links a {
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        text-decoration: none;
+        padding: 4px 8px;
+      }
+
+      /* flow-page: behaviour swapped by data-fix on .viewport */
+      .flow-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+      /* BEFORE (the bug): flow-page claims a full viewport height regardless
+         of the nav above it. app-shell becomes nav + 100vh -> overflow. */
+      [data-fix="before"] .flow-page {
+        min-height: var(--device-h, 100vh);
+      }
+      /* AFTER option A: flex-fill. flow-page grows to fill remaining space
+         under the nav; no magic numbers. */
+      [data-fix="flex"] .flow-page {
+        flex: 1;
+        min-height: 0;
+      }
+      /* AFTER option B: calc. flow-page reserves exactly nav height. */
+      [data-fix="calc"] .flow-page {
+        min-height: calc(var(--device-h, 100vh) - var(--nav-h, 49px));
+      }
+
+      .home {
+        text-align: center;
+        max-width: 500px;
+        width: 100%;
+      }
+      .home__title {
+        font-family: var(--font-ui);
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0 0 8px;
+      }
+      .home__subtitle {
+        font-size: 1rem;
+        color: var(--text-primary);
+        margin: 0 0 32px;
+      }
+      .home__description {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        margin: 0 0 24px;
+        line-height: 1.5;
+      }
+      .home__actions,
+      .home__auth-prompt {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+      }
+
+      .btn-primary {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: var(--btn-radius);
+        border: none;
+        cursor: pointer;
+        background: var(--btn-primary-bg);
+        color: var(--btn-primary-text);
+        width: 100%;
+      }
+      .btn-secondary {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 500;
+        padding: 10px 20px;
+        border-radius: var(--btn-radius);
+        border: 1.5px solid var(--btn-secondary-border);
+        background: var(--btn-secondary-bg);
+        color: var(--btn-secondary-text);
+        cursor: pointer;
+        text-decoration: none;
+        text-align: center;
+        display: inline-block;
+      }
+      .home__btn {
+        display: block;
+        text-align: center;
+        text-decoration: none;
+      }
+      /* BUG (button width): in the auth-prompt flex column with no width
+         coercion, the inline-block secondary button shrinks to its text,
+         so "Sign Up" reads narrower than the full-width "Log In". */
+      [data-btnfix="before"] .home__auth-prompt {
+        align-items: center;
+      }
+      [data-btnfix="before"] .home__auth-prompt .btn-secondary {
+        width: auto;
+      }
+      /* FIX (button width): action buttons stretch to the container width
+         regardless of primary/secondary variant. */
+      [data-btnfix="after"] .home__actions .home__btn,
+      [data-btnfix="after"] .home__auth-prompt .home__btn {
+        width: 100%;
+        display: block;
+        box-sizing: border-box;
+      }
+
+      /* ---------- Measurement overlays ---------- */
+      .gap-top,
+      .gap-bottom {
+        position: absolute;
+        left: 0;
+        right: 0;
+        pointer-events: none;
+        z-index: 5;
+        font-size: 0.62rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: #7fcf99;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .viewport[data-show-gaps="false"] .gap-top,
+      .viewport[data-show-gaps="false"] .gap-bottom {
+        display: none;
+      }
+      .midline {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        border-top: 1px dashed rgba(201, 168, 76, 0.55);
+        z-index: 4;
+        pointer-events: none;
+      }
+      .viewport[data-show-gaps="false"] .midline {
+        display: none;
+      }
+      .midline::after {
+        content: "viewport center";
+        position: absolute;
+        right: 6px;
+        top: -16px;
+        font-size: 0.58rem;
+        color: rgba(201, 168, 76, 0.85);
+      }
+      .overflow-flag {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 6;
+        font-size: 0.62rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 3px 8px;
+        border-radius: 5px;
+        background: rgba(224, 85, 85, 0.92);
+        color: #fff;
+        display: none;
+      }
+      .viewport[data-overflow="true"] .overflow-flag {
+        display: block;
+      }
+
+      .metrics {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+        background: rgba(20, 12, 8, 0.55);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        padding: 10px 14px;
+      }
+      .metrics b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .metrics .ok {
+        color: #7fcf99;
+      }
+      .metrics .err {
+        color: #e07a7a;
+      }
+
+      .note {
+        max-width: 1180px;
+        margin: 36px auto 0;
+        padding: 18px 22px;
+        background: rgba(20, 12, 8, 0.5);
+        border-left: 3px solid var(--gold-accent);
+        border-radius: 0 8px 8px 0;
+        font-size: 0.86rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      .note h3 {
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+      }
+      .note code {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 0.82em;
+        color: var(--gold-accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Signed-in Home — Vertical Centering &amp; Overflow Fix</h1>
+      <p>
+        The signed-in home overflows the viewport and sits above true center.
+        Cause: <code>.flow-page</code> keeps <code>min-height: 100vh</code> even
+        when it is a flex child <em>beneath</em> the nav, so
+        <code>.app-shell</code> = nav (~49px) + 100vh &gt; viewport. The frames
+        below render the real <code>app-shell &rarr; nav + flow-page</code>
+        structure inside a fixed "device" so you can see the stray scrollbar and
+        the off-center content. Toggle the fix strategy to compare. A second,
+        minor fix makes the secondary action button match the primary width.
+      </p>
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <span>View</span>
+        <div class="seg" id="seg-view">
+          <button data-view="compare" class="active">Before / After</button>
+          <button data-view="single">Single (full)</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span>Fix strategy (the "after" frame)</span>
+        <div class="seg" id="seg-fix">
+          <button data-fix="flex" class="active">A · flex: 1</button>
+          <button data-fix="calc">B · calc(100vh − nav)</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span>Auth state</span>
+        <div class="seg" id="seg-auth">
+          <button data-auth="in" class="active">Signed in</button>
+          <button data-auth="out">Signed out</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span>Viewport</span>
+        <div class="seg" id="seg-vp">
+          <button data-vp="mobile" class="active">Mobile 375×667</button>
+          <button data-vp="desktop">Desktop 1440×900</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span>Button width</span>
+        <div class="seg" id="seg-btn">
+          <button data-btn="after" class="active">Fixed (equal)</button>
+          <button data-btn="before">Bug (mismatch)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span
+        ><span class="swatch" style="background: #c9a84c"></span>device viewport
+        edge / center line</span
+      >
+      <span
+        ><span class="swatch" style="background: rgba(224, 85, 85, 0.92)"></span
+        >overflow (stray scrollbar)</span
+      >
+      <span
+        ><span
+          class="swatch"
+          style="background: rgba(127, 207, 153, 0.5)"
+        ></span
+        >top / bottom gap measurement</span
+      >
+    </div>
+
+    <div class="stage" id="stage"></div>
+
+    <div class="note">
+      <h3>What you are comparing</h3>
+      <p>
+        <b>Before</b> — <code>.flow-page { min-height: 100vh }</code>. The shell
+        is taller than the screen by ~one nav height, so a scrollbar appears and
+        the content centers within the 100vh box (which is pushed down by the
+        nav), reading as off-center / pushed up against the visible area.
+      </p>
+      <p>
+        <b>After · A (recommended)</b> —
+        <code>.flow-page { flex: 1; min-height: 0 }</code>. The column flex in
+        <code>.app-shell</code> hands the leftover height (viewport − nav) to
+        the flow-page, which then centers content in exactly the visible area.
+        No magic numbers; resilient to nav height changes (font load, wrapping).
+      </p>
+      <p>
+        <b>After · B</b> —
+        <code>.flow-page { min-height: calc(100vh − navHeight) }</code>. Works,
+        but hard-codes the nav height; if the nav reflows (font load, narrow
+        wrap, future nav content) the number drifts and the bug can creep back.
+      </p>
+      <p>
+        <b>Button width fix</b> — the signed-out auth prompt's
+        <code>.btn-secondary</code> ("Sign Up") is
+        <code>inline-block</code> with no width, so it shrinks to its text
+        inside the centered flex column, appearing narrower than the full-width
+        primary. Fix: force action buttons (<code>.home__btn</code>) to
+        <code>width: 100%</code> in both the signed-in actions and the
+        signed-out auth prompt so both buttons share the 300px column width.
+      </p>
+    </div>
+
+    <script>
+      const VPS = {
+        mobile: { w: 375, h: 667, nav: 49 },
+        desktop: { w: 1440, h: 900, nav: 49 },
+      };
+      // On-screen device is scaled down so both frames fit side by side.
+      const SCALE = { mobile: 0.62, desktop: 0.42 };
+
+      const state = {
+        view: "compare",
+        fix: "flex",
+        auth: "in",
+        vp: "mobile",
+        btn: "after",
+      };
+
+      function homeMarkup(auth) {
+        if (auth === "in") {
+          return `
+            <div class="home">
+              <h1 class="home__title">Card Game Simulator</h1>
+              <p class="home__subtitle">Welcome back, Alice</p>
+              <div class="home__actions">
+                <a class="btn-primary home__btn">Create Game</a>
+                <a class="btn-secondary home__btn">Join Game</a>
+              </div>
+            </div>`;
+        }
+        return `
+          <div class="home">
+            <h1 class="home__title">Card Game Simulator</h1>
+            <div class="home__auth-prompt">
+              <p class="home__description">
+                Play Big2 with friends. Create an account to host games, or join
+                via an invite link as a guest.
+              </p>
+              <a class="btn-primary home__btn">Log In</a>
+              <a class="btn-secondary home__btn">Sign Up</a>
+            </div>
+          </div>`;
+      }
+
+      function navMarkup(auth) {
+        const right =
+          auth === "in"
+            ? `<span class="app-nav__user">Alice</span>
+               <button class="app-nav__logout">Log out</button>`
+            : `<a>Log in</a><a>Sign up</a>`;
+        return `
+          <nav class="app-nav">
+            <a class="app-nav__logo">Card Game Simulator</a>
+            <div class="app-nav__links">${right}</div>
+          </nav>`;
+      }
+
+      function buildFrame({ fixMode, title, badgeText, badgeClass }) {
+        const vp = VPS[state.vp];
+        const scale = SCALE[state.vp];
+        const showNav = state.auth === "in"; // nav only renders when signed in
+        const navH = showNav ? vp.nav : 0;
+
+        const viewport = document.createElement("div");
+        viewport.className = "viewport";
+        viewport.dataset.fix = fixMode;
+        viewport.dataset.btnfix = state.btn;
+        viewport.style.width = vp.w * scale + "px";
+        viewport.style.height = vp.h * scale + "px";
+
+        const scrollport = document.createElement("div");
+        scrollport.className = "scrollport";
+
+        const shell = document.createElement("div");
+        shell.className = "app-shell";
+        // Device-height variable drives the before/calc min-heights, scaled
+        // to match the rendered device box.
+        shell.style.setProperty("--device-h", vp.h * scale + "px");
+        shell.style.setProperty("--nav-h", navH * scale + "px");
+        shell.innerHTML =
+          (showNav ? navMarkup(state.auth) : "") +
+          `<div class="flow-page">${homeMarkup(state.auth)}</div>`;
+
+        scrollport.appendChild(shell);
+
+        // Overlays
+        const mid = document.createElement("div");
+        mid.className = "midline";
+        const gapTop = document.createElement("div");
+        gapTop.className = "gap-top";
+        const gapBottom = document.createElement("div");
+        gapBottom.className = "gap-bottom";
+        const flag = document.createElement("div");
+        flag.className = "overflow-flag";
+        flag.textContent = "⚠ overflows · scrollbar";
+
+        viewport.appendChild(scrollport);
+        viewport.appendChild(mid);
+        viewport.appendChild(gapTop);
+        viewport.appendChild(gapBottom);
+        viewport.appendChild(flag);
+
+        return { viewport, scrollport, shell, gapTop, gapBottom };
+      }
+
+      function measure(parts) {
+        const { viewport, scrollport, shell, gapTop, gapBottom } = parts;
+        const vpH = viewport.clientHeight;
+        const shellH = shell.scrollHeight;
+        const overflow = shellH > vpH + 1;
+        viewport.dataset.overflow = overflow ? "true" : "false";
+
+        // Position of the .home block relative to the scrollport top.
+        const home = shell.querySelector(".home");
+        const homeBox = home.getBoundingClientRect();
+        const portBox = scrollport.getBoundingClientRect();
+        const topGap = Math.round(homeBox.top - portBox.top);
+        const bottomGap = Math.round(portBox.top + vpH - homeBox.bottom);
+
+        gapTop.style.top = "0";
+        gapTop.style.height = Math.max(0, topGap) + "px";
+        gapTop.innerHTML = topGap > 18 ? `<span>top ${topGap}px</span>` : "";
+        gapTop.style.borderBottom = "1px dashed rgba(127,207,153,0.4)";
+
+        gapBottom.style.bottom = "0";
+        gapBottom.style.height = Math.max(0, bottomGap) + "px";
+        gapBottom.innerHTML =
+          bottomGap > 18 ? `<span>bottom ${bottomGap}px</span>` : "";
+        gapBottom.style.borderTop = "1px dashed rgba(127,207,153,0.4)";
+
+        return { vpH, shellH, overflow, topGap, bottomGap };
+      }
+
+      function metricsCard(m, fixMode) {
+        const card = document.createElement("div");
+        card.className = "metrics";
+        const overflowTxt = m.overflow
+          ? `<span class="err">overflows by ${m.shellH - m.vpH}px (scaled)</span>`
+          : `<span class="ok">fits — no scrollbar</span>`;
+        const centered = Math.abs(m.topGap - m.bottomGap) <= 6;
+        const centerTxt = centered
+          ? `<span class="ok">centered (Δ ${Math.abs(m.topGap - m.bottomGap)}px)</span>`
+          : `<span class="err">off-center (top ${m.topGap} vs bottom ${m.bottomGap})</span>`;
+        card.innerHTML = `
+          <div>Page height vs viewport: ${overflowTxt}</div>
+          <div>Vertical position: ${centerTxt}</div>`;
+        return card;
+      }
+
+      function wrapFrame(parts, title, badgeText, badgeClass, fixMode) {
+        const wrap = document.createElement("div");
+        wrap.className = "frame-wrap";
+        const label = document.createElement("div");
+        label.className = "frame-label";
+        label.innerHTML = `<h2>${title}</h2><span class="badge ${badgeClass}">${badgeText}</span>`;
+        wrap.appendChild(label);
+        wrap.appendChild(parts.viewport);
+        wrap._parts = parts;
+        wrap._fixMode = fixMode;
+        return wrap;
+      }
+
+      function render() {
+        // sync control active states
+        document
+          .querySelectorAll("#seg-view button")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.view === state.view),
+          );
+        document
+          .querySelectorAll("#seg-fix button")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.fix === state.fix),
+          );
+        document
+          .querySelectorAll("#seg-auth button")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.auth === state.auth),
+          );
+        document
+          .querySelectorAll("#seg-vp button")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.vp === state.vp),
+          );
+        document
+          .querySelectorAll("#seg-btn button")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.btn === state.btn),
+          );
+
+        const stage = document.getElementById("stage");
+        stage.innerHTML = "";
+        stage.classList.toggle("single", state.view === "single");
+
+        const frames = [];
+        if (state.view === "compare") {
+          frames.push(buildFrame({ fixMode: "before" }) /* before */);
+          frames.push(buildFrame({ fixMode: state.fix }) /* after */);
+          const w0 = wrapFrame(
+            frames[0],
+            "Before (bug)",
+            "overflow + off-center",
+            "bad",
+            "before",
+          );
+          const afterName =
+            state.fix === "flex" ? "After · A (flex: 1)" : "After · B (calc)";
+          const w1 = wrapFrame(
+            frames[1],
+            afterName,
+            "fits + centered",
+            "good",
+            state.fix,
+          );
+          stage.appendChild(w0);
+          stage.appendChild(w1);
+          requestAnimationFrame(() => {
+            [w0, w1].forEach((w) => {
+              const m = measure(w._parts);
+              w.appendChild(metricsCard(m, w._fixMode));
+            });
+          });
+        } else {
+          const f = buildFrame({ fixMode: state.fix });
+          const afterName =
+            state.fix === "flex" ? "Fixed · flex: 1" : "Fixed · calc";
+          const w = wrapFrame(
+            f,
+            afterName,
+            "fits + centered",
+            "good",
+            state.fix,
+          );
+          stage.appendChild(w);
+          requestAnimationFrame(() => {
+            const m = measure(w._parts);
+            w.appendChild(metricsCard(m, w._fixMode));
+          });
+        }
+      }
+
+      function wireSeg(id, key) {
+        document.getElementById(id).addEventListener("click", (e) => {
+          const btn = e.target.closest("button");
+          if (!btn) return;
+          state[key] = btn.dataset[key];
+          render();
+        });
+      }
+      wireSeg("seg-view", "view");
+      wireSeg("seg-fix", "fix");
+      wireSeg("seg-auth", "auth");
+      wireSeg("seg-vp", "vp");
+      wireSeg("seg-btn", "btn");
+
+      document.fonts && document.fonts.ready.then(render);
+      render();
+      window.addEventListener("resize", render);
+    </script>
+  </body>
+</html>
