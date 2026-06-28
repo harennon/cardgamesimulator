@@ -51,14 +51,19 @@ export interface SerializableGame {
 
 export type SerializableGameState = Record<string, unknown>;
 
-export interface GetStatsResponse {
-  userId: string;
+export interface GameStatsEntry {
+  gameType: GameType;
   gamesPlayed: number;
   gamesWon: number;
   gamesLost: number;
   totalScore: number;
-  winRate: number; // computed: gamesWon / gamesPlayed (0 if no games)
-  lastPlayedAt: string | null; // ISO 8601 timestamp, null if never played
+  winRate: number; // gamesWon / gamesPlayed (0 if none), rounded to 3 dp
+  lastPlayedAt: string | null; // ISO 8601
+}
+
+export interface GetStatsResponse {
+  userId: string;
+  games: GameStatsEntry[]; // one entry per game type the user has played; [] if none
 }
 
 export type FeedbackCategory =
