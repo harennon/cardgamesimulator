@@ -10,6 +10,8 @@ import type {
   GameActionResponse,
   GameStartPayload,
   GameStartResponse,
+  GameRematchPayload,
+  GameRematchResponse,
   GameLeavePayload,
   TimerExpiredPayload,
 } from "@shared/socket-events";
@@ -334,6 +336,55 @@ async function handleGameStart(
   }
 }
 
+async function handleGameRematch(
+  socket: TypedSocket,
+  io: TypedServer,
+  payload: GameRematchPayload,
+  ack: (response: GameRematchResponse) => void,
+  gameService: GameService,
+  connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
+): Promise<void> {
+  const { gameId } = payload;
+  const { userId } = socket.data;
+
+  if (!gameId) {
+    ack({ success: false, error: "gameId is required" });
+    return;
+  }
+
+  if (connectionManager.isSpectator(socket.id)) {
+    ack({ success: false, error: "SPECTATOR_CANNOT_ACT" });
+    return;
+  }
+
+  try {
+    const connectedPlayerIds = connectionManager.getConnectedPlayerIds(gameId);
+    const { newGameId } = await gameService.createRematch(
+      gameId,
+      userId,
+      connectedPlayerIds,
+    );
+
+    // Register and start the timer for the new game, mirroring handleGameStart.
+    const newGame = await gameService.getGame(newGameId);
+    if (newGame?.turnTimerSeconds != null) {
+      turnTimerService.registerGame(newGameId, {
+        turnTimerSeconds: newGame.turnTimerSeconds,
+      });
+      turnTimerService.startTurn(newGameId, true);
+    }
+
+    // Broadcast to the old room so every connected client navigates to the new game.
+    io.to(`game:${gameId}`).emit("game:rematchStarted", { newGameId });
+
+    ack({ success: true, newGameId });
+  } catch (err: unknown) {
+    const code = err instanceof Error ? err.message : "INTERNAL_ERROR";
+    ack({ success: false, error: code });
+  }
+}
+
 async function handleGameAction(
   socket: TypedSocket,
   io: TypedServer,
@@ -627,6 +678,21 @@ export function registerSocketHandlers(
         turnTimerService,
       ).catch((err: unknown) => {
         console.error("game:start error", err);
+        ack({ success: false, error: "INTERNAL_ERROR" });
+      });
+    });
+
+    socket.on("game:rematch", (payload, ack) => {
+      handleGameRematch(
+        socket,
+        io,
+        payload,
+        ack,
+        gameService,
+        connectionManager,
+        turnTimerService,
+      ).catch((err: unknown) => {
+        console.error("game:rematch error", err);
         ack({ success: false, error: "INTERNAL_ERROR" });
       });
     });

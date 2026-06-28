@@ -16,6 +16,10 @@ export interface GameRepository {
   getGame(gameId: string): Promise<Game | null>;
   getGameByJoinCode(code: string): Promise<Game | null>;
   saveGame(game: Game): Promise<Game>; // throws OptimisticLockError on version conflict
+  /** Clear the join code on a game row so the code can be transferred to another
+   *  game. Persists join_code = NULL. Used by the rematch flow before inserting
+   *  the new game with the freed code. Does not participate in optimistic locking. */
+  clearJoinCode(gameId: string): Promise<void>;
 }
 // Note: `createGame` takes gameId as a parameter (caller generates UUID via `crypto.randomUUID()`).
 // This allows the REST handler to generate the ID and use it for in-memory cache registration (LLD 2) in the same call.

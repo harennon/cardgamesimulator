@@ -4,11 +4,17 @@ import type { Card } from "@shared/engine-types";
 import type {
   GameStartResponse,
   GameActionResponse,
+  GameRematchResponse,
 } from "@shared/socket-events";
 import type { TypedClientSocket } from "./useSocket";
 
 interface UseGameActionsReturn {
   startGame(gameId: string): Promise<{ success: boolean; error?: string }>;
+  rematch(gameId: string): Promise<{
+    success: boolean;
+    newGameId?: string;
+    error?: string;
+  }>;
   playCards(
     gameId: string,
     cards: readonly Card[],
@@ -56,6 +62,30 @@ export function useGameActions(): UseGameActionsReturn {
           }
           resolve(response);
         });
+      });
+    } finally {
+      actionPending.value = false;
+    }
+  }
+
+  async function rematch(
+    gameId: string,
+  ): Promise<{ success: boolean; newGameId?: string; error?: string }> {
+    const socket = requireSocket();
+    actionError.value = null;
+    actionPending.value = true;
+    try {
+      return await new Promise((resolve) => {
+        socket.emit(
+          "game:rematch",
+          { gameId },
+          (response: GameRematchResponse) => {
+            if (!response.success) {
+              actionError.value = response.error ?? "Failed to start rematch";
+            }
+            resolve(response);
+          },
+        );
       });
     } finally {
       actionPending.value = false;
@@ -116,6 +146,7 @@ export function useGameActions(): UseGameActionsReturn {
 
   return {
     startGame,
+    rematch,
     playCards,
     pass,
     actionError,

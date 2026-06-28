@@ -135,9 +135,95 @@ function makeGameRepo(overrides: Partial<GameRepository> = {}): GameRepository {
   return {
     createGame: vi.fn(),
     getGame: vi.fn().mockResolvedValue(null),
+    getGameByJoinCode: vi.fn().mockResolvedValue(null),
     saveGame: vi.fn().mockImplementation(async (g: Game) => g),
+    clearJoinCode: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
+}
+
+/**
+ * An in-memory GameRepository that enforces the partial-unique-on-non-null
+ * join_code constraint (mirrors migration 001_create_tables.sql idx_games_join_code).
+ * Used to prove the rematch insert ordering: the old code must be cleared and
+ * persisted before the new row is inserted with the freed code.
+ */
+function makeInMemoryRepo(seed: Game[] = []): GameRepository {
+  const rows = new Map<string, Game>();
+  for (const g of seed) rows.set(g.gameId, g);
+
+  function assertJoinCodeUnique(gameId: string, joinCode: string | null): void {
+    if (joinCode === null) return;
+    for (const [id, g] of rows) {
+      if (id !== gameId && g.joinCode === joinCode) {
+        throw new Error(
+          `duplicate key value violates unique constraint "idx_games_join_code"`,
+        );
+      }
+    }
+  }
+
+  return {
+    createGame: vi
+      .fn()
+      .mockImplementation(
+        async (
+          gameId: string,
+          gameType: Game["gameType"],
+          creatorId: string,
+          maxPlayers: number,
+          creatorDisplayName: string,
+          turnTimerSeconds: number | null,
+          joinCode: string | null,
+        ) => {
+          assertJoinCodeUnique(gameId, joinCode);
+          const game = new Game();
+          game.gameId = gameId;
+          game.gameType = gameType;
+          game.playerIds = [creatorId];
+          game.playerDisplayNames = { [creatorId]: creatorDisplayName };
+          game.maxPlayers = maxPlayers;
+          game.status = "CREATED";
+          game.state = {};
+          game.turnTimerSeconds = turnTimerSeconds;
+          game.joinCode = joinCode;
+          game.version = 1;
+          rows.set(gameId, game);
+          return game;
+        },
+      ),
+    getGame: vi
+      .fn()
+      .mockImplementation(async (gameId: string) => rows.get(gameId) ?? null),
+    getGameByJoinCode: vi.fn().mockImplementation(async (code: string) => {
+      for (const g of rows.values()) {
+        if (g.joinCode === code) return g;
+      }
+      return null;
+    }),
+    saveGame: vi.fn().mockImplementation(async (g: Game) => {
+      assertJoinCodeUnique(g.gameId, g.joinCode);
+      rows.set(g.gameId, g);
+      return g;
+    }),
+    clearJoinCode: vi.fn().mockImplementation(async (gameId: string) => {
+      const g = rows.get(gameId);
+      if (g) g.joinCode = null;
+    }),
+  };
+}
+
+function makeCompletedGame(overrides: Partial<Game> = {}): Game {
+  return makeGame({
+    gameId: "old-game",
+    status: "COMPLETED",
+    playerIds: ["player-a", "player-b"],
+    playerDisplayNames: { "player-a": "Alice", "player-b": "Bob" },
+    joinCode: "H7K3",
+    maxPlayers: 4,
+    turnTimerSeconds: 30,
+    ...overrides,
+  });
 }
 
 function makeStatsService(): StatsService {
@@ -344,6 +430,249 @@ describe("GameService", () => {
       await expect(service.startGame("game-1", "player-a")).rejects.toThrow(
         "NOT_ENOUGH_PLAYERS",
       );
+    });
+  });
+
+  describe("createRematch", () => {
+    // Engine whose initialize echoes back an IN_PROGRESS state for the gameId
+    // it was given, so the new game's started state matches the new gameId.
+    function makeRematchEngine(): GameEngine {
+      return makeEngine({
+        initialize: vi
+          .fn()
+          .mockImplementation((gameId: string) =>
+            makeState(gameId, { status: "IN_PROGRESS" }),
+          ),
+      });
+    }
+
+    it("succeeds from a COMPLETED game — a new IN_PROGRESS game is started while the old stays COMPLETED", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame();
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId, state } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "player-b"],
+      );
+
+      expect(newGameId).not.toBe("old-game");
+      expect(state.status).toBe("IN_PROGRESS");
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.status).toBe("IN_PROGRESS");
+
+      const reloadedOld = await repo.getGame("old-game");
+      expect(reloadedOld?.status).toBe("COMPLETED");
+    });
+
+    it("transfers the join code: new game keeps the code, old game's code is cleared and persisted", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({ joinCode: "H7K3" });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "player-b"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.joinCode).toBe("H7K3");
+
+      const reloadedOld = await repo.getGame("old-game");
+      expect(reloadedOld?.joinCode).toBeNull();
+      expect(repo.clearJoinCode).toHaveBeenCalledWith("old-game");
+
+      // Resolving the code returns the new game, never the old one.
+      const resolved = await repo.getGameByJoinCode("H7K3");
+      expect(resolved?.gameId).toBe(newGameId);
+    });
+
+    it("clears the old code BEFORE inserting the new row (constraint regression)", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({ joinCode: "H7K3" });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      // The in-memory repo enforces the partial unique index — if createRematch
+      // inserted before clearing, createGame would throw the duplicate error.
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a", "player-b"]),
+      ).resolves.toBeDefined();
+    });
+
+    it("documents the collision: inserting the new row before clearing the old code throws a unique violation", async () => {
+      const oldGame = makeCompletedGame({ joinCode: "H7K3" });
+      const repo = makeInMemoryRepo([oldGame]);
+
+      // Inserting a second row with the same non-null code while the old row
+      // still holds it must collide.
+      await expect(
+        repo.createGame("new-game", "big2", "player-a", 4, "Alice", 30, "H7K3"),
+      ).rejects.toThrow(/unique|duplicate/);
+    });
+
+    it("is idempotent: a second rematch of the same finished game throws REMATCH_ALREADY_STARTED", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({ joinCode: "H7K3" });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await service.createRematch("old-game", "player-a", [
+        "player-a",
+        "player-b",
+      ]);
+
+      const createCallsAfterFirst = (
+        repo.createGame as ReturnType<typeof vi.fn>
+      ).mock.calls.length;
+
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a", "player-b"]),
+      ).rejects.toThrow("REMATCH_ALREADY_STARTED");
+
+      // No second new game was created.
+      expect(
+        (repo.createGame as ReturnType<typeof vi.fn>).mock.calls.length,
+      ).toBe(createCallsAfterFirst);
+    });
+
+    it("mutates the joinCodeCache: getJoinCode(old) is null, getJoinCode(new) is the transferred code without an extra DB read", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({ joinCode: "H7K3" });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "player-b"],
+      );
+
+      const getGameCallsBefore = (repo.getGame as ReturnType<typeof vi.fn>).mock
+        .calls.length;
+
+      expect(await service.getJoinCode("old-game")).toBeNull();
+      expect(await service.getJoinCode(newGameId)).toBe("H7K3");
+
+      // Both reads were served from the seeded cache — no extra getGame calls.
+      expect((repo.getGame as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
+        getGameCallsBefore,
+      );
+    });
+
+    it("throws GAME_NOT_FOUND when the old game does not exist", async () => {
+      const cache = new GameCache();
+      const repo = makeInMemoryRepo([]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(
+        service.createRematch("missing", "player-a", ["player-a", "player-b"]),
+      ).rejects.toThrow("GAME_NOT_FOUND");
+    });
+
+    it("throws GAME_NOT_FINISHED when the old game is not COMPLETED", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({ status: "IN_PROGRESS" });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a", "player-b"]),
+      ).rejects.toThrow("GAME_NOT_FINISHED");
+    });
+
+    it("throws NOT_HOST when the requester is not the first player; no new game persisted", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame();
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(
+        service.createRematch("old-game", "player-b", ["player-a", "player-b"]),
+      ).rejects.toThrow("NOT_HOST");
+
+      expect(repo.createGame).not.toHaveBeenCalled();
+      expect(repo.clearJoinCode).not.toHaveBeenCalled();
+    });
+
+    it("throws NOT_ENOUGH_PLAYERS when only one connected player remains; old code stays intact", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({ joinCode: "H7K3" });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a"]),
+      ).rejects.toThrow("NOT_ENOUGH_PLAYERS");
+
+      // Early throw must not clear the old code (still re-clickable).
+      expect(repo.clearJoinCode).not.toHaveBeenCalled();
+      const reloadedOld = await repo.getGame("old-game");
+      expect(reloadedOld?.joinCode).toBe("H7K3");
+    });
+
+    it("carries over only connected players, host first, preserving order and display names", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", "player-b", "player-c"],
+        playerDisplayNames: {
+          "player-a": "Alice",
+          "player-b": "Bob",
+          "player-c": "Carol",
+        },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      // player-b departed; connected roster arrives in arbitrary order.
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-c", "player-a"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.playerIds).toEqual(["player-a", "player-c"]);
+      expect(newGame?.playerDisplayNames).toEqual({
+        "player-a": "Alice",
+        "player-c": "Carol",
+      });
+    });
+
+    it("carries a guest player into the new game unchanged", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", "guest-xyz"],
+        playerDisplayNames: { "player-a": "Alice", "guest-xyz": "GuestBob" },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "guest-xyz"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.playerIds).toContain("guest-xyz");
+      expect(newGame?.playerDisplayNames["guest-xyz"]).toBe("GuestBob");
     });
   });
 
