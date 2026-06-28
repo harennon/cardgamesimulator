@@ -8,6 +8,18 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Removed
+
+- **LLD 74: Remove leftover Vue scaffold (HelloWorld / `/echo` route + EchoHandler)** — deleted the unused `npm create vue` echo scaffold end-to-end. Nothing in the live UI linked to it, and `HelloWorld.vue` POSTed to `/api/authNedEcho`, a backend route that no longer existed. Pure dead-code removal; no behavior change for users.
+  - `src/frontend/component/HelloWorld.vue` — deleted (the "Vite + Vue 3" greeting card with two echo buttons).
+  - `src/backend/api/echo.ts` — deleted (`EchoHandler`).
+  - `src/shared/model.ts` — removed the `EchoRequest` / `EchoResponse` interfaces (imported only by the two deleted files).
+  - `src/frontend/routes.ts` — removed the `HelloWorld` import and the `{ path: "/echo", meta: { requiresAuth: true } }` route.
+  - `src/backend/server.ts` — removed the `EchoHandler` import and the `["/echo", …]` handler-map entry; the seed map is now `new Map<string, Handler>([])` (the conditional `.set("/", …)` and `.forEach` still type-check and run with an initially-empty map).
+  - `tests/integration/helpers/testServer.ts` — removed the `EchoHandler` import and the `["/echo", …]` entry, leaving `["/", ServeAppHandler.INSTANCE]` as the sole entry.
+  - `tests/frontend/joinRouteGuard.test.ts` — removed the now-unnecessary `vi.mock("@/component/HelloWorld.vue", …)` (routes.ts no longer imports it).
+  - `playwright.config.ts` — repointed the backend `webServer` readiness probe from `http://localhost:3000/echo` to the purpose-built `http://localhost:3000/health` (a real `200 GET`), the only consumer of `/echo` as a probe. Verified the full E2E suite still detects the backend as ready.
+
 ### Added
 
 - **LLD 69: Tonk game engine** — a new pure, server-authoritative `TonkEngine` implementing the full `GameEngine` interface for the Tonk (Tunk) variant signed off in LLD 65. Backend-only; proves the engine abstraction supports a second game with no rearchitecting. No `Math.random()`, no PRNG threaded into `applyAction` — all inter-trick deck rebuilds + cuts and the end-of-game TRUE-LOSER draw derive deterministic sub-seeds (`hashSeed(randomSeed + ":trick:" + n)` / `":trueloser:" + n`).

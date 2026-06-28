@@ -1,11 +1,3 @@
-export interface EchoRequest {
-  string: string;
-}
-
-export interface EchoResponse {
-  string: string;
-}
-
 // GAME Requests
 import type { GameType, GameStatus } from "./engine-types.js";
 export type { GameType, GameStatus };

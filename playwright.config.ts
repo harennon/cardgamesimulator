@@ -32,7 +32,7 @@ export default defineConfig({
   webServer: [
     {
       command: "node build/backend/index.js",
-      url: "http://localhost:3000/echo",
+      url: "http://localhost:3000/health",
       reuseExistingServer: true,
       timeout: 30_000,
       env: {
