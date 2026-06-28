@@ -62,7 +62,7 @@ This LLD pins down the EXACT Tonk (Tunk) variant we will implement. Tonk has man
 
 3. **Discard-then-draw is two phases of one player's turn, not two turns.** A single player's turn is a `discard` action **immediately** followed (still that player, no turn hand-off in between) by a `draw` action. The engine models this as a two-phase turn with a `turnPhase` field (`"discard" | "draw"`) so that `validateAction`/`getValidActions` can offer exactly the legal action at each phase. TONK is a third action type available only at the **start** of a turn (phase `"discard"`, before any discard). See §4.
 
-4. **Lower-is-better maps onto the winner-centric stats pipeline via a documented adapter, not a pipeline change.** `StatsService.recordGameCompletion` derives win/loss from `state.winner` + `state.scores` (verified: `statsService.ts` lines 29–31). We keep that contract: at game end we set `state.winner = <the player with the lowest final tally>` and record the **TRUE LOSER** via `breakdown`. This is a *leaking-abstraction risk* called out explicitly in §6.3.
+4. **Lower-is-better maps onto the stats pipeline via a tally-driven multi-winner derivation, not a pipeline change.** Tonk has potentially **multiple winners** (everyone who did NOT lose) and one or more losers. Win/loss is derived per player from the final tally vs the 150 threshold (`finalTally >= 150` ⇒ lost), **not** from `state.winner`. The `StatsDelta` counters are already independent (verified: `database.ts:23-27`), so this is a *derivation-logic* change for Tonk, not a schema change. `state.winner` becomes a display-only "best result" value that does **not** drive stats. The **TRUE LOSER** is recorded via `breakdown` as a flavor distinction within the losers. Detail in §6.3 (the residual leaking-abstraction note is now narrow: the existing derivation is single-winner today and its derivation must be updated for Tonk).
 
 5. **No melds, hits, drops, or hand-emptying anywhere.** The action set is exactly `{ discard, draw, callTonk }`. This keeps the engine far simpler than Big2's combination logic.
 
@@ -143,8 +143,8 @@ If the stock empties (a player must draw but the stock has 0 cards) before any T
 | `status` | `IN_PROGRESS` from `initialize` until the match ends (player ≥150 → TRUE LOSER resolved), then `COMPLETED`. Never `CREATED` post-init. |
 | `currentPlayerIndex` | Seat index whose turn it is. `-1` when `COMPLETED`. |
 | `turnNumber` | Increments on every applied action (per existing convention). |
-| `winner` | Set at `COMPLETED` to the player with the lowest final tally (stats adapter, §6.3). |
-| `scores` | At `COMPLETED`: one `PlayerScore` per player. `score` = final running tally (lower is better). `breakdown` carries `{ lost: 0|1, trueLoser: 0|1, finalTally }`. |
+| `winner` | Set at `COMPLETED` to the player with the lowest final tally (ties → lowest seat index); **display/best-result only; does NOT drive stats — see §6.3.** Stats derive from each player's tally vs 150, not from this field. |
+| `scores` | At `COMPLETED`: one `PlayerScore` per player. `score` = final running tally (lower is better). `breakdown` carries `{ lost: 0|1, trueLoser: 0|1, finalTally }`, where `lost = (finalTally >= 150) ? 1 : 0` (this — not `winner` — is what drives `gamesWon`/`gamesLost`; §6.3) and `trueLoser` is the within-losers flavor distinction (does not affect win/loss). |
 | `randomSeed` | The seed; deck build, every per-trick reshuffle (and the cut at 6+ players, §8.1), and the TRUE-LOSER joker draw all derive from a PRNG seeded by it (deterministic replay). |
 | `gameSpecificState` | `TonkState` (below). |
 
@@ -240,22 +240,23 @@ Every method of `GameEngine` (`src/backend/engine/game-engine.ts`) maps as follo
 
 ⚠ **Leaking-abstraction note (turn phases).** The `GameEngine` interface and Big2 assume **one action per turn**. Tonk needs **two phases per turn** (discard then draw) plus a turn-start-only `callTonk`. We model this entirely **inside** `gameSpecificState.turnPhase` without changing the interface — `currentPlayerIndex` stays the same player across both phases, and the turn only hands off after the draw. This maps cleanly; flagged so #57 expects a two-phase turn and the frontend action panel renders phase-appropriately. **No interface change required.**
 
-### 6.3 Stats pipeline mapping ⚠ (leaking-abstraction: winner-centric vs loss-centric)
+### 6.3 Stats pipeline mapping ⚠ (leaking-abstraction: winner-centric derivation today)
 
-`StatsService.recordGameCompletion` (`src/backend/service/statsService.ts`, **verified lines 29–31**) derives, per player: `gamesWon = (playerId === state.winner) ? 1 : 0`, `gamesLost = (playerId !== state.winner) ? 1 : 0`, `totalScore = playerScore.score`. It is **winner-centric and single-winner** (exactly one winner, everyone else "lost"). It silently skips guest players and reads only `state.winner` + `state.scores[].score`.
+> **Forward reference (out of scope here):** Game-specific (per-game-type) stats are specified in a separate forthcoming stats LLD; this section assumes the existing **global** `player_stats` contract and changes only the win/loss **derivation** for Tonk.
 
-Tonk is **loss-centric**: there is exactly one **TRUE LOSER**; everyone else simply did not lose. Naively reusing the pipeline would mark every non-`winner` player as `gamesLost: 1`, which is wrong for Tonk.
+**Multi-winner model.** Tonk has potentially **MULTIPLE winners** — *everyone who did NOT lose is a winner* — and one or more losers. A player has **lost** iff their final tally is **≥ 150** (the ruleset: "ANY player ≥150 has lost"). The **TRUE LOSER** (§5.3) is a flavor distinction **within the losers**; it does **not** change who won or lost.
 
-**Recommended mapping (no generic plumbing change — simplest correct option):**
-- Set `state.winner` = the player with the **lowest final tally** (ties → lowest seat index). This is the most defensible "winner" and makes `gamesWon` meaningful.
-- Populate `state.scores[i].score` = final tally (lower is better — note this inverts Big2's "higher score is better," documented here so leaderboard/`totalScore` aggregation understands Tonk scores are penalties).
-- Add `breakdown: { finalTally, lost: 0|1, trueLoser: 0|1 }` so a future Tonk-aware stats reader can compute true-loser stats without re-deriving.
+**Counters are already independent — only the derivation changes.** `StatsDelta` (`src/backend/database/database.ts:23-27`) has **independent integer counters**: `gamesWon: number` (line 25), `gamesLost: number` (line 26), `totalScore: number` (line 27). They are **not** mutually derived in the type, so the multi-winner mapping needs **no change to `StatsDelta` or the DB schema** — only the derivation logic changes.
 
-**The `gamesLost` semantics mismatch is the residual risk.** With the recommended mapping, the existing `StatsService` would record `gamesLost: 1` for **every** player except the lowest-tally winner — which over-counts losses for Tonk (only the TRUE LOSER truly "lost"). Two options for the stats sub-issue to choose between (decision deferred to that sub-issue, **not** this spec — flagged here so it is not missed):
-  1. **Accept the approximation for v1** (non-winners get `gamesLost: 1`). Zero code change to `StatsService`. Simplest; slightly inflates loss counts.
-  2. **Make `StatsService` read `breakdown.trueLoser`** when present (only the TRUE LOSER gets `gamesLost: 1`; non-winner non-losers get `0/0`). One small, additive, backward-compatible change isolated to `StatsService`, not the engine or generic types.
+`StatsService.recordGameCompletion` (`src/backend/service/statsService.ts:18-31`) **today** reads `const winnerId = state.winner;` (line 22) and derives, per non-guest player, `gamesWon: playerScore.playerId === winnerId ? 1 : 0` (line 29) and `gamesLost: playerScore.playerId !== winnerId ? 1 : 0` (line 30). That is the **single-winner** derivation (`state.winner` is a single `PlayerId | null` — `engine-types.ts:72` — and cannot hold multiple winners). For Tonk this derivation must be **decoupled from `state.winner`** and driven by tally-vs-150 instead. This is a derivation-logic change, **not** a `StatsDelta`/DB-schema change.
 
-This LLD **recommends option 2** (it records correct Tonk semantics with a tiny, isolated change) but does **not** require it for the gate; either is acceptable. The engine LLD must populate `breakdown.trueLoser` regardless so the choice can be made downstream.
+**Derivation for Tonk (per player at `COMPLETED`, derived from `scores[].score` = the final tally, NOT from `state.winner`):**
+- `gamesLost = (finalTally >= 150) ? 1 : 0` — matches the ruleset (any player ≥150 has lost).
+- `gamesWon  = (finalTally >= 150) ? 0 : 1` — everyone who did not lose won.
+- `breakdown.trueLoser` (0/1) records the **TRUE LOSER** as a distinction **within** the losers; it does **NOT** affect `gamesWon`/`gamesLost`.
+- `totalScore = finalTally` (still lower-is-better — note this inverts Big2's "higher score is better"; documented here so leaderboard/`totalScore` aggregation understands Tonk scores are **penalties, not achievements**).
+
+Because the counters are independent and the derivation is the exact ≥150 set, there is **no over-counting** to debate — `gamesLost` is precisely the set of players at ≥150, and `gamesWon` is precisely the rest. The residual leaking-abstraction note is narrow: the **existing** `StatsService` derivation is single-winner today (`statsService.ts:29-30`, reading `state.winner`) and its derivation must be updated for Tonk to read tally-vs-150. The resolution is clean: independent counters (no schema change) + a tally-driven derivation. `state.winner` is decoupled — it is a display-only "best result" value (§4.1) and does not drive stats.
 
 ⚠ **Leaking-abstraction note (randomness in `applyAction`).** The interface says `applyAction` "takes no PRNG — it must be deterministic" and "mid-game randomness must use a pre-shuffled deck stored in `gameSpecificState`." Big2 needs no mid-game randomness. Tonk needs randomness **between tricks** (rebuild + cut a new deck) and **at game end** (TRUE-LOSER joker draw). We satisfy the determinism contract by re-seeding a `SeededPRNG` from a **derived sub-seed** (`hashSeed(randomSeed + ":trick:" + trickNumber)` / `+ ":trueloser:" + trickNumber`) inside `applyAction`. Same `(state, action)` → same result, no external PRNG needed. `hashSeed`, `SeededPRNG`, and `FixedPRNG` are exported from `src/backend/engine/prng.ts` (**verified**). This maps cleanly with **no interface change**; flagged so #57 implements the sub-seed scheme rather than reaching for `Math.random()` or threading a PRNG param.
 
@@ -360,9 +361,9 @@ Draw legality is governed by the **turn-start snapshot** `drawableDiscard` (§4.
 | Stock empty at draw phase | Trick ends, Case C scoring (§7). |
 | Stock empty at start of a turn's discard | Discard still allowed (sink is the pile); trick only ends when a draw can't be satisfied. |
 | Tie for lowest in Case C | All tied-lowest players each add 30 (default — confirm §9.7). |
-| Tie at match end for lowest tally (the "winner") | Lowest seat index among the tied (deterministic). |
+| Tie at match end for lowest tally (the display "winner") | Lowest seat index among the tied (deterministic). This is a **display tiebreak only** — `winner` does not drive stats (§6.3), so the tiebreak affects only the best-result display, not who won/lost. |
 | Multiple players ≥150 simultaneously | All marked lost; TRUE LOSER by joker draw (§5.3). |
-| Player ≥150 but also lowest tally | Still "lost" (any ≥150 has lost, per ruleset); cannot be the `winner`. If *all* players are ≥150, `winner` = lowest tally among them but they are still all "lost"; TRUE LOSER decides. (Confirm at §9.8 whether `winner` should be null in an all-lost game.) |
+| Player ≥150 but also lowest tally | Still "lost" — `gamesLost = 1` for any player ≥150 (per ruleset), regardless of being the lowest tally. The display `winner` (lowest tally) is independent of win/loss (§6.3), so a lost player can still be the lowest-tally display `winner` while counting as a loss in stats. If *all* players are ≥150, every player gets `gamesLost = 1, gamesWon = 0`; `winner` = lowest tally among them as the display best-result; TRUE LOSER decides the flavor distinction. (Confirm at §9.8 whether the display `winner` should be `null` in an all-lost game.) |
 | Initialize with <3 or >6 players | `initialize` throws `"Tonk requires 3-6 players"` (proposed range — §9.1). |
 | Reconnection / spectator mid-trick | Standard `getPlayerView`/`getSpectatorView`; revealed hands only exist transiently in the log at trick end. |
 | Creator omits `deckRoundsTarget` | Default to **8** (the field is optional in the request; engine falls back to the default if `config.options.deckRoundsTarget` is absent). |
@@ -406,7 +407,7 @@ Confirm:
 3. **Trick-1 starter = seat 0** (ruleset specifies the starter only for trick 2+). **(default)**
 4. **Turn timer auto-action:** discard-phase → discard single highest card (never auto-TONK); draw-phase → draw from stock. Timer re-arms per phase. **(default)**
 5. **Joker = value 0 and the TRUE-LOSER token; TRUE-LOSER draw uses a fresh full pool of `numDecks` decks** (`2 * numDecks` Jokers — 2 at ≤5 players, 4 at 6 players). (From ruleset; confirming Joker count = `2 * numDecks`.) **(default for joker count)**
-6. **Stats mapping:** `winner` = lowest final tally; TRUE LOSER recorded via `breakdown.trueLoser`; recommend the small `StatsService` change (option 2, §6.3) so only the TRUE LOSER counts as a loss. **(default — recommendation)**
+6. **Stats mapping (multi-winner):** win/loss derives per player from the final tally vs 150 — `gamesLost = (finalTally >= 150) ? 1 : 0`, `gamesWon = (finalTally >= 150) ? 0 : 1` (everyone who did not lose won), `totalScore = finalTally` (penalty, lower is better). `breakdown.trueLoser` records the TRUE LOSER as a within-losers flavor distinction and does NOT affect win/loss. `state.winner` is decoupled — display-only (lowest tally), does not drive stats. This is a derivation-logic change for Tonk's `StatsService` mapping, NOT a `StatsDelta`/DB-schema change (counters are already independent — `database.ts:23-27`). Per-game-type stats are a separate forthcoming LLD (§6.3). **(default — confirm)**
 7. **Case C tie (multiple lowest hands at stock-out):** each tied-lowest player adds 30. **(default)**
 8. **All-players-lost edge:** `winner` = lowest tally among them (vs `null`). **(default — confirm)**
 9. **Creator-configurable deck cut (`deckRoundsTarget`) — and the SCOPE EXPANSION it carries.** The game creator picks `deckRoundsTarget` in the lobby (control type: a **number input / slider**, **range 5–12, default 8**), driving the §8.1 cut formula: a low value cuts cards (so the deck "changes every trick") even at 3–5 players; a high value yields no cut. **This is a scope expansion beyond the engine (#57):** it adds new API + DB + frontend plumbing (§8.8) — `deckRoundsTarget?` on `CreateGameRequest` (model.ts), range validation in createGame.ts, a NEW persisted column on the `Game` entity (no generic options column exists today), the `gameService.startGame` change to pass it into `config.options` instead of the hardcoded `{}` (`gameService.ts:102`), and a lobby control mirroring the turn-timer picker. **Confirm whether to build that plumbing, OR keep `deckRoundsTarget` an internal constant for v1** (engine default 8 only, NO creator control — which avoids all the new plumbing entirely). Also confirm the §8.1 default-boundary question: at the default `deckRoundsTarget = 8` the formula DOES cut at ≤5 players (e.g. 15 cards at 3 players); if "≤5 = no cut at the default" is the product intent, the ≤5 default must be raised to the no-cut boundary (≥13 for 3 players). **(default — confirm)**
@@ -482,7 +483,14 @@ On sign-off, record the date and any overrides at the top of this section, then 
 - Tally ≥150 → that player lost; new trick otherwise.
 - Single lost player → auto TRUE LOSER.
 - Multiple lost → joker-draw from a fresh pool of `numDecks` decks (`2 * numDecks` Jokers; deterministic via seed) picks TRUE LOSER; termination guaranteed even with multiple Jokers (more Jokers only ends the draw sooner).
-- `winner` = lowest final tally; `breakdown.trueLoser` set on the true loser.
+- `winner` = lowest final tally (display/best-result only; ties → lowest seat index).
+
+### Unit — stats derivation (multi-winner; §6.3)
+- **Multiple winners:** in a game where several players finish <150, EACH of them gets `gamesWon: 1, gamesLost: 0`.
+- **One or more losers:** every player ≥150 gets `gamesLost: 1, gamesWon: 0`.
+- **TRUE LOSER is flavor only:** `breakdown.trueLoser` is set to 1 on exactly the TRUE LOSER and 0 on everyone else (including other losers); it does **not** change anyone's `gamesWon`/`gamesLost`.
+- `totalScore` = final tally (penalty, lower is better).
+- `state.winner` (lowest tally) is a display value and does **not** drive any of the above — derivation reads `scores[].score` (the tally) vs 150, not `winner`.
 
 ### Unit — invalid actions (testing-principles #6)
 - Wrong turn, wrong phase, action after `COMPLETED`, action not in `validActions`: all rejected, **state unchanged**, version not incremented.
@@ -509,4 +517,4 @@ On sign-off, record the date and any overrides at the top of this section, then 
 
 ### Integration — full match simulation (testing-principles #9)
 - Seeded PRNG, pick from `validActions` each step (simple strategy), play tricks until some player ≥150 and a TRUE LOSER is resolved.
-- Assert invariants hold every step, the match terminates (no infinite loop), `winner`/`scores`/`trueLoser` populated, and `StatsService.recordGameCompletion` consumes the result without error (per §6.3 mapping).
+- Assert invariants hold every step, the match terminates (no infinite loop), and `winner`/`scores`/`trueLoser` are populated (with `winner` as the display lowest-tally value and `scores[].breakdown.lost`/`trueLoser` set). Assert the multi-winner stats derivation consumes the result correctly: every player <150 gets `gamesWon: 1, gamesLost: 0`, every player ≥150 gets `gamesLost: 1, gamesWon: 0`, derived from `scores[].score` vs 150 (not `winner`); `StatsService.recordGameCompletion` runs without error (per §6.3 mapping).
