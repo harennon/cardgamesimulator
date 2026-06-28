@@ -960,3 +960,130 @@ describe("Migration 004 backfill (I4)", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// 006: Composite-PK repair.
+//
+// 004 dropped the PK by a hardcoded name ('player_stats_pkey'). On prod the
+// original PK was named 'player_stats_pkey1' (TypeORM-created), so 004 silently
+// left a single-column PRIMARY KEY (user_id) -- breaking 005's
+// ON CONFLICT (user_id, game_type). 006 repoints by the ACTUAL constraint name
+// and is a no-op where the composite PK already exists.
+//
+// A clean `supabase start` already has the correct composite PK, so this test
+// self-materializes BOTH the prod-like broken state and the fresh-like correct
+// state in dedicated throwaway schemas, runs the REAL 006 SQL against each
+// (search_path-scoped, exactly like the I4 harness), and asserts the outcome.
+// Self-contained: each schema is created and dropped within the test.
+// ---------------------------------------------------------------------------
+
+describe("Migration 006 composite-PK repair", () => {
+  it("prod-like: repoints a single-column PK named 'player_stats_pkey1' to the composite (user_id, game_type) named 'player_stats_pkey'", async () => {
+    const schema = `lld66_006_prod_${Date.now().toString(36)}`;
+    const pg = makePgClient();
+    await pg.connect();
+
+    try {
+      // 1. Materialize the post-004-on-prod state in an isolated schema:
+      //    game_type is present (004 steps 2/3 worked), but the PK is still the
+      //    single-column 'player_stats_pkey1' (004 step 4 silently skipped).
+      await pg.query(`CREATE SCHEMA "${schema}";`);
+      await pg.query(`SET search_path TO "${schema}", public;`);
+      await pg.query(
+        `CREATE TABLE player_stats (
+           user_id UUID NOT NULL,
+           game_type VARCHAR(50) NOT NULL,
+           games_played INT NOT NULL DEFAULT 0,
+           games_won INT NOT NULL DEFAULT 0,
+           games_lost INT NOT NULL DEFAULT 0,
+           total_score INT NOT NULL DEFAULT 0,
+           last_played_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+           CONSTRAINT player_stats_pkey1 PRIMARY KEY (user_id)
+         );`,
+      );
+
+      // Sanity: the PK starts as a single-column PK with the prod-only name.
+      const prePk = await pg.query<{ conname: string; def: string }>(
+        `SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint
+         WHERE conrelid = '${schema}.player_stats'::regclass AND contype = 'p';`,
+      );
+      expect(prePk.rows).toHaveLength(1);
+      expect(prePk.rows[0]!.conname).toBe("player_stats_pkey1");
+      expect(prePk.rows[0]!.def).toBe("PRIMARY KEY (user_id)");
+
+      // 2. Run the REAL 006 migration SQL against this schema.
+      await pg.query(readMigrationSql("006_fix_player_stats_composite_pk.sql"));
+
+      // 3. The PK is now the composite (user_id, game_type), named
+      //    'player_stats_pkey', and the old prod-only name is gone.
+      const postPk = await pg.query<{ conname: string; def: string }>(
+        `SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint
+         WHERE conrelid = '${schema}.player_stats'::regclass AND contype = 'p';`,
+      );
+      expect(postPk.rows).toHaveLength(1);
+      expect(postPk.rows[0]!.conname).toBe("player_stats_pkey");
+      expect(postPk.rows[0]!.def).toBe("PRIMARY KEY (user_id, game_type)");
+    } finally {
+      await pg.query(`SET search_path TO public;`);
+      await pg.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE;`);
+      await pg.end();
+    }
+  });
+
+  it("fresh-like: is a no-op (and idempotent) when the composite PK already exists", async () => {
+    const schema = `lld66_006_fresh_${Date.now().toString(36)}`;
+    const pg = makePgClient();
+    await pg.connect();
+
+    try {
+      // 1. Materialize the post-004-on-fresh state: the PK is already the
+      //    composite (user_id, game_type) named 'player_stats_pkey'.
+      await pg.query(`CREATE SCHEMA "${schema}";`);
+      await pg.query(`SET search_path TO "${schema}", public;`);
+      await pg.query(
+        `CREATE TABLE player_stats (
+           user_id UUID NOT NULL,
+           game_type VARCHAR(50) NOT NULL,
+           games_played INT NOT NULL DEFAULT 0,
+           games_won INT NOT NULL DEFAULT 0,
+           games_lost INT NOT NULL DEFAULT 0,
+           total_score INT NOT NULL DEFAULT 0,
+           last_played_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+           CONSTRAINT player_stats_pkey PRIMARY KEY (user_id, game_type)
+         );`,
+      );
+
+      // Capture the PK's OID so we can prove 006 did NOT drop and recreate it
+      // (a no-op leaves the original constraint object untouched).
+      const beforeOid = await pg.query<{ oid: string }>(
+        `SELECT oid::text AS oid FROM pg_constraint
+         WHERE conrelid = '${schema}.player_stats'::regclass AND contype = 'p';`,
+      );
+      expect(beforeOid.rows).toHaveLength(1);
+
+      // 2. Run 006 twice to prove it is a no-op AND idempotent.
+      await pg.query(readMigrationSql("006_fix_player_stats_composite_pk.sql"));
+      await pg.query(readMigrationSql("006_fix_player_stats_composite_pk.sql"));
+
+      // 3. Still exactly one PK: composite, conventionally named, and the SAME
+      //    constraint object (OID unchanged) -- proving it was never recreated.
+      const afterPk = await pg.query<{
+        oid: string;
+        conname: string;
+        def: string;
+      }>(
+        `SELECT oid::text AS oid, conname, pg_get_constraintdef(oid) AS def
+         FROM pg_constraint
+         WHERE conrelid = '${schema}.player_stats'::regclass AND contype = 'p';`,
+      );
+      expect(afterPk.rows).toHaveLength(1);
+      expect(afterPk.rows[0]!.conname).toBe("player_stats_pkey");
+      expect(afterPk.rows[0]!.def).toBe("PRIMARY KEY (user_id, game_type)");
+      expect(afterPk.rows[0]!.oid).toBe(beforeOid.rows[0]!.oid);
+    } finally {
+      await pg.query(`SET search_path TO public;`);
+      await pg.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE;`);
+      await pg.end();
+    }
+  });
+});
