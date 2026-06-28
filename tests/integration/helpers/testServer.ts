@@ -3,7 +3,6 @@ import express, { type Express } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import { Handler } from "../../../src/backend/api/handler.js";
-import { EchoHandler } from "../../../src/backend/api/echo.js";
 import { ServeAppHandler } from "../../../src/backend/api/serveApp.js";
 import { SupabaseDB } from "../../../src/backend/database/supabaseDb.js";
 import { errorHandler } from "../../../src/backend/middleware/errorHandler.js";
@@ -84,12 +83,11 @@ export async function createTestServer(
   const guestSessionStore = new GuestSessionStore();
   const authMiddleware = createAuthMiddleware(guestSessionStore);
 
-  new Map<string, Handler>([
-    ["/", ServeAppHandler.INSTANCE],
-    ["/echo", EchoHandler.INSTANCE],
-  ]).forEach((handler: Handler, path: string) => {
-    app.use(path, handler.router);
-  });
+  new Map<string, Handler>([["/", ServeAppHandler.INSTANCE]]).forEach(
+    (handler: Handler, path: string) => {
+      app.use(path, handler.router);
+    },
+  );
 
   // Guest session creation (no auth required)
   app.use(
