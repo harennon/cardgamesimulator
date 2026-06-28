@@ -46,11 +46,43 @@ pattern rather than inventing a new protocol.
    completion. (`statsService.recordGameCompletion` operates on the per-game
    `InternalGameState`; two distinct games → two independent stat recordings.)
 
-2. **Reuse the join code.** The new game is created with the **same** `joinCode` as
-   the finished game so the invite code players already shared keeps working. This
-   requires a create path that accepts a caller-supplied join code (see Interfaces).
-   Because the old game keeps its row, two games temporarily share a join code; see
-   Edge Cases for how `getGameByJoinCode` ambiguity is avoided.
+2. **Transfer the join code to the new game (not naive reuse).** The new game keeps the
+   **same** `joinCode` as the finished game so the invite code players already shared
+   keeps working. This is a **transfer**, not a duplication: the DB enforces a partial
+   unique index `idx_games_join_code ON games (join_code) WHERE join_code IS NOT NULL`
+   (migration `001_create_tables.sql:39-40`), so two rows may **not** hold the same
+   non-null code. Therefore the rematch flow must **clear the old row's `join_code` and
+   persist that clear BEFORE inserting the new row** with the code. If the old code were
+   left in place, the new `INSERT` would fail the unique constraint (the same
+   `duplicate`/`unique` error `createGame.ts:61-63` retries on) — the failure happens at
+   **INSERT time**, not at resolve time. See key decision 2a (repository capability) and
+   the step ordering in `createRematch` below.
+
+   **2a. New repository capability required.** The existing `saveGame()`
+   (`supabaseDb.ts:100-128`) updates only `game_type, player_ids,
+   player_display_names, max_players, status, state, turn_timer_seconds, version,
+   updated_at` — it does **not** write `join_code`. There is no existing way to
+   clear or change a join code. The LLD adds a focused repository method:
+
+   ```ts
+   // GameRepository (database.ts)
+   /** Clear the join code on a game row so the code can be transferred to another
+    *  game. Persists join_code = NULL. Used by the rematch flow before inserting
+    *  the new game with the freed code. */
+   clearJoinCode(gameId: string): Promise<void>;
+   ```
+
+   Supabase implementation: `UPDATE games SET join_code = NULL, updated_at = now()
+   WHERE game_id = $1`. It deliberately does **not** participate in the optimistic
+   `version` check used by `saveGame` (the old game is `COMPLETED` and otherwise
+   immutable; this is a one-shot terminal edit). Considered alternatives and why
+   rejected: (b) give the new game a fresh code and accept the old code becoming
+   dead — rejected because it breaks the Decision-2 CX benefit ("the invite code
+   players already shared keeps working"); the previously-shared code would silently
+   404. (c) make `getGameByJoinCode` prefer the newest non-COMPLETED row — rejected
+   because the unique index blocks the duplicate `INSERT` outright, so resolve-time
+   preference never gets a chance to run. Transfer (clear-then-reuse) is the only
+   option that both passes the constraint and keeps the shared code live.
 
 3. **Connected players only, host-anchored.** The new game's player roster is the
    subset of the finished game's players who are **currently connected** to the old
@@ -59,10 +91,15 @@ pattern rather than inventing a new protocol.
    game. Departed/disconnected players are excluded. Guests are kept as guests (their
    guest IDs are ordinary player IDs; no re-auth).
 
-4. **Server-authoritative guards.** All three constraints are enforced inside
+4. **Server-authoritative guards.** All constraints are enforced inside
    `createRematch()` on the server; the client only sends intent (`{ gameId }`):
    - **Host-only:** requester must equal `oldGame.playerIds[0]`, else `NOT_HOST`.
    - **Finished game only:** old game must be `COMPLETED`, else `GAME_NOT_FINISHED`.
+   - **Rematch-once (idempotency):** the finished game may be rematched at most once,
+     detected by `oldGame.joinCode === null` (a prior rematch transferred the code away),
+     else `REMATCH_ALREADY_STARTED`. Prevents double-fire from creating a second
+     `IN_PROGRESS` game / colliding on the shared code (see Edge Case 6). Does not rely
+     on the client disabling the button.
    - **Min 2 connected:** connected roster must have `>= 2` players, else
      `NOT_ENOUGH_PLAYERS`.
 
@@ -98,7 +135,7 @@ export interface GameRematchPayload {
 export interface GameRematchResponse {
   success: boolean;
   newGameId?: string; // present on success
-  error?: string; // SocketErrorCode-style string on failure
+  error?: string; // free-form error string; see note below
 }
 
 // ServerToClientEvents — add:
@@ -110,8 +147,28 @@ export interface GameRematchStartedPayload {
 }
 ```
 
-Add `"GAME_NOT_FINISHED"` to `SocketErrorCode`. (`NOT_HOST` and
-`NOT_ENOUGH_PLAYERS` already exist.)
+**On the `error` field type.** `GameRematchResponse.error` is a **free-form `string`**,
+matching the existing ack convention: `GameJoinResponse`, `GameActionResponse`, and
+`GameStartResponse` all declare `error?: string` (socket-events.ts:39,57,66), and the
+current handlers already put non-`SocketErrorCode` strings in it (e.g.
+`"SPECTATOR_CANNOT_ACT"` at socketHandler.ts:302,355 is **not** a member of the
+`SocketErrorCode` union). It is **not** typed as `SocketErrorCode`. To keep tests
+deterministic, the rematch handler MUST populate `error` with exactly one of these
+literal values (the values tests assert on):
+
+- `"NOT_HOST"`
+- `"GAME_NOT_FINISHED"`
+- `"NOT_ENOUGH_PLAYERS"`
+- `"GAME_NOT_FOUND"`
+- `"SPECTATOR_CANNOT_ACT"`
+- `"REMATCH_ALREADY_STARTED"` (idempotency guard; see Edge Case 6)
+- `"INTERNAL_ERROR"` (catch-all wrapper)
+
+Separately, add `"GAME_NOT_FINISHED"` to the `SocketErrorCode` union for use by the
+`socket.emit("error", ...)` path (`SocketErrorPayload.code` is typed `SocketErrorCode`).
+(`NOT_HOST` and `NOT_ENOUGH_PLAYERS` already exist in the union; `SPECTATOR_CANNOT_ACT`
+and `REMATCH_ALREADY_STARTED` are intentionally ack-only strings, consistent with the
+existing spectator handling, and are not added to the union.)
 
 ### GameService (`src/backend/service/gameService.ts`)
 
@@ -124,7 +181,8 @@ Add `"GAME_NOT_FINISHED"` to `SocketErrorCode`. (`NOT_HOST` and
  *   passed in by the socket layer (the service has no connection knowledge).
  * - Reuses oldGame.joinCode, maxPlayers, gameType, turnTimerSeconds.
  * Returns the new game's id and started state.
- * Throws: GAME_NOT_FOUND, NOT_HOST, GAME_NOT_FINISHED, NOT_ENOUGH_PLAYERS.
+ * Throws: GAME_NOT_FOUND, NOT_HOST, GAME_NOT_FINISHED, REMATCH_ALREADY_STARTED,
+ *   NOT_ENOUGH_PLAYERS.
  */
 async createRematch(
   oldGameId: string,
@@ -133,30 +191,53 @@ async createRematch(
 ): Promise<{ newGameId: string; state: InternalGameState }>;
 ```
 
-Behavior:
+Behavior (ordering is load-bearing — the old code must be freed before the new INSERT):
 
 1. Load `oldGame`; if null → `GAME_NOT_FOUND`.
 2. If `oldGame.status !== "COMPLETED"` → `GAME_NOT_FINISHED`.
 3. If `oldGame.playerIds[0] !== requesterId` → `NOT_HOST`.
-4. Build `rematchPlayerIds` = `oldGame.playerIds` filtered to those in
-   `connectedPlayerIds`, **preserving old order**, then ensure the host is first
-   (the host is the requester and, being the one who clicked, is connected). If
-   `rematchPlayerIds.length < 2` → `NOT_ENOUGH_PLAYERS`.
-5. `newGameId = crypto.randomUUID()`.
-6. Create the new row via `gameRepo.createGame(newGameId, gameType, hostId,
-   maxPlayers, hostDisplayName, turnTimerSeconds, oldGame.joinCode)`, then add the
-   remaining `rematchPlayerIds` with their carried-over display names and
-   `saveGame()`. (A small helper assembles the full roster; see State Model.)
-7. Call `this.startGame(newGameId, hostId)` (reuses all existing validation +
-   shuffle + cache + persist + `markClean`).
-8. Mark the old `joinCode` cache entry for the new game (`joinCodeCache.set`).
-9. Return `{ newGameId, state }`.
+4. **Idempotency guard (see Edge Case 6).** If `oldGame.joinCode === null`, the old game
+   has already been rematched (its code was transferred away in a prior call) → throw
+   `REMATCH_ALREADY_STARTED`. This is the single source of "this game can only be
+   rematched once," enforced server-side and independent of the client's button state.
+   Capture `transferCode = oldGame.joinCode` (non-null past this point) for step 7.
+5. Build `rematchPlayerIds` = `oldGame.playerIds` filtered to those in
+   `connectedPlayerIds`, **preserving old order**, then ensure the host (`requesterId`)
+   is first (the host clicked, so is connected). If `rematchPlayerIds.length < 2` →
+   `NOT_ENOUGH_PLAYERS`. (No code has been transferred yet, so an early throw here leaves
+   the old game's code intact and re-clickable.)
+6. `newGameId = crypto.randomUUID()`.
+7. **Free the code on the old row, then persist:** `await
+   this.gameRepo.clearJoinCode(oldGameId)` (sets `join_code = NULL`). Then invalidate the
+   old game's join-code cache entry: `this.joinCodeCache.set(oldGameId, null)` so a later
+   `getJoinCode(oldGameId)` does not return the stale code. This MUST complete before
+   step 8.
+8. **Insert the new row with the freed code:** `gameRepo.createGame(newGameId, gameType,
+   requesterId, maxPlayers, hostDisplayName, turnTimerSeconds, transferCode)`. Because
+   the old row's code is now `NULL`, the partial unique index is satisfied. Then push the
+   remaining `rematchPlayerIds` / carried-over `playerDisplayNames` onto the returned
+   `Game` and `saveGame()` (a small helper assembles the full roster; mirrors how
+   `joinGame` mutates `playerIds`/`playerDisplayNames` and saves). Note: `saveGame` does
+   not touch `join_code`, which is correct here — the code was already set by
+   `createGame`'s INSERT and must not change.
+9. Seed the new game's code into the cache: `this.joinCodeCache.set(newGameId,
+   transferCode)`.
+10. Call `this.startGame(newGameId, requesterId)` (reuses all existing validation +
+    shuffle + cache + persist + `markClean`).
+11. Return `{ newGameId, state }`.
 
-> Note on `createGame` signature: it currently sets only the creator as the initial
-> player. To carry over multiple players we either (a) call `createGame` then push
-> the rest of `rematchPlayerIds` / `playerDisplayNames` onto the returned `Game` and
-> `saveGame`, or (b) add a repository helper. Recommended: **(a)** — no new repo
-> method, mirrors how `joinGame` mutates `playerIds`/`playerDisplayNames` and saves.
+> **Failure-window note.** Steps 7→8 are not a DB transaction (the repo exposes per-row
+> ops only). If the process crashes between clearing the old code and inserting the new
+> row, the old game is left with `join_code = NULL` and no successor exists — the shared
+> code is dead but no constraint is violated and no game is corrupted. This is an
+> acceptable, rare degradation (the players are already on the game-over screen and can
+> fall back to "Back to Home"); a cross-row transaction is out of scope. The ordering is
+> chosen so the *only* failure mode is a freed-but-unused code, never a unique-constraint
+> violation.
+
+> **Why not naive `createGame(..., oldGame.joinCode)` first?** The partial unique index
+> would reject the INSERT while the old `COMPLETED` row still holds the code. The clear
+> must be persisted first. See key decision 2.
 
 ### Socket handler (`src/backend/websocket/socketHandler.ts`)
 
@@ -174,7 +255,11 @@ Behavior:
 2. `connectedPlayerIds = connectionManager.getConnectedPlayerIds(gameId)`.
 3. `const { newGameId, state } = await gameService.createRematch(gameId,
    socket.data.userId, connectedPlayerIds)` — wrapped in try/catch; on throw,
-   `ack({ success: false, error: <code> })`.
+   `ack({ success: false, error: <thrown Error.message> })`. The thrown message is one
+   of the literal codes enumerated under "On the `error` field type" above
+   (`NOT_HOST`, `GAME_NOT_FINISHED`, `NOT_ENOUGH_PLAYERS`, `GAME_NOT_FOUND`,
+   `REMATCH_ALREADY_STARTED`); any unexpected throw is mapped to `"INTERNAL_ERROR"` by
+   the outer `.catch` wrapper.
 4. Register + start the turn timer for `newGameId` if `turnTimerSeconds != null`
    (same block as `handleGameStart`).
 5. `io.to(\`game:${gameId}\`).emit("game:rematchStarted", { newGameId })`.
@@ -210,14 +295,20 @@ Register the listener in `registerSocketHandlers` alongside the others, with the
 
 ## State Model
 
-- **Persisted (DB):** A **new** `Game` row (`newGameId`, status `IN_PROGRESS`, reused
+- **Persisted (DB):** Two row writes, ordered. **(1)** The **old** row's `join_code` is
+  set to `NULL` via `clearJoinCode(oldGameId)` (status stays `COMPLETED`; this is the
+  only mutation to the old row, and it frees the code for transfer). **(2)** A **new**
+  `Game` row is inserted (`newGameId`, status `IN_PROGRESS`, the **transferred**
   `joinCode`, carried-over `playerIds`/`playerDisplayNames`/`maxPlayers`/
-  `gameType`/`turnTimerSeconds`, fresh dealt `state`). The **old** row is untouched
-  (`status COMPLETED`).
+  `gameType`/`turnTimerSeconds`, fresh dealt `state`). Write (1) MUST persist before
+  write (2)'s INSERT to satisfy the partial unique index on `join_code`.
 - **In-memory:** New game state cached via existing `startGame` (`cache.set` +
-  `markClean`). New game's join code memoized in `joinCodeCache`. New turn timer
-  registered. Old game's in-memory artifacts (timer already unregistered at
-  completion; abandoned set already cleared) are unaffected.
+  `markClean`). `joinCodeCache` is mutated on two keys (both keyed by **gameId**, per
+  gameService.ts:20): `joinCodeCache.set(oldGameId, null)` (invalidate the stale code so
+  `getJoinCode(oldGameId)` no longer returns it) and `joinCodeCache.set(newGameId,
+  transferCode)` (seed the new game's code). New turn timer registered for `newGameId`.
+  Old game's other in-memory artifacts (timer already unregistered at completion;
+  abandoned set already cleared) are unaffected.
 - **Connection/room state:** Players remain in `game:<oldGameId>` until their client
   navigates; on mounting `/game/<newGameId>` they `game:join` the new room. No server
   push moves sockets between rooms — the client drives it.
@@ -249,25 +340,47 @@ host clicks Rematch
    applies.
 4. **Host disconnected after game over.** Host is not connected → cannot emit
    `game:rematch` (no socket). Rematch simply isn't initiated. No host-transfer in
-   scope; remaining players use "Back to Home". (Acceptable: host-only model.)
+   scope; remaining players use "Back to Home". **CEO-acknowledged dead-end note:** this
+   mildly tensions CX principle 5 ("No dead ends", customer-experience.md:13) and the
+   "Rematch with fewer players" line (customer-experience.md:324) — if the host has left,
+   the remaining *connected* players have no rematch affordance and can only return home.
+   This is an accepted scope decision for the host-only model (Option A); host-transfer /
+   "anyone can rematch" is explicitly deferred. If user feedback shows this dead-end is
+   painful, the follow-up is to allow the most-senior connected player to host the
+   rematch — flag to CEO at that point. Recorded here so the tradeoff is explicit rather
+   than silent.
 5. **Guest as host or participant.** Guest IDs are ordinary player IDs; carried over
    as-is, no re-auth. New game starts normally (CX:325).
-6. **Double-trigger (host clicks twice / ack + broadcast race).** `rematchPending`
-   disables the button after first click; navigation to the same route is idempotent.
-   If two `game:rematch` events do slip through, two new games are created — mitigate
-   by disabling the button on `actionPending` and clearing it only on navigation/error.
-   (Two orphan games are harmless; the host's client navigates to the first
-   `newGameId` it receives.)
-7. **Join-code ambiguity (old + new game share the code).** `getGameByJoinCode` could
-   now match either row. **Required handling:** `createRematch` must ensure the new
-   game is the one resolved by the code. Recommended: when creating the new row, the
-   old `COMPLETED` row should no longer be discoverable by code. Two acceptable
-   options (pick one in implementation, document in code):
-   - (a) Null out `oldGame.joinCode` and `saveGame(oldGame)` as part of the rematch
-     transaction (the old finished game no longer needs its code). **Recommended** —
-     simplest, guarantees uniqueness.
-   - (b) Make `getGameByJoinCode` prefer the most-recently-created non-COMPLETED game.
-   This must be resolved before implementation; flag to design-reviewer.
+6. **Double-trigger (host clicks twice / two `game:rematch` events / ack + broadcast
+   race).** With join-code transfer plus the unique constraint, a true double-fire is
+   **not** harmless and must be guarded server-side, not just by the client. The client
+   disables the button on `rematchPending` and navigation to the same route is
+   idempotent, but those are best-effort. The authoritative guard is in `createRematch`
+   step 4: a game can be rematched **at most once**, detected by `oldGame.joinCode ===
+   null` (the prior rematch transferred the code away). Sequence:
+   - First `game:rematch`: old code is non-null → proceeds, clears the old code,
+     transfers it to `newGameId` A, returns `{ success: true, newGameId: A }`.
+   - Second `game:rematch` for the same `oldGameId`: reloads the old game, sees
+     `joinCode === null` → throws `REMATCH_ALREADY_STARTED`; **no second row is
+     inserted**, so there is no unique-constraint collision and no duplicate
+     `IN_PROGRESS` game on the shared code. The handler acks `{ success: false, error:
+     "REMATCH_ALREADY_STARTED" }`.
+   - The host's client navigates to the first `newGameId` it receives (from its own ack
+     or the broadcast, whichever arrives first); the duplicate ack's error is ignored
+     because navigation has already occurred (idempotent `router.push`).
+   This makes the operation effectively idempotent per `oldGameId` without a DB
+   transaction or distributed lock.
+7. **Join-code transfer / no resolve-time ambiguity.** Because of the partial unique
+   index, at most one non-null code per value can ever exist, so `getGameByJoinCode` is
+   **never** ambiguous — the framing of this as a query-resolution problem is incorrect.
+   The real constraint is at **INSERT time**: a second row cannot be inserted with a code
+   the old `COMPLETED` row still holds. **Required handling** (see key decision 2 / 2a and
+   `createRematch` steps 7-8): add the `clearJoinCode(gameId)` repository method, clear
+   and persist the old row's `join_code = NULL` **before** inserting the new row, and only
+   then `createGame(..., transferCode)`. Note: nulling `oldGame.joinCode` and calling
+   `saveGame(oldGame)` does **not** work — `saveGame` (supabaseDb.ts:100-128) does not
+   write the `join_code` column, so the clear would not persist and the new INSERT would
+   still collide. The new repository method is therefore mandatory, not optional.
 8. **Old game not actually COMPLETED (client raced the finish).** `GAME_NOT_FINISHED`
    returned; client shows generic error.
 9. **`maxPlayers` vs. carried roster.** Carried roster is always `<= old maxPlayers`,
@@ -284,6 +397,11 @@ Must exist before implementation (all present):
   `socketServer.ts` typed events). This is the direct upstream.
 - `GameService` (`startGame`, `getGame`, `joinCodeCache`), `GameRepository`
   (`createGame`, `saveGame`), `Game` entity, `joinCodeService.generateJoinCode`.
+- **New repository method `clearJoinCode(gameId)`** must be added to the `GameRepository`
+  interface (`database.ts`) and implemented in `SupabaseDB` (`supabaseDb.ts`) before
+  `createRematch` can be implemented. This is a hard prerequisite — existing `saveGame`
+  cannot clear the join code (it omits the `join_code` column). Any other repository
+  implementations or repo test doubles/in-memory fakes must also implement it.
 - `connectionManager.getConnectedPlayerIds` (exists, line 152).
 - `StatsService.recordGameCompletion` (already keyed per-game via `applyAction`).
 - Frontend: `useGameActions`, `useSocket`, `GameView.vue`, `GameOverView.vue`,
@@ -335,8 +453,20 @@ Component contract (`GameOverView.vue`):
   `COMPLETED` — proves a new game can be started from a finished game, the path that
   `startGame` blocks with `GAME_ALREADY_STARTED`. Assert: new `gameId !== oldGameId`,
   new game `status === "IN_PROGRESS"`, hands dealt, old game still `COMPLETED`.
-- **Join code reuse:** new game's `joinCode === oldGame.joinCode`; and per the chosen
-  ambiguity fix (case 7), `getGameByJoinCode(code)` resolves to the new game.
+- **Join code transfer:** new game's `joinCode === <old code>`; the old game's
+  `joinCode` is now `null` (cleared via `clearJoinCode`); `getGameByJoinCode(code)`
+  resolves to the **new** game and never the old one. Assert the clear is persisted
+  (re-fetch old game shows `joinCode === null`), not just mutated in memory.
+- **Insert ordering (constraint regression):** with a repo fake that enforces the
+  partial-unique-on-non-null-`join_code` rule, assert `createRematch` succeeds (proves
+  the old code is cleared **before** the new INSERT). A test that inserts the new row
+  *without* first clearing the old code must collide — documents why the ordering exists.
+- **Idempotency (rematch-once):** calling `createRematch` twice for the same finished
+  game — the second call throws `REMATCH_ALREADY_STARTED` (old game's `joinCode` is
+  already `null`), no second new game is created, and no constraint collision occurs.
+- **joinCodeCache mutation:** after `createRematch`, `getJoinCode(oldGameId)` returns
+  `null` (stale entry invalidated) and `getJoinCode(newGameId)` returns the transferred
+  code without an extra DB read (cache seeded).
 - **Host-only:** `createRematch` with a non-host `requesterId` throws `NOT_HOST`; no
   new game persisted.
 - **Min-2 guard:** `connectedPlayerIds` of length 1 throws `NOT_ENOUGH_PLAYERS`.
@@ -355,10 +485,14 @@ Component contract (`GameOverView.vue`):
 - `game:rematch` from the host of a COMPLETED game → ack `{ success: true, newGameId }`
   and a `game:rematchStarted { newGameId }` broadcast received by other connected
   players in the old room.
-- `game:rematch` from a non-host → ack `NOT_HOST`, no broadcast.
-- `game:rematch` from a spectator socket → `SPECTATOR_CANNOT_ACT`.
+- `game:rematch` from a non-host → ack `{ success: false, error: "NOT_HOST" }`, no
+  broadcast.
+- `game:rematch` from a spectator socket → ack `error: "SPECTATOR_CANNOT_ACT"`.
+- A **second** `game:rematch` for the same finished game → ack `{ success: false, error:
+  "REMATCH_ALREADY_STARTED" }`; no third game row, no duplicate broadcast.
 - After rematch, a player `game:join(newGameId)` receives a `game:state` with
-  `status` IN_PROGRESS and the reused `joinCode`.
+  `status` IN_PROGRESS and the **transferred** `joinCode`; `game:join(oldGameId)` /
+  resolving the code routes to the new game only.
 - Turn timer is registered/started for the new game when the old game had a timer.
 
 ### Security
