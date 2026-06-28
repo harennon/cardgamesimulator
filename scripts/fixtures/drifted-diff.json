@@ -1,0 +1,9 @@
+{
+  "$comment": "LLD 77 §5.5 — captured/fixture diff exhibiting the TypeORM-era drift class (T1): a *_pkey1-named constraint and a stray anon write grant that the applied migrations never declared, with nothing pending. The drift gate exits 1 (fail-closed) against this.",
+  "objects": [
+    { "object": "constraint:player_stats:player_stats_pkey1" },
+    { "object": "grant:anon:player_stats:INSERT" }
+  ],
+  "expectedFromPending": [],
+  "pending": []
+}
