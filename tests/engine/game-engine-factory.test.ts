@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { GameEngineFactory } from "../../src/backend/engine/game-engine-factory.js";
+import {
+  GameEngineFactory,
+  engineFactory,
+} from "../../src/backend/engine/game-engine-factory.js";
+import { TonkEngine } from "../../src/backend/engine/tonk/tonk-engine.js";
+import { Big2Engine } from "../../src/backend/engine/big2/big2-engine.js";
 import type {
   GameEngine,
   GameEngineConfig,
@@ -138,5 +143,17 @@ describe("GameEngineFactory", () => {
       const types = factory.getRegisteredTypes();
       expect(types.filter((t) => t === "big2")).toHaveLength(1);
     });
+  });
+});
+
+describe("engineFactory singleton — pre-registered engines", () => {
+  it("has a Big2Engine for 'big2'", () => {
+    expect(engineFactory.hasEngine("big2")).toBe(true);
+    expect(engineFactory.getEngine("big2")).toBeInstanceOf(Big2Engine);
+  });
+
+  it("has a TonkEngine for 'tonk'", () => {
+    expect(engineFactory.hasEngine("tonk")).toBe(true);
+    expect(engineFactory.getEngine("tonk")).toBeInstanceOf(TonkEngine);
   });
 });
