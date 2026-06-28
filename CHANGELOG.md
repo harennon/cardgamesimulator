@@ -10,6 +10,10 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- **LLD 52: Selected cards stay raised after pressing pass; should auto-deselect** — pressing **Pass** now clears the player's card selection, so any raised (`.card--selected`) cards drop back to the resting position in the hand immediately, mirroring the existing deselect-on-successful-play behavior.
+  - `src/frontend/component/game/GameView.vue` — `onPass()` now calls `clearSelection()` after `await pass(...)`. The clear is unconditional (unlike `onPlay`'s success-gated clear) because the selection has no functional role in a pass, so a stray selection that survives a pass is exactly the bug.
+  - `tests/frontend/gameViewOnPass.test.ts` — 8 unit tests replicating `onPass`/`onPlay` against the real `useCardSelection` composable: selection cleared after pass with one/many cards selected, no-op on empty selection, `pass` called exactly once per invocation, selection cleared even when pass fails (confirms unconditional clear), idempotent on double-press; plus regression tests asserting `onPlay` still clears only on success and not on failure.
+
 - **LLD 48: Game Room ID Not Visible During Gameplay** — the 4-character room (join) code is now shown in-game on the `GameBoard`, anchored to the far-left of the opponents bar, and survives a mid-game refresh/reconnect (when the client loads straight into an `IN_PROGRESS` game and never sees `lobby:state`). Tapping the code copies it to the clipboard, reusing the lobby's copy pattern.
   - `src/shared/socket-events.ts` — added read-only `joinCode: string | null` to `EnrichedPlayerView` (the `game:state` payload); `EnrichedSpectatorView` intentionally unchanged (spectator display out of scope)
   - `src/shared/model.ts` — added `joinCode: string | null` to `SerializableGame` (the REST `getGameState` payload)

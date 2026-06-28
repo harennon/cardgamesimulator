@@ -304,6 +304,7 @@ async function onPlay(): Promise<void> {
 
 async function onPass(): Promise<void> {
   await pass(props.gameId);
+  clearSelection();
 }
 </script>
 
