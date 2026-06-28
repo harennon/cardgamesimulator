@@ -8,6 +8,10 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Added
+
+- **LLD 64: Tonk Rules Specification (docs-only — HARD GATE)** — `docs/lld/64-tonk-rules-spec.md`: pins the exact Tonk (Tunk) variant to implement, transcribed from the user's authoritative `TONK.Rules.md`. Supersedes PR #73 / LLD 59 (a different game with spreads/runs/melds/hitting/drop-knock that this variant does not have). Covers deck composition (1 deck + 2 Jokers for 3–5 players, deterministic blind cut), card/hand values (A=1, J/Q/K=10, 2–10=face, Joker=0), the discard-then-draw two-phase turn, calling TONK (gated to after every player's first turn), trick scoring Cases A/B/C, the 150-point match end and TRUE-LOSER joker draw, turn-timer auto-timeout per phase, information-hiding expectations, and a full method-by-method mapping onto the existing `GameEngine` interface and `StatsService` pipeline (with leaking-abstraction risks flagged: two-phase turns, mid-game randomness via derived sub-seeds, winner-centric vs loss-centric stats, Joker type gap). **No engine, types, frontend, or transport code is included or permitted until the user signs off on §9 (Variant Sign-Off); that work is sub-issue #57 and is gated on this spec.**
+
 ### Fixed
 
 - **LLD 58: Signed-in home page overflows viewport; content not vertically centered** — the signed-in home page ("Welcome back, $user") no longer adds a stray vertical scrollbar and now centers its content in the visible area below the nav, at both 375×667 and 1440×900. The signed-out home's "Log In" and "Sign Up" buttons now render at equal width.
