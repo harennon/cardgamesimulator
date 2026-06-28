@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Over — Final Cards Reveal (LLD 72)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background:
+          radial-gradient(
+            ellipse 60% 40% at 20% 0%,
+            #14361f 0%,
+            transparent 60%
+          ),
+          #0b1c12;
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 40px 24px 80px;
+        line-height: 1.5;
+      }
+
+      /* ===== Page chrome (mockup-only, not part of the product) ===== */
+      .doc-head {
+        max-width: 1180px;
+        margin: 0 auto 8px;
+      }
+      .doc-eyebrow {
+        font-size: 0.72rem;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+      .doc-title {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+        color: var(--text-primary);
+        margin-top: 6px;
+        letter-spacing: -0.01em;
+      }
+      .doc-lede {
+        max-width: 760px;
+        color: var(--text-muted);
+        margin-top: 12px;
+        font-size: 0.95rem;
+      }
+      .doc-lede b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .section {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin: 56px auto 4px;
+        flex-wrap: wrap;
+      }
+      .section-num {
+        font-family: var(--font-card);
+        font-size: 1.1rem;
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .section-name {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+      .section-note {
+        color: var(--text-muted);
+        font-size: 0.86rem;
+      }
+      .decision-tag {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 3px 9px;
+        border-radius: 999px;
+        margin-left: 4px;
+        border: 1px solid var(--gold-accent);
+        color: var(--gold-accent);
+      }
+      .decision-tag.chosen {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .stage-row {
+        display: grid;
+        gap: 28px;
+        margin-top: 24px;
+        grid-template-columns: 1fr 392px;
+        align-items: start;
+      }
+      @media (max-width: 1000px) {
+        .stage-row {
+          grid-template-columns: 1fr;
+        }
+      }
+      .stage-caption {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin-bottom: 10px;
+        font-weight: 600;
+      }
+      .stage-caption b {
+        color: var(--gold-accent);
+      }
+
+      /* ===================================================================
+     SHARED GAME PRIMITIVES (mirrors src/frontend card/board styling)
+     =================================================================== */
+      .card {
+        position: relative;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+      }
+      .card.med {
+        width: 64px;
+        height: 90px;
+        font-size: 1rem;
+      }
+      .card.big {
+        width: 80px;
+        height: 112px;
+        font-size: 1.25rem;
+      }
+      .card.sm {
+        width: 44px;
+        height: 62px;
+        font-size: 0.72rem;
+      }
+      .card .corner {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+      }
+      .card.big .corner {
+        top: 6px;
+        left: 7px;
+      }
+      .card .corner .r {
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .card.big .corner .r {
+        font-size: 13px;
+      }
+      .card .corner .s {
+        font-size: 10px;
+        margin-top: -2px;
+      }
+      .card.big .corner .s {
+        font-size: 12px;
+      }
+      .card .pip {
+        line-height: 1;
+        font-size: 1.6em;
+        margin-top: 2px;
+      }
+      .card.red .r,
+      .card.red .s,
+      .card.red .pip {
+        color: var(--red-suit);
+      }
+      .card.black .r,
+      .card.black .s,
+      .card.black .pip {
+        color: var(--black-suit);
+      }
+      .card-back {
+        border: 1.5px solid #c9a84c;
+        border-radius: 6px;
+        overflow: hidden;
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        position: relative;
+        flex-shrink: 0;
+      }
+      .card-back::after {
+        content: "";
+        position: absolute;
+        inset: 4px;
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        border-radius: 3px;
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 4px,
+          rgba(201, 168, 76, 0.08) 4px,
+          rgba(201, 168, 76, 0.08) 5px
+        );
+      }
+      .card-back.mini {
+        width: 18px;
+        height: 26px;
+      }
+
+      /* ===================================================================
+     BOARD FRAME — desktop reveal
+     =================================================================== */
+      .board {
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        border: 10px solid;
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+      }
+      .board.desktop {
+        display: grid;
+        grid-template-rows: 64px 1fr 150px;
+        grid-template-columns: 1fr 220px;
+        grid-template-areas: "opp opp" "table log" "hand log";
+        height: 560px;
+      }
+
+      .b-opp {
+        grid-area: opp;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 36px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+      }
+      .opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+      .opp .name {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+      }
+      .opp .name.win {
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .opp .backs {
+        display: flex;
+      }
+      .opp .backs .card-back.mini {
+        margin-left: -12px;
+      }
+      .opp .backs .card-back.mini:first-child {
+        margin-left: 0;
+      }
+      .opp.out .name {
+        color: #5a5246;
+      }
+
+      .b-table {
+        grid-area: table;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .play-label {
+        font-size: 0.72rem;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 600;
+      }
+      .play-row {
+        display: flex;
+        gap: 5px;
+      }
+      .played-by {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      .b-hand {
+        grid-area: hand;
+        display: flex;
+        align-items: center;
+        gap: 0;
+        padding-left: 20px;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+      }
+      .b-hand .card {
+        margin-left: -22px;
+      }
+      .b-hand .card:first-child {
+        margin-left: 0;
+      }
+      .b-hand .empty {
+        font-style: italic;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+      }
+      .b-log {
+        grid-area: log;
+        background: var(--panel-bg);
+        border-left: 1px solid var(--table-rim-light);
+        padding: 14px 16px;
+        font-size: 0.74rem;
+        color: var(--text-muted);
+        overflow: hidden;
+      }
+      .b-log .ttl {
+        color: var(--text-primary);
+        font-weight: 600;
+        margin-bottom: 8px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .b-log .line {
+        padding: 3px 0;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+      }
+      .b-log .line.you {
+        color: var(--gold-accent);
+      }
+
+      /* ===================================================================
+     THE FIX — winner banner that does NOT bury the cards
+     The previous overlay was inset:0 full-screen dim+blur over the WHOLE
+     board (cards included). The new banner is a top ribbon + a spotlighted
+     final play, leaving the played cards fully legible.
+     =================================================================== */
+      .reveal-spotlight {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+        background: radial-gradient(
+          ellipse 46% 50% at 50% 42%,
+          transparent 0%,
+          transparent 38%,
+          rgba(0, 0, 0, 0.34) 100%
+        );
+      }
+      .reveal-ribbon {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 12px 16px;
+        min-height: 64px;
+        background: linear-gradient(
+          180deg,
+          rgba(10, 6, 3, 0.92),
+          rgba(10, 6, 3, 0)
+        );
+      }
+      .reveal-ribbon .trophy {
+        font-size: 1.3rem;
+        filter: drop-shadow(0 0 8px var(--gold-glow));
+      }
+      .reveal-ribbon .wtext {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: var(--gold-accent);
+        text-shadow: 0 0 24px var(--gold-glow);
+      }
+      /* Final play gets lifted + ringed so it reads as THE moment */
+      .final-play {
+        position: relative;
+        z-index: 7;
+        padding: 18px 26px;
+        border-radius: 14px;
+        background: rgba(10, 6, 3, 0.32);
+        box-shadow:
+          0 0 0 1.5px var(--gold-accent),
+          0 0 40px var(--gold-glow);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        animation: lift 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      @keyframes lift {
+        from {
+          transform: translateY(14px) scale(0.96);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+        }
+      }
+      .final-play .play-row .card {
+        animation: dealIn 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      .final-play .play-row .card:nth-child(1) {
+        animation-delay: 60ms;
+      }
+      .final-play .play-row .card:nth-child(2) {
+        animation-delay: 130ms;
+      }
+      .final-play .play-row .card:nth-child(3) {
+        animation-delay: 200ms;
+      }
+      .final-play .play-row .card:nth-child(4) {
+        animation-delay: 270ms;
+      }
+      .final-play .play-row .card:nth-child(5) {
+        animation-delay: 340ms;
+      }
+      @keyframes dealIn {
+        from {
+          transform: translateY(10px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      .winning-tag {
+        font-size: 0.68rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+
+      /* Continue button — bottom center, clearly an action, no timer pressure */
+      .reveal-actions {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 8;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 0 16px 20px;
+        background: linear-gradient(
+          0deg,
+          rgba(10, 6, 3, 0.92),
+          rgba(10, 6, 3, 0)
+        );
+        padding-top: 28px;
+      }
+      .btn-continue {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 34px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        min-height: 48px;
+        transition:
+          background 0.15s ease,
+          transform 0.1s ease;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      }
+      .btn-continue:hover {
+        background: #d4b45a;
+        transform: translateY(-1px);
+      }
+      .reveal-hint {
+        font-size: 0.74rem;
+        color: var(--text-muted);
+      }
+      .reveal-hint b {
+        color: var(--text-primary);
+      }
+
+      /* ===================================================================
+     MOBILE BOARD — this is where the original bug lived
+     =================================================================== */
+      .phone-wrap {
+        display: flex;
+        justify-content: center;
+      }
+      .phone {
+        width: 360px;
+        height: 720px;
+        border-radius: 34px;
+        padding: 10px;
+        background: #050a07;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+        border: 1px solid #1e2a22;
+      }
+      .phone .screen {
+        width: 100%;
+        height: 100%;
+        border-radius: 26px;
+        overflow: hidden;
+        position: relative;
+      }
+      .board.mobile {
+        width: 100%;
+        height: 100%;
+        border-width: 4px;
+        display: grid;
+        grid-template-rows: 52px 1fr 150px;
+        grid-template-columns: 1fr;
+        grid-template-areas: "opp" "table" "hand";
+      }
+      .board.mobile .b-opp {
+        gap: 18px;
+      }
+      .board.mobile .opp .name {
+        font-size: 0.62rem;
+      }
+      .board.mobile .b-hand {
+        padding-left: 12px;
+      }
+      .board.mobile .b-hand .card {
+        margin-left: -26px;
+      }
+
+      /* OLD (broken) mobile overlay shown for the "before" comparison */
+      .old-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 9;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(2px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 24px;
+      }
+      .old-overlay .wtext {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: var(--gold-accent);
+        text-align: center;
+      }
+      .old-overlay .btn-continue {
+        font-size: 16px;
+      }
+      .old-overlay .barn {
+        width: 180px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .old-overlay .barn > div {
+        width: 60%;
+        height: 100%;
+        background: var(--gold-accent);
+      }
+      .broken-callout {
+        position: absolute;
+        z-index: 11;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, 90px);
+        text-align: center;
+        color: #e05555;
+        font-size: 0.72rem;
+        font-weight: 700;
+        width: 220px;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+      }
+
+      /* NEW mobile reveal — cards prominently visible, banner is a ribbon */
+      .board.mobile .reveal-ribbon {
+        min-height: 52px;
+        padding: 8px;
+      }
+      .board.mobile .reveal-ribbon .wtext {
+        font-size: 1.15rem;
+      }
+      .board.mobile .final-play {
+        padding: 14px 16px;
+      }
+      .board.mobile .reveal-actions .btn-continue {
+        font-size: 16px;
+        width: calc(100% - 8px);
+      }
+
+      /* before/after pair */
+      .ba-grid {
+        display: grid;
+        gap: 28px;
+        grid-template-columns: 1fr 1fr;
+        margin-top: 24px;
+      }
+      @media (max-width: 820px) {
+        .ba-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .ba-col .ba-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .ba-col .ba-label.bad {
+        color: #e05555;
+      }
+      .ba-col .ba-label.good {
+        color: var(--gold-accent);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .dot.bad {
+        background: #e05555;
+      }
+      .dot.good {
+        background: var(--gold-accent);
+      }
+
+      /* ===================================================================
+     GAME OVER VIEW — optional persistent "final play" row (AC bullet 3)
+     =================================================================== */
+      .go-panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 32px 40px;
+        max-width: 460px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+      }
+      .go-winner {
+        font-family: var(--font-card);
+        font-size: 1.7rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-shadow: 0 0 24px var(--gold-glow);
+      }
+      /* the NEW small final-play row on the results screen */
+      .go-finalplay {
+        width: 100%;
+        border-radius: 10px;
+        padding: 14px 16px;
+        background: rgba(26, 74, 46, 0.35);
+        border: 1px solid var(--table-rim-light);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .go-finalplay .lbl {
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+      .go-finalplay .play-row .card {
+        /* small */
+      }
+      .go-finalplay .by {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      table.scores {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+      }
+      table.scores th {
+        color: var(--gold-accent);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.68rem;
+        letter-spacing: 0.06em;
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--table-rim-light);
+        text-align: left;
+      }
+      table.scores td {
+        padding: 7px 10px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+      }
+      .badge {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 7px;
+        vertical-align: middle;
+      }
+      .badge.g {
+        background: #c9a84c;
+      }
+      .badge.s {
+        background: #a8a8a8;
+      }
+      .badge.b {
+        background: #b87333;
+      }
+      .badge.x {
+        background: #5a5a5a;
+      }
+      .go-actions {
+        display: flex;
+        gap: 10px;
+      }
+      .go-btn {
+        font-family: var(--font-ui);
+        font-size: 0.92rem;
+        font-weight: 600;
+        padding: 10px 26px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+      }
+      .go-btn.home {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .go-btn.rematch {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1.5px solid var(--text-muted);
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .callout {
+        border-left: 3px solid var(--gold-accent);
+        background: rgba(201, 168, 76, 0.06);
+        padding: 14px 18px;
+        border-radius: 0 8px 8px 0;
+        margin-top: 18px;
+        font-size: 0.9rem;
+        color: var(--text-primary);
+        max-width: 760px;
+      }
+      .callout b {
+        color: var(--gold-accent);
+      }
+      ul.notes {
+        margin: 10px 0 0 0;
+        padding-left: 18px;
+        color: var(--text-muted);
+        font-size: 0.88rem;
+      }
+      ul.notes li {
+        margin: 6px 0;
+      }
+      ul.notes b {
+        color: var(--text-primary);
+      }
+      .foot {
+        max-width: 1180px;
+        margin: 64px auto 0;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        border-top: 1px solid var(--table-rim-light);
+        padding-top: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc-head">
+      <div class="doc-eyebrow">LLD 72 · Frontend Mockup</div>
+      <h1 class="doc-title">
+        Game-Over Reveal — show the final cards, lose the timer
+      </h1>
+      <p class="doc-lede">
+        Two changes. <b>(1)</b> The reveal phase no longer auto-advances on a 4s
+        timer — it waits for you to click <b>Continue to Results</b> (approved
+        direction B; no time pressure = "I want longer"). <b>(2)</b> The real
+        reported bug: on the reveal screen the final played cards were
+        <b>buried under a full-screen dim + blur overlay</b>, especially on
+        mobile. The banner is reworked into a top ribbon + spotlight so the
+        final play stays the visual hero.
+      </p>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- SECTION 1 — THE BUG, BEFORE / AFTER (mobile)                    -->
+    <!-- ============================================================== -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-name"
+          >The actual bug — final cards hidden on the reveal screen
+          (mobile)</span
+        >
+      </div>
+      <p class="section-note">
+        User: "The reveal screen itself on mobile doesn't show the final cards
+        played." Below: what shipped vs. the fix.
+      </p>
+
+      <div class="ba-grid">
+        <!-- BEFORE -->
+        <div class="ba-col">
+          <div class="ba-label bad">
+            <span class="dot bad"></span>Before — current behavior
+          </div>
+          <div class="phone-wrap">
+            <div class="phone">
+              <div class="screen">
+                <div class="board mobile">
+                  <div class="b-opp">
+                    <div class="opp out">
+                      <div class="name">Bob · 0</div>
+                      <div class="backs"></div>
+                    </div>
+                    <div class="opp">
+                      <div class="name">Cara · 7</div>
+                      <div class="backs">
+                        <span class="card-back mini"></span
+                        ><span class="card-back mini"></span
+                        ><span class="card-back mini"></span>
+                      </div>
+                    </div>
+                    <div class="opp">
+                      <div class="name">Dev · 11</div>
+                      <div class="backs">
+                        <span class="card-back mini"></span
+                        ><span class="card-back mini"></span
+                        ><span class="card-back mini"></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="b-table">
+                    <div class="play-label">Pair</div>
+                    <div class="play-row">
+                      <div class="card med red">
+                        <div class="corner">
+                          <span class="r">2</span><span class="s">♥</span>
+                        </div>
+                        <span class="pip">♥</span>
+                      </div>
+                      <div class="card med black">
+                        <div class="corner">
+                          <span class="r">2</span><span class="s">♠</span>
+                        </div>
+                        <span class="pip">♠</span>
+                      </div>
+                    </div>
+                    <div class="played-by">played by Bob</div>
+                  </div>
+                  <div class="b-hand">
+                    <div class="empty">Finished — waiting for others.</div>
+                  </div>
+                </div>
+                <!-- the shipped overlay: dims & blurs the whole board incl. cards -->
+                <div class="old-overlay">
+                  <div class="wtext">Bob wins!</div>
+                  <button class="btn-continue">Continue to Results</button>
+                  <div class="barn"><div></div></div>
+                </div>
+                <div class="broken-callout">
+                  Final cards sit under the dim<br />+ blur — you can't read
+                  them
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AFTER -->
+        <div class="ba-col">
+          <div class="ba-label good">
+            <span class="dot good"></span>After — final play is the hero
+          </div>
+          <div class="phone-wrap">
+            <div class="phone">
+              <div class="screen">
+                <div class="board mobile">
+                  <div class="reveal-spotlight"></div>
+                  <div class="reveal-ribbon">
+                    <span class="trophy">🏆</span
+                    ><span class="wtext">Bob wins!</span>
+                  </div>
+                  <div class="b-opp">
+                    <div class="opp out">
+                      <div class="name win">Bob · 0</div>
+                      <div class="backs"></div>
+                    </div>
+                    <div class="opp">
+                      <div class="name">Cara · 7</div>
+                      <div class="backs">
+                        <span class="card-back mini"></span
+                        ><span class="card-back mini"></span
+                        ><span class="card-back mini"></span>
+                      </div>
+                    </div>
+                    <div class="opp">
+                      <div class="name">Dev · 11</div>
+                      <div class="backs">
+                        <span class="card-back mini"></span
+                        ><span class="card-back mini"></span
+                        ><span class="card-back mini"></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="b-table">
+                    <div class="final-play">
+                      <div class="winning-tag">Winning Play · Pair</div>
+                      <div class="play-row">
+                        <div class="card med red">
+                          <div class="corner">
+                            <span class="r">2</span><span class="s">♥</span>
+                          </div>
+                          <span class="pip">♥</span>
+                        </div>
+                        <div class="card med black">
+                          <div class="corner">
+                            <span class="r">2</span><span class="s">♠</span>
+                          </div>
+                          <span class="pip">♠</span>
+                        </div>
+                      </div>
+                      <div class="played-by">Bob emptied their hand</div>
+                    </div>
+                  </div>
+                  <div class="b-hand">
+                    <div class="empty">Finished — your hand is empty.</div>
+                  </div>
+                </div>
+                <div class="reveal-actions">
+                  <span class="reveal-hint"
+                    >Review the final play. No rush —
+                    <b>nothing auto-advances.</b></span
+                  >
+                  <button
+                    class="btn-continue"
+                    style="font-size: 16px; width: calc(100% - 8px)"
+                  >
+                    Continue to Results →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <b>Why this fixes it:</b> the winner announcement moves to a translucent
+        top <b>ribbon</b> and a soft radial <b>spotlight</b> (vignette) instead
+        of a full-screen dim+blur. The final play is lifted into a gold-ringed
+        card so it is unmistakably visible. The <b>Continue</b> action lives in
+        a bottom bar — clearly tappable, never timed.
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- SECTION 2 — DESKTOP REVEAL                                     -->
+    <!-- ============================================================== -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-num">02</span>
+        <span class="section-name">Desktop reveal (SHOW_FINAL_PLAY)</span>
+        <span class="decision-tag chosen"
+          >No auto-advance · waits for Continue</span
+        >
+      </div>
+      <p class="section-note">
+        Board stays mounted. Final play spotlighted center. Click to proceed
+        whenever you're ready.
+      </p>
+
+      <div class="board desktop" style="margin-top: 24px">
+        <div class="reveal-spotlight"></div>
+        <div class="reveal-ribbon">
+          <span class="trophy">🏆</span><span class="wtext">Alice wins!</span>
+        </div>
+
+        <div class="b-opp">
+          <div class="opp">
+            <div class="name">Cara · 7</div>
+            <div class="backs">
+              <span class="card-back mini"></span
+              ><span class="card-back mini"></span
+              ><span class="card-back mini"></span
+              ><span class="card-back mini"></span>
+            </div>
+          </div>
+          <div class="opp">
+            <div class="name">Dev · 11</div>
+            <div class="backs">
+              <span class="card-back mini"></span
+              ><span class="card-back mini"></span
+              ><span class="card-back mini"></span
+              ><span class="card-back mini"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="b-table">
+          <div class="final-play">
+            <div class="winning-tag">Winning Play · Straight</div>
+            <div class="play-row">
+              <div class="card big black">
+                <div class="corner">
+                  <span class="r">9</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card big red">
+                <div class="corner">
+                  <span class="r">10</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div class="card big red">
+                <div class="corner">
+                  <span class="r">J</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div class="card big black">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+              <div class="card big black">
+                <div class="corner">
+                  <span class="r">K</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+            </div>
+            <div class="played-by">Alice emptied their hand to win</div>
+          </div>
+        </div>
+
+        <div class="b-hand">
+          <div class="card med black">
+            <div class="corner">
+              <span class="r">3</span><span class="s">♠</span>
+            </div>
+            <span class="pip">♠</span>
+          </div>
+          <div class="card med red">
+            <div class="corner">
+              <span class="r">4</span><span class="s">♦</span>
+            </div>
+            <span class="pip">♦</span>
+          </div>
+          <div class="card med red">
+            <div class="corner">
+              <span class="r">7</span><span class="s">♥</span>
+            </div>
+            <span class="pip">♥</span>
+          </div>
+          <div class="card med black">
+            <div class="corner">
+              <span class="r">8</span><span class="s">♣</span>
+            </div>
+            <span class="pip">♣</span>
+          </div>
+        </div>
+
+        <div class="b-log">
+          <div class="ttl">Game Log</div>
+          <div class="line">Dev: Pass</div>
+          <div class="line">Cara: Pass</div>
+          <div class="line you">Alice: Straight 9–K</div>
+          <div class="line">Alice wins the game</div>
+        </div>
+
+        <div class="reveal-actions">
+          <span class="reveal-hint"
+            >Take your time — the results screen waits for you.
+            <b>No timer.</b></span
+          >
+          <button class="btn-continue">Continue to Results →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- SECTION 3 — GAME OVER VIEW with persistent final-play row       -->
+    <!-- ============================================================== -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-num">03</span>
+        <span class="section-name"
+          >Results screen — optional persistent "final play" row</span
+        >
+        <span class="decision-tag">Optional · AC bullet 3</span>
+      </div>
+      <p class="section-note">
+        After Continue, the board is gone — so the cards are re-shown compactly
+        on the results panel itself, directly answering the literal "game over
+        screen does not display final cards played."
+      </p>
+
+      <div class="go-panel" style="margin-top: 24px">
+        <div class="go-winner">🏆 Alice wins!</div>
+
+        <div class="go-finalplay">
+          <div class="lbl">Final Play · Straight · Alice</div>
+          <div class="play-row">
+            <div class="card sm black">
+              <div class="corner">
+                <span class="r">9</span><span class="s">♣</span>
+              </div>
+              <span class="pip">♣</span>
+            </div>
+            <div class="card sm red">
+              <div class="corner">
+                <span class="r">10</span><span class="s">♦</span>
+              </div>
+              <span class="pip">♦</span>
+            </div>
+            <div class="card sm red">
+              <div class="corner">
+                <span class="r">J</span><span class="s">♥</span>
+              </div>
+              <span class="pip">♥</span>
+            </div>
+            <div class="card sm black">
+              <div class="corner">
+                <span class="r">Q</span><span class="s">♠</span>
+              </div>
+              <span class="pip">♠</span>
+            </div>
+            <div class="card sm black">
+              <div class="corner">
+                <span class="r">K</span><span class="s">♣</span>
+              </div>
+              <span class="pip">♣</span>
+            </div>
+          </div>
+        </div>
+
+        <table class="scores">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Place</th>
+              <th>Cards Left</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge g"></span>Alice</td>
+              <td>1st</td>
+              <td>0</td>
+              <td>5</td>
+            </tr>
+            <tr>
+              <td><span class="badge s"></span>Bob</td>
+              <td>2nd</td>
+              <td>3</td>
+              <td>3</td>
+            </tr>
+            <tr>
+              <td><span class="badge b"></span>Cara</td>
+              <td>3rd</td>
+              <td>7</td>
+              <td>1</td>
+            </tr>
+            <tr>
+              <td><span class="badge x"></span>Dev</td>
+              <td>4th</td>
+              <td>11</td>
+              <td>0</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="go-actions">
+          <button class="go-btn rematch">Rematch</button>
+          <button class="go-btn home">Back to Home</button>
+        </div>
+      </div>
+
+      <div class="callout">
+        <b>Note:</b> this row reuses <code>GameCard size="small"</code> + the
+        existing <code>playHistory</code> / <code>lastPlay</code> data already
+        passed to <code>GameOverView</code>. It is independent of the
+        reveal-phase fix — it can ship together or be deferred. The reveal-phase
+        fix (Sections 1–2) is the primary deliverable.
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- SECTION 4 — decisions summary                                  -->
+    <!-- ============================================================== -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-num">04</span>
+        <span class="section-name">Decisions baked into this mockup</span>
+      </div>
+      <ul class="notes">
+        <li>
+          <b>Timer:</b> removed from the reveal phase entirely (direction B).
+          <code>SHOW_FINAL_PLAY</code> persists until "Continue to Results" is
+          clicked. The shrink progress-bar is gone.
+        </li>
+        <li>
+          <b>Named constant:</b> no timer literal at all in the chosen path. (If
+          a fallback auto-advance is ever wanted, it would be a named constant —
+          not an inline <code>4000</code>.)
+        </li>
+        <li>
+          <b>The real fix:</b> reveal banner = top ribbon + radial spotlight
+          instead of full-screen dim+blur, so the final cards stay legible on
+          desktop AND mobile.
+        </li>
+        <li>
+          <b>Final play, restyled:</b> the table's current play is promoted into
+          a gold-ringed "Winning Play" card during the reveal — no new data
+          needed, it's the existing <code>lastPlay</code>.
+        </li>
+        <li>
+          <b>Reconnect:</b> joining an already-COMPLETED game still skips
+          straight to results (no reveal phase) — unchanged from LLD 43.
+        </li>
+        <li>
+          <b>Optional results-screen row:</b> small final-play row on
+          <code>GameOverView</code> for users who reach results and still want
+          to see the cards.
+        </li>
+        <li>
+          <b>Reduced motion:</b> deal-in / lift animations gated behind
+          <code>prefers-reduced-motion</code>; cards appear instantly, fully
+          legible.
+        </li>
+      </ul>
+    </div>
+
+    <div class="foot">
+      Mockup for LLD 72 · matches existing felt/gold/Libre-Baskerville game
+      styling · throwaway design artifact, not production code.
+    </div>
+  </body>
+</html>
