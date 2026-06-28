@@ -1,0 +1,1381 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rematch / Play Again — Game Over Mockups</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --gold-bright: #d4b45a;
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --error-text: #e05555;
+        --ready-green: #4f9d69;
+        --font-ui: "DM Sans", sans-serif;
+        --font-mono: "JetBrains Mono", "Courier New", monospace;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 24px 96px;
+        background-image:
+          radial-gradient(
+            circle at 20% 10%,
+            rgba(201, 168, 76, 0.04),
+            transparent 40%
+          ),
+          radial-gradient(
+            circle at 85% 90%,
+            rgba(37, 107, 66, 0.06),
+            transparent 45%
+          );
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 36px;
+      }
+      .page-head h1 {
+        font-size: 1.55rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin-top: 10px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 820px;
+        line-height: 1.55;
+      }
+      .page-head .decision-note {
+        margin-top: 16px;
+        padding: 14px 18px;
+        border: 1px solid var(--table-rim-light);
+        border-left: 3px solid var(--gold-accent);
+        border-radius: 6px;
+        background: rgba(201, 168, 76, 0.05);
+        font-size: 0.86rem;
+        line-height: 1.6;
+        color: var(--text-primary);
+        max-width: 820px;
+      }
+      .page-head .decision-note b {
+        color: var(--gold-accent);
+      }
+
+      .direction {
+        max-width: 1180px;
+        margin: 0 auto 64px;
+      }
+      .direction__head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 6px;
+      }
+      .direction__tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #0a0a0a;
+        background: var(--gold-accent);
+        padding: 3px 9px;
+        border-radius: 4px;
+      }
+      .direction__head h2 {
+        font-size: 1.18rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+      .direction__desc {
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        line-height: 1.55;
+        max-width: 860px;
+        margin-bottom: 22px;
+      }
+      .direction__desc b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .state-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+      }
+      .state {
+        flex: 1 1 340px;
+        min-width: 320px;
+      }
+      .state__label {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .state__label::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-glow);
+      }
+
+      /* ---- The game-over screen frame (mirrors production .game-over) ---- */
+      .frame {
+        background: radial-gradient(
+          ellipse at 50% 0%,
+          var(--felt-light) 0%,
+          var(--felt) 55%,
+          #143823 100%
+        );
+        border-radius: 14px;
+        padding: 30px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 470px;
+        overflow: hidden;
+        position: relative;
+      }
+      .frame::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(
+          circle at 50% 40%,
+          transparent 60%,
+          rgba(0, 0, 0, 0.35) 100%
+        );
+        pointer-events: none;
+      }
+
+      .panel {
+        position: relative;
+        z-index: 1;
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 28px 32px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        width: 100%;
+        max-width: 380px;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+      }
+
+      .winner {
+        font-family: var(--font-ui);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-shadow: 0 0 24px var(--gold-glow);
+        text-align: center;
+        line-height: 1.1;
+      }
+      .winner .trophy {
+        display: block;
+        font-size: 1.6rem;
+        margin-bottom: 2px;
+      }
+
+      table.scores {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+        color: var(--text-primary);
+      }
+      table.scores th {
+        color: var(--gold-accent);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.66rem;
+        letter-spacing: 0.06em;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--table-rim-light);
+        text-align: left;
+      }
+      table.scores td {
+        padding: 6px 10px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+      }
+      .player-cell {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .badge {
+        display: inline-block;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .badge--gold {
+        background: #c9a84c;
+        box-shadow: 0 0 6px rgba(201, 168, 76, 0.5);
+      }
+      .badge--silver {
+        background: #a8a8a8;
+      }
+      .badge--bronze {
+        background: #b87333;
+      }
+      .badge--grey {
+        background: #5a5a5a;
+      }
+
+      /* ---- Buttons ---- */
+      .actions {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        justify-content: center;
+      }
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.92rem;
+        font-weight: 600;
+        padding: 11px 22px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          transform 0.1s ease,
+          box-shadow 0.2s ease,
+          opacity 0.15s ease;
+        flex: 1;
+        text-align: center;
+        white-space: nowrap;
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn--rematch {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        box-shadow: 0 0 0 rgba(201, 168, 76, 0);
+      }
+      .btn--rematch:hover {
+        background: var(--gold-bright);
+        box-shadow: 0 4px 18px rgba(201, 168, 76, 0.35);
+      }
+      .btn--home {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+      .btn--home:hover {
+        border-color: var(--text-primary);
+        background: rgba(232, 220, 200, 0.07);
+      }
+      .btn--ghost {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1.5px solid var(--text-muted);
+      }
+      .btn--accent-outline {
+        background: transparent;
+        color: var(--gold-accent);
+        border: 1.5px solid var(--gold-accent);
+      }
+      .btn--accent-outline:hover {
+        background: rgba(201, 168, 76, 0.12);
+      }
+      .btn[disabled] {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      .btn--waiting {
+        background: rgba(201, 168, 76, 0.12);
+        color: var(--gold-accent);
+        border: 1.5px solid var(--gold-accent);
+        cursor: default;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+      }
+      .btn--waiting:hover {
+        background: rgba(201, 168, 76, 0.12);
+        box-shadow: none;
+      }
+
+      .spinner {
+        width: 13px;
+        height: 13px;
+        border: 2px solid rgba(201, 168, 76, 0.3);
+        border-top-color: var(--gold-accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        flex-shrink: 0;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        animation: pulse 1.3s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.4;
+          transform: scale(0.8);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.15);
+        }
+      }
+
+      /* ---- Rematch roster (Option B) ---- */
+      .rematch-block {
+        width: 100%;
+        border-top: 1px solid var(--table-rim-light);
+        padding-top: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .rematch-block__head {
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        text-align: center;
+      }
+      .roster {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        width: 100%;
+      }
+      .roster__row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 12px;
+        background: rgba(45, 24, 16, 0.5);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        font-size: 0.86rem;
+      }
+      .roster__row--ready {
+        border-color: rgba(79, 157, 105, 0.55);
+        background: rgba(79, 157, 105, 0.08);
+      }
+      .roster__row--left {
+        opacity: 0.45;
+      }
+      .roster__status {
+        margin-left: auto;
+        font-size: 0.72rem;
+        font-family: var(--font-mono);
+        letter-spacing: 0.04em;
+      }
+      .roster__status--ready {
+        color: var(--ready-green);
+      }
+      .roster__status--waiting {
+        color: var(--text-muted);
+      }
+      .roster__status--left {
+        color: var(--text-muted);
+        font-style: italic;
+      }
+      .check {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--ready-green);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #0a0a0a;
+        font-size: 0.62rem;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .dot-idle {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid var(--text-muted);
+        flex-shrink: 0;
+      }
+
+      .you-tag {
+        font-size: 0.62rem;
+        font-family: var(--font-mono);
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.14);
+        padding: 1px 5px;
+        border-radius: 3px;
+        letter-spacing: 0.05em;
+      }
+      .host-tag {
+        font-size: 0.62rem;
+        font-family: var(--font-mono);
+        color: var(--text-muted);
+        letter-spacing: 0.05em;
+      }
+
+      .toast {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        color: var(--text-primary);
+        background: rgba(45, 24, 16, 0.9);
+        border: 1px solid var(--gold-accent);
+        border-radius: 8px;
+        padding: 10px 16px;
+        text-align: center;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      .toast .pulse-dot {
+        background: var(--gold-accent);
+      }
+
+      .guest-nudge {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .guest-nudge a {
+        color: var(--gold-accent);
+        text-decoration: underline;
+      }
+
+      .helper {
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        text-align: center;
+        line-height: 1.4;
+        max-width: 300px;
+      }
+      .helper b {
+        color: var(--text-primary);
+      }
+
+      .legend {
+        max-width: 1180px;
+        margin: 0 auto 8px;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      .countdown-num {
+        font-family: var(--font-mono);
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Rematch / Play Again — Game Over Screen</h1>
+      <p>
+        Three directions for turning the dead "Rematch (Coming soon)" button
+        into a working flow. All preserve the existing felt-table panel, score
+        table, gold-accent buttons, and the guest sign-up nudge. The directions
+        differ in the <b>multiplayer coordination model</b> — that is the real
+        product decision, and it drives the server-side rematch flow in the LLD.
+      </p>
+      <div class="decision-note">
+        <b>What you are choosing:</b> not just a button style, but
+        <b>how a rematch is coordinated across players</b>. Option A = instant
+        host-driven (one click, everyone is pulled in). Option B = opt-in
+        ready-up (each present player accepts; a roster shows who is in). Option
+        C = lightweight host-driven with an auto-route (host clicks, others get
+        a brief "starting…" then land in the new game). Each option below also
+        shows the relevant button/roster states.
+      </div>
+    </div>
+
+    <!-- ============================= OPTION A ============================= -->
+    <div class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option A</span>
+        <h2>Instant Rematch — host-driven, one click</h2>
+      </div>
+      <p class="direction__desc">
+        The <b>host</b> sees an active <b>Rematch</b> button. One click creates
+        a new round with everyone still present and
+        <b>immediately routes all connected players into it</b> (reusing the
+        same room code). Non-host players see a passive "host can start a
+        rematch" state, then get pulled in automatically. Simplest model, lowest
+        friction — matches the existing host-only "Start Game" pattern in the
+        lobby. Players who left are simply dropped; the new round starts with
+        whoever is still here (min 2).
+      </p>
+
+      <div class="state-row">
+        <!-- A1: host idle -->
+        <div class="state">
+          <div class="state__label">A · Host view — ready to rematch</div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Place</th>
+                    <th>Cards</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--silver"></span>Bob</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--bronze"></span>Cara</span
+                      >
+                    </td>
+                    <td>3rd</td>
+                    <td>7</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--grey"></span>Dan</span
+                      >
+                    </td>
+                    <td>4th</td>
+                    <td>12</td>
+                    <td>0</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions">
+                <button class="btn btn--rematch">Rematch</button>
+                <button class="btn btn--home">Back to Home</button>
+              </div>
+              <div class="helper">
+                Starts a new round with everyone still here, same room code.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- A2: non-host waiting -->
+        <div class="state">
+          <div class="state__label">A · Non-host view — waiting on host</div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Place</th>
+                    <th>Cards</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--silver"></span>Bob</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--bronze"></span>Cara</span
+                      >
+                    </td>
+                    <td>3rd</td>
+                    <td>7</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--grey"></span>Dan</span
+                      >
+                    </td>
+                    <td>4th</td>
+                    <td>12</td>
+                    <td>0</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions">
+                <button class="btn btn--waiting">
+                  <span class="pulse-dot"></span>Host can start a rematch
+                </button>
+                <button class="btn btn--home">Back to Home</button>
+              </div>
+              <div class="helper">
+                You'll be taken into the new round automatically.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- A3: starting -->
+        <div class="state">
+          <div class="state__label">A · After click — starting new round</div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Place</th>
+                    <th>Cards</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--silver"></span>Bob</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--bronze"></span>Cara</span
+                      >
+                    </td>
+                    <td>3rd</td>
+                    <td>7</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--grey"></span>Dan</span
+                      >
+                    </td>
+                    <td>4th</td>
+                    <td>12</td>
+                    <td>0</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions">
+                <button class="btn btn--waiting" disabled>
+                  <span class="spinner"></span>Starting…
+                </button>
+                <button class="btn btn--home" disabled>Back to Home</button>
+              </div>
+              <div class="helper">Dealing a new hand…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================= OPTION B ============================= -->
+    <div class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option B</span>
+        <h2>Ready-Up Rematch — opt-in, every player accepts</h2>
+      </div>
+      <p class="direction__desc">
+        <b>Any present player</b> can hit <b>Play Again</b>. Doing so marks them
+        "ready" and reveals a <b>roster</b> showing who has accepted, who is
+        still deciding, and who already left. The new round starts automatically
+        once <b>all still-present players are ready</b> (host can also
+        force-start with the ready subset, min 2). Most explicit and fair for
+        casual groups — no one is yanked into a game they didn't agree to.
+        Players who left the table show as grayed and are excluded. Highest
+        clarity, slightly more friction.
+      </p>
+
+      <div class="state-row">
+        <!-- B1: idle / nobody ready -->
+        <div class="state">
+          <div class="state__label">B · Idle — invite to play again</div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Place</th>
+                    <th>Cards</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--silver"></span>Bob</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--bronze"></span>Cara</span
+                      >
+                    </td>
+                    <td>3rd</td>
+                    <td>7</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--grey"></span>Dan</span
+                      >
+                    </td>
+                    <td>4th</td>
+                    <td>12</td>
+                    <td>0</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions">
+                <button class="btn btn--rematch">Play Again</button>
+                <button class="btn btn--home">Back to Home</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- B2: ready roster in progress -->
+        <div class="state">
+          <div class="state__label">
+            B · You're ready — waiting on others (2/3)
+          </div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <div class="rematch-block">
+                <div class="rematch-block__head">
+                  Play Again &middot; 2 of 3 ready
+                </div>
+                <div class="roster">
+                  <div class="roster__row roster__row--ready">
+                    <span class="check">&#10003;</span> Alice
+                    <span class="you-tag">YOU</span>
+                    <span class="roster__status roster__status--ready"
+                      >Ready</span
+                    >
+                  </div>
+                  <div class="roster__row roster__row--ready">
+                    <span class="check">&#10003;</span> Bob
+                    <span class="roster__status roster__status--ready"
+                      >Ready</span
+                    >
+                  </div>
+                  <div class="roster__row">
+                    <span class="dot-idle"></span> Cara
+                    <span class="roster__status roster__status--waiting"
+                      >Deciding…</span
+                    >
+                  </div>
+                  <div class="roster__row roster__row--left">
+                    <span class="dot-idle"></span> Dan
+                    <span class="roster__status roster__status--left"
+                      >Left</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="actions">
+                <button class="btn btn--ghost">Cancel</button>
+                <button class="btn btn--home">Back to Home</button>
+              </div>
+              <div class="helper">
+                Starts automatically when everyone's ready.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- B3: all ready / starting -->
+        <div class="state">
+          <div class="state__label">B · Everyone ready — starting</div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <div class="rematch-block">
+                <div class="rematch-block__head">
+                  Play Again &middot; all ready
+                </div>
+                <div class="roster">
+                  <div class="roster__row roster__row--ready">
+                    <span class="check">&#10003;</span> Alice
+                    <span class="you-tag">YOU</span>
+                    <span class="roster__status roster__status--ready"
+                      >Ready</span
+                    >
+                  </div>
+                  <div class="roster__row roster__row--ready">
+                    <span class="check">&#10003;</span> Bob
+                    <span class="roster__status roster__status--ready"
+                      >Ready</span
+                    >
+                  </div>
+                  <div class="roster__row roster__row--ready">
+                    <span class="check">&#10003;</span> Cara
+                    <span class="roster__status roster__status--ready"
+                      >Ready</span
+                    >
+                  </div>
+                  <div class="roster__row roster__row--left">
+                    <span class="dot-idle"></span> Dan
+                    <span class="roster__status roster__status--left"
+                      >Left</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="toast">
+                <span class="spinner"></span>Dealing new round…
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================= OPTION C ============================= -->
+    <div class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Option C</span>
+        <h2>Quick Rematch — host-driven with countdown route</h2>
+      </div>
+      <p class="direction__desc">
+        Middle ground. The <b>host</b> hits <b>Rematch</b>; instead of an
+        instant yank (A) or a full ready-up (B), every present player gets a
+        short <b>"New round starting in 3…"</b> toast with a chance to bail to
+        Home. Anyone who doesn't leave is routed into the new round. Keeps host
+        control and low friction, but gives non-host players a beat of warning
+        and an exit — good for avoiding the "wait, I wasn't ready" complaint of
+        pure Option A. Departed players are excluded.
+      </p>
+
+      <div class="state-row">
+        <!-- C1: host idle -->
+        <div class="state">
+          <div class="state__label">C · Host view — ready to rematch</div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Place</th>
+                    <th>Cards</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--silver"></span>Bob</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--bronze"></span>Cara</span
+                      >
+                    </td>
+                    <td>3rd</td>
+                    <td>7</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--grey"></span>Dan</span
+                      >
+                    </td>
+                    <td>4th</td>
+                    <td>12</td>
+                    <td>0</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions">
+                <button class="btn btn--rematch">Rematch</button>
+                <button class="btn btn--home">Back to Home</button>
+              </div>
+              <div class="helper">
+                <b>3 players</b> still here will be brought into the new round.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- C2: countdown for everyone -->
+        <div class="state">
+          <div class="state__label">C · Countdown — all present players</div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Place</th>
+                    <th>Cards</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--silver"></span>Bob</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--bronze"></span>Cara</span
+                      >
+                    </td>
+                    <td>3rd</td>
+                    <td>7</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--grey"></span>Dan</span
+                      >
+                    </td>
+                    <td>4th</td>
+                    <td>12</td>
+                    <td>0</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="toast">
+                <span class="pulse-dot"></span>New round starting in
+                <span class="countdown-num">3</span>…
+              </div>
+              <div class="actions">
+                <button class="btn btn--ghost">Leave instead</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- C3: too few players edge case -->
+        <div class="state">
+          <div class="state__label">C · Edge — too few players left</div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Place</th>
+                    <th>Cards</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--grey"></span>Bob</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>9</td>
+                    <td>3</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions">
+                <button class="btn btn--rematch" disabled>Rematch</button>
+                <button class="btn btn--home">Back to Home</button>
+              </div>
+              <div class="helper">
+                Only <b>you</b> are still here. Need at least 2 players —
+                <a style="color: var(--gold-accent)" href="#">invite someone</a>
+                or head home.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================= SHARED STATES ============================= -->
+    <div class="direction">
+      <div class="direction__head">
+        <span class="direction__tag">Shared</span>
+        <h2>Cross-cutting states (apply to whichever option is chosen)</h2>
+      </div>
+      <p class="direction__desc">
+        These states are independent of the coordination model and should be
+        handled regardless of which option ships.
+      </p>
+
+      <div class="state-row">
+        <!-- Guest nudge coexisting -->
+        <div class="state">
+          <div class="state__label">
+            Guest — rematch + sign-up nudge coexist
+          </div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Place</th>
+                    <th>Cards</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--silver"></span>You
+                        (guest)</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--bronze"></span>Cara</span
+                      >
+                    </td>
+                    <td>3rd</td>
+                    <td>7</td>
+                    <td>1</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions">
+                <button class="btn btn--rematch">Play Again</button>
+                <button class="btn btn--home">Back to Home</button>
+              </div>
+              <div class="guest-nudge">
+                <a href="#">Sign up to save your stats</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error state -->
+        <div class="state">
+          <div class="state__label">Error — rematch could not start</div>
+          <div class="frame">
+            <div class="panel">
+              <div class="winner">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Place</th>
+                    <th>Cards</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--silver"></span>Bob</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions">
+                <button class="btn btn--rematch">Rematch</button>
+                <button class="btn btn--home">Back to Home</button>
+              </div>
+              <div
+                class="toast"
+                style="
+                  border-color: var(--error-text);
+                  color: var(--error-text);
+                "
+              >
+                Couldn't start rematch. Try again.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile -->
+        <div class="state">
+          <div class="state__label">Mobile — stacked buttons (375px)</div>
+          <div class="frame" style="min-height: 470px">
+            <div class="panel" style="max-width: 300px; padding: 22px 18px">
+              <div class="winner" style="font-size: 1.25rem">
+                <span class="trophy">&#127942;</span>Alice wins!
+              </div>
+              <table class="scores" style="font-size: 0.76rem">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Pl</th>
+                    <th>C</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--gold"></span>Alice</span
+                      >
+                    </td>
+                    <td>1st</td>
+                    <td>0</td>
+                    <td>5</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--silver"></span>Bob</span
+                      >
+                    </td>
+                    <td>2nd</td>
+                    <td>3</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="player-cell"
+                        ><span class="badge badge--bronze"></span>Cara</span
+                      >
+                    </td>
+                    <td>3rd</td>
+                    <td>7</td>
+                    <td>1</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="actions" style="flex-direction: column">
+                <button class="btn btn--rematch" style="min-height: 48px">
+                  Play Again
+                </button>
+                <button class="btn btn--home" style="min-height: 48px">
+                  Back to Home
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      Rendering notes: all colors, fonts, panel/border treatment, and the score
+      table mirror the production <code>GameOverView.vue</code> tokens
+      (<code>game-variables.css</code>). The frame's green felt gradient is
+      mockup-only context to show the panel on its real backdrop. Trophy glyph
+      shown for context — production currently uses a text winner line.
+    </div>
+  </body>
+</html>
