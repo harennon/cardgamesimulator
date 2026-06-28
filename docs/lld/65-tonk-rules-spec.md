@@ -222,7 +222,7 @@ Every method of `GameEngine` (`src/backend/engine/game-engine.ts`) maps as follo
 
 | Method | Tonk behavior |
 | --- | --- |
-| `initialize(gameId, players, config, prng)` | Validate `3 ≤ players.length ≤ 6` (proposed range — §9.1). Build the deck deterministically (§8.1) using `prng` and `config.options` (optional `deckTargetRounds`, `extraDecks`): ≤5 players → 1 deck (54), no cut; 6+ → `ceil(players/5)` decks shuffled then cut. Deal 5 each; rest → stock; trick-1 discard empty. `currentPlayerIndex` = 0. `status = IN_PROGRESS`, `version = 1`, `tallies` all 0, `trickNumber = 1`, `turnPhase = "discard"`. |
+| `initialize(gameId, players, config, prng)` | Validate `3 ≤ players.length ≤ 6` (proposed range — §9.1). Build the deck deterministically (§8.1) using `prng` and `config.options` (optional `deckRoundsTarget` [creator-set, range 5–12, default 8 — §8.1, §8.8], `extraDecks`): the §8.1 cut formula applies uniformly (default/high `deckRoundsTarget` at ≤5 → no cut; lower target or 6+ → real cut). Deal 5 each; rest → stock; trick-1 discard empty. `currentPlayerIndex` = 0. `status = IN_PROGRESS`, `version = 1`, `tallies` all 0, `trickNumber = 1`, `turnPhase = "discard"`. Reads `config.options.deckRoundsTarget` defaulting to 8 (⚠ not populated today — `config.options` is `{}` at `gameService.ts:102`; see §8.8). |
 | `validateAction(state, action)` | Pure predicate: true iff `applyAction` would succeed (Big2 pattern — delegate). |
 | `applyAction(state, action)` | Dispatch on `action.type ∈ {discard, draw, callTonk}` and `turnPhase`. Deterministic; no PRNG param. **All inter-trick and end-game randomness (new deck cut, TRUE-LOSER draw) uses a PRNG re-seeded deterministically from `randomSeed` — see ⚠-A.** Returns immutable new state, `version + 1`. |
 | `getPlayerView(state, playerId)` | Your hand only; opponents as counts; public discard top + count, `drawableDiscard` (the turn-start snapshot, so the current player and spectators can see what is drawable from the discard — distinct from the live top), stock **count** (not cards), tallies, trickNumber, turnPhase, log, winner/scores. `validActions` populated only on your turn (§6.2). |
@@ -282,19 +282,38 @@ The turn timer (LLD 07) calls `getAutoTimeoutAction(state)` when a player's cloc
 
 ### 8.1 Deck composition, cut, and joker count selection (engine-critical, resolved — proposed defaults)
 
-**Deck count.** `numDecks = ceil(players.length / 5)` (proposed default; `+ config.options.extraDecks`, default 0). 3–5 players → 1 deck; 6 players → 2 decks. **6 MUST trigger 2 decks** — this is the ruleset's own single→multi-deck cutoff. Each deck contributes **52 standard cards + 2 Jokers**, so the pool has `54 * numDecks` cards and `2 * numDecks` Jokers. (`Card` type in `engine-types.ts` has no Joker rank — see ⚠ §8.6.)
+**Deck count.** `numDecks = ceil(players.length / 5)` (proposed default; `+ config.options.extraDecks`, default 0). 3–5 players → 1 deck; 6 players → 2 decks. **6 MUST trigger 2 decks** — this is the ruleset's own single→multi-deck cutoff. Each deck contributes **52 standard cards + 2 Jokers**, so `poolSize = 54 * numDecks` cards and `2 * numDecks` Jokers. (`Card` type in `engine-types.ts` has no Joker rank — see ⚠ §8.6.)
 
-**≤5 players (single deck): NO CUT.** The deck is exactly **1 deck = 52 + 2 Jokers = 54 cards**, and **all 54 cards are used every trick** — there is no cut. The per-trick reshuffle (deterministic from the sub-seed) changes the **draw ORDER** only; the **card SET is the identical 54 cards every trick**. The ruleset's "the cards used changes every trick" property is a **6+ multi-deck feature, NOT a ≤5 single-deck feature** — at ≤5 players the set is intentionally the same 54 each trick and only the order varies by seed. This is the intended behavior.
+**Creator-configurable rounds target.** The cut is driven by `deckRoundsTarget`, an **integer the game creator picks in the lobby** = how many rounds the deck should last after dealing. **Range 5–12, default 8** (the 7–9-round heuristic sits inside that range). (This is the field previously named `roundsTarget` / `config.options.deckTargetRounds` and treated as an internal default; it is now exposed as a per-game creator control — renamed `deckRoundsTarget`. **NOTE: this is not wired to the engine today — see the new cross-stack plumbing in §8.8 (SCOPE EXPANSION).**) Whether to ship it as a creator control vs. keep it an internal constant for v1 is a sign-off question — §9.9.
 
-**6+ players (multi-deck): cut to target rounds.** Shuffle all `numDecks` decks together with the PRNG, **then cut** the pool down to a target size so it lasts ~7–9 rounds after dealing:
-- `targetCards = handCardsDealt + roundsTarget * players.length`, where `handCardsDealt = 5 * players.length` and `roundsTarget` defaults to **8** (the 7–9-round heuristic).
-- Clamp `targetCards` to `[handCardsDealt + players.length, 54 * numDecks]` (never cut below one post-deal round; never exceed the available pool).
-- **The cut** removes the top `(54 * numDecks - targetCards)` cards from the shuffled pool. The cut is **blind** — removed cards may include Jokers. Because the cut takes a different subset from the 108+-card pool each trick (sub-seed varies by trick), the **card set genuinely changes every trick** here — this is where the ruleset's changing-cards property lives. (If a trick's cut deck ends up with 0 Jokers it has no effect on that trick — Jokers only matter for hand value, 0, and the end-of-game draw, which uses a **fresh full pool**, §8.5.)
-- Example (6 players, 2 decks → 108-card pool): `handCardsDealt = 30`, `targetCards = 30 + 8*6 = 78`, so cut `108 - 78 = 30` cards.
+**Unified cut formula (applies to BOTH ≤5 and 6+).** The cut amount is computed the same way for every player count; ≤5-no-cut and 6+-cut both fall out of the same math:
 
-**Overrides.** `config.options.deckTargetRounds` (number) and `config.options.extraDecks` (number, default 0) allow tuning; v1 lobby may not expose these (defaults used). `GameEngineConfig.options` is already `Record<string, unknown>` (**verified in `game-engine.ts`**) — no plumbing change.
+```
+handCardsDealt = 5 * players.length
+poolSize       = 54 * numDecks
+targetCards    = handCardsDealt + deckRoundsTarget * players.length
+cutAmount      = max(0, poolSize - clamp(targetCards, [handCardsDealt + players.length, poolSize]))
+```
 
-**Determinism.** The per-trick deck uses sub-seed `hashSeed(randomSeed + ":trick:" + trickNumber)`; same seed + trick → identical shuffle (and identical cut for 6+) (testing-principles #2; can be fixed via `FixedPRNG`).
+- `clamp(x, [lo, hi])` = `min(hi, max(lo, x))`. The lower bound `handCardsDealt + players.length` guarantees the deck always survives at least one post-deal round (never cut below it); the upper bound `poolSize` means we never "need" more cards than exist, so `cutAmount` is never negative.
+- **`cutAmount = 0` (NO CUT) falls out automatically whenever `targetCards ≥ poolSize`** — the clamp caps `targetCards` at `poolSize`, making `poolSize - clamp(...) = 0`. With the default/high `deckRoundsTarget`, this is the normal case at ≤5 players: all `54 * numDecks` cards stay in play and only the per-trick reshuffle ORDER varies by seed (the card SET is identical every trick). This is why "≤5 = no cut" is a **consequence of the default/high target, not a hard rule** — a creator who lowers `deckRoundsTarget` enough makes `targetCards < poolSize` and DOES cut, even at 3–5 players (this is how a low-player-count game gets the "cards change every trick" feel on demand).
+- **`cutAmount > 0` (REAL CUT)** whenever the creator's `targetCards < poolSize`. The cut removes the top `cutAmount` cards from the shuffled pool. The cut is **blind** — removed cards may include Jokers. Because the cut takes a different subset of the pool each trick (sub-seed varies by trick), the **card set genuinely changes every trick** when a cut applies. (If a trick's cut deck ends up with 0 Jokers it has no effect on that trick — Jokers only matter for hand value, 0, and the end-of-game draw, which uses a **fresh full pool**, §8.5.)
+
+**Worked examples:**
+
+| Scenario | players | numDecks | poolSize | handCardsDealt | deckRoundsTarget | targetCards (raw) | clamp range | targetCards (clamped) | cutAmount |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ≤5, default → NO cut (boundary) | 3 | 1 | 54 | 15 | 8 | 15 + 8·3 = 39 | [18, 54] | 39 | max(0, 54−39) = **15** |
+| ≤5, default → NO cut | 3 | 1 | 54 | 15 | 12 | 15 + 12·3 = 51 | [18, 54] | 51 | max(0, 54−51) = **3** |
+| ≤5, LOW target → DOES cut | 3 | 1 | 54 | 15 | 5 | 15 + 5·3 = **30** | [18, 54] | 30 | max(0, 54−30) = **24** |
+| 6+, default | 6 | 2 | 108 | 30 | 8 | 30 + 8·6 = **78** | [36, 108] | 78 | max(0, 108−78) = **30** |
+
+- The 3-player default (`deckRoundsTarget = 8`) yields `targetCards = 39 < poolSize = 54`, so by the formula it cuts 15 cards. To get the previous "≤5 = no cut by default" behavior the creator/default must pick a `deckRoundsTarget` high enough that `targetCards ≥ 54`; for 3 players that needs `deckRoundsTarget ≥ 13` (`15 + 13·3 = 54`). **This is the boundary to verify and confirm:** if the product intent is "≤5 = no cut at the *default*," then either the default for ≤5 must be raised to that boundary, or the no-cut-by-default framing must be stated as "only at the top of the 5–12 range." The formula itself is correct and deterministic at every value; the open question is purely which default lands ≤5 on no-cut. **Flagged for sign-off (§9.9).** Regardless of default, a LOW creator-set target (e.g. 5) demonstrably DOES cut at ≤5 (3 players, `deckRoundsTarget = 5` → `targetCards = 30`, `cutAmount = 24`), and a high enough target yields NO cut.
+- The 6-player default (`deckRoundsTarget = 8`) yields `targetCards = 78`, `cutAmount = 30`, consistent with the prior worked example.
+
+**Overrides.** `config.options.extraDecks` (number, default 0) still allows deck-count tuning. The old `config.options.deckTargetRounds` is renamed/superseded by the creator-facing `deckRoundsTarget`. **⚠ Both `deckTargetRounds` and `extraDecks` are DEAD config today:** `config.options` is hardcoded to `{}` at `gameService.ts:102`, so nothing in `config.options` reaches the engine. Wiring `deckRoundsTarget` from the lobby to the engine therefore requires NEW cross-stack plumbing (API + DB + frontend), specified in **§8.8 (SCOPE EXPANSION)**; `GameEngineConfig.options` being typed `Record<string, unknown>` (**verified in `game-engine.ts`**) is necessary but **not sufficient** — the value still has to be put there at start time.
+
+**Determinism.** The per-trick deck uses sub-seed `hashSeed(randomSeed + ":trick:" + trickNumber)`; same seed + trick + `deckRoundsTarget` → identical shuffle AND identical cut (testing-principles #2; can be fixed via `FixedPRNG`).
 
 ### 8.2 Discarding multiples
 
@@ -346,23 +365,51 @@ Draw legality is governed by the **turn-start snapshot** `drawableDiscard` (§4.
 | Player ≥150 but also lowest tally | Still "lost" (any ≥150 has lost, per ruleset); cannot be the `winner`. If *all* players are ≥150, `winner` = lowest tally among them but they are still all "lost"; TRUE LOSER decides. (Confirm at §9.8 whether `winner` should be null in an all-lost game.) |
 | Initialize with <3 or >6 players | `initialize` throws `"Tonk requires 3-6 players"` (proposed range — §9.1). |
 | Reconnection / spectator mid-trick | Standard `getPlayerView`/`getSpectatorView`; revealed hands only exist transiently in the log at trick end. |
+| Creator omits `deckRoundsTarget` | Default to **8** (the field is optional in the request; engine falls back to the default if `config.options.deckRoundsTarget` is absent). |
+| `deckRoundsTarget` out of range (<5 or >12, or non-integer) | Reject at the API boundary (§8.8); the engine additionally clamps/defaults defensively but the authoritative validation is `createGame.ts`. |
+
+### 8.8 Creator configuration plumbing (`deckRoundsTarget`) ⚠ SCOPE EXPANSION (beyond engine #57)
+
+> **This subsection is a SCOPE EXPANSION flagged for sign-off (§9.9).** Exposing `deckRoundsTarget` as a creator control is **not** an engine-only change — it creates new **API + DB + frontend** work that belongs to sub-issues *beyond* #57. The engine (#57) only needs to *read* `config.options.deckRoundsTarget` (defaulting to 8); everything below is what must exist *outside* the engine for the creator's lobby choice to actually reach `initialize`. Cross-reference §10 (Dependencies). If the user prefers to keep `deckRoundsTarget` an **internal constant for v1** (no creator control), **none of this plumbing is needed** and only the engine default applies — that is the alternative offered at §9.9.
+
+**The core problem (verified against source).** `config.options` is **hardcoded to `{}`** at `gameService.ts:102`:
+
+```ts
+const config = { maxPlayers: game.maxPlayers, minPlayers, options: {} }; // gameService.ts:102
+const state = engine.initialize(gameId, players, config, prng);          // gameService.ts:104
+```
+
+So there is **no path today** for any per-game option (including the §8.1 `deckTargetRounds`/`extraDecks` "overrides") to reach the engine — they are **dead config**. Adding a creator control means building the path, not flipping a flag. Mirror the **existing, fully-traced `turnTimerSeconds` precedent** end-to-end:
+
+| Step | File:line (verified) | Change for `deckRoundsTarget` |
+| --- | --- | --- |
+| (a) Request type | `src/shared/model.ts` — `CreateGameRequest` (interface at line 13; `turnTimerSeconds: 30 \| 60 \| 90` at line 17) | Add `deckRoundsTarget?: number` to `CreateGameRequest` (optional; default applied if absent). Also surface it on the persisted game shape: `SerializableGame` (line 48) carries `turnTimerSeconds: number \| null` at line 56 — add a parallel `deckRoundsTarget: number \| null`. |
+| (b) API validation | `src/backend/api/game/createGame.ts` — `VALID_TIMER_VALUES = new Set([30,60,90])` at line 10; rejects out-of-set at lines 21–22 | Mirror the timer check: validate `deckRoundsTarget` is an **integer in [5, 12]**; reject with `BadRequestError` otherwise. (A range check rather than a set, but the same reject-at-boundary shape.) If absent, treat as default 8 (do not reject). |
+| (c) DB persistence | `src/backend/database/entities/Game.ts` — persisted column `turnTimerSeconds: number \| null = null;` at line 11 | Add a **NEW persisted field/column** `deckRoundsTarget: number \| null = null;`. **There is NO generic per-game options column today** (the entity has only specific columns), so a dedicated column is required for the creator's choice to survive to game start. |
+| (d) Start-time wiring | `src/backend/service/gameService.ts` — `startGame` (line 72); the hardcoded `options: {}` (line 102) | Replace `options: {}` with `options: { deckRoundsTarget: game.deckRoundsTarget ?? 8 }` (read the persisted value; default 8 when null). This is the single line that makes ANY per-game option reach the engine — note it currently sends `{}`, so this is **new wiring, not enabling something that exists**. |
+| (e) Frontend lobby control | (create-game lobby view — same component that renders the turn-timer picker) | Add a number input / slider for `deckRoundsTarget`, range 5–12, default 8, mirroring the existing turn-timer picker; include it in the `CreateGameRequest` payload. Visual spec belongs to `frontend-architect`. |
+
+**Engine side (#57, in scope for the engine LLD):** `initialize` reads `config.options.deckRoundsTarget`, validates/clamps to [5, 12] defensively, defaults to 8 if absent, and feeds it into the §8.1 cut formula. The engine must remain correct and deterministic for any value in range regardless of whether the plumbing (a)–(e) ships — i.e. if (a)–(e) are deferred, the engine simply always sees the default 8.
+
+**Sub-issue ownership.** (a)–(b) and (d) are backend-API/service work; (c) is a DB-entity/migration change; (e) is frontend. These are **distinct sub-issues from the engine (#57)** and must be tracked as such. Flagged here so the expansion is visible at sign-off and not silently absorbed into the engine estimate.
 
 ---
 
 ## 9. Variant Sign-Off (HARD GATE)
 
-**Engine sub-issue #57 MUST NOT begin until the user explicitly signs off on the points below.** This spec is transcribed from the user's authoritative `TONK.Rules.md` (verified faithful); the items marked **(default)** are engine-critical points the ruleset's prose left open, resolved here with a concrete default for confirmation. The three items the prose most clearly leaves open are **§9.1 (player range now proposed as 3–6: ≤5 = single deck with no cut, 6 = two decks then cut to ~7–9 rounds), §9.3 (trick-1 starter = seat 0), and §9.7 (Case-C tie handling)** — these are the primary questions to put to the user. Note §9.1 reverses the earlier "multi-deck deferred" stance: multi-deck is now a proposed default, with 6+ frontend seating flagged as a downstream **non-blocking** CSS-polish cost (`OpponentRow.vue` already renders any count; backend has no hard cap — see §2.3).
+**Engine sub-issue #57 MUST NOT begin until the user explicitly signs off on the points below.** This spec is transcribed from the user's authoritative `TONK.Rules.md` (verified faithful); the items marked **(default)** are engine-critical points the ruleset's prose left open, resolved here with a concrete default for confirmation. The three items the prose most clearly leaves open are **§9.1 (player range now proposed as 3–6: ≤5 = single deck, 6 = two decks then cut), §9.3 (trick-1 starter = seat 0), and §9.7 (Case-C tie handling)** — these are the primary questions to put to the user. Note §9.1 reverses the earlier "multi-deck deferred" stance: multi-deck is now a proposed default, with 6+ frontend seating flagged as a downstream **non-blocking** CSS-polish cost (`OpponentRow.vue` already renders any count; backend has no hard cap — see §2.3). **Also notable: §9.9** proposes making the deck cut creator-configurable via a lobby `deckRoundsTarget` (5–12, default 8); this carries a **SCOPE EXPANSION** (new API + DB + frontend plumbing, §8.8) beyond the engine, and the alternative — keeping it an internal constant for v1 — needs an explicit decision.
 
 Confirm:
 
-1. **Player range = 3–6.** ≤5 players → 1 deck (52 + 2 Jokers = 54), **no cut** (all 54 cards every trick; only draw order varies by seed). 6 players → `ceil(players/5)` = 2 decks shuffled together, **then cut** to ~7–9 rounds. Multi-deck is now adopted as a proposed default (reverses the earlier deferral). 6+ frontend seating is a downstream **non-blocking** CSS-polish cost (§2.3). **(default — confirm)**
-2. **Deck-size heuristic (6+ only):** `roundsTarget = 8`, `numDecks = ceil(players/5)`, deterministic blind cut via seed; Jokers may be cut from a trick's deck. At ≤5 players there is **no cut** (the heuristic does not apply). **(default)**
+1. **Player range = 3–6.** ≤5 players → 1 deck (52 + 2 Jokers = 54); 6 players → `ceil(players/5)` = 2 decks shuffled together. Whether ≤5 cuts depends on `deckRoundsTarget` (§8.1, §9.9): at a high-enough target the formula yields **no cut** (all 54 cards every trick; only draw order varies), and 6 players cuts under the default. Multi-deck is now adopted as a proposed default (reverses the earlier deferral). 6+ frontend seating is a downstream **non-blocking** CSS-polish cost (§2.3). **(default — confirm)**
+2. **Deck-size heuristic:** `numDecks = ceil(players/5)`; the cut amount comes from the unified §8.1 formula driven by `deckRoundsTarget` (creator-set, range 5–12, default 8 — §9.9), deterministic blind cut via seed; Jokers may be cut from a trick's deck. NO cut falls out automatically when `targetCards ≥ poolSize` (the default/high-target ≤5 case); a real cut occurs otherwise (6+, or ≤5 with a low target). **(default)**
 3. **Trick-1 starter = seat 0** (ruleset specifies the starter only for trick 2+). **(default)**
 4. **Turn timer auto-action:** discard-phase → discard single highest card (never auto-TONK); draw-phase → draw from stock. Timer re-arms per phase. **(default)**
 5. **Joker = value 0 and the TRUE-LOSER token; TRUE-LOSER draw uses a fresh full pool of `numDecks` decks** (`2 * numDecks` Jokers — 2 at ≤5 players, 4 at 6 players). (From ruleset; confirming Joker count = `2 * numDecks`.) **(default for joker count)**
 6. **Stats mapping:** `winner` = lowest final tally; TRUE LOSER recorded via `breakdown.trueLoser`; recommend the small `StatsService` change (option 2, §6.3) so only the TRUE LOSER counts as a loss. **(default — recommendation)**
 7. **Case C tie (multiple lowest hands at stock-out):** each tied-lowest player adds 30. **(default)**
 8. **All-players-lost edge:** `winner` = lowest tally among them (vs `null`). **(default — confirm)**
+9. **Creator-configurable deck cut (`deckRoundsTarget`) — and the SCOPE EXPANSION it carries.** The game creator picks `deckRoundsTarget` in the lobby (control type: a **number input / slider**, **range 5–12, default 8**), driving the §8.1 cut formula: a low value cuts cards (so the deck "changes every trick") even at 3–5 players; a high value yields no cut. **This is a scope expansion beyond the engine (#57):** it adds new API + DB + frontend plumbing (§8.8) — `deckRoundsTarget?` on `CreateGameRequest` (model.ts), range validation in createGame.ts, a NEW persisted column on the `Game` entity (no generic options column exists today), the `gameService.startGame` change to pass it into `config.options` instead of the hardcoded `{}` (`gameService.ts:102`), and a lobby control mirroring the turn-timer picker. **Confirm whether to build that plumbing, OR keep `deckRoundsTarget` an internal constant for v1** (engine default 8 only, NO creator control — which avoids all the new plumbing entirely). Also confirm the §8.1 default-boundary question: at the default `deckRoundsTarget = 8` the formula DOES cut at ≤5 players (e.g. 15 cards at 3 players); if "≤5 = no cut at the default" is the product intent, the ≤5 default must be raised to the no-cut boundary (≥13 for 3 players). **(default — confirm)**
 
 On sign-off, record the date and any overrides at the top of this section, then proceed to LLD for engine sub-issue #57.
 
@@ -380,8 +427,12 @@ On sign-off, record the date and any overrides at the top of this section, then 
 | `src/backend/engine/game-engine-factory.ts` | Implemented | `TonkEngine` registered here in #57. `"tonk"` already in `GameType`. |
 | `src/backend/service/statsService.ts` | Implemented (verified lines 29–31) | Stats mapping §6.3 (recommend isolated additive change, option 2). |
 | Big2 reference (`big2-engine.ts`, LLD 04) | Implemented | Pattern for immutability, `validateAction` delegation, view filtering, auto-timeout. |
+| `src/shared/model.ts` (`CreateGameRequest`, `SerializableGame`) | Implemented | **§8.8 SCOPE EXPANSION** — add `deckRoundsTarget?` (mirrors `turnTimerSeconds` at line 17 / line 56). |
+| `src/backend/api/game/createGame.ts` | Implemented (`VALID_TIMER_VALUES`, lines 10/21–22) | **§8.8** — validate `deckRoundsTarget` range 5–12 mirroring the timer check. |
+| `src/backend/database/entities/Game.ts` | Implemented (`turnTimerSeconds` column, line 11) | **§8.8** — add NEW persisted `deckRoundsTarget` column (no generic options column exists). |
+| `src/backend/service/gameService.ts` (`startGame`, line 72; `options: {}` line 102) | Implemented | **§8.8** — pass persisted `deckRoundsTarget` into `config.options` instead of the hardcoded `{}`. |
 
-**This LLD has no code dependencies — it is docs-only.** Downstream sub-issue #57 (engine) depends on this spec being **signed off** (§9).
+**This LLD has no code dependencies — it is docs-only.** Downstream sub-issue #57 (engine) depends on this spec being **signed off** (§9). **The §8.8 creator-config plumbing (`deckRoundsTarget`) is a SCOPE EXPANSION beyond #57** — it spans the four rows above (API + DB + frontend) and is gated on §9.9; if the user keeps `deckRoundsTarget` an internal constant, those rows are not touched and only the engine default applies.
 
 ---
 
@@ -392,10 +443,18 @@ On sign-off, record the date and any overrides at the top of this section, then 
 ### Unit — card values & hand value
 - Ace=1, J/Q/K=10, 2–10=face, Joker=0; hand value = sum.
 
-### Unit — deck build & cut (determinism)
-- Same seed + trick → identical deck (and, for 6+, identical cut).
-- **≤5 players → NO cut:** the deck is exactly the 54 cards (52 + 2 Jokers) every trick; across tricks the **card set is identical** and only the draw **ORDER** varies by seed (assert set equality across tricks, order inequality for distinct sub-seeds). Joker count = `2 * numDecks` = 2.
-- **6+ players → multi-deck cut:** `numDecks = ceil(players/5)` (6 → 2 decks); pool = `54 * numDecks` with `2 * numDecks` Jokers; cut down to `targetCards` honoring `roundsTarget` math and the clamp; **different subset per trick** (assert distinct card sets across tricks for distinct sub-seeds); cut is reproducible and may remove Jokers.
+### Unit — deck build & cut (determinism + creator-configurable `deckRoundsTarget`)
+- Same seed + trick + `deckRoundsTarget` → identical deck AND identical cut (determinism preserved across the configurable value).
+- **Cut formula correctness:** for given `(players, numDecks, deckRoundsTarget)`, `cutAmount` matches `max(0, poolSize - clamp(handCardsDealt + deckRoundsTarget * players, [handCardsDealt + players, poolSize]))` (assert the §8.1 worked-example rows, including the 3-player default = 15 and 6-player default = 30).
+- **Low creator-set `deckRoundsTarget` DOES cut at ≤5 players:** with 3 players and `deckRoundsTarget = 5` (`targetCards = 30`, `cutAmount = 24`), a real cut occurs; assert the **card SET changes between tricks** (distinct subsets across tricks for distinct sub-seeds) — the "cards change every trick" feel on demand at low player count.
+- **High/default `deckRoundsTarget` yields NO cut at ≤5 players:** with a `deckRoundsTarget` high enough that `targetCards ≥ poolSize` (e.g. ≥13 at 3 players), `cutAmount = 0`; assert the **card SET is identical across tricks** and only the draw ORDER varies by seed. Joker count = `2 * numDecks` = 2.
+- **6+ players → multi-deck cut:** `numDecks = ceil(players/5)` (6 → 2 decks); pool = `54 * numDecks` with `2 * numDecks` Jokers; cut down to `targetCards` honoring the formula and clamp; **different subset per trick** (assert distinct card sets across tricks for distinct sub-seeds); cut is reproducible and may remove Jokers.
+- **Default applied when absent:** engine with no `config.options.deckRoundsTarget` uses 8.
+
+### Unit / Integration — `deckRoundsTarget` validation (§8.8 plumbing; if the creator control ships)
+- Out-of-range `deckRoundsTarget` (<5, >12, non-integer) is **rejected** at the API boundary (`createGame.ts`), mirroring the `turnTimerSeconds` reject behavior.
+- In-range values (5–12) accepted; absent value defaults to 8.
+- A persisted `deckRoundsTarget` survives `startGame` and reaches `initialize` via `config.options` (not the hardcoded `{}`).
 
 ### Unit — turn phases (discard → draw)
 - `validActions` correct per phase and per TONK gate (§6.2).
