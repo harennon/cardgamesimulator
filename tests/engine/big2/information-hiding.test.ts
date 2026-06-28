@@ -122,6 +122,34 @@ describe("getPlayerView — information hiding", () => {
     ).toBeUndefined();
   });
 
+  it("trickStartIndex exposes no hidden data — it is an index into the public playHistory", () => {
+    let state = initGame();
+    const gs = state.gameSpecificState as { hands: (readonly Card[])[] };
+    const startIdx = state.currentPlayerIndex;
+    const lowestCard = gs.hands[startIdx]!.find(
+      (c) => c.rank === "3" && c.suit === "clubs",
+    )!;
+    const result = engine.applyAction(state, {
+      type: "playCards",
+      playerId: PLAYERS4[startIdx]!.playerId,
+      cards: [lowestCard],
+    });
+    state = result.newState!;
+
+    for (const p of PLAYERS4) {
+      const view = engine.getPlayerView(state, p.playerId);
+      const pub = view.gameSpecificPublicState as Big2PublicState;
+      // It is a plain non-negative index, bounded by the public history length.
+      expect(typeof pub.trickStartIndex).toBe("number");
+      expect(pub.trickStartIndex).toBeGreaterThanOrEqual(0);
+      expect(pub.trickStartIndex).toBeLessThanOrEqual(pub.playHistory.length);
+      // The public state still leaks no hands.
+      expect(
+        (pub as unknown as Record<string, unknown>)["hands"],
+      ).toBeUndefined();
+    }
+  });
+
   it("played cards appear in lastPlay visible to all players", () => {
     let state = initGame();
     const gs = state.gameSpecificState as { hands: (readonly Card[])[] };

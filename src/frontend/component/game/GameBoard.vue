@@ -23,6 +23,8 @@
         :players="gameState.players"
         :turn-deadline="turnDeadline"
         :total-seconds="totalSeconds"
+        :play-history="big2State?.playHistory ?? []"
+        :trick-start-index="big2State?.trickStartIndex ?? 0"
       />
     </div>
 

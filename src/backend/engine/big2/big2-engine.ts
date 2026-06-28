@@ -53,6 +53,7 @@ export class Big2Engine implements GameEngine {
       isFirstPlayOfGame: true,
       playHistory: [],
       finishedPlayerIndices: [],
+      trickStartIndex: 0,
     };
 
     return {
@@ -132,6 +133,7 @@ export class Big2Engine implements GameEngine {
       isFirstPlayOfGame: big2State.isFirstPlayOfGame,
       playHistory: big2State.playHistory,
       finishedPlayerIndices: big2State.finishedPlayerIndices,
+      trickStartIndex: big2State.trickStartIndex ?? 0,
     };
 
     const validActions = this.getValidActions(state, playerId);
@@ -217,6 +219,7 @@ export class Big2Engine implements GameEngine {
       isFirstPlayOfGame: big2State.isFirstPlayOfGame,
       playHistory: big2State.playHistory,
       finishedPlayerIndices: big2State.finishedPlayerIndices,
+      trickStartIndex: big2State.trickStartIndex ?? 0,
     };
 
     return {
@@ -339,6 +342,7 @@ export class Big2Engine implements GameEngine {
         isFirstPlayOfGame: false,
         playHistory: newPlayHistory,
         finishedPlayerIndices: newFinished,
+        trickStartIndex: big2State.trickStartIndex,
       };
 
       return {
@@ -369,6 +373,7 @@ export class Big2Engine implements GameEngine {
       isFirstPlayOfGame: false,
       playHistory: newPlayHistory,
       finishedPlayerIndices: big2State.finishedPlayerIndices,
+      trickStartIndex: big2State.trickStartIndex,
     };
 
     return {
@@ -438,6 +443,7 @@ export class Big2Engine implements GameEngine {
         lastPlay: null,
         lastPlayPlayerIndex: null,
         playHistory: [...big2State.playHistory, historyEntry],
+        trickStartIndex: big2State.playHistory.length + 1,
       };
 
       return {

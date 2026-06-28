@@ -7,33 +7,42 @@
       :total-seconds="totalSeconds"
     />
 
-    <div v-if="lastPlay" class="play-area__cards">
-      <div class="play-area__hand-label">
-        {{ handTypeLabel }}
-      </div>
-      <div class="play-area__card-row">
-        <GameCard
-          v-for="card in lastPlay.cards"
-          :key="`${card.rank}-${card.suit}`"
-          :card="card"
-          size="medium"
-        />
-      </div>
-      <div class="play-area__played-by">
-        played by {{ lastPlayDisplayName }}
-      </div>
-    </div>
+    <div class="play-area__center">
+      <TrickPile
+        class="play-area__trick-pile"
+        :play-history="playHistory"
+        :trick-start-index="trickStartIndex"
+      />
 
-    <div v-else class="play-area__free">New Trick — Play any combination</div>
+      <div v-if="lastPlay" class="play-area__cards">
+        <div class="play-area__hand-label">
+          {{ handTypeLabel }}
+        </div>
+        <div class="play-area__card-row">
+          <GameCard
+            v-for="card in lastPlay.cards"
+            :key="`${card.rank}-${card.suit}`"
+            :card="card"
+            size="medium"
+          />
+        </div>
+        <div class="play-area__played-by">
+          played by {{ lastPlayDisplayName }}
+        </div>
+      </div>
+
+      <div v-else class="play-area__free">New Trick — Play any combination</div>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { computed } from "vue";
 import type { PlayerPublicInfo } from "@shared/engine-types";
-import type { Big2PublicState } from "@shared/big2-types";
+import type { Big2PublicState, Big2HistoryEntry } from "@shared/big2-types";
 import GameCard from "./GameCard.vue";
 import TurnTimer from "./TurnTimer.vue";
+import TrickPile from "./TrickPile.vue";
 
 const HAND_TYPE_LABELS: Record<string, string> = {
   single: "Single",
@@ -51,6 +60,8 @@ const props = defineProps<{
   players: readonly PlayerPublicInfo[];
   turnDeadline: number | null;
   totalSeconds: number;
+  playHistory: readonly Big2HistoryEntry[];
+  trickStartIndex: number;
 }>();
 
 const handTypeLabel = computed(() => {
@@ -81,6 +92,23 @@ const lastPlayDisplayName = computed(() => {
   gap: 12px;
   height: 100%;
   padding: 16px;
+}
+
+.play-area__center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Pile sits beside the centered current play (left side per mockup). */
+.play-area__trick-pile {
+  position: absolute;
+  left: -88px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .play-area__cards {
@@ -116,5 +144,11 @@ const lastPlayDisplayName = computed(() => {
   color: var(--text-muted);
   font-style: italic;
   text-align: center;
+}
+
+@media (max-width: 767px) {
+  .play-area__trick-pile {
+    left: -64px;
+  }
 }
 </style>

@@ -236,6 +236,21 @@ describe("WebSocket game flow", () => {
         const publicState =
           currentState.gameSpecificPublicState as Big2PublicState;
 
+        // trickStartIndex invariants (LLD 55): published, bounded by the
+        // public playHistory, and the slice reflects only the current trick.
+        expect(typeof publicState.trickStartIndex).toBe("number");
+        expect(publicState.trickStartIndex).toBeGreaterThanOrEqual(0);
+        expect(publicState.trickStartIndex).toBeLessThanOrEqual(
+          publicState.playHistory.length,
+        );
+        // On a free play / first play the current trick has no lead yet, so
+        // the engine boundary sits at the end of history (empty current trick).
+        if (publicState.isFreePlay || publicState.isFirstPlayOfGame) {
+          expect(publicState.trickStartIndex).toBe(
+            publicState.playHistory.length,
+          );
+        }
+
         const hasPass = validActions.some((a) => a.type === "pass");
         const hasPlayCards = validActions.some((a) => a.type === "playCards");
 

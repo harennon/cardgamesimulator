@@ -337,6 +337,7 @@ describe("trick winner finished — free play goes to next active player", () =>
       isFirstPlayOfGame: false,
       playHistory: [],
       finishedPlayerIndices: [0],
+      trickStartIndex: 0,
     };
 
     const state: InternalGameState = {
@@ -387,6 +388,7 @@ describe("player finishes on a play but trick continues for others", () => {
       isFirstPlayOfGame: false,
       playHistory: [],
       finishedPlayerIndices: [],
+      trickStartIndex: 0,
     };
 
     const state: InternalGameState = {

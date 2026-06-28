@@ -18,6 +18,7 @@ export interface Big2State {
   readonly isFirstPlayOfGame: boolean;
   readonly playHistory: readonly Big2HistoryEntry[];
   readonly finishedPlayerIndices: readonly number[];
+  readonly trickStartIndex: number;
 }
 
 /** Big2-specific actions */
