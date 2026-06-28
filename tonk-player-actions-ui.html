@@ -1,0 +1,2068 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tonk Player Actions UI — Mockups</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --error-text: #e05555;
+        --tonk-red: #b8324a;
+        --tonk-red-glow: rgba(184, 50, 74, 0.45);
+        --font-ui: "DM Sans", sans-serif;
+        --font-mono: "JetBrains Mono", "Courier New", monospace;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 24px 100px;
+        line-height: 1.45;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 36px;
+      }
+      .page-head h1 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin-top: 10px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 860px;
+      }
+      .page-head .ruleref {
+        margin-top: 14px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        max-width: 860px;
+        border-left: 2px solid var(--table-rim-light);
+        padding-left: 14px;
+      }
+      .page-head .ruleref b {
+        color: var(--text-primary);
+      }
+
+      .direction {
+        max-width: 1180px;
+        margin: 0 auto 52px;
+      }
+      .direction > h2 {
+        font-size: 1.18rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--table-rim-light);
+        padding-bottom: 10px;
+        margin-bottom: 6px;
+      }
+      .direction > h2 .tag {
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--gold-accent);
+        margin-left: 10px;
+      }
+      .direction > .blurb {
+        font-size: 0.88rem;
+        color: var(--text-muted);
+        max-width: 860px;
+        margin-bottom: 22px;
+      }
+      .direction > .blurb b {
+        color: var(--text-primary);
+      }
+
+      .state-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 22px;
+      }
+
+      .state-card {
+        border: 1px solid var(--table-rim-light);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #0d2418;
+      }
+      .state-card__label {
+        font-size: 0.74rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--text-muted);
+        padding: 10px 14px;
+        background: rgba(0, 0, 0, 0.25);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .state-card__label .hint {
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 400;
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        opacity: 0.8;
+      }
+
+      /* ===== Stage: a slice of the felt table the controls sit on ===== */
+      .stage {
+        position: relative;
+        background: radial-gradient(
+          ellipse 90% 80% at 50% 30%,
+          var(--felt-light) 0%,
+          var(--felt) 55%,
+          #0f2e1c 100%
+        );
+        padding: 18px 16px 0;
+        min-height: 320px;
+        display: flex;
+        flex-direction: column;
+      }
+      .stage--tall {
+        min-height: 400px;
+      }
+
+      /* ===== Cards ===== */
+      .card {
+        position: relative;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .card .corner {
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+      }
+      .card .corner .r {
+        font-size: 11px;
+      }
+      .card .corner .s {
+        font-size: 10px;
+        margin-top: -1px;
+      }
+      .card .pip {
+        font-size: 1.5em;
+        line-height: 1;
+      }
+      .card.red {
+        color: var(--red-suit);
+      }
+      .card.black {
+        color: var(--black-suit);
+      }
+      .card.joker {
+        color: #6a4a8a;
+        font-family: var(--font-ui);
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+      .card.joker .pip {
+        font-size: 1.6em;
+      }
+
+      .card--hand {
+        width: 62px;
+        height: 88px;
+        font-size: 1.05rem;
+      }
+      .card--pile {
+        width: 58px;
+        height: 82px;
+        font-size: 1rem;
+      }
+      .card--mini {
+        width: 30px;
+        height: 42px;
+        font-size: 0.55rem;
+        border-radius: 4px;
+        box-shadow: 1px 2px 4px var(--card-shadow);
+      }
+      .card--mini .corner {
+        top: 2px;
+        left: 2px;
+      }
+      .card--mini .corner .r {
+        font-size: 7px;
+      }
+      .card--mini .corner .s {
+        font-size: 6px;
+      }
+      .card--mini .pip {
+        font-size: 1em;
+      }
+
+      /* card back */
+      .card-back {
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1.5px solid #c9a84c;
+        position: relative;
+        overflow: hidden;
+      }
+      .card-back::after {
+        content: "";
+        position: absolute;
+        inset: 4px;
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        border-radius: 3px;
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 4px,
+          rgba(201, 168, 76, 0.08) 4px,
+          rgba(201, 168, 76, 0.08) 5px
+        );
+      }
+
+      /* selection states */
+      .card--selectable {
+        cursor: pointer;
+      }
+      .card--selected {
+        transform: translateY(-16px);
+        border-color: var(--gold-accent);
+        box-shadow:
+          0 8px 22px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+      }
+      .card--badselect {
+        transform: translateY(-16px);
+        border-color: var(--error-text);
+        box-shadow:
+          0 8px 22px rgba(224, 85, 85, 0.45),
+          3px 6px 16px var(--card-shadow);
+      }
+      .card--dimmed {
+        opacity: 0.42;
+        filter: saturate(0.5);
+      }
+      .card--samerank-hint {
+        border-color: rgba(201, 168, 76, 0.55);
+        box-shadow:
+          0 0 0 2px rgba(201, 168, 76, 0.18),
+          2px 4px 8px var(--card-shadow);
+      }
+
+      /* table table-center area (pile + stock) */
+      .table-center {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 44px;
+        padding: 14px 0 18px;
+        flex: 1;
+      }
+      .pile-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .pile-group__label {
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+      .pile-stack {
+        position: relative;
+        width: 58px;
+        height: 82px;
+      }
+      .pile-stack .card {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      .pile-stack .card:nth-child(1) {
+        transform: rotate(-4deg) translate(-3px, 1px);
+      }
+      .pile-stack .card:nth-child(2) {
+        transform: rotate(3deg) translate(2px, -1px);
+      }
+      .pile-stack .card:nth-child(3) {
+        transform: rotate(-1deg);
+      }
+      .stock-count {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        color: var(--text-primary);
+      }
+
+      /* DRAW TARGET treatment (Direction B/C) */
+      .draw-target {
+        cursor: pointer;
+        position: relative;
+        border-radius: 8px;
+        padding: 6px;
+        transition: all 0.15s ease;
+      }
+      .draw-target--active {
+        background: rgba(201, 168, 76, 0.1);
+        box-shadow:
+          0 0 0 2px var(--gold-accent),
+          0 0 18px var(--gold-glow);
+        animation: drawpulse 1.8s ease-in-out infinite;
+      }
+      @keyframes drawpulse {
+        0%,
+        100% {
+          box-shadow:
+            0 0 0 2px var(--gold-accent),
+            0 0 14px var(--gold-glow);
+        }
+        50% {
+          box-shadow:
+            0 0 0 2px var(--gold-accent),
+            0 0 26px var(--gold-glow);
+        }
+      }
+      .draw-target--disabled {
+        opacity: 0.4;
+      }
+      .draw-pick-tag {
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.6rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #1a0f06;
+        background: var(--gold-accent);
+        padding: 2px 8px;
+        border-radius: 10px;
+        white-space: nowrap;
+      }
+
+      /* hand row at bottom of stage */
+      .hand-row {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 14px 8px 18px;
+      }
+      .hand-row .card {
+        margin-left: -18px;
+      }
+      .hand-row .card:first-child {
+        margin-left: 0;
+      }
+      .hand-label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        padding-left: 10px;
+      }
+
+      /* turn pill */
+      .turn-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.74rem;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: 20px;
+        align-self: center;
+      }
+      .turn-pill--yours {
+        background: rgba(201, 168, 76, 0.16);
+        color: var(--gold-accent);
+        box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.4);
+      }
+      .turn-pill--theirs {
+        background: rgba(0, 0, 0, 0.3);
+        color: var(--text-muted);
+      }
+      .turn-pill .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .turn-pill--yours .dot {
+        animation: blink 1.4s ease-in-out infinite;
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      /* ============================================================= */
+      /* ACTION PANEL — footer bar shared shell                        */
+      /* ============================================================= */
+      .action-panel {
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .action-panel__error {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: var(--error-text);
+        background: rgba(224, 85, 85, 0.1);
+        border: 1px solid rgba(224, 85, 85, 0.35);
+        border-radius: 6px;
+        padding: 7px 11px;
+      }
+      .action-panel__error::before {
+        content: "!";
+        flex-shrink: 0;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--error-text);
+        color: #1a0f06;
+        font-weight: 700;
+        font-size: 0.72rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* phase stepper (Direction A) */
+      .phase-stepper {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        font-size: 0.74rem;
+        font-weight: 600;
+        align-self: center;
+      }
+      .phase-stepper .step {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--text-muted);
+        padding: 3px 4px;
+      }
+      .phase-stepper .step .num {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 1.5px solid var(--text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.68rem;
+        font-family: var(--font-mono);
+      }
+      .phase-stepper .step--active {
+        color: var(--gold-accent);
+      }
+      .phase-stepper .step--active .num {
+        border-color: var(--gold-accent);
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .phase-stepper .step--done {
+        color: var(--text-primary);
+      }
+      .phase-stepper .step--done .num {
+        border-color: var(--text-primary);
+        background: transparent;
+        color: var(--text-primary);
+      }
+      .phase-stepper .step--done .num::after {
+        content: "✓";
+      }
+      .phase-stepper .step--done .num .label {
+        display: none;
+      }
+      .phase-stepper .arrow {
+        color: var(--text-muted);
+        margin: 0 8px;
+        font-size: 0.9rem;
+      }
+
+      .action-panel__prompt {
+        text-align: center;
+        font-size: 0.82rem;
+        color: var(--text-primary);
+      }
+      .action-panel__prompt .sub {
+        color: var(--text-muted);
+        font-size: 0.76rem;
+      }
+
+      .action-panel__buttons {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.92rem;
+        font-weight: 600;
+        padding: 11px 26px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        min-height: 44px;
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .btn--primary {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--primary:not(:disabled):hover {
+        background: #d4b45a;
+        box-shadow: 0 4px 16px var(--gold-glow);
+      }
+      .btn--ghost {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+      .btn--ghost:not(:disabled):hover {
+        border-color: var(--text-primary);
+        background: rgba(232, 220, 200, 0.08);
+      }
+      .btn--tonk {
+        background: transparent;
+        color: var(--tonk-red);
+        border: 1.5px solid var(--tonk-red);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+      .btn--tonk:not(:disabled):hover {
+        background: var(--tonk-red);
+        color: #fff;
+        box-shadow: 0 4px 18px var(--tonk-red-glow);
+      }
+      .btn .count-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        margin-left: 8px;
+        border-radius: 9px;
+        background: rgba(0, 0, 0, 0.25);
+        font-size: 0.74rem;
+        font-family: var(--font-mono);
+      }
+      .btn--source {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 10px 22px;
+        min-width: 120px;
+      }
+      .btn--source .src-sub {
+        font-size: 0.68rem;
+        font-weight: 400;
+        opacity: 0.8;
+      }
+      .btn--source .src-card {
+        display: flex;
+        gap: 4px;
+        margin-top: 2px;
+      }
+
+      /* tonk gate hint */
+      .gate-hint {
+        text-align: center;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+      /* draw-prompt bar (Direction B footer) */
+      .draw-prompt-bar {
+        text-align: center;
+        font-size: 0.84rem;
+        color: var(--gold-accent);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      .draw-prompt-bar .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        animation: blink 1.4s ease-in-out infinite;
+      }
+
+      /* guided banner (Direction C) */
+      .turn-banner {
+        margin: 0 8px 10px;
+        border-radius: 10px;
+        background: linear-gradient(
+          180deg,
+          rgba(201, 168, 76, 0.16),
+          rgba(201, 168, 76, 0.04)
+        );
+        box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.32);
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .turn-banner__top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .turn-banner__heading {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+      }
+      .turn-banner__phase-chip {
+        font-size: 0.66rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #1a0f06;
+        background: var(--gold-accent);
+        padding: 3px 9px;
+        border-radius: 10px;
+      }
+      .turn-banner__steps {
+        display: flex;
+        gap: 6px;
+      }
+      .turn-banner__steps .seg {
+        height: 4px;
+        flex: 1;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .turn-banner__steps .seg--active {
+        background: var(--gold-accent);
+      }
+      .turn-banner__steps .seg--done {
+        background: rgba(201, 168, 76, 0.55);
+      }
+      .turn-banner__instruction {
+        font-size: 0.82rem;
+        color: var(--text-primary);
+      }
+      .turn-banner__instruction b {
+        color: var(--gold-accent);
+      }
+      .turn-banner__actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .turn-banner__actions .spacer {
+        flex: 1;
+      }
+      .turn-banner__tonk-link {
+        background: none;
+        border: none;
+        color: var(--tonk-red);
+        font-weight: 700;
+        font-size: 0.82rem;
+        cursor: pointer;
+        letter-spacing: 0.04em;
+        padding: 6px 4px;
+      }
+      .turn-banner__tonk-link:hover {
+        text-decoration: underline;
+      }
+
+      .legend {
+        max-width: 1180px;
+        margin: 0 auto 36px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 16px 20px;
+        background: #0d2418;
+      }
+      .legend b {
+        color: var(--text-primary);
+      }
+      .legend ul {
+        margin: 8px 0 0 18px;
+      }
+      .legend li {
+        margin: 4px 0;
+      }
+
+      .compare {
+        max-width: 1180px;
+        margin: 0 auto 40px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      .compare .col {
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 14px 16px;
+        background: #0d2418;
+      }
+      .compare .col h3 {
+        font-size: 0.92rem;
+        color: var(--gold-accent);
+        margin-bottom: 8px;
+      }
+      .compare .col p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .compare .col .verdict {
+        margin-top: 10px;
+        font-size: 0.78rem;
+        color: var(--text-primary);
+      }
+
+      @media (max-width: 760px) {
+        .compare {
+          grid-template-columns: 1fr;
+        }
+        .state-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Tonk — Player Actions UI</h1>
+      <p>
+        Three distinct interaction models for the Tonk two-phase turn:
+        <b>discard first → then draw</b>, plus a turn-start
+        <b>TONK</b> declaration. Every control is rendered/enabled strictly from
+        the server's <code>validActions</code> per phase — the client never
+        validates Tonk rules itself. Aesthetic intentionally matches the live
+        Big2 felt-table board (same tokens, fonts, card rendering).
+      </p>
+      <div class="ruleref">
+        <b>Rules driving this UI (LLD 65):</b> A turn is two mandatory phases by
+        the same player. <b>Discard phase</b> — discard one or more
+        <b>same-rank</b> cards, OR (only when the TONK gate is open, i.e. every
+        player has had ≥1 turn) declare <b>TONK</b> instead. <b>Draw phase</b> —
+        draw exactly one card from the <b>stock</b> or the single
+        <b>drawable discard</b> (offered only when the snapshot is non-null; you
+        can never draw back your own just-discarded card). Turn hands off only
+        after the draw. Mixed-rank discard selection is visually rejected, but
+        the <b>server is the authority</b> — rejection produces an inline error
+        and the selection is preserved.
+      </div>
+    </div>
+
+    <div class="legend">
+      <b>How to read these mockups.</b> Each direction below shows the same
+      sequence of turn states so you can compare them directly:
+      <ul>
+        <li>
+          <b>A — Discard phase, idle:</b> your turn just started, nothing
+          selected yet (TONK gate still closed).
+        </li>
+        <li>
+          <b>B — Discard phase, same-rank selected:</b> three Queens picked;
+          other ranks dimmed; Discard armed with a count.
+        </li>
+        <li>
+          <b>C — Mixed-rank rejected:</b> a non-matching card got picked →
+          inline error, selection preserved (server-authoritative).
+        </li>
+        <li>
+          <b>D — Discard phase, TONK gate OPEN:</b> <code>callTonk</code> is now
+          in <code>validActions</code>; the TONK control appears.
+        </li>
+        <li>
+          <b>E — Draw phase:</b> discard committed; now choose stock or the
+          drawable discard (here a 4♦ snapshot).
+        </li>
+        <li>
+          <b>F — Draw phase, stock-only:</b>
+          <code>drawableDiscard === null</code>
+          (trick-1 first player) → only stock is offered.
+        </li>
+        <li><b>G — Not your turn:</b> all controls disabled.</li>
+      </ul>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DIRECTION A — PHASE STEPPER (morphing footer panel)          -->
+    <!-- ============================================================ -->
+    <section class="direction">
+      <h2>
+        Direction A — Phase Stepper
+        <span class="tag">footer panel, drop-in slot</span>
+      </h2>
+      <p class="blurb">
+        Keeps the exact footer-bar slot Big2 already uses
+        (<code>game-board__actions</code>). A compact
+        <b>“1 Discard → 2 Draw”</b> stepper at the top of the panel shows where
+        you are in the turn; the panel <b>morphs its buttons</b> per
+        <code>turnPhase</code>. Lowest layout risk — reuses the existing
+        <code>ActionPanel.vue</code> shell and grid. Draw sources are buttons in
+        the footer (the stock count and a thumbnail of the drawable card live on
+        the button).
+      </p>
+
+      <div class="state-grid">
+        <!-- A: discard idle -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Discard phase — idle
+            <span class="hint">· gate closed · nothing selected</span>
+          </div>
+          <div class="stage">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard</div>
+                <div class="pile-stack">
+                  <div class="card card--pile black">
+                    <div class="corner">
+                      <span class="r">8</span><span class="s">♠</span>
+                    </div>
+                    <span class="pip">♠</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">31 left</div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand card--selectable red">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div class="card card--hand card--selectable black">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card card--hand card--selectable red">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div class="card card--hand card--selectable black">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+              <div class="card card--hand card--selectable joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="phase-stepper">
+              <span class="step step--active"
+                ><span class="num">1</span> Discard</span
+              >
+              <span class="arrow">→</span>
+              <span class="step"><span class="num">2</span> Draw</span>
+            </div>
+            <div class="action-panel__prompt">
+              Discard one card, or
+              <span class="sub">multiple of the same rank.</span>
+            </div>
+            <div class="action-panel__buttons">
+              <button class="btn btn--primary" disabled>Discard</button>
+            </div>
+            <div class="gate-hint">
+              TONK unlocks after everyone has had a turn.
+            </div>
+          </div>
+        </div>
+
+        <!-- B: same-rank selected -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Discard phase — same-rank selected
+            <span class="hint">· 3 Queens · others dimmed</span>
+          </div>
+          <div class="stage">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard</div>
+                <div class="pile-stack">
+                  <div class="card card--pile black">
+                    <div class="corner">
+                      <span class="r">8</span><span class="s">♠</span>
+                    </div>
+                    <span class="pip">♠</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">31 left</div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand card--selectable card--dimmed red">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div
+                class="card card--hand card--selectable card--selected black"
+              >
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card card--hand card--selectable card--selected red">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div
+                class="card card--hand card--selectable card--selected black"
+              >
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+              <div class="card card--hand card--selectable card--dimmed joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="phase-stepper">
+              <span class="step step--active"
+                ><span class="num">1</span> Discard</span
+              >
+              <span class="arrow">→</span>
+              <span class="step"><span class="num">2</span> Draw</span>
+            </div>
+            <div class="action-panel__prompt">
+              Three Queens selected.
+              <span class="sub">You'll still draw exactly one.</span>
+            </div>
+            <div class="action-panel__buttons">
+              <button class="btn btn--primary">
+                Discard<span class="count-badge">3</span>
+              </button>
+            </div>
+            <div class="gate-hint">
+              TONK unlocks after everyone has had a turn.
+            </div>
+          </div>
+        </div>
+
+        <!-- C: mixed-rank rejected -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Discard phase — mixed-rank rejected
+            <span class="hint">· inline error · selection kept</span>
+          </div>
+          <div class="stage">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard</div>
+                <div class="pile-stack">
+                  <div class="card card--pile black">
+                    <div class="corner">
+                      <span class="r">8</span><span class="s">♠</span>
+                    </div>
+                    <span class="pip">♠</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">31 left</div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand card--selectable card--badselect red">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div
+                class="card card--hand card--selectable card--selected black"
+              >
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card card--hand card--selectable card--selected red">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div class="card card--hand card--selectable black">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+              <div class="card card--hand card--selectable joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="action-panel__error">
+              Discard must be a single rank. Deselect the 3♥ or the Queens.
+            </div>
+            <div class="phase-stepper">
+              <span class="step step--active"
+                ><span class="num">1</span> Discard</span
+              >
+              <span class="arrow">→</span>
+              <span class="step"><span class="num">2</span> Draw</span>
+            </div>
+            <div class="action-panel__buttons">
+              <button class="btn btn--primary" disabled>
+                Discard<span class="count-badge">3</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- D: tonk gate open -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Discard phase — TONK gate OPEN
+            <span class="hint">· callTonk in validActions</span>
+          </div>
+          <div class="stage">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard</div>
+                <div class="pile-stack">
+                  <div class="card card--pile red">
+                    <div class="corner">
+                      <span class="r">5</span><span class="s">♥</span>
+                    </div>
+                    <span class="pip">♥</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">12 left</div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand card--selectable red">
+                <div class="corner">
+                  <span class="r">A</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div class="card card--hand card--selectable red">
+                <div class="corner">
+                  <span class="r">2</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div class="card card--hand card--selectable black">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card card--hand card--selectable joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="phase-stepper">
+              <span class="step step--active"
+                ><span class="num">1</span> Discard</span
+              >
+              <span class="arrow">→</span>
+              <span class="step"><span class="num">2</span> Draw</span>
+            </div>
+            <div class="action-panel__prompt">
+              Your hand is low (6).
+              <span class="sub">Discard, or call TONK to end the trick.</span>
+            </div>
+            <div class="action-panel__buttons">
+              <button class="btn btn--tonk">Call TONK</button>
+              <button class="btn btn--primary" disabled>Discard</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- E: draw phase with drawable discard -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Draw phase — stock OR drawable discard
+            <span class="hint">· just discarded the Queens</span>
+          </div>
+          <div class="stage">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard (live top)</div>
+                <div class="pile-stack">
+                  <div class="card card--pile black">
+                    <div class="corner">
+                      <span class="r">Q</span><span class="s">♠</span>
+                    </div>
+                    <span class="pip">♠</span>
+                  </div>
+                </div>
+                <div class="stock-count" style="color: var(--text-muted)">
+                  your Q♠ — not drawable
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">31 left</div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand red">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div class="card card--hand joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="phase-stepper">
+              <span class="step step--done"
+                ><span class="num"><span class="label">1</span></span>
+                Discard</span
+              >
+              <span class="arrow">→</span>
+              <span class="step step--active"
+                ><span class="num">2</span> Draw</span
+              >
+            </div>
+            <div class="action-panel__prompt">
+              Draw one card to finish your turn.
+            </div>
+            <div class="action-panel__buttons">
+              <button class="btn btn--primary btn--source">
+                <span>Draw stock</span>
+                <span class="src-sub">31 face-down</span>
+              </button>
+              <button class="btn btn--ghost btn--source">
+                <span>Take discard</span>
+                <span class="src-card">
+                  <span class="card card--mini red"
+                    ><div class="corner">
+                      <span class="r">4</span><span class="s">♦</span>
+                    </div>
+                    <span class="pip">♦</span></span
+                  >
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- F: draw phase stock only -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Draw phase — stock only
+            <span class="hint">· drawableDiscard === null</span>
+          </div>
+          <div class="stage">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard (live top)</div>
+                <div class="pile-stack">
+                  <div class="card card--pile black">
+                    <div class="corner">
+                      <span class="r">7</span><span class="s">♣</span>
+                    </div>
+                    <span class="pip">♣</span>
+                  </div>
+                </div>
+                <div class="stock-count" style="color: var(--text-muted)">
+                  your 7♣ — not drawable
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">38 left</div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand red">
+                <div class="corner">
+                  <span class="r">A</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div class="card card--hand black">
+                <div class="corner">
+                  <span class="r">K</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+              <div class="card card--hand red">
+                <div class="corner">
+                  <span class="r">9</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div class="card card--hand black">
+                <div class="corner">
+                  <span class="r">6</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="phase-stepper">
+              <span class="step step--done"
+                ><span class="num"><span class="label">1</span></span>
+                Discard</span
+              >
+              <span class="arrow">→</span>
+              <span class="step step--active"
+                ><span class="num">2</span> Draw</span
+              >
+            </div>
+            <div class="action-panel__prompt">
+              First turn of the trick — only the stock is available.
+            </div>
+            <div class="action-panel__buttons">
+              <button class="btn btn--primary btn--source">
+                <span>Draw stock</span>
+                <span class="src-sub">38 face-down</span>
+              </button>
+              <button class="btn btn--ghost btn--source" disabled>
+                <span>Take discard</span>
+                <span class="src-sub">none available</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- G: not your turn -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Not your turn — all disabled
+            <span class="hint">· validActions empty</span>
+          </div>
+          <div class="stage">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard</div>
+                <div class="pile-stack">
+                  <div class="card card--pile black">
+                    <div class="corner">
+                      <span class="r">8</span><span class="s">♠</span>
+                    </div>
+                    <span class="pip">♠</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">31 left</div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand card--dimmed black">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card card--hand card--dimmed red">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div class="card card--hand card--dimmed black">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+              <div class="card card--hand card--dimmed joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="turn-pill turn-pill--theirs">
+              <span class="dot"></span> Mei is taking their turn…
+            </div>
+            <div class="action-panel__buttons">
+              <button class="btn btn--primary" disabled>Discard</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- DIRECTION B — CONTEXTUAL IN-PLACE DRAW                       -->
+    <!-- ============================================================ -->
+    <section class="direction">
+      <h2>
+        Direction B — Contextual In-Place Draw
+        <span class="tag">draw from where the cards are</span>
+      </h2>
+      <p class="blurb">
+        Discard phase is identical to A (footer buttons + hand selection). The
+        difference is the <b>draw phase</b>: instead of footer buttons, the
+        <b
+          >stock pile and the drawable-discard card on the table light up as the
+          two clickable targets</b
+        >
+        (gold ring + pulse), and the footer collapses to a thin prompt. You draw
+        from the literal spot the card lives — spatially intuitive, and it keeps
+        your eyes on the table. Costs a bit more layout wiring (the table piles
+        must be interactive).
+      </p>
+
+      <div class="state-grid">
+        <!-- B-discard same-rank -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Discard phase — same-rank selected
+            <span class="hint">· same as A</span>
+          </div>
+          <div class="stage">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard</div>
+                <div class="pile-stack">
+                  <div class="card card--pile red">
+                    <div class="corner">
+                      <span class="r">4</span><span class="s">♦</span>
+                    </div>
+                    <span class="pip">♦</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">31 left</div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand card--selectable card--dimmed red">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div
+                class="card card--hand card--selectable card--selected black"
+              >
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card card--hand card--selectable card--selected red">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div
+                class="card card--hand card--selectable card--selected black"
+              >
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+              <div class="card card--hand card--selectable card--dimmed joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="phase-stepper">
+              <span class="step step--active"
+                ><span class="num">1</span> Discard</span
+              >
+              <span class="arrow">→</span>
+              <span class="step"><span class="num">2</span> Draw</span>
+            </div>
+            <div class="action-panel__buttons">
+              <button class="btn btn--primary">
+                Discard<span class="count-badge">3</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- B-draw phase: table targets light up -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Draw phase — table targets glow
+            <span class="hint">· tap stock OR the 4♦ snapshot</span>
+          </div>
+          <div class="stage stage--tall">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Drawable discard</div>
+                <div class="draw-target draw-target--active">
+                  <div class="pile-stack">
+                    <div class="card card--pile red">
+                      <div class="corner">
+                        <span class="r">4</span><span class="s">♦</span>
+                      </div>
+                      <span class="pip">♦</span>
+                    </div>
+                  </div>
+                  <div class="draw-pick-tag">Take 4♦</div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="draw-target draw-target--active">
+                  <div class="pile-stack">
+                    <div class="card card--pile card-back"></div>
+                    <div class="card card--pile card-back"></div>
+                    <div class="card card--pile card-back"></div>
+                  </div>
+                  <div class="draw-pick-tag">Draw (31)</div>
+                </div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand red">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div class="card card--hand joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="draw-prompt-bar">
+              <span class="pulse-dot"></span>
+              Pick a card to draw — tap the stock or the glowing discard.
+            </div>
+          </div>
+        </div>
+
+        <!-- B-draw phase stock-only -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Draw phase — stock only
+            <span class="hint">· discard target dark (null snapshot)</span>
+          </div>
+          <div class="stage stage--tall">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Drawable discard</div>
+                <div class="draw-target draw-target--disabled">
+                  <div class="pile-stack">
+                    <div class="card card--pile black">
+                      <div class="corner">
+                        <span class="r">7</span><span class="s">♣</span>
+                      </div>
+                      <span class="pip">♣</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="stock-count" style="color: var(--text-muted)">
+                  your discard — not drawable
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="draw-target draw-target--active">
+                  <div class="pile-stack">
+                    <div class="card card--pile card-back"></div>
+                    <div class="card card--pile card-back"></div>
+                    <div class="card card--pile card-back"></div>
+                  </div>
+                  <div class="draw-pick-tag">Draw (38)</div>
+                </div>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand red">
+                <div class="corner">
+                  <span class="r">A</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div class="card card--hand black">
+                <div class="corner">
+                  <span class="r">K</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+              <div class="card card--hand red">
+                <div class="corner">
+                  <span class="r">9</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="draw-prompt-bar">
+              <span class="pulse-dot"></span>
+              Only the stock is available this turn — tap to draw.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- DIRECTION C — GUIDED TURN BANNER                             -->
+    <!-- ============================================================ -->
+    <section class="direction">
+      <h2>
+        Direction C — Guided Turn Banner
+        <span class="tag">narrated prompt above the hand</span>
+      </h2>
+      <p class="blurb">
+        A prominent banner sits <b>above the hand</b> and narrates the turn
+        step-by-step, with a two-segment progress bar and the controls inline.
+        Most hand-holding — best for players new to Tonk's
+        <b>unusual discard-first order</b>. The banner explicitly states the
+        rule for the current phase ("discard one or more of the same rank").
+        TONK is a quiet text link (so it's never the accidental primary action).
+        Heaviest footprint and most text, but the clearest teaching surface.
+      </p>
+
+      <div class="state-grid">
+        <!-- C-discard idle with gate closed -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Discard phase — idle
+            <span class="hint">· narrated · gate closed</span>
+          </div>
+          <div class="stage stage--tall">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard</div>
+                <div class="pile-stack">
+                  <div class="card card--pile black">
+                    <div class="corner">
+                      <span class="r">8</span><span class="s">♠</span>
+                    </div>
+                    <span class="pip">♠</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">31 left</div>
+              </div>
+            </div>
+            <div class="turn-banner">
+              <div class="turn-banner__top">
+                <div class="turn-banner__heading">
+                  Your turn
+                  <span class="turn-banner__phase-chip">Step 1 · Discard</span>
+                </div>
+              </div>
+              <div class="turn-banner__steps">
+                <span class="seg seg--active"></span>
+                <span class="seg"></span>
+              </div>
+              <div class="turn-banner__instruction">
+                Pick <b>one card</b> to discard — or
+                <b>several of the same rank</b> at once.
+              </div>
+              <div class="turn-banner__actions">
+                <button class="btn btn--primary" disabled>Discard</button>
+                <span class="spacer"></span>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand card--selectable red">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div class="card card--hand card--selectable black">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card card--hand card--selectable red">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div class="card card--hand card--selectable black">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+              <div class="card card--hand card--selectable joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="gate-hint">
+              Banner lives on the table; footer stays thin.
+            </div>
+          </div>
+        </div>
+
+        <!-- C-discard same-rank + gate open (tonk link) -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Discard — selected + TONK gate open
+            <span class="hint">· TONK is a quiet link</span>
+          </div>
+          <div class="stage stage--tall">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard</div>
+                <div class="pile-stack">
+                  <div class="card card--pile red">
+                    <div class="corner">
+                      <span class="r">5</span><span class="s">♥</span>
+                    </div>
+                    <span class="pip">♥</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">12 left</div>
+              </div>
+            </div>
+            <div class="turn-banner">
+              <div class="turn-banner__top">
+                <div class="turn-banner__heading">
+                  Your turn
+                  <span class="turn-banner__phase-chip">Step 1 · Discard</span>
+                </div>
+              </div>
+              <div class="turn-banner__steps">
+                <span class="seg seg--active"></span>
+                <span class="seg"></span>
+              </div>
+              <div class="turn-banner__instruction">
+                Discarding <b>two 9s</b>. Confident your hand is lowest? You can
+                call TONK instead.
+              </div>
+              <div class="turn-banner__actions">
+                <button class="btn btn--primary">
+                  Discard<span class="count-badge">2</span>
+                </button>
+                <span class="spacer"></span>
+                <button class="turn-banner__tonk-link">Call TONK ▸</button>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand card--selectable card--dimmed red">
+                <div class="corner">
+                  <span class="r">A</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div
+                class="card card--hand card--selectable card--selected black"
+              >
+                <div class="corner">
+                  <span class="r">9</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card card--hand card--selectable card--selected red">
+                <div class="corner">
+                  <span class="r">9</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div class="card card--hand card--selectable card--dimmed joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="gate-hint">
+              TONK link only appears when callTonk ∈ validActions.
+            </div>
+          </div>
+        </div>
+
+        <!-- C-draw phase -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Draw phase — narrated source choice
+            <span class="hint">· step 2 of 2</span>
+          </div>
+          <div class="stage stage--tall">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard (live top)</div>
+                <div class="pile-stack">
+                  <div class="card card--pile black">
+                    <div class="corner">
+                      <span class="r">Q</span><span class="s">♠</span>
+                    </div>
+                    <span class="pip">♠</span>
+                  </div>
+                </div>
+                <div class="stock-count" style="color: var(--text-muted)">
+                  your Q♠ — not drawable
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">31 left</div>
+              </div>
+            </div>
+            <div class="turn-banner">
+              <div class="turn-banner__top">
+                <div class="turn-banner__heading">
+                  Your turn
+                  <span class="turn-banner__phase-chip">Step 2 · Draw</span>
+                </div>
+              </div>
+              <div class="turn-banner__steps">
+                <span class="seg seg--done"></span>
+                <span class="seg seg--active"></span>
+              </div>
+              <div class="turn-banner__instruction">
+                Discarded <b>3 Queens</b>. Now draw <b>one</b> card to finish.
+              </div>
+              <div class="turn-banner__actions">
+                <button class="btn btn--primary btn--source">
+                  <span>Draw stock</span
+                  ><span class="src-sub">31 face-down</span>
+                </button>
+                <button class="btn btn--ghost btn--source">
+                  <span>Take discard</span>
+                  <span class="src-card">
+                    <span class="card card--mini red"
+                      ><div class="corner">
+                        <span class="r">4</span><span class="s">♦</span>
+                      </div>
+                      <span class="pip">♦</span></span
+                    >
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand red">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div class="card card--hand joker">
+                <span class="pip">★</span>JOKER
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="gate-hint">
+              Same data as A/B — different presentation surface.
+            </div>
+          </div>
+        </div>
+
+        <!-- C-error -->
+        <div class="state-card">
+          <div class="state-card__label">
+            Mixed-rank rejected — error in banner
+            <span class="hint">· selection preserved</span>
+          </div>
+          <div class="stage stage--tall">
+            <div class="table-center">
+              <div class="pile-group">
+                <div class="pile-group__label">Discard</div>
+                <div class="pile-stack">
+                  <div class="card card--pile black">
+                    <div class="corner">
+                      <span class="r">8</span><span class="s">♠</span>
+                    </div>
+                    <span class="pip">♠</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pile-group">
+                <div class="pile-group__label">Stock</div>
+                <div class="pile-stack">
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                  <div class="card card--pile card-back"></div>
+                </div>
+                <div class="stock-count">31 left</div>
+              </div>
+            </div>
+            <div
+              class="turn-banner"
+              style="
+                box-shadow: 0 0 0 1px rgba(224, 85, 85, 0.5);
+                background: linear-gradient(
+                  180deg,
+                  rgba(224, 85, 85, 0.14),
+                  rgba(224, 85, 85, 0.03)
+                );
+              "
+            >
+              <div class="turn-banner__top">
+                <div
+                  class="turn-banner__heading"
+                  style="color: var(--error-text)"
+                >
+                  Can't discard that
+                  <span
+                    class="turn-banner__phase-chip"
+                    style="background: var(--error-text); color: #fff"
+                    >Step 1 · Discard</span
+                  >
+                </div>
+              </div>
+              <div
+                class="turn-banner__instruction"
+                style="color: var(--text-primary)"
+              >
+                A discard must be <b>a single rank</b>. The 3♥ doesn't match
+                your Queens — deselect one group.
+              </div>
+              <div class="turn-banner__actions">
+                <button class="btn btn--primary" disabled>
+                  Discard<span class="count-badge">3</span>
+                </button>
+                <span class="spacer"></span>
+              </div>
+            </div>
+            <div class="hand-row">
+              <div class="card card--hand card--selectable card--badselect red">
+                <div class="corner">
+                  <span class="r">3</span><span class="s">♥</span>
+                </div>
+                <span class="pip">♥</span>
+              </div>
+              <div
+                class="card card--hand card--selectable card--selected black"
+              >
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♣</span>
+                </div>
+                <span class="pip">♣</span>
+              </div>
+              <div class="card card--hand card--selectable card--selected red">
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♦</span>
+                </div>
+                <span class="pip">♦</span>
+              </div>
+              <div
+                class="card card--hand card--selectable card--selected black"
+              >
+                <div class="corner">
+                  <span class="r">Q</span><span class="s">♠</span>
+                </div>
+                <span class="pip">♠</span>
+              </div>
+            </div>
+          </div>
+          <div class="action-panel">
+            <div class="gate-hint">
+              Error shares the banner; no separate error row needed.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- COMPARISON                                                   -->
+    <!-- ============================================================ -->
+    <section class="direction">
+      <h2>Side-by-side trade-offs</h2>
+      <div class="compare">
+        <div class="col">
+          <h3>A — Phase Stepper</h3>
+          <p>
+            Morphing footer panel + “1 → 2” stepper. Reuses the Big2
+            <code>ActionPanel</code> slot and grid almost verbatim.
+          </p>
+          <div class="verdict">
+            <b>Best for:</b> shipping fast with minimal layout risk and a
+            consistent, compact control bar. The safe default.
+          </div>
+        </div>
+        <div class="col">
+          <h3>B — Contextual Draw</h3>
+          <p>
+            Draw happens by tapping the glowing piles on the table; footer is a
+            thin prompt during the draw phase.
+          </p>
+          <div class="verdict">
+            <b>Best for:</b> the most spatially intuitive “draw from where the
+            card is” feel. Needs interactive table piles (more wiring).
+          </div>
+        </div>
+        <div class="col">
+          <h3>C — Guided Banner</h3>
+          <p>
+            Narrated banner above the hand teaches the discard-first order
+            explicitly; TONK is a quiet link.
+          </p>
+          <div class="verdict">
+            <b>Best for:</b> onboarding players to Tonk's unusual turn order.
+            Largest footprint, most copy to maintain.
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
