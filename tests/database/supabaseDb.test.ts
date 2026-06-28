@@ -209,6 +209,7 @@ describe("SupabaseDB mappers", () => {
     it("correctly maps snake_case row to PlayerStats instance", async () => {
       const row = {
         user_id: "user-42",
+        game_type: "big2",
         games_played: 10,
         games_won: 4,
         games_lost: 6,
@@ -216,20 +217,24 @@ describe("SupabaseDB mappers", () => {
         last_played_at: "2026-05-15T12:00:00.000Z",
       };
 
+      // getStats now filters by user_id AND game_type: .eq().eq().maybeSingle()
       mockFrom.mockReturnValueOnce({
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
-            maybeSingle: vi
-              .fn()
-              .mockResolvedValueOnce({ data: row, error: null }),
+            eq: vi.fn(() => ({
+              maybeSingle: vi
+                .fn()
+                .mockResolvedValueOnce({ data: row, error: null }),
+            })),
           })),
         })),
       });
 
-      const stats = await db.getStats("user-42");
+      const stats = await db.getStats("user-42", "big2");
 
       expect(stats).not.toBeNull();
       expect(stats!.userId).toBe("user-42");
+      expect(stats!.gameType).toBe("big2");
       expect(stats!.gamesPlayed).toBe(10);
       expect(stats!.gamesWon).toBe(4);
       expect(stats!.gamesLost).toBe(6);

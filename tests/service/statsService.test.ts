@@ -69,6 +69,57 @@ describe("StatsService.recordGameCompletion", () => {
     expect(repo.incrementStats).toHaveBeenCalledTimes(2);
   });
 
+  // U1: incrementStats receives state.gameType for each non-guest player.
+  it("passes state.gameType ('big2') to incrementStats for every player", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await service.recordGameCompletion(makeCompletedState());
+
+    const calls = vi.mocked(repo.incrementStats).mock.calls;
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call[1]).toBe("big2");
+    }
+  });
+
+  // U2: a state with gameType "tonk" causes incrementStats(..., "tonk", ...).
+  // Pure mapping test — does not exercise any Tonk derivation logic.
+  it("passes 'tonk' to incrementStats when state.gameType is 'tonk'", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await service.recordGameCompletion(
+      makeCompletedState({ gameType: "tonk" }),
+    );
+
+    const calls = vi.mocked(repo.incrementStats).mock.calls;
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call[1]).toBe("tonk");
+    }
+  });
+
+  // U4: the StatsDelta shape passed to the repo is unchanged
+  // ({ gamesPlayed, gamesWon, gamesLost, totalScore }) regardless of game type.
+  // Locks the §7 "counters independent / delta shape unchanged" contract.
+  it("passes an unchanged StatsDelta shape (keys) to incrementStats", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await service.recordGameCompletion(makeCompletedState());
+
+    const calls = vi.mocked(repo.incrementStats).mock.calls;
+    const winnerCall = calls.find((c) => c[0] === "player-a");
+    const delta = winnerCall![2] as StatsDelta;
+    expect(Object.keys(delta).sort()).toEqual(
+      ["gamesLost", "gamesPlayed", "gamesWon", "totalScore"].sort(),
+    );
+  });
+
   it("winner gets gamesWon: 1 and gamesLost: 0", async () => {
     const repo = makeStatsRepo();
     const guestStore = makeGuestSessionStore();
@@ -79,7 +130,7 @@ describe("StatsService.recordGameCompletion", () => {
     const calls = vi.mocked(repo.incrementStats).mock.calls;
     const winnerCall = calls.find((c) => c[0] === "player-a");
     expect(winnerCall).toBeDefined();
-    const winnerDelta = winnerCall![1] as StatsDelta;
+    const winnerDelta = winnerCall![2] as StatsDelta;
     expect(winnerDelta.gamesWon).toBe(1);
     expect(winnerDelta.gamesLost).toBe(0);
     expect(winnerDelta.gamesPlayed).toBe(1);
@@ -95,7 +146,7 @@ describe("StatsService.recordGameCompletion", () => {
     const calls = vi.mocked(repo.incrementStats).mock.calls;
     const loserCall = calls.find((c) => c[0] === "player-b");
     expect(loserCall).toBeDefined();
-    const loserDelta = loserCall![1] as StatsDelta;
+    const loserDelta = loserCall![2] as StatsDelta;
     expect(loserDelta.gamesWon).toBe(0);
     expect(loserDelta.gamesLost).toBe(1);
     expect(loserDelta.gamesPlayed).toBe(1);
@@ -111,8 +162,8 @@ describe("StatsService.recordGameCompletion", () => {
     const calls = vi.mocked(repo.incrementStats).mock.calls;
     const aCall = calls.find((c) => c[0] === "player-a");
     const bCall = calls.find((c) => c[0] === "player-b");
-    expect((aCall![1] as StatsDelta).totalScore).toBe(10);
-    expect((bCall![1] as StatsDelta).totalScore).toBe(5);
+    expect((aCall![2] as StatsDelta).totalScore).toBe(10);
+    expect((bCall![2] as StatsDelta).totalScore).toBe(5);
   });
 
   it("skips guest players — incrementStats not called for guests", async () => {
@@ -126,10 +177,12 @@ describe("StatsService.recordGameCompletion", () => {
     expect(repo.incrementStats).toHaveBeenCalledTimes(1);
     expect(repo.incrementStats).toHaveBeenCalledWith(
       "player-a",
+      "big2",
       expect.any(Object),
     );
     expect(repo.incrementStats).not.toHaveBeenCalledWith(
       "player-b",
+      expect.any(String),
       expect.any(Object),
     );
   });
