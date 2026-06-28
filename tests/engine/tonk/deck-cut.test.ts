@@ -47,10 +47,6 @@ describe("deckCount", () => {
     expect(deckCount(7)).toBe(2);
     expect(deckCount(8)).toBe(2);
   });
-
-  it("extraDecks adds to the count", () => {
-    expect(deckCount(3, 1)).toBe(2);
-  });
 });
 
 describe("cutAmount — §8.1 worked examples", () => {

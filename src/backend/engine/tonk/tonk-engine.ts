@@ -66,11 +66,7 @@ export class TonkEngine implements GameEngine {
     const deckRoundsTarget = resolveDeckRoundsTarget(
       config.options["deckRoundsTarget"],
     );
-    const extraDecks =
-      typeof config.options["extraDecks"] === "number"
-        ? (config.options["extraDecks"] as number)
-        : 0;
-    const numDecks = deckCount(players.length, extraDecks);
+    const numDecks = deckCount(players.length);
 
     const trickPrng = new SeededPRNG(String(hashSeed(prng.seed + ":trick:1")));
     const { hands, stock, deckSize } = buildTrickDeck(

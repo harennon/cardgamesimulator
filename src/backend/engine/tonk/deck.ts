@@ -10,9 +10,9 @@ import {
   DEFAULT_DECK_ROUNDS_TARGET,
 } from "./constants.js";
 
-/** numDecks = ceil(players / 5) (+ extraDecks). 3-5 -> 1, 6-10 -> 2. */
-export function deckCount(playerCount: number, extraDecks = 0): number {
-  return Math.ceil(playerCount / 5) + extraDecks;
+/** numDecks = ceil(players / 5). 3-5 -> 1, 6-10 -> 2. */
+export function deckCount(playerCount: number): number {
+  return Math.ceil(playerCount / 5);
 }
 
 /**
