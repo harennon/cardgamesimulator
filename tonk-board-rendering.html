@@ -1,0 +1,2013 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tonk Board Rendering — Mockups</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        /* Tonk-specific accents */
+        --drawable-cyan: #5fc9d4;
+        --drawable-glow: rgba(95, 201, 212, 0.45);
+        --phase-discard: #e0894d;
+        --phase-draw: #6fb96f;
+        --font-ui: "DM Sans", sans-serif;
+        --font-mono: "JetBrains Mono", "Courier New", monospace;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 24px 96px;
+        line-height: 1.5;
+      }
+
+      /* ---------- page scaffolding ---------- */
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 36px;
+      }
+      .page-head h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin-top: 8px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 820px;
+      }
+      .page-head .legend {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 18px;
+        font-size: 0.78rem;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--text-muted);
+      }
+      .legend i {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        display: inline-block;
+      }
+
+      .section {
+        max-width: 1180px;
+        margin: 0 auto 64px;
+      }
+      .section__head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 4px;
+        border-bottom: 1px solid #1e1e1e;
+        padding-bottom: 10px;
+      }
+      .section__tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #0a0a0a;
+        background: var(--gold-accent);
+        padding: 3px 9px;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+      .section__head h2 {
+        font-size: 1.18rem;
+        font-weight: 600;
+      }
+      .section__desc {
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        margin: 12px 0 24px;
+        max-width: 880px;
+      }
+      .section__desc strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .section__desc .pick {
+        color: var(--drawable-cyan);
+        font-weight: 600;
+      }
+
+      .frame-label {
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+      }
+      .variants {
+        display: grid;
+        gap: 28px;
+      }
+      .variants--2 {
+        grid-template-columns: 1fr 1fr;
+      }
+      .variants--3 {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+      @media (max-width: 1000px) {
+        .variants--2,
+        .variants--3 {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .variant__title {
+        font-size: 0.96rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+      }
+      .variant__title .badge {
+        font-family: var(--font-mono);
+        font-size: 0.6rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #0a0a0a;
+        background: var(--drawable-cyan);
+        padding: 2px 7px;
+        border-radius: 4px;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+      .variant__note {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin: 4px 0 12px;
+      }
+
+      /* ---------- table / board ---------- */
+      .board {
+        position: relative;
+        border-radius: 12px;
+        background: radial-gradient(
+          ellipse 80% 70% at 50% 46%,
+          var(--felt-light) 0%,
+          var(--felt) 52%,
+          #0f2e1c 100%
+        );
+        border: 10px solid var(--table-rim);
+        box-shadow:
+          inset 0 0 0 2px var(--table-rim-light),
+          0 20px 48px rgba(0, 0, 0, 0.55);
+        overflow: hidden;
+      }
+      .board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+
+      /* full board frame */
+      .board--full {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-height: 540px;
+      }
+
+      /* ---------- opponent seating ---------- */
+      .seat-rail {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        justify-content: center;
+        flex-wrap: wrap;
+        padding: 14px 16px 10px;
+        background: linear-gradient(
+          180deg,
+          rgba(45, 24, 16, 0.65),
+          rgba(45, 24, 16, 0)
+        );
+        position: relative;
+        z-index: 2;
+      }
+      .seat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        padding: 7px 11px 8px;
+        border-radius: 10px;
+        border: 1.5px solid transparent;
+        background: rgba(0, 0, 0, 0.18);
+        position: relative;
+        min-width: 78px;
+      }
+      .seat--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.1);
+        box-shadow: 0 0 0 1px var(--gold-glow);
+      }
+      .seat__backs {
+        display: flex;
+        height: 30px;
+        align-items: center;
+      }
+      .mini-back {
+        width: 20px;
+        height: 28px;
+        border-radius: 3px;
+        border: 1px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a, #5c1010);
+        margin-left: -12px;
+        flex-shrink: 0;
+        position: relative;
+      }
+      .mini-back:first-child {
+        margin-left: 0;
+      }
+      .mini-back::after {
+        content: "";
+        position: absolute;
+        inset: 2px;
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 2px;
+      }
+      .seat__name {
+        font-size: 0.76rem;
+        font-weight: 600;
+        max-width: 92px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .seat__meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.66rem;
+        color: var(--text-muted);
+      }
+      .seat__count {
+        background: rgba(0, 0, 0, 0.35);
+        padding: 1px 6px;
+        border-radius: 8px;
+      }
+      /* tally chip on the seat — running score (lower is better) */
+      .seat__tally {
+        font-family: var(--font-mono);
+        font-weight: 700;
+        font-size: 0.66rem;
+        padding: 1px 6px;
+        border-radius: 8px;
+        background: rgba(201, 168, 76, 0.16);
+        color: var(--gold-accent);
+      }
+      .seat__tally--danger {
+        background: rgba(224, 85, 85, 0.18);
+        color: #ef8a8a;
+      }
+      .seat__tally--leader {
+        background: rgba(111, 185, 111, 0.18);
+        color: #95d495;
+      }
+      .seat__turn-dot {
+        position: absolute;
+        top: 5px;
+        right: 6px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-accent);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      /* phase tag under the active opponent */
+      .seat__phase {
+        font-family: var(--font-mono);
+        font-size: 0.56rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 1px 6px;
+        border-radius: 6px;
+        font-weight: 700;
+      }
+      .phase--discard {
+        background: rgba(224, 137, 77, 0.2);
+        color: var(--phase-discard);
+      }
+      .phase--draw {
+        background: rgba(111, 185, 111, 0.2);
+        color: var(--phase-draw);
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.55;
+          transform: scale(1.35);
+        }
+      }
+
+      /* ---------- center table region ---------- */
+      .center {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 48px;
+        padding: 20px 16px;
+      }
+      .center__banner {
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.82rem;
+        color: var(--text-primary);
+        background: rgba(0, 0, 0, 0.32);
+        padding: 5px 14px;
+        border-radius: 18px;
+        white-space: nowrap;
+      }
+      .center__banner b {
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .center__banner .trick-no {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        border-left: 1px solid var(--table-rim-light);
+        padding-left: 10px;
+      }
+
+      .pile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .pile__label {
+        font-family: var(--font-mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .pile__stack {
+        position: relative;
+      }
+
+      /* ---------- a card face ---------- */
+      .card {
+        width: 64px;
+        height: 90px;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        position: relative;
+        font-family: var(--font-card);
+        font-weight: 700;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .card .corner {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+        font-size: 11px;
+      }
+      .card .pip {
+        font-size: 1.5rem;
+      }
+      .card.red {
+        color: var(--red-suit);
+      }
+      .card.black {
+        color: var(--black-suit);
+      }
+      .card--sm {
+        width: 48px;
+        height: 68px;
+      }
+      .card--sm .pip {
+        font-size: 1.15rem;
+      }
+      .card--sm .corner {
+        font-size: 9px;
+      }
+      .card--joker {
+        background: linear-gradient(145deg, #faf3e8, #e8d9bd);
+        color: #6a4ea0;
+        font-family: var(--font-ui);
+      }
+      .card--joker .pip {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .card-back {
+        width: 64px;
+        height: 90px;
+        border-radius: 6px;
+        border: 1.5px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        position: relative;
+        flex-shrink: 0;
+      }
+      .card-back::after {
+        content: "";
+        position: absolute;
+        inset: 4px;
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        border-radius: 3px;
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 4px,
+          rgba(201, 168, 76, 0.1) 4px,
+          rgba(201, 168, 76, 0.1) 5px
+        );
+      }
+
+      /* stock = stacked card backs + count badge */
+      .stock {
+        position: relative;
+        width: 64px;
+        height: 90px;
+      }
+      .stock .card-back {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      .stock .card-back:nth-child(1) {
+        transform: translate(4px, 4px);
+        opacity: 0.5;
+      }
+      .stock .card-back:nth-child(2) {
+        transform: translate(2px, 2px);
+        opacity: 0.8;
+      }
+      .stock__count {
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        font-weight: 700;
+        background: rgba(0, 0, 0, 0.65);
+        color: var(--text-primary);
+        padding: 2px 8px;
+        border-radius: 10px;
+        white-space: nowrap;
+        z-index: 5;
+      }
+
+      /* discard pile = small fan of recent discards, top card prominent */
+      .discard {
+        position: relative;
+        width: 64px;
+        height: 90px;
+      }
+      .discard .card {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      .discard .buried {
+        opacity: 0.55;
+      }
+      .discard .buried.b1 {
+        transform: translate(-9px, 5px) rotate(-7deg);
+      }
+      .discard .buried.b2 {
+        transform: translate(7px, 3px) rotate(6deg);
+      }
+      .discard__live {
+        z-index: 4;
+      }
+      .discard__count {
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-family: var(--font-mono);
+        font-size: 0.62rem;
+        background: rgba(0, 0, 0, 0.6);
+        color: var(--text-muted);
+        padding: 1px 7px;
+        border-radius: 10px;
+        white-space: nowrap;
+        z-index: 5;
+      }
+      /* tag that marks the live top as "just discarded by X" */
+      .discard__livetag {
+        position: absolute;
+        top: -16px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-family: var(--font-mono);
+        font-size: 0.54rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        white-space: nowrap;
+      }
+
+      /* ===== DRAWABLE INDICATOR TREATMENTS ===== */
+
+      /* A: separate "drawable" slot with cyan ring */
+      .drawable-slot {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .drawable-card {
+        position: relative;
+        border-radius: 7px;
+      }
+      .drawable-card .card {
+        box-shadow:
+          0 0 0 2px var(--drawable-cyan),
+          0 0 18px var(--drawable-glow),
+          2px 4px 8px var(--card-shadow);
+      }
+      .drawable-tag {
+        font-family: var(--font-mono);
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: var(--drawable-cyan);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .drawable-tag::before {
+        content: "▾";
+        font-size: 0.7rem;
+      }
+
+      /* B: badge tucked onto the live pile top */
+      .draw-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        z-index: 8;
+        background: var(--drawable-cyan);
+        color: #06262a;
+        font-family: var(--font-mono);
+        font-size: 0.54rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: 8px;
+        box-shadow: 0 0 12px var(--drawable-glow);
+      }
+      .ring-drawable .card {
+        box-shadow:
+          0 0 0 2px var(--drawable-cyan),
+          0 0 16px var(--drawable-glow),
+          2px 4px 8px var(--card-shadow);
+        border-color: var(--drawable-cyan);
+      }
+
+      /* ---------- own hand ---------- */
+      .hand-region {
+        position: relative;
+        z-index: 2;
+        background: linear-gradient(
+          0deg,
+          rgba(37, 107, 66, 0.55),
+          rgba(37, 107, 66, 0)
+        );
+        border-top: 1px solid var(--table-rim-light);
+        padding: 14px 18px 16px;
+      }
+      .hand-head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .hand-head .label {
+        font-family: var(--font-mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .hand-head .hv {
+        font-size: 0.78rem;
+        color: var(--text-primary);
+      }
+      .hand-head .hv b {
+        font-family: var(--font-mono);
+        color: var(--gold-accent);
+      }
+      .hand {
+        display: flex;
+        padding-left: 4px;
+      }
+      .hand .card {
+        margin-left: -18px;
+      }
+      .hand .card:first-child {
+        margin-left: 0;
+      }
+
+      /* ---------- right-side panel (tallies + log) ---------- */
+      .with-side {
+        display: grid;
+        grid-template-columns: 1fr 270px;
+        gap: 0;
+      }
+      .side {
+        background: var(--panel-bg);
+        border-left: 1px solid var(--table-rim-light);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .side__block {
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .side__title {
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        padding: 10px 12px 8px;
+      }
+      .tally-list {
+        padding: 0 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .tally-row {
+        display: grid;
+        grid-template-columns: 16px 1fr auto;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 8px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+      }
+      .tally-row--me {
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .tally-row__rank {
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        color: var(--text-muted);
+      }
+      .tally-row__name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tally-row__score {
+        font-family: var(--font-mono);
+        font-weight: 700;
+      }
+      .bar-track {
+        grid-column: 1 / -1;
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(0, 0, 0, 0.35);
+        overflow: hidden;
+        margin-top: 2px;
+      }
+      .bar-fill {
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          var(--phase-draw),
+          var(--gold-accent)
+        );
+      }
+      .bar-fill--danger {
+        background: linear-gradient(90deg, var(--gold-accent), #e05555);
+      }
+      .tally-goal {
+        font-family: var(--font-mono);
+        font-size: 0.58rem;
+        color: var(--text-muted);
+        padding: 0 12px 10px;
+      }
+
+      .log {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .log__entries {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        max-height: 210px;
+      }
+      .log-entry {
+        font-size: 0.74rem;
+        color: var(--text-muted);
+        line-height: 1.35;
+      }
+      .log-entry b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .log-entry .crd {
+        font-family: var(--font-card);
+        color: var(--text-primary);
+      }
+      .log-entry .crd.red {
+        color: #d98b8b;
+      }
+      .log-entry--tonk b {
+        color: var(--gold-accent);
+      }
+      .log-entry--trick {
+        color: var(--gold-accent);
+        font-style: italic;
+        border-top: 1px dashed var(--table-rim-light);
+        padding-top: 5px;
+      }
+      .log-entry--draw {
+        color: var(--drawable-cyan);
+      }
+
+      /* spectator banner */
+      .spectator-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px;
+        background: rgba(0, 0, 0, 0.4);
+        font-size: 0.8rem;
+        position: relative;
+        z-index: 3;
+      }
+      .spectator-bar .eye {
+        color: var(--gold-accent);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+      }
+      .spectator-bar .watching {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      .spectator-hand-note {
+        position: relative;
+        z-index: 2;
+        text-align: center;
+        font-style: italic;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        padding: 18px;
+        border-top: 1px solid var(--table-rim-light);
+      }
+
+      /* phone frame */
+      .phone {
+        width: 360px;
+        margin: 0 auto;
+        border: 8px solid #1c1c1c;
+        border-radius: 26px;
+        overflow: hidden;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+      }
+      .phone .board {
+        border-radius: 0;
+        border-width: 5px;
+        min-height: 600px;
+      }
+      .phone .center {
+        gap: 22px;
+        padding: 16px 8px;
+      }
+      .phone .seat-rail {
+        gap: 6px;
+        padding: 8px 6px 6px;
+      }
+      .phone .seat {
+        flex-direction: row;
+        min-width: 0;
+        padding: 4px 8px;
+        gap: 7px;
+        border-radius: 14px;
+      }
+      .phone .seat__backs {
+        display: none;
+      }
+      .phone .seat__name {
+        max-width: 52px;
+        font-size: 0.68rem;
+      }
+      .phone .card,
+      .phone .card-back,
+      .phone .stock,
+      .phone .discard,
+      .phone .drawable-card .card {
+        width: 50px;
+        height: 70px;
+      }
+      .phone .stock,
+      .phone .discard {
+        width: 50px;
+      }
+      .phone .pip {
+        font-size: 1.15rem;
+      }
+      .phone .hand .card {
+        margin-left: -26px;
+        width: 50px;
+        height: 70px;
+      }
+      .phone .log-fab {
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--text-muted);
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        z-index: 9;
+      }
+
+      .callout {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        background: rgba(95, 201, 212, 0.06);
+        border: 1px solid rgba(95, 201, 212, 0.25);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-top: 18px;
+      }
+      .callout b {
+        color: var(--drawable-cyan);
+      }
+      ul.tight {
+        margin: 8px 0 0 18px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+      ul.tight li {
+        margin-bottom: 5px;
+      }
+      ul.tight b {
+        color: var(--text-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Tonk Board — Read-Only Rendering</h1>
+      <p>
+        Mockups for
+        <strong style="color: var(--text-primary)">TonkBoard.vue</strong>, a
+        display-only board dispatched when
+        <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+          >gameType === "tonk"</code
+        >. No action controls in this sub-issue — the goal is to prove we can
+        correctly DISPLAY Tonk state. All numbers below use a real dealt
+        scenario (5-card hands, lower-is-better tallies, two-phase turns, jokers
+        worth 0).
+      </p>
+      <div class="legend">
+        <span
+          ><i style="background: var(--gold-accent)"></i> active turn /
+          leader</span
+        >
+        <span
+          ><i style="background: var(--drawable-cyan)"></i> drawable-discard
+          snapshot</span
+        >
+        <span
+          ><i style="background: var(--phase-discard)"></i> discard phase</span
+        >
+        <span><i style="background: var(--phase-draw)"></i> draw phase</span>
+        <span><i style="background: #e05555"></i> near 150 (loss line)</span>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 1: FULL BOARD — RECOMMENDED LAYOUT (4 players)         -->
+    <!-- ============================================================= -->
+    <section class="section">
+      <div class="section__head">
+        <span class="section__tag">Layout</span>
+        <h2>Full board — recommended composition (4 players, your turn)</h2>
+      </div>
+      <p class="section__desc">
+        Same four-zone skeleton as Big2's <strong>GameBoard</strong> (opponent
+        rail top, center table, your hand bottom, right side panel) so the
+        dispatch swap is seamless. Tonk-specific center: a
+        <strong>stock</strong> (face-down + count) and a
+        <strong>discard pile</strong> sitting side by side, with the
+        <strong class="pick">drawable-discard snapshot</strong> called out
+        separately. The right panel stacks
+        <strong>running tallies</strong> (lower is better, with progress toward
+        the 150 loss line) above the <strong>game log</strong>. A center banner
+        carries <strong>whose turn + which phase + trick number</strong>.
+      </p>
+
+      <div class="frame-label">Desktop · 1 deck · 4 players · trick 3</div>
+      <div class="board with-side">
+        <div>
+          <div
+            class="board board--full"
+            style="
+              border: 0;
+              box-shadow: none;
+              border-radius: 0;
+              min-height: 480px;
+            "
+          >
+            <!-- opponents -->
+            <div class="seat-rail">
+              <div class="seat">
+                <div class="seat__backs">
+                  <div class="mini-back"></div>
+                  <div class="mini-back"></div>
+                  <div class="mini-back"></div>
+                  <div class="mini-back"></div>
+                </div>
+                <div class="seat__name">Maya</div>
+                <div class="seat__meta">
+                  <span class="seat__count">4</span
+                  ><span class="seat__tally">38</span>
+                </div>
+              </div>
+              <div class="seat seat--active">
+                <span class="seat__turn-dot"></span>
+                <div class="seat__backs">
+                  <div class="mini-back"></div>
+                  <div class="mini-back"></div>
+                  <div class="mini-back"></div>
+                  <div class="mini-back"></div>
+                  <div class="mini-back"></div>
+                </div>
+                <div class="seat__name">Devon</div>
+                <div class="seat__meta">
+                  <span class="seat__count">5</span
+                  ><span class="seat__tally">71</span>
+                </div>
+                <span class="seat__phase phase--discard">discarding</span>
+              </div>
+              <div class="seat">
+                <div class="seat__backs">
+                  <div class="mini-back"></div>
+                  <div class="mini-back"></div>
+                  <div class="mini-back"></div>
+                </div>
+                <div class="seat__name">Priya</div>
+                <div class="seat__meta">
+                  <span class="seat__count">3</span
+                  ><span class="seat__tally seat__tally--danger">142</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- center table -->
+            <div class="center">
+              <div class="center__banner">
+                <b>Devon</b>'s turn ·
+                <span
+                  class="phase--discard seat__phase"
+                  style="position: static"
+                  >discard phase</span
+                >
+                <span class="trick-no">TRICK 3</span>
+              </div>
+
+              <!-- stock -->
+              <div class="pile">
+                <div class="pile__label">Stock</div>
+                <div class="stock">
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="stock__count">23 left</div>
+                </div>
+              </div>
+
+              <!-- discard pile (live top) -->
+              <div class="pile">
+                <div class="pile__label">Discard</div>
+                <div class="discard">
+                  <div class="discard__livetag">Devon just played</div>
+                  <div class="card black buried b1">
+                    <span class="corner">8<br />♠</span
+                    ><span class="pip">♠</span>
+                  </div>
+                  <div class="card red buried b2">
+                    <span class="corner">4<br />♦</span
+                    ><span class="pip">♦</span>
+                  </div>
+                  <div class="card black discard__live">
+                    <span class="corner">Q<br />♠</span
+                    ><span class="pip">♠</span>
+                  </div>
+                  <div class="discard__count">12 cards</div>
+                </div>
+              </div>
+
+              <!-- drawable snapshot (Treatment A — recommended) -->
+              <div class="drawable-slot">
+                <div class="drawable-tag">Drawable</div>
+                <div class="drawable-card">
+                  <div class="card red">
+                    <span class="corner">7<br />♥</span
+                    ><span class="pip">♥</span>
+                  </div>
+                </div>
+                <div style="font-size: 0.62rem; color: var(--text-muted)">
+                  from Maya
+                </div>
+              </div>
+            </div>
+
+            <!-- own hand -->
+            <div class="hand-region">
+              <div class="hand-head">
+                <span class="label">Your hand (5)</span>
+                <span class="hv">value <b>27</b></span>
+              </div>
+              <div class="hand">
+                <div class="card black">
+                  <span class="corner">3<br />♣</span><span class="pip">♣</span>
+                </div>
+                <div class="card red">
+                  <span class="corner">5<br />♦</span><span class="pip">♦</span>
+                </div>
+                <div class="card red">
+                  <span class="corner">9<br />♥</span><span class="pip">♥</span>
+                </div>
+                <div class="card black">
+                  <span class="corner">K<br />♠</span><span class="pip">♠</span>
+                </div>
+                <div class="card card--joker">
+                  <span class="pip">Joker</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- side panel: tallies + log -->
+        <aside class="side">
+          <div class="side__block">
+            <div class="side__title">Tallies — lower wins</div>
+            <div class="tally-list">
+              <div class="tally-row">
+                <span class="tally-row__rank">1</span
+                ><span class="tally-row__name">Maya</span
+                ><span class="tally-row__score" style="color: #95d495">38</span>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 25%"></div>
+                </div>
+              </div>
+              <div class="tally-row tally-row--me">
+                <span class="tally-row__rank">2</span
+                ><span class="tally-row__name">You</span
+                ><span
+                  class="tally-row__score"
+                  style="color: var(--gold-accent)"
+                  >52</span
+                >
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 35%"></div>
+                </div>
+              </div>
+              <div class="tally-row">
+                <span class="tally-row__rank">3</span
+                ><span class="tally-row__name">Devon</span
+                ><span class="tally-row__score">71</span>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 47%"></div>
+                </div>
+              </div>
+              <div class="tally-row">
+                <span class="tally-row__rank">4</span
+                ><span class="tally-row__name">Priya</span
+                ><span class="tally-row__score" style="color: #ef8a8a"
+                  >142</span
+                >
+                <div class="bar-track">
+                  <div
+                    class="bar-fill bar-fill--danger"
+                    style="width: 95%"
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <div class="tally-goal">Game ends when anyone reaches 150</div>
+          </div>
+          <div class="side__block log">
+            <div class="side__title">Game log</div>
+            <div class="log__entries">
+              <div class="log-entry log-entry--trick">
+                Trick 3 — Priya deals, highest tally starts
+              </div>
+              <div class="log-entry">
+                <b>Priya</b> discarded <span class="crd">10♣</span>
+              </div>
+              <div class="log-entry log-entry--draw">
+                <b>Priya</b> drew from stock
+              </div>
+              <div class="log-entry">
+                <b>You</b> discarded <span class="crd">2♠</span>
+              </div>
+              <div class="log-entry log-entry--draw">
+                <b>You</b> drew the discard <span class="crd red">10♣</span>
+              </div>
+              <div class="log-entry">
+                <b>Maya</b> discarded <span class="crd red">7♥</span>
+              </div>
+              <div class="log-entry log-entry--draw">
+                <b>Maya</b> drew from stock
+              </div>
+              <div class="log-entry">
+                <b>Devon</b> discarded <span class="crd">Q♠</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="callout">
+        <b>The core challenge.</b> Tonk discards <em>before</em> drawing, so the
+        live discard top is the current player's own just-played card — NOT what
+        a drawing player may take. The board must show two different cards at
+        once: the <b>live pile top</b> (Q♠, "Devon just played") and the
+        <b>drawable snapshot</b> (7♥, "from Maya", cyan ring). Sections 2–3 show
+        distinct ways to render that distinction.
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 2: DRAWABLE INDICATOR TREATMENTS                       -->
+    <!-- ============================================================= -->
+    <section class="section">
+      <div class="section__head">
+        <span class="section__tag">Decision A</span>
+        <h2>Drawable-discard indicator — three treatments</h2>
+      </div>
+      <p class="section__desc">
+        How to make it obvious which card a drawing player could take from the
+        discard (the turn-start <strong>drawableDiscard</strong> snapshot,
+        distinct from the live pile top). This is the one genuinely new visual
+        problem in Tonk. Pick one — they are genuinely different mental models.
+        <span class="pick">A1 (separate slot)</span> reads most clearly for new
+        players.
+      </p>
+
+      <div class="variants variants--3">
+        <!-- A1: separate slot -->
+        <div>
+          <div class="variant__title">
+            A1 · Separate drawable slot <span class="badge">recommended</span>
+          </div>
+          <div class="variant__note">
+            Drawable card lifted out beside the pile, cyan-ringed, labeled. The
+            pile shows the live top untouched. Two distinct objects = least
+            ambiguity.
+          </div>
+          <div class="board" style="padding: 28px 12px">
+            <div class="center" style="gap: 26px; padding: 8px">
+              <div class="pile">
+                <div class="pile__label">Discard</div>
+                <div class="discard">
+                  <div class="discard__livetag">just played</div>
+                  <div class="card black buried b1">
+                    <span class="corner">8<br />♠</span
+                    ><span class="pip">♠</span>
+                  </div>
+                  <div class="card black discard__live">
+                    <span class="corner">Q<br />♠</span
+                    ><span class="pip">♠</span>
+                  </div>
+                  <div class="discard__count">12</div>
+                </div>
+              </div>
+              <div class="drawable-slot">
+                <div class="drawable-tag">Drawable</div>
+                <div class="drawable-card">
+                  <div class="card red">
+                    <span class="corner">7<br />♥</span
+                    ><span class="pip">♥</span>
+                  </div>
+                </div>
+                <div style="font-size: 0.62rem; color: var(--text-muted)">
+                  prev. player
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- A2: badge on live top -->
+        <div>
+          <div class="variant__title">A2 · Badge on the pile</div>
+          <div class="variant__note">
+            One pile object. The drawable card peeks from underneath with a cyan
+            "TAKE" badge; live top sits on top. Compact, but the relationship is
+            subtler.
+          </div>
+          <div class="board" style="padding: 28px 12px">
+            <div class="center" style="gap: 26px; padding: 8px">
+              <div class="pile">
+                <div class="pile__label">Discard</div>
+                <div class="discard" style="width: 86px">
+                  <div
+                    class="card red ring-drawable"
+                    style="left: -16px; top: 6px; z-index: 1"
+                  >
+                    <span class="corner">7<br />♥</span
+                    ><span class="pip">♥</span>
+                    <span class="draw-badge">take</span>
+                  </div>
+                  <div class="card black discard__live" style="left: 14px">
+                    <span class="corner">Q<br />♠</span
+                    ><span class="pip">♠</span>
+                  </div>
+                  <div class="discard__count" style="left: 30%">live: Q♠</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- A3: dimmed pile + spotlight -->
+        <div>
+          <div class="variant__title">A3 · Spotlight the drawable</div>
+          <div class="variant__note">
+            Pile rendered dim/de-emphasized as "history"; only the drawable card
+            is full-brightness & ringed. Reads "this is the one that matters,"
+            but hides which card is the live top.
+          </div>
+          <div class="board" style="padding: 28px 12px">
+            <div class="center" style="gap: 26px; padding: 8px">
+              <div class="pile">
+                <div class="pile__label">Discard pile (12)</div>
+                <div class="discard">
+                  <div class="card black buried b1" style="opacity: 0.35">
+                    <span class="corner">8<br />♠</span
+                    ><span class="pip">♠</span>
+                  </div>
+                  <div
+                    class="card black"
+                    style="opacity: 0.35; left: 0; top: 0; position: absolute"
+                  >
+                    <span class="corner">Q<br />♠</span
+                    ><span class="pip">♠</span>
+                  </div>
+                  <div
+                    class="card red ring-drawable"
+                    style="position: absolute; left: 0; top: -14px; z-index: 6"
+                  >
+                    <span class="corner">7<br />♥</span
+                    ><span class="pip">♥</span>
+                    <span class="draw-badge">drawable</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 3: TURN + PHASE INDICATOR TREATMENTS                   -->
+    <!-- ============================================================= -->
+    <section class="section">
+      <div class="section__head">
+        <span class="section__tag">Decision B</span>
+        <h2>Two-phase turn indicator</h2>
+      </div>
+      <p class="section__desc">
+        Tonk turns are two phases —
+        <strong style="color: var(--phase-discard)">discard</strong> then
+        <strong style="color: var(--phase-draw)">draw</strong> — same player
+        throughout. The board must show both whose turn it is AND which phase.
+        <span class="pick">B1 (color-coded chip)</span> recommended: one chip in
+        the center banner + a matching tag on the active seat, reusing Big2's
+        pulse-dot turn affordance.
+      </p>
+
+      <div class="variants variants--2">
+        <div>
+          <div class="variant__title">
+            B1 · Color-coded phase chip <span class="badge">recommended</span>
+          </div>
+          <div class="variant__note">
+            Center banner names the player + a colored phase chip. The active
+            seat repeats the phase tag so the eye-line at the rail is enough.
+          </div>
+          <div class="board" style="padding: 20px 12px 34px">
+            <div class="seat-rail" style="background: none">
+              <div class="seat seat--active">
+                <span class="seat__turn-dot"></span>
+                <div class="seat__name">Devon</div>
+                <div class="seat__meta">
+                  <span class="seat__count">5</span
+                  ><span class="seat__tally">71</span>
+                </div>
+                <span class="seat__phase phase--discard">discarding</span>
+              </div>
+            </div>
+            <div
+              style="
+                display: flex;
+                justify-content: center;
+                gap: 14px;
+                margin-top: 16px;
+              "
+            >
+              <div
+                class="center__banner"
+                style="position: static; transform: none"
+              >
+                <b>Devon</b>'s turn ·
+                <span
+                  class="seat__phase phase--discard"
+                  style="position: static"
+                  >discard phase</span
+                >
+              </div>
+              <div
+                class="center__banner"
+                style="position: static; transform: none"
+              >
+                <b>You</b>r turn ·
+                <span class="seat__phase phase--draw" style="position: static"
+                  >draw phase</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="variant__title">B2 · Two-step progress track</div>
+          <div class="variant__note">
+            A literal 2-step "Discard → Draw" tracker in the banner, lit step =
+            current phase. More explicit for first-timers, busier visually.
+          </div>
+          <div class="board" style="padding: 20px 12px 34px">
+            <div
+              style="display: flex; justify-content: center; margin-top: 8px"
+            >
+              <div
+                class="center__banner"
+                style="position: static; transform: none; gap: 14px"
+              >
+                <b>Devon</b>'s turn
+                <span
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-family: var(--font-mono);
+                    font-size: 0.68rem;
+                  "
+                >
+                  <span
+                    style="
+                      color: var(--phase-discard);
+                      border-bottom: 2px solid var(--phase-discard);
+                      padding-bottom: 2px;
+                    "
+                    >1 · DISCARD</span
+                  >
+                  <span style="color: var(--text-muted)">→</span>
+                  <span style="color: var(--text-muted)">2 · DRAW</span>
+                </span>
+              </div>
+            </div>
+            <div
+              style="display: flex; justify-content: center; margin-top: 16px"
+            >
+              <div
+                class="center__banner"
+                style="position: static; transform: none; gap: 14px"
+              >
+                <b>You</b>r turn
+                <span
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-family: var(--font-mono);
+                    font-size: 0.68rem;
+                  "
+                >
+                  <span style="color: var(--text-muted)">1 · DISCARD</span>
+                  <span style="color: var(--text-muted)">→</span>
+                  <span
+                    style="
+                      color: var(--phase-draw);
+                      border-bottom: 2px solid var(--phase-draw);
+                      padding-bottom: 2px;
+                    "
+                    >2 · DRAW</span
+                  >
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 4: SEATING DENSITY — 3 vs 8 PLAYERS                    -->
+    <!-- ============================================================= -->
+    <section class="section">
+      <div class="section__head">
+        <span class="section__tag">Decision C</span>
+        <h2>Seating at 3–8 players</h2>
+      </div>
+      <p class="section__desc">
+        The rail is a centered, wrapping flex row (matches the uncapped
+        <strong>OpponentRow.vue</strong>). At 6–8 players seats compress:
+        <strong>card-back fans shrink to a single stub + count</strong>, names
+        ellipsize, and the tally chip stays. At <strong>≥7</strong> the rail
+        wraps to two rows. This keeps every seat's count + tally + turn state
+        readable without scrolling. Recommended:
+        <span class="pick">compact seat at ≥6</span> (drop the full card fan,
+        keep count + tally).
+      </p>
+
+      <div class="frame-label">3 players — roomy</div>
+      <div class="board" style="padding: 10px 12px; margin-bottom: 22px">
+        <div class="seat-rail" style="background: none">
+          <div class="seat">
+            <div class="seat__backs">
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+            </div>
+            <div class="seat__name">Maya</div>
+            <div class="seat__meta">
+              <span class="seat__count">4</span
+              ><span class="seat__tally seat__tally--leader">38</span>
+            </div>
+          </div>
+          <div class="seat seat--active">
+            <span class="seat__turn-dot"></span>
+            <div class="seat__backs">
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+            </div>
+            <div class="seat__name">Devon</div>
+            <div class="seat__meta">
+              <span class="seat__count">5</span
+              ><span class="seat__tally">71</span>
+            </div>
+            <span class="seat__phase phase--draw">drawing</span>
+          </div>
+          <div class="seat">
+            <div class="seat__backs">
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+              <div class="mini-back"></div>
+            </div>
+            <div class="seat__name">Priya</div>
+            <div class="seat__meta">
+              <span class="seat__count">3</span
+              ><span class="seat__tally seat__tally--danger">142</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="frame-label">
+        8 players — compact seats, wraps to 2 rows at ≥7
+      </div>
+      <div class="board" style="padding: 10px 12px">
+        <div class="seat-rail" style="background: none">
+          <div class="seat" style="min-width: 0; padding: 6px 10px">
+            <div class="seat__name">Maya</div>
+            <div class="seat__meta">
+              <span class="seat__count">4</span
+              ><span class="seat__tally seat__tally--leader">38</span>
+            </div>
+          </div>
+          <div
+            class="seat seat--active"
+            style="min-width: 0; padding: 6px 10px"
+          >
+            <span class="seat__turn-dot"></span>
+            <div class="seat__name">Devon</div>
+            <div class="seat__meta">
+              <span class="seat__count">5</span
+              ><span class="seat__tally">71</span>
+            </div>
+            <span class="seat__phase phase--discard">disc.</span>
+          </div>
+          <div class="seat" style="min-width: 0; padding: 6px 10px">
+            <div class="seat__name">Priya</div>
+            <div class="seat__meta">
+              <span class="seat__count">3</span
+              ><span class="seat__tally seat__tally--danger">142</span>
+            </div>
+          </div>
+          <div class="seat" style="min-width: 0; padding: 6px 10px">
+            <div class="seat__name">Sam</div>
+            <div class="seat__meta">
+              <span class="seat__count">5</span
+              ><span class="seat__tally">64</span>
+            </div>
+          </div>
+          <div class="seat" style="min-width: 0; padding: 6px 10px">
+            <div class="seat__name">Lena</div>
+            <div class="seat__meta">
+              <span class="seat__count">5</span
+              ><span class="seat__tally">90</span>
+            </div>
+          </div>
+          <div class="seat" style="min-width: 0; padding: 6px 10px">
+            <div class="seat__name">Theo</div>
+            <div class="seat__meta">
+              <span class="seat__count">4</span
+              ><span class="seat__tally">45</span>
+            </div>
+          </div>
+          <div class="seat" style="min-width: 0; padding: 6px 10px">
+            <div class="seat__name">Nour</div>
+            <div class="seat__meta">
+              <span class="seat__count">5</span
+              ><span class="seat__tally">118</span>
+            </div>
+          </div>
+          <div class="seat" style="min-width: 0; padding: 6px 10px">
+            <div class="seat__name">Ivo</div>
+            <div class="seat__meta">
+              <span class="seat__count">5</span
+              ><span class="seat__tally">73</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 5: SPECTATOR VIEW                                      -->
+    <!-- ============================================================= -->
+    <section class="section">
+      <div class="section__head">
+        <span class="section__tag">View</span>
+        <h2>Spectator view — public info only</h2>
+      </div>
+      <p class="section__desc">
+        Driven by <strong>SpectatorView</strong>: no hands, no stock contents.
+        Spectators see opponent counts, the discard top + drawable snapshot,
+        stock count, turn + phase, tallies, and the log. The bottom hand region
+        is replaced by a "no hand" note. Identical center + rail as the player
+        board — only the private hand is removed.
+      </p>
+
+      <div class="frame-label">Spectating · 4 players · trick 3</div>
+      <div class="board with-side">
+        <div>
+          <div class="spectator-bar">
+            <span class="eye">● Spectating</span>
+            <span class="watching">2 watching · TRICK 3</span>
+          </div>
+          <div class="seat-rail">
+            <div class="seat">
+              <div class="seat__backs">
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+              </div>
+              <div class="seat__name">Maya</div>
+              <div class="seat__meta">
+                <span class="seat__count">4</span
+                ><span class="seat__tally seat__tally--leader">38</span>
+              </div>
+            </div>
+            <div class="seat seat--active">
+              <span class="seat__turn-dot"></span>
+              <div class="seat__backs">
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+              </div>
+              <div class="seat__name">Devon</div>
+              <div class="seat__meta">
+                <span class="seat__count">5</span
+                ><span class="seat__tally">71</span>
+              </div>
+              <span class="seat__phase phase--discard">discarding</span>
+            </div>
+            <div class="seat">
+              <div class="seat__backs">
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+              </div>
+              <div class="seat__name">Priya</div>
+              <div class="seat__meta">
+                <span class="seat__count">3</span
+                ><span class="seat__tally seat__tally--danger">142</span>
+              </div>
+            </div>
+            <div class="seat">
+              <div class="seat__backs">
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+                <div class="mini-back"></div>
+              </div>
+              <div class="seat__name">You(?) Ada</div>
+              <div class="seat__meta">
+                <span class="seat__count">4</span
+                ><span class="seat__tally">52</span>
+              </div>
+            </div>
+          </div>
+          <div class="center" style="min-height: 200px">
+            <div class="center__banner">
+              <b>Devon</b>'s turn ·
+              <span class="seat__phase phase--discard" style="position: static"
+                >discard phase</span
+              ><span class="trick-no">TRICK 3</span>
+            </div>
+            <div class="pile">
+              <div class="pile__label">Stock</div>
+              <div class="stock">
+                <div class="card-back"></div>
+                <div class="card-back"></div>
+                <div class="card-back"></div>
+                <div class="stock__count">23 left</div>
+              </div>
+            </div>
+            <div class="pile">
+              <div class="pile__label">Discard</div>
+              <div class="discard">
+                <div class="discard__livetag">Devon just played</div>
+                <div class="card black buried b1">
+                  <span class="corner">8<br />♠</span><span class="pip">♠</span>
+                </div>
+                <div class="card black discard__live">
+                  <span class="corner">Q<br />♠</span><span class="pip">♠</span>
+                </div>
+                <div class="discard__count">12 cards</div>
+              </div>
+            </div>
+            <div class="drawable-slot">
+              <div class="drawable-tag">Drawable</div>
+              <div class="drawable-card">
+                <div class="card red">
+                  <span class="corner">7<br />♥</span><span class="pip">♥</span>
+                </div>
+              </div>
+              <div style="font-size: 0.62rem; color: var(--text-muted)">
+                from Maya
+              </div>
+            </div>
+          </div>
+          <div class="spectator-hand-note">
+            You are spectating — hands are hidden until a trick is revealed.
+          </div>
+        </div>
+        <aside class="side">
+          <div class="side__block">
+            <div class="side__title">Tallies — lower wins</div>
+            <div class="tally-list">
+              <div class="tally-row">
+                <span class="tally-row__rank">1</span
+                ><span class="tally-row__name">Maya</span
+                ><span class="tally-row__score" style="color: #95d495">38</span>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 25%"></div>
+                </div>
+              </div>
+              <div class="tally-row">
+                <span class="tally-row__rank">2</span
+                ><span class="tally-row__name">Ada</span
+                ><span class="tally-row__score">52</span>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 35%"></div>
+                </div>
+              </div>
+              <div class="tally-row">
+                <span class="tally-row__rank">3</span
+                ><span class="tally-row__name">Devon</span
+                ><span class="tally-row__score">71</span>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 47%"></div>
+                </div>
+              </div>
+              <div class="tally-row">
+                <span class="tally-row__rank">4</span
+                ><span class="tally-row__name">Priya</span
+                ><span class="tally-row__score" style="color: #ef8a8a"
+                  >142</span
+                >
+                <div class="bar-track">
+                  <div
+                    class="bar-fill bar-fill--danger"
+                    style="width: 95%"
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <div class="tally-goal">Game ends when anyone reaches 150</div>
+          </div>
+          <div class="side__block log">
+            <div class="side__title">Game log</div>
+            <div class="log__entries">
+              <div class="log-entry log-entry--trick">Trick 3 begins</div>
+              <div class="log-entry">
+                <b>You</b> discarded <span class="crd">2♠</span>
+              </div>
+              <div class="log-entry log-entry--draw">
+                <b>Ada</b> drew the discard <span class="crd red">10♣</span>
+              </div>
+              <div class="log-entry">
+                <b>Maya</b> discarded <span class="crd red">7♥</span>
+              </div>
+              <div class="log-entry log-entry--draw">
+                <b>Maya</b> drew from stock
+              </div>
+              <div class="log-entry">
+                <b>Devon</b> discarded <span class="crd">Q♠</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 6: MOBILE                                              -->
+    <!-- ============================================================= -->
+    <section class="section">
+      <div class="section__head">
+        <span class="section__tag">Responsive</span>
+        <h2>Mobile layout (≤767px)</h2>
+      </div>
+      <p class="section__desc">
+        Single-column stack like Big2 mobile: seat rail collapses to compact
+        pill rows, the center keeps stock + discard + drawable in one row (cards
+        scale down), the hand scrolls horizontally, and the log moves behind a
+        floating button. Tallies fold into the seat pills (count + score), so
+        the side panel is not needed in portrait.
+      </p>
+
+      <div class="phone">
+        <div class="board">
+          <div class="seat-rail">
+            <div class="seat">
+              <div class="seat__name">Maya</div>
+              <div class="seat__meta">
+                <span class="seat__count">4</span
+                ><span class="seat__tally seat__tally--leader">38</span>
+              </div>
+            </div>
+            <div class="seat seat--active">
+              <span class="seat__turn-dot"></span>
+              <div class="seat__name">Devon</div>
+              <div class="seat__meta">
+                <span class="seat__count">5</span
+                ><span class="seat__tally">71</span>
+              </div>
+              <span class="seat__phase phase--discard">disc.</span>
+            </div>
+            <div class="seat">
+              <div class="seat__name">Priya</div>
+              <div class="seat__meta">
+                <span class="seat__count">3</span
+                ><span class="seat__tally seat__tally--danger">142</span>
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: center; padding: 8px">
+            <div
+              class="center__banner"
+              style="position: static; transform: none; font-size: 0.74rem"
+            >
+              <b>Devon</b> ·
+              <span class="seat__phase phase--discard" style="position: static"
+                >discard</span
+              ><span class="trick-no">T3</span>
+            </div>
+          </div>
+          <div class="center">
+            <div class="pile">
+              <div class="pile__label">Stock</div>
+              <div class="stock">
+                <div class="card-back"></div>
+                <div class="card-back"></div>
+                <div class="card-back"></div>
+                <div class="stock__count">23</div>
+              </div>
+            </div>
+            <div class="pile">
+              <div class="pile__label">Discard</div>
+              <div class="discard">
+                <div class="card black buried b1">
+                  <span class="corner">8<br />♠</span><span class="pip">♠</span>
+                </div>
+                <div class="card black discard__live">
+                  <span class="corner">Q<br />♠</span><span class="pip">♠</span>
+                </div>
+                <div class="discard__count">12</div>
+              </div>
+            </div>
+            <div class="drawable-slot">
+              <div class="drawable-tag" style="font-size: 0.5rem">Drawable</div>
+              <div class="drawable-card">
+                <div class="card red">
+                  <span class="corner">7<br />♥</span><span class="pip">♥</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="hand-region">
+            <div class="hand-head">
+              <span class="label">Your hand (5)</span
+              ><span class="hv">value <b>27</b></span>
+            </div>
+            <div class="hand">
+              <div class="card black">
+                <span class="corner">3<br />♣</span><span class="pip">♣</span>
+              </div>
+              <div class="card red">
+                <span class="corner">5<br />♦</span><span class="pip">♦</span>
+              </div>
+              <div class="card red">
+                <span class="corner">9<br />♥</span><span class="pip">♥</span>
+              </div>
+              <div class="card black">
+                <span class="corner">K<br />♠</span><span class="pip">♠</span>
+              </div>
+              <div class="card card--joker"><span class="pip">Joker</span></div>
+            </div>
+          </div>
+          <div class="log-fab">&#9776;</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 7: WHAT MAPS / WHAT'S NEW                              -->
+    <!-- ============================================================= -->
+    <section class="section">
+      <div class="section__head">
+        <span class="section__tag">Reuse</span>
+        <h2>Component reuse plan</h2>
+      </div>
+      <p class="section__desc">
+        Most of the board is the existing Big2 skeleton with a Tonk-specific
+        center. Concrete component-spec details go in the LLD after a direction
+        is picked.
+      </p>
+      <ul class="tight">
+        <li>
+          <b>Reuse as-is:</b>
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >GameCard.vue</code
+          >
+          (card faces + backs; Joker rendered as a special face), the
+          seat/turn-dot/pulse affordance pattern from
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >OpponentRow.vue</code
+          >, and the auto-scrolling
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >GameLog.vue</code
+          >
+          shell.
+        </li>
+        <li>
+          <b>Adapt:</b>
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >OpponentRow.vue</code
+          >
+          gains a per-seat tally chip + optional phase tag, and a compact mode
+          at ≥6 players (drop the card fan). Could be a Tonk-local
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >TonkSeatRail.vue</code
+          >
+          rather than overloading Big2's row.
+        </li>
+        <li>
+          <b>New, Tonk-only:</b> center
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >TonkPiles</code
+          >
+          (stock + discard + drawable slot), the
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >TonkTallyPanel</code
+          >
+          (lower-is-better + 150 line), and the phase chip. The
+          <b>GameLog</b> needs Tonk entry shapes (discard / draw-source / TONK /
+          trick result) — drive it off the Tonk log, not Big2's playHistory.
+        </li>
+        <li>
+          <b>Dispatch:</b>
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >GameView.vue</code
+          >
+          renders
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >&lt;TonkBoard&gt;</code
+          >
+          when
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >gameType === "tonk"</code
+          >, else
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >&lt;GameBoard&gt;</code
+          >. No Tonk branches in the WebSocket/state plumbing — selection is at
+          the component layer only.
+        </li>
+        <li>
+          <b>Read-only:</b> no ActionPanel, no card selection/interactivity.
+          Hand cards render non-interactive (Big2's
+          <code style="font-family: var(--font-mono); color: var(--gold-accent)"
+            >interactive=false</code
+          >
+          path).
+        </li>
+      </ul>
+    </section>
+  </body>
+</html>
