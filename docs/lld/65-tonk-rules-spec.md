@@ -85,7 +85,7 @@ This LLD pins down the EXACT Tonk (Tunk) variant we will implement. Tonk has man
    - **Trick 1:** discard pile starts **empty**; the trick-1 first player's `drawableDiscard` (§4.2) is `null` (no draw-from-discard option).
    - **Trick 2+:** flip **1** card face up from the stock into the discard pile before play starts. This face-up card is the trick starter's initial `drawableDiscard` snapshot (§3.3, §4.2) — it gives the trick starter a draw option (the ruleset's "slight advantage to the highest score" player). Because the starter discards before drawing, this snapshot is captured at the starter's turn start so it survives being buried under the starter's own discard; the starter still cannot draw back their own discard.
 5. **First player.**
-   - **Trick 1:** the player at seat index 0 (game creator's seat / lobby order) starts. (The ruleset does not specify the trick-1 starter; default to seat 0 — confirm at sign-off, §9.3.)
+   - **Trick 1:** the player at seat index 0 (game creator's seat / lobby order) starts. (The ruleset does not specify the trick-1 starter; seat 0 — signed off §9.3.)
    - **Trick 2+:** the player with the **overall highest tally** starts (and is the dealer). Ties broken by lowest seat index (§8.7).
 
 ### 3.2 Card values
@@ -197,7 +197,7 @@ Let `caller` = the player who called TONK (if any), and `hv(p)` = hand value of 
 **Case C — stock exhausted, no TONK:**
 - The player with the **lowest** hand value adds **30** to their tally (a penalty, not a reward).
 - All other players add **0**.
-- Ties for lowest in Case C: see §7 (all tied-lowest players each add 30 — default, confirm at sign-off §9.7).
+- Ties for lowest in Case C: see §7 (all tied-lowest players each add 30 — signed off §9.7).
 
 > Note the asymmetry, transcribed exactly: a *successful* TONK (Case A) penalizes everyone *except* the caller; a *failed* TONK (Case B) penalizes only the caller 30; a *stock-out* (Case C) penalizes only the lowest hand 30.
 
@@ -282,11 +282,11 @@ The turn timer (LLD 07) calls `getAutoTimeoutAction(state)` when a player's cloc
 
 ## 8. Edge Cases (resolved — no TBDs that block the engine)
 
-### 8.1 Deck composition, cut, and joker count selection (engine-critical, resolved — proposed defaults)
+### 8.1 Deck composition, cut, and joker count selection (engine-critical, resolved — signed off 2026-06-28)
 
 **Deck count.** `numDecks = ceil(players.length / 5)` (`+ config.options.extraDecks`, default 0). 3–5 players → 1 deck; **6–8 players → 2 decks** (signed-off range is 3–8, §9.1). **6 MUST trigger 2 decks** — this is the ruleset's own single→multi-deck cutoff. Each deck contributes **52 standard cards + 2 Jokers**, so `poolSize = 54 * numDecks` cards and `2 * numDecks` in-play Jokers. (`Card` type in `engine-types.ts` has no Joker rank — see ⚠ §8.6.) Note the in-play Joker count (`2 * numDecks`) is independent of the end-of-game TRUE-LOSER draw, which always uses a single deck + 2 Jokers (§5.3, §8.5).
 
-**Creator-configurable rounds target.** The cut is driven by `deckRoundsTarget`, an **integer the game creator picks in the lobby** = how many rounds the deck should last after dealing. **Range 5–12, default 8** (the 7–9-round heuristic sits inside that range). (This is the field previously named `roundsTarget` / `config.options.deckTargetRounds` and treated as an internal default; it is now exposed as a per-game creator control — renamed `deckRoundsTarget`. **NOTE: this is not wired to the engine today — see the new cross-stack plumbing in §8.8 (SCOPE EXPANSION).**) Whether to ship it as a creator control vs. keep it an internal constant for v1 is a sign-off question — §9.9.
+**Creator-configurable rounds target.** The cut is driven by `deckRoundsTarget`, an **integer the game creator picks in the lobby** = how many rounds the deck should last after dealing. **Range 5–12, default 8** (the 7–9-round heuristic sits inside that range). (This is the field previously named `roundsTarget` / `config.options.deckTargetRounds` and treated as an internal default; it is now exposed as a per-game creator control — renamed `deckRoundsTarget`. **NOTE: this is not wired to the engine today — see the new cross-stack plumbing in §8.8 (SCOPE EXPANSION).**) §9.9 (signed off 2026-06-28) confirmed it ships as a **creator control** — build the plumbing (§8.8), not an internal constant.
 
 **Unified cut formula (applies to BOTH ≤5 and 6+).** The cut amount is computed the same way for every player count from the same math:
 
@@ -312,7 +312,7 @@ cutAmount      = max(0, poolSize - clamp(targetCards, [handCardsDealt + players.
 | 6+, default | 6 | 2 | 108 | 30 | 8 | 30 + 8·6 = **78** | [36, 108] | 78 | max(0, 108−78) = **30** |
 | 8 (max), default | 8 | 2 | 108 | 40 | 8 | 40 + 8·8 = **104** | [48, 108] | 104 | max(0, 108−104) = **4** |
 
-- The 3-player default (`deckRoundsTarget = 8`) yields `targetCards = 39 < poolSize = 54`, so the formula cuts 15 cards. **Recommended resolution (§9.9): keep the default at 8 and accept this cut at ≤5 players** — the deck changing between tricks even at low player counts is acceptable/desirable. This collapses the earlier open question (it is no longer "raise the ≤5 default to avoid the cut"); the no-cut boundary (`deckRoundsTarget ≥ 13` for 3 players, see the table) is available to a creator who explicitly wants no cut, but it is **not** the default. The formula is correct and deterministic at every value; this is a product-default choice, recorded as the recommended resolution at §9.9 (still awaiting the user's own sign-off as part of the §9 gate).
+- The 3-player default (`deckRoundsTarget = 8`) yields `targetCards = 39 < poolSize = 54`, so the formula cuts 15 cards. **Recommended resolution (§9.9): keep the default at 8 and accept this cut at ≤5 players** — the deck changing between tricks even at low player counts is acceptable/desirable. This collapses the earlier open question (it is no longer "raise the ≤5 default to avoid the cut"); the no-cut boundary (`deckRoundsTarget ≥ 13` for 3 players, see the table) is available to a creator who explicitly wants no cut, but it is **not** the default. The formula is correct and deterministic at every value; this is a product-default choice, **confirmed at §9.9 (signed off 2026-06-28): keep default 8 and accept the cut at ≤5 players.**
 - The 6-player default (`deckRoundsTarget = 8`) yields `targetCards = 78`, `cutAmount = 30`, consistent with the prior worked example.
 
 **Overrides.** `config.options.extraDecks` (number, default 0) still allows deck-count tuning. The old `config.options.deckTargetRounds` is renamed/superseded by the creator-facing `deckRoundsTarget`. **⚠ Both `deckTargetRounds` and `extraDecks` are DEAD config today:** `config.options` is hardcoded to `{}` at `gameService.ts:102`, so nothing in `config.options` reaches the engine. Wiring `deckRoundsTarget` from the lobby to the engine therefore requires NEW cross-stack plumbing (API + DB + frontend), specified in **§8.8 (SCOPE EXPANSION)**; `GameEngineConfig.options` being typed `Record<string, unknown>` (**verified in `game-engine.ts`**) is necessary but **not sufficient** — the value still has to be put there at start time.
@@ -363,7 +363,7 @@ Draw legality is governed by the **turn-start snapshot** `drawableDiscard` (§4.
 | Empty discard payload | Reject `"Must discard at least one card"`. |
 | Stock empty at draw phase | Trick ends, Case C scoring (§7). |
 | Stock empty at start of a turn's discard | Discard still allowed (sink is the pile); trick only ends when a draw can't be satisfied. |
-| Tie for lowest in Case C | All tied-lowest players each add 30 (default — confirm §9.7). |
+| Tie for lowest in Case C | All tied-lowest players each add 30 (signed off §9.7). |
 | Tie at match end for lowest tally (the display "winner") | Lowest seat index among the tied (deterministic). This is a **display tiebreak only** — `winner` does not drive stats (§6.3), so the tiebreak affects only the best-result display, not who won/lost. |
 | Multiple players ≥150 simultaneously | All eligible for the TRUE-LOSER joker draw (§5.3); the joker-drawer is the single loser. Crossing 150 does NOT by itself record a loss — only the TRUE LOSER gets `gamesLost: 1` (§6.3). |
 | Player ≥150 but also lowest tally | Per the loss-centric model (§6.3), crossing 150 does not by itself record a loss — `gamesLost = 1` only for the TRUE LOSER. So a player who crossed 150 but is not the TRUE LOSER gets `gamesWon: 1`. The display `winner` (lowest tally) is independent of win/loss. **All-lost edge:** if *every* player is ≥150, there is still exactly ONE loser (the TRUE LOSER by joker draw); everyone else gets `gamesWon: 1`. `winner` = lowest tally among them as the display best-result. (Resolved at §9.8 — no `null`-winner special case needed.) |
@@ -510,7 +510,7 @@ The decisions above are recorded in the dated sign-off block at the top of this 
 ### Unit — match end & TRUE LOSER
 - Tally ≥150 → that player lost; new trick otherwise.
 - Single lost player → auto TRUE LOSER.
-- Multiple lost → joker-draw from a fresh pool of `numDecks` decks (`2 * numDecks` Jokers; deterministic via seed) picks TRUE LOSER; termination guaranteed even with multiple Jokers (more Jokers only ends the draw sooner).
+- Multiple lost → joker-draw from a **single fresh deck (52 + 2 Jokers = 54), regardless of the in-play `numDecks`** (deterministic via seed) picks TRUE LOSER; termination guaranteed by the 2 Jokers in 54 (§5.3, §8.5).
 - `winner` = lowest final tally (display/best-result only; ties → lowest seat index).
 
 ### Unit — stats derivation (loss-centric; §6.3)
