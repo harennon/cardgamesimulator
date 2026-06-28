@@ -209,6 +209,12 @@
     padding-top: 48px;
   }
 
+  /* Home is short; center it. Tall forms keep flex-start so they don't clip. */
+  .flow-page--center {
+    align-items: center;
+    padding-top: 24px;
+  }
+
   .form-card__input,
   .form-card__input[type="email"],
   .form-card__input[type="password"],
