@@ -18,6 +18,7 @@ This is a **read-only rendering** LLD. It proves we can correctly DISPLAY server
   - `TonkSeatRail.vue` — Tonk opponent rail: count + running-tally chip + phase tag, compact at ≥6, wrapping at ≥7. (Reuses Big2's pulse-dot affordance pattern; see §Frontend Design for why this is a new component rather than reusing `OpponentRow.vue` directly.)
   - `TonkTallyPanel.vue` — right-panel running tallies (lower is better) with 150-loss-line progress and current trick number.
   - `TonkLog.vue` — Tonk-shaped game log (the existing `GameLog.vue` is typed to `Big2HistoryEntry`; Tonk's `TonkLogEntry` differs, so a Tonk log renderer is needed — see §Approach).
+  - `TonkHand.vue` — read-only local-hand renderer typed `readonly TonkCard[]` (the shared `PlayerHand.vue` is `readonly Card[]` and keys on `rank`/`suit`, which a `TonkJoker` lacks — see §Approach decision 3).
 - Rendering of the player's own hand (incl. Jokers as an **icon**), discard top, drawable-discard indicator, face-down stock + count, opponent counts, color-coded turn+phase indicator, per-player tallies + trick number, and the log — **all from the Tonk public view only**.
 - Responsive/mobile layout matching the approved mockup (compact tallies folded into seat pills, log behind a FAB, single-column stack).
 
@@ -28,7 +29,7 @@ This is a **read-only rendering** LLD. It proves we can correctly DISPLAY server
 - **No client-side rule computation.** No "is this card drawable", no hand-value math, no scoring. Everything displayed comes verbatim from the server view (`PlayerView`/`SpectatorView` → `gameSpecificPublicState: TonkPublicState`).
 - **No new Tonk branches in `useGameState` / `useGameActions` / `useSocket` / `useCardSelection`** or any shared type. Dispatch is component-level only.
 - **No spectator entry path wiring.** TonkBoard is designed to render correctly from public-only fields (so it is spectator-safe by construction), but `GameView.vue` joins only as `role: "player"` today and has no spectator rendering route. Wiring a spectator route for either game is pre-existing missing scope and is **out of scope here** — flagged in §Dependencies. The acceptance criterion "spectator view renders public info only" is satisfied at the **component contract** level (TonkBoard never reads `you.hand` for anyone but the local player and never reads stock contents), and is verified by unit test, not by an end-to-end spectator flow.
-- **No `deckRoundsTarget` lobby control** (LLD 65 §8.8 / #60) and **no GameOver/results changes**. `displayPhase === "COMPLETED"` still routes to the existing `GameOverView`.
+- **No `deckRoundsTarget` lobby control** (LLD 65 §8.8 / #60) and **no GameOver/results-component changes**. `displayPhase === "COMPLETED"` still routes to the existing `GameOverView` (see §Edge Cases E8 for what this LLD *does* change in `GameView.vue` — the ribbon gate — and the explicit GameOver follow-up flagged in §Dependencies). The one in-scope `GameView.vue` change beyond board dispatch is gating the Big2 final-play ribbon (decision 1b / E8); the ribbon markup and `GameOverView.vue` itself are not modified here.
 
 ---
 
@@ -36,16 +37,19 @@ This is a **read-only rendering** LLD. It proves we can correctly DISPLAY server
 
 ### Key decisions
 
-1. **Dispatch by game type at the board layer, mirroring the existing branch points.** `GameView.vue` already branches its render tree on `displayPhase`; `GameBoard.vue` already narrows `gameSpecificPublicState` by `gameType === "big2"`. We add one conditional in `GameView.vue`'s `IN_PROGRESS`/`SHOW_FINAL_PLAY` block:
-   - `gameType === "tonk"` → `<TonkBoard>`
-   - else → `<GameBoard>` (unchanged).
-   `SHOW_FINAL_PLAY` is a Big2-specific intermediate phase (final-play ribbon, driven by Big2's `lastPlay`/`winner`). Tonk has no equivalent and its engine flips straight to `COMPLETED`; for Tonk we render `TonkBoard` for `IN_PROGRESS` only and let `COMPLETED` go to `GameOverView`. The final-play ribbon block stays gated to Big2 (see §Edge Cases E8). This keeps the dispatch change additive and Big2 untouched.
+1. **Dispatch by game type at the board layer, mirroring the existing branch points; and gate the final-play ribbon to Big2.** `GameView.vue` already branches its render tree on `displayPhase`; `GameBoard.vue` already narrows `gameSpecificPublicState` by `gameType === "big2"`. We make **two** changes in `GameView.vue`'s `IN_PROGRESS`/`SHOW_FINAL_PLAY` block:
+   - **(a) Board dispatch:** `gameType === "tonk"` → `<TonkBoard>`; else → `<GameBoard>` (unchanged).
+   - **(b) Ribbon gate:** wrap the existing final-play ribbon block (`game-view__final-play-ribbon`) so it renders **only** when `displayPhase === "SHOW_FINAL_PLAY" && gameState.gameType === "big2"`.
+
+   **Why (b) is required (corrects the prior draft).** `SHOW_FINAL_PLAY` is **not** an engine phase — it is a GameView-local display state set by the `displayPhase` watcher (`GameView.vue:162-164`) on **any** game's generic `IN_PROGRESS → COMPLETED` status transition. Per LLD 65 §3.1 (line 59) and §4.1 (lines 143-146), a Tonk match **does** make that exact transition (status stays `IN_PROGRESS` across tricks, then flips to `COMPLETED`) and **does** set `state.winner` (the lowest-tally player, display-only). Therefore a completing Tonk game **will** enter `SHOW_FINAL_PLAY` for the brief interval before the user/auto-advance reaches `COMPLETED` → `GameOverView`. Without gate (b), the Big2 "`<winner> wins!`" ribbon (`GameView.vue:45-60`) would render over the Tonk board — both visually wrong and semantically wrong for Tonk's loss-centric model (there is no single "winner"; the displayed lowest-tally player did **not** "win" in any stats sense — LLD 65 §6.3). The ribbon also reads Big2-only fields (`lastPlay`/`finalPlay`) which are absent on a Tonk view.
+
+   The watcher itself is **not** changed (it is generic and game-agnostic; touching it risks Big2 regression and violates the "no Tonk branches in generic plumbing" constraint). Instead, **during the transient Tonk `SHOW_FINAL_PLAY` step, `TonkBoard` renders normally and ribbon-free**, then the watcher's `COMPLETED` branch routes to `GameOverView` exactly as Big2 does. This keeps the change additive and Big2 untouched.
 
 2. **TonkBoard reuses the Big2 zone skeleton, not its center.** TonkBoard owns the same CSS grid skeleton as `GameBoard.vue` (`opponents` / `table` / `hand` / `log` / `actions` areas, same desktop and mobile grid templates and felt/rim styling) so the two boards are visually consistent and the dispatch swap is seamless. The `actions` area renders **nothing interactive** (read-only); on Tonk it holds only the compact phase/turn status line (no buttons). The `table` area renders `TonkPiles` + `TonkPhaseBanner` instead of Big2's `PlayArea`/`TrickPile`.
 
 3. **Reuse shared primitives where they fit; add Tonk-only where Big2's doesn't map.**
    - **`GameCard.vue`** — reused for the player's hand, the discard top, and the drawable slot. **Requires a small additive change** to render a Joker (see decision 5).
-   - **`PlayerHand.vue`** — reused for the local player's hand **in read-only mode** (`interactive=false`, no selection). Its `cards` prop is typed `readonly Card[]`; a Tonk hand is `readonly TonkCard[]` (`Card | TonkJoker`). To avoid widening shared Big2 types, TonkBoard passes the hand to a thin Tonk hand wrapper (or reuses `PlayerHand` after the `GameCard` joker change makes `GameCard` accept `TonkCard`); see §Interfaces for the exact prop contract.
+   - **`PlayerHand.vue` — NOT reused directly; a thin `TonkHand.vue` wrapper is added instead (decision resolved).** `PlayerHand`'s `cards` prop is typed `readonly Card[]` and it **keys each card on `` `${card.rank}-${card.suit}` ``** (`PlayerHand.vue:5`). A Tonk hand is `readonly TonkCard[]` (`Card | TonkJoker`), and `TonkJoker` has **no `rank`/`suit`** — only `{ joker: true; id: number }` (`tonk-types.ts:6-10`). Reusing `PlayerHand` directly would (a) require widening its shared prop to `readonly TonkCard[]` (coupling a Big2 component to Tonk), and (b) produce a broken/colliding `undefined-undefined` key for jokers. **Decision:** add a Tonk-only `TonkHand.vue` (sibling under `game-ui/`) that mirrors `PlayerHand`'s read-only layout (overlap, horizontal scroll, mobile behavior — copy the CSS) but types its prop `readonly TonkCard[]`, keys jokers by `` `joker-${card.id}` `` (and standard cards by `rank-suit`), passes `interactive={false}` with no selection, and delegates each card to the joker-aware `GameCard` (decision 5). This keeps the shared Big2 `PlayerHand`/`Card[]` contract intact. **Decision criterion** (for the record): reuse a shared Big2 primitive only when its prop contract already accepts the Tonk shape without widening; if it would require changing a shared type to a Tonk-inclusive union, fork a thin Tonk-only component that copies the CSS/behavior — same rule applied to `OpponentRow`/`GameLog`.
    - **`GameLog.vue`** — **not** directly reusable: it is typed to `Big2HistoryEntry` and renders Big2 hand-type labels. Tonk needs `TonkLog.vue` rendering `TonkLogEntry` (discard counts, draw source, TONK/trick results). The mobile log-drawer/FAB pattern and styling are copied from `GameBoard.vue`.
    - **`OpponentRow.vue`** — its seat affordance (pulse-dot, active border, count, disconnected state) is the model, but it renders a Big2 card-back fan and has no tally/phase-tag concept. `TonkSeatRail.vue` reuses the same visual language (the pulse-dot CSS, active-border, name/count) but adds the tally chip + phase tag and the compact/wrap behavior. See §Frontend Design for the reuse-vs-fork decision.
 
@@ -112,7 +116,7 @@ Single-column stack like Big2 mobile (reuse the same grid override approach as `
 
 - **Rail** collapses to compact **pill rows**; **tallies fold into the seat pills** (count + score in the pill), so the right `TonkTallyPanel` is hidden in portrait (`display:none`, same as Big2 hides its log column). Approved: "mobile compact tallies look good!"
 - **Center** keeps stock + discard + drawable in **one row**, cards scaled down (existing mobile card tokens).
-- **Hand** scrolls horizontally (reuse `PlayerHand` mobile behavior).
+- **Hand** scrolls horizontally (`TonkHand` copies `PlayerHand`'s mobile scroll behavior — decision 3).
 - **Log** moves behind a **floating action button (FAB, `☰`)** opening a teleported drawer — copy `GameBoard.vue`'s `log-toggle` + `log-drawer` pattern (Esc to close, `prefers-reduced-motion` respected) but render `TonkLog` inside.
 - Trick number abbreviates to `T<n>` on mobile.
 
@@ -124,10 +128,11 @@ All new colors are added as tokens in `src/frontend/styles/game-variables.css` (
 
 No shared types change except the additive `GameCard` prop. All Tonk view types already exist in `src/shared/tonk-types.ts` (`TonkPublicState`, `TonkCard`, `TonkJoker`, `isJoker`, `TonkLogEntry`, `TonkTrickResult`, `TonkTurnPhase`, `TonkDrawSource`).
 
-### `GameView.vue` dispatch (the one change to existing render tree)
+### `GameView.vue` changes (two edits to the existing render tree)
+
+**(a) Board dispatch** inside the `IN_PROGRESS`/`SHOW_FINAL_PLAY` board-container block:
 
 ```vue
-<!-- inside the IN_PROGRESS / SHOW_FINAL_PLAY board-container block -->
 <TonkBoard
   v-if="gameState.gameType === 'tonk'"
   :game-state="gameState"
@@ -141,7 +146,25 @@ No shared types change except the additive `GameCard` prop. All Tonk view types 
 />
 ```
 
-Notes: TonkBoard takes **no** selection/action props (read-only) and emits **no** events. The `SHOW_FINAL_PLAY` final-play ribbon stays Big2-only (§Edge Cases E8). `gameState.gameType` is on `PlayerView` (`engine-types.ts`), always present.
+**(b) Ribbon gate.** The existing ribbon block today renders on `v-if="displayPhase === 'SHOW_FINAL_PLAY'"` (`GameView.vue:45-46`) with **no** game-type condition. Add the `gameType === "big2"` guard so it never renders over a Tonk board:
+
+```vue
+<!-- BEFORE: v-if="displayPhase === 'SHOW_FINAL_PLAY'" -->
+<!-- AFTER: -->
+<div
+  v-if="displayPhase === 'SHOW_FINAL_PLAY' && gameState.gameType === 'big2'"
+  class="game-view__final-play-ribbon"
+  data-testid="final-play-overlay"
+>
+  ... (unchanged ribbon contents) ...
+</div>
+```
+
+Notes:
+- TonkBoard takes **no** selection/action props (read-only) and emits **no** events. `gameState.gameType` is on `PlayerView` (`engine-types.ts`), always present.
+- During a Tonk match's transient `SHOW_FINAL_PLAY` step, `gameType === "tonk"` selects `<TonkBoard>` (which renders normally) **and** the gated ribbon `v-if` is false, so **no Big2 ribbon appears**. The `COMPLETED` branch then routes to `GameOverView`.
+- The `skipToResults` / "Continue to Results" button lives inside the ribbon block, so gating the block out for Tonk means a Tonk game does not get a manual skip button during `SHOW_FINAL_PLAY`; it advances to `GameOverView` when the watcher's `COMPLETED` branch fires (same generic status flow Big2 uses). This is acceptable for read-only scope; a Tonk-specific results-advance affordance, if wanted, is the GameOver follow-up (§Dependencies).
+- The watcher (`GameView.vue:162-172`) is **unchanged**.
 
 ### `TonkBoard.vue`
 
@@ -232,6 +255,18 @@ defineProps<{
 // const LOSS_LINE = 150; // display constant (LLD 65 §5.2); progress = min(tally/150, 1)
 ```
 
+### `TonkHand.vue`
+
+```ts
+// read-only local hand; no emits, no selection.
+defineProps<{
+  cards: readonly TonkCard[]; // NOT Card[] — accepts jokers
+}>();
+// key: isJoker(card) ? `joker-${card.id}` : `${card.rank}-${card.suit}`
+// always passes interactive={false}, no selectedIndices; delegates to joker-aware GameCard.
+// copies PlayerHand.vue's overlap/scroll/mobile CSS (read-only variant).
+```
+
 ### `TonkLog.vue`
 
 ```ts
@@ -270,7 +305,7 @@ defineProps<{ entries: readonly TonkLogEntry[] }>();
 | E5 | Multi-discard (`lastDiscardCount > 1`) | Discard top shows a `×N` badge (display only); only the single top card is shown (matches the snapshot rule — buried cards aren't drawable, aren't shown individually). |
 | E6 | 3 players (min) | Seat rail shows 2 opponent seats with fans + tally chips; tally panel lists 3. |
 | E7 | 8 players (max) | Seat rail is compact (no fans) and wraps to 2 rows; remains readable. Tally panel lists 8. |
-| E8 | Tonk reaches `COMPLETED`; `SHOW_FINAL_PLAY` | Tonk engine flips straight to `COMPLETED` (no Big2-style final-play). For `gameType === "tonk"`, `GameView` does not enter `SHOW_FINAL_PLAY` rendering of the Tonk-specific ribbon — the final-play ribbon block stays gated to Big2 (it reads Big2 `lastPlay`/`finalPlay`). `COMPLETED` → existing `GameOverView`. **Confirm in implementation that the `SHOW_FINAL_PLAY` watcher path does not show a Big2 ribbon over a Tonk board** (gate the ribbon on `gameType === "big2"`). |
+| E8 | Tonk match completes (`IN_PROGRESS → COMPLETED`); transient `SHOW_FINAL_PLAY` | A Tonk match **does** make the generic `IN_PROGRESS → COMPLETED` status transition (LLD 65 §3.1/§4.1) and **does** set `state.winner` (lowest tally, display-only), so the `displayPhase` watcher (`GameView.vue:162-164`) **does** set `SHOW_FINAL_PLAY` for the brief interval before `COMPLETED`. The fix is **definitive**: (1) the Big2 final-play ribbon block is gated on `displayPhase === "SHOW_FINAL_PLAY" && gameState.gameType === "big2"` (decision 1b), so it never renders for Tonk; (2) during that transient step `TonkBoard` (selected by `gameType === "tonk"`) renders **normally and ribbon-free** — no Big2 "wins!" ribbon over the Tonk board; (3) the watcher's `COMPLETED` branch then routes to the existing `GameOverView`. This avoids the semantic error of showing a single-"winner" ribbon for Tonk's loss-centric model (no one "wins"; the displayed lowest-tally player did not win in any stats sense — LLD 65 §6.3) and avoids the ribbon's Big2-only `lastPlay`/`finalPlay` reads on a Tonk view. |
 | E9 | Opponent disconnected | Reuse `OpponentRow`'s "disconnected" affordance in `TonkSeatRail` (read `players[i].isConnected`). |
 | E10 | A player's tally ≥ 150 mid-render (before `COMPLETED`) | Tally panel shows the bar full + `near-150`/over-line styling; the board does **not** declare game over (server decides). |
 | E11 | Spectator-style render (no local hand, `myPlayerIndex === -1`) | Hand zone renders nothing; seat rail renders all players; piles/tallies/log render from public state. (Contract-level; not a live route — Scope.) |
@@ -290,7 +325,7 @@ defineProps<{ entries: readonly TonkLogEntry[] }>();
 | `src/frontend/component/game/GameView.vue` | Implemented | Add the one game-type dispatch conditional; no plumbing changes. |
 | `src/frontend/component/game/GameBoard.vue` | Implemented | Skeleton/grid/mobile-drawer pattern to mirror; **not modified**. |
 | `src/frontend/component/game-ui/GameCard.vue` | Implemented | **Modified additively** to accept `Card \| TonkJoker` and render a joker icon. Big2 path unchanged. |
-| `src/frontend/component/game-ui/PlayerHand.vue` | Implemented | Reused read-only for the local hand (after `GameCard` accepts `TonkCard`); or wrapped if its `Card[]` prop must stay Big2-only — implementer picks the least-coupling option per §Approach. |
+| `src/frontend/component/game-ui/PlayerHand.vue` | Implemented | **NOT reused / not modified** — its `readonly Card[]` prop and `rank-suit` key are Big2-only and break for `TonkJoker` (no `rank`/`suit`). The new `TonkHand.vue` copies its read-only CSS/behavior but types `readonly TonkCard[]` and keys jokers by `id` (decision 3). |
 | `src/frontend/component/game-ui/OpponentRow.vue`, `OpponentTimer.vue` | Implemented | Visual language (pulse-dot, active-border, timer) copied into `TonkSeatRail`; not modified. |
 | `src/frontend/component/game-ui/GameLog.vue` | Implemented | Pattern/styling reference for `TonkLog`; not reused directly (Big2-typed). |
 | `src/frontend/styles/game-variables.css` | Implemented | Add `--tonk-cyan`, `--tonk-phase-discard`, `--tonk-phase-draw`, `--tonk-near-150` tokens. |
@@ -300,6 +335,10 @@ defineProps<{ entries: readonly TonkLogEntry[] }>();
 - **Action controls** (discard/draw/call-TONK) — **#59**.
 - **`deckRoundsTarget` lobby control + plumbing** — LLD 65 §8.8 / **#60**.
 - **Spectator entry route wiring** for either game (GameView only joins as `role:"player"`; no spectator render path exists today) — **pre-existing gap, flag to CEO/execution-plan**, not this LLD.
+- **`GameOverView` Tonk wording/ordering** — **explicit follow-up flagged here; NOT addressed in this LLD.** `GameOverView.vue` is Big2-shaped in two ways that are wrong for Tonk's loss-centric, lower-is-better model (LLD 65 §6.3):
+  1. It renders `{{ winner }} wins!` (`GameOverView.vue:4`). For Tonk, the `winner` prop is `state.winner` = the **lowest-tally** player — a **display-only "best result"**, NOT a stats winner (everyone except the TRUE LOSER "won"; LLD 65 §4.1/§6.3). "`<name> wins!`" is therefore misleading for Tonk (it should read more like "lowest score" / "best result", and the loss-centric framing — who the TRUE LOSER was — is not surfaced).
+  2. Its score table sorts **descending** (`b.score - a.score`, `GameOverView.vue:168`) and labels the column "Points" with higher = better placement. Tonk tallies are **penalties (lower is better)**, so the placement/ordering and "Points" semantics are inverted for Tonk.
+  These render **without crashing** for a Tonk `scores`/`winner` shape (the props are structurally compatible — `PlayerScore[]` + a winner string), so the COMPLETED path is functional; but the wording/ordering is semantically Big2-specific. **Decision:** keep `GameOverView` unchanged in this read-only board LLD (it routes correctly and does not break), and track Tonk-correct GameOver wording/ordering as a **separate follow-up** (suggest folding into #59 results polish or the stats LLD 66, where Tonk's `breakdown.trueLoser`/`finalTally` are already in scope). Flagged for CEO/execution-plan to slot. The dispatch test (§Test Requirements) asserts a completing Tonk game reaches `GameOverView` without a Big2 ribbon; it does **not** assert Tonk-correct GameOver copy (out of scope here).
 
 ---
 
@@ -310,7 +349,8 @@ Per testing-principles: bias toward automated assertions; reserve manual checks 
 ### Unit — dispatch (`GameView.vue`)
 - `gameType === "tonk"` (IN_PROGRESS) renders `TonkBoard`, not `GameBoard`.
 - `gameType === "big2"` still renders `GameBoard` (no regression). Both assert the other board is absent.
-- A `tonk` game reaching `COMPLETED` renders `GameOverView` (not a Big2 final-play ribbon over a Tonk board) — E8.
+- **Tonk transient `SHOW_FINAL_PLAY` step (E8 — the key regression guard):** drive a Tonk game through the generic `IN_PROGRESS → COMPLETED` status transition so the watcher sets `displayPhase === "SHOW_FINAL_PLAY"` (set `gameState.gameType === "tonk"`, give it a `state.winner`), then assert: (a) `TonkBoard` is rendered, and (b) the final-play ribbon (`[data-testid="final-play-overlay"]`) is **absent** (negative assertion — the Big2 "wins!" ribbon must not appear over the Tonk board). Mirror with a Big2 control case asserting the ribbon **is** present in `SHOW_FINAL_PLAY`, proving the gate is `gameType`-specific and Big2 is unregressed.
+- A `tonk` game reaching `COMPLETED` renders `GameOverView` (and still no Big2 final-play ribbon) — E8 end state. (This LLD does **not** assert Tonk-correct GameOver wording/ordering — that is the flagged follow-up, §Dependencies.)
 
 ### Unit — TonkBoard rendering from `TonkPublicState`
 - Given a constructed `EnrichedPlayerView` with a `TonkPublicState`, assert the DOM shows: own hand cards (count matches `you.hand`), discard top card, the cyan drawable slot (with the `drawableDiscard` card), the face-down stock with `stockCount` label, opponent counts, the trick number, and the per-player tallies.
