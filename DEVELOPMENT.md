@@ -297,6 +297,61 @@ Copy `.env.example` to `.env` and fill in:
 
 ---
 
+## Prod Migration Release
+
+Migrations are **not** applied to prod automatically. Railway auto-deploys the
+backend on merge to `main`, but `supabase/migrations/*` reach prod only via a
+manual `supabase db push`. The two are decoupled, so the schema must lead the
+code (LLD 77 §8.3 — *the backend never deploys ahead of its schema*).
+
+**Release sequence for any change that includes a migration:**
+
+```bash
+supabase db push                                   # 1. apply pending migrations to prod
+node --env-file=.env.admin scripts/verify-postconditions.mjs   # 2. verify prod — MUST pass (see below)
+# 3. only after 1–2 pass: merge/deploy the consuming backend code
+```
+
+Step 2 is the scripted, fail-closed replacement for the manual post-apply
+`SELECT` (LLD 77 §6). Each migration has a co-located
+`supabase/migrations/postconditions/NNN_*.postcondition.sql` asserting its
+intended end state; the runner enforces 1:1 coverage and exits non-zero on any
+violation. Run it **after** `db push` — running it before applying a pending
+migration makes that migration's post-condition RAISE (correctly: the schema
+isn't there yet). It is read-only; use a least-privilege DB credential.
+
+### Connecting the verifier to prod (IPv4-only hosts)
+
+The script reads `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` from the env
+(defaults to the local stack). Put prod values in a **gitignored** env file
+(`.env.local` or `.env.admin` — never `.env.prod`, which is not gitignored) and
+pass it with Node's `--env-file`. Two Supabase-specific gotchas, both of which
+cost real debugging time:
+
+- **Use the connection pooler, not the direct host.** `db.<ref>.supabase.co` is
+  **IPv6-only**; on an IPv4-only machine it fails with `getaddrinfo ENOTFOUND`.
+  Use the Supavisor pooler from the dashboard (Settings → Database → Connection
+  pooler, Session mode): host `aws-0-<region>.pooler.supabase.com`, port `5432`,
+  and user **`postgres.<project-ref>`** (the `.<ref>` suffix is required — plain
+  `postgres` fails auth on the pooler).
+- **SSL is required, and the pooler cert is self-signed in chain.** Set
+  `PGSSLMODE=no-verify` in the env file (still encrypted, skips chain
+  verification — acceptable for a manual read-only run). Plain `PGSSLMODE=require`
+  fails with `SELF_SIGNED_CERT_IN_CHAIN`. `node-postgres` reads `PGSSLMODE` from
+  the env, so no code change is needed.
+
+```bash
+# .env.admin (gitignored) — prod verify creds
+DB_HOST=aws-0-<region>.pooler.supabase.com
+DB_PORT=5432
+DB_USER=postgres.<project-ref>
+DB_PASSWORD=<prod-db-password>
+DB_NAME=postgres
+PGSSLMODE=no-verify
+```
+
+---
+
 ## When in Doubt
 
 1. Check if a principle doc answers your question
