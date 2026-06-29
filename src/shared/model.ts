@@ -13,7 +13,7 @@ export interface GameConfig {
 export interface CreateGameRequest {
   gameType: GameType;
   maxPlayers: number;
-  gameOptions: { [key: string]: string };
+  gameOptions?: { [key: string]: string }; // dead/unread by the backend; optional so callers can omit it
   turnTimerSeconds: 30 | 60 | 90;
   deckRoundsTarget?: number; // optional, integer [5,12]; omitted -> default 8
 }
