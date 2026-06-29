@@ -93,10 +93,15 @@ jobs:
   deploy-backend:
     needs: migrate-and-verify
     runs-on: ubuntu-latest
-    if: ${{ secrets.RAILWAY_TOKEN != '' }}
+    # `secrets` is NOT an allowed context in a job-level `if`, so the presence
+    # check is surfaced as a job-level env boolean and the prod-touching step is
+    # gated on it — mirroring how `migrate-and-verify` guards on PROD_LINKED.
+    env:
+      RAILWAY_WIRED: ${{ secrets.RAILWAY_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Promote Railway deploy [human-wired]
+        if: env.RAILWAY_WIRED == 'true'
         run: |
           echo "Schema applied + verified; promoting backend deploy."
           # Human-owned: invoke the Railway promotion using RAILWAY_TOKEN here.
