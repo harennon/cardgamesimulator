@@ -67,19 +67,33 @@ export function justPlayedName(
 }
 
 /**
- * Name of the player the drawable discard came from (the player preceding the
- * one who just played), or "" when not derivable (LLD 88 §A1). Returns "" when
- * there is no discard owner or only one player.
+ * Name of the player the drawable discard card was placed by (its provenance,
+ * LLD 88 §A1), or "" when not derivable. Returns "" when there is no discard
+ * owner or only one player.
+ *
+ * The drawable snapshot is always the card placed by the player who handed the
+ * turn off to the current player, but `lastDiscardPlayerIndex` advances when the
+ * current player discards — so the provenance index is phase-dependent:
+ *
+ * - **discard phase** (turn start, current player has NOT discarded yet):
+ *   `lastDiscardPlayerIndex` still points at the player who just handed off, so
+ *   the drawable came from `lastDiscardPlayerIndex` itself.
+ * - **draw phase** (current player HAS discarded, so `lastDiscardPlayerIndex` is
+ *   now the current player): the drawable still belongs to the preceding player,
+ *   `lastDiscardPlayerIndex - 1`.
  */
 export function drawableFromName(
   players: readonly PlayerPublicInfo[],
   lastDiscardPlayerIndex: number | null,
+  turnPhase: TonkTurnPhase,
 ): string {
   if (lastDiscardPlayerIndex === null || players.length === 0) return "";
-  const precedingIndex =
-    (lastDiscardPlayerIndex - 1 + players.length) % players.length;
-  if (precedingIndex === lastDiscardPlayerIndex) return "";
-  return players[precedingIndex]?.displayName ?? "";
+  const sourceIndex =
+    turnPhase === "discard"
+      ? lastDiscardPlayerIndex
+      : (lastDiscardPlayerIndex - 1 + players.length) % players.length;
+  if (turnPhase === "draw" && sourceIndex === lastDiscardPlayerIndex) return "";
+  return players[sourceIndex]?.displayName ?? "";
 }
 
 /** Compact seats (drop the card-back fan) at 6+ players (LLD 88 §Seats). */

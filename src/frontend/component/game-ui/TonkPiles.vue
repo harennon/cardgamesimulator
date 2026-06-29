@@ -64,7 +64,7 @@
 <script lang="ts" setup>
 import { computed } from "vue";
 import type { Card, PlayerPublicInfo } from "@shared/engine-types";
-import type { TonkCard } from "@shared/tonk-types";
+import type { TonkCard, TonkTurnPhase } from "@shared/tonk-types";
 import GameCard from "./GameCard.vue";
 import { drawableFromName, justPlayedName } from "./tonkDisplay";
 
@@ -79,6 +79,7 @@ const props = defineProps<{
   lastDiscardCount: number;
   lastDiscardPlayerIndex: number | null;
   drawableDiscard: TonkCard | null;
+  turnPhase: TonkTurnPhase;
   players: readonly PlayerPublicInfo[];
 }>();
 
@@ -86,7 +87,11 @@ const justPlayed = computed(() =>
   justPlayedName(props.players, props.lastDiscardPlayerIndex),
 );
 const drawableFrom = computed(() =>
-  drawableFromName(props.players, props.lastDiscardPlayerIndex),
+  drawableFromName(
+    props.players,
+    props.lastDiscardPlayerIndex,
+    props.turnPhase,
+  ),
 );
 </script>
 
