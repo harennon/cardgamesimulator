@@ -1,6 +1,6 @@
 {
-  "$comment": "LLD 77 §5.5 — captured/fixture diff representing a CLEAN prod baseline (post-#83): no drift, nothing pending. The drift gate exits 0 against this. Used as the autonomous-safe / local / placeholder target so the gate runs green with no prod access.",
+  "$comment": "LLD 77 §5.5 — captured/fixture diff representing a CLEAN prod baseline (post-#83): no residual drift. `pending` lists the in-tree migrations not yet applied to prod (009 adds the game_config column, LLD 95) and must mirror the allowlist's expectedPending so the gate is honest. The drift gate exits 0 against this. Used as the autonomous-safe / local / placeholder target so the gate runs green with no prod access.",
   "objects": [],
   "expectedFromPending": [],
-  "pending": []
+  "pending": ["009_add_game_config.sql"]
 }

@@ -203,6 +203,64 @@ describe("SupabaseDB mappers", () => {
       const result = await db.getGame("no-such-game");
       expect(result).toBeNull();
     });
+
+    it("maps game_config onto Game.gameConfig when present", async () => {
+      const row = {
+        game_id: "tonk-1",
+        game_type: "tonk",
+        player_ids: ["uid-1"],
+        player_display_names: { "uid-1": "Alice" },
+        max_players: 4,
+        status: "CREATED",
+        state: {},
+        turn_timer_seconds: 30,
+        game_config: { deckRoundsTarget: 10 },
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z",
+        version: 1,
+      };
+      mockFrom.mockReturnValueOnce({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi
+              .fn()
+              .mockResolvedValueOnce({ data: row, error: null }),
+          })),
+        })),
+      });
+
+      const game = await db.getGame("tonk-1");
+      expect(game!.gameConfig).toEqual({ deckRoundsTarget: 10 });
+    });
+
+    it("coalesces a null/absent game_config to {}", async () => {
+      const row = {
+        game_id: "legacy-1",
+        game_type: "big2",
+        player_ids: ["uid-1"],
+        player_display_names: { "uid-1": "Alice" },
+        max_players: 4,
+        status: "CREATED",
+        state: {},
+        turn_timer_seconds: 30,
+        game_config: null,
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z",
+        version: 1,
+      };
+      mockFrom.mockReturnValueOnce({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi
+              .fn()
+              .mockResolvedValueOnce({ data: row, error: null }),
+          })),
+        })),
+      });
+
+      const game = await db.getGame("legacy-1");
+      expect(game!.gameConfig).toEqual({});
+    });
   });
 
   describe("mapPlayerStats", () => {

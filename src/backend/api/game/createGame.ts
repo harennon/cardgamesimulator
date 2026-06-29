@@ -1,6 +1,10 @@
 import { type Request, type Response } from "@/util/types";
 import { Handler } from "@/api/handler";
-import { CreateGameRequest, CreateGameResponse } from "@shared/model";
+import {
+  CreateGameRequest,
+  CreateGameResponse,
+  GameConfig,
+} from "@shared/model";
 import { gameRepo } from "@/database";
 import { BadRequestError } from "@/util/errors";
 import { generateJoinCode } from "@/service/joinCodeService";
@@ -8,6 +12,29 @@ import { Game } from "@/database/entities/Game";
 import type { GameType } from "@shared/engine-types";
 
 const VALID_TIMER_VALUES: ReadonlySet<number> = new Set([30, 60, 90]);
+
+const MIN_DECK_ROUNDS = 5;
+const MAX_DECK_ROUNDS = 12;
+const DEFAULT_DECK_ROUNDS = 8;
+
+/**
+ * Validate the creator-supplied deckRoundsTarget. Returns the value when present
+ * and a valid integer in [5,12]; returns the default 8 when omitted. Throws
+ * BadRequestError when present-but-invalid (non-integer, out of range). Unlike
+ * turnTimerSeconds, an omitted value is a valid "use the default" request.
+ */
+function resolveDeckRoundsTargetOrThrow(raw: number | undefined): number {
+  if (raw == null) return DEFAULT_DECK_ROUNDS;
+  if (
+    typeof raw !== "number" ||
+    !Number.isInteger(raw) ||
+    raw < MIN_DECK_ROUNDS ||
+    raw > MAX_DECK_ROUNDS
+  ) {
+    throw new BadRequestError();
+  }
+  return raw;
+}
 
 export class CreateGameHandler extends Handler {
   public static INSTANCE: CreateGameHandler = new CreateGameHandler();
@@ -21,6 +48,13 @@ export class CreateGameHandler extends Handler {
     if (turnTimerSeconds == null || !VALID_TIMER_VALUES.has(turnTimerSeconds)) {
       throw new BadRequestError();
     }
+    // Validate deckRoundsTarget regardless of game type (an out-of-range value
+    // is a 400 either way); only persist it for Tonk — Big2's config stays {}.
+    const deckRoundsTarget = resolveDeckRoundsTargetOrThrow(
+      request.body.deckRoundsTarget,
+    );
+    const gameConfig: GameConfig =
+      request.body.gameType === "tonk" ? { deckRoundsTarget } : {};
     const gameId = crypto.randomUUID();
     const game = await this.createGameWithCode(
       gameId,
@@ -29,6 +63,7 @@ export class CreateGameHandler extends Handler {
       request.body.maxPlayers,
       request.displayName ?? request.userId!,
       turnTimerSeconds,
+      gameConfig,
     );
     const createGameResponse: CreateGameResponse = {
       gameId: game.gameId,
@@ -45,6 +80,7 @@ export class CreateGameHandler extends Handler {
     maxPlayers: number,
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
+    gameConfig: GameConfig,
   ): Promise<Game> {
     const MAX_RETRIES = 5;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -57,6 +93,7 @@ export class CreateGameHandler extends Handler {
           creatorDisplayName,
           turnTimerSeconds,
           generateJoinCode(),
+          gameConfig,
         );
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
