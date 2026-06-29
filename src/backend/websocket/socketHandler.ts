@@ -17,6 +17,15 @@ import type {
 } from "@shared/socket-events";
 import type { TurnTimerService } from "@/timer/turnTimerService";
 
+/**
+ * Upper bound on auto-timeout actions any engine takes to advance one seat to
+ * the next. Big2 = 1 (pass/playCards advances immediately). Tonk = 2
+ * (discard then draw advance the same seat through two phases before the
+ * seat changes). Used only as a divergence guard for autoPlayAbandoned —
+ * loop correctness comes from the semantic exit conditions, not this number.
+ */
+const MAX_AUTO_ACTIONS_PER_SEAT = 2;
+
 function emitSpectatorCount(
   io: TypedServer,
   gameId: string,
@@ -84,8 +93,11 @@ async function autoPlayAbandoned(
   turnTimerService: TurnTimerService,
 ): Promise<void> {
   const state = await gameService.getGameState(gameId);
-  // Loop bounded by player count to prevent infinite loops
-  const maxIterations = state?.players.length ?? 4;
+  // Divergence guard only. A seat may take multiple auto-actions to advance
+  // (Tonk: discard then draw), so the cap is sized per-seat, not per-iteration.
+  // Loop correctness comes from the semantic exit conditions below, not this cap.
+  const playerCount = state?.players.length ?? 4;
+  const maxIterations = playerCount * MAX_AUTO_ACTIONS_PER_SEAT;
 
   for (let i = 0; i < maxIterations; i++) {
     const currentState = await gameService.getGameState(gameId);
@@ -136,6 +148,14 @@ async function autoPlayAbandoned(
     );
     // Loop continues to check the next player
   }
+
+  // E7: the safety cap was exhausted without reaching a non-abandoned seat or
+  // completion — only reachable if an engine never advances/completes (a bug).
+  // Fail safe: do NOT arm a timer on a still-abandoned seat; log so it is
+  // observable rather than a silent stall.
+  console.warn(
+    `autoPlayAbandoned hit divergence guard (${maxIterations} iterations) for game ${gameId}; no timer armed`,
+  );
 }
 
 async function handleGameJoin(
@@ -605,7 +625,7 @@ export async function handleTimerExpired(
   const timerExpiredPayload: TimerExpiredPayload = {
     gameId,
     playerId: autoAction.playerId,
-    action: autoAction.type as "pass" | "playCards",
+    action: autoAction.type,
   };
   io.to(`game:${gameId}`)
     .to(`spectators:${gameId}`)
