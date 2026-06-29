@@ -1,7 +1,15 @@
 <template>
   <div class="lobby" data-testid="game-lobby">
     <div class="lobby__panel">
-      <h2 class="lobby__title">Game Lobby</h2>
+      <div class="lobby__header">
+        <h2 class="lobby__title">Game Lobby</h2>
+        <span
+          class="lobby__type-badge"
+          :data-type="gameType"
+          data-testid="lobby-type-badge"
+          >{{ typeBadge }}</span
+        >
+      </div>
 
       <div class="lobby__chip-container" data-testid="join-code-container">
         <span class="lobby__chip-label">ROOM CODE</span>
@@ -24,6 +32,10 @@
         >
       </div>
 
+      <div class="lobby__count" data-testid="lobby-count">
+        Players <b>{{ players.length }}</b> / {{ maxPlayers }}
+      </div>
+
       <div class="lobby__players">
         <div
           v-for="player in players"
@@ -44,15 +56,26 @@
       <div v-if="errorMessage" class="lobby__error">{{ errorMessage }}</div>
 
       <div class="lobby__actions">
-        <button
-          v-if="isHost"
-          class="lobby__btn lobby__btn--start"
-          :disabled="!canStart || actionPending"
-          @click="onStart"
-          data-testid="start-game-button"
-        >
-          Start Game
-        </button>
+        <template v-if="isHost">
+          <button
+            class="lobby__btn lobby__btn--start"
+            :disabled="!canStart || actionPending"
+            @click="onStart"
+            data-testid="start-game-button"
+          >
+            Start Game
+          </button>
+          <span
+            v-if="!canStart && playersNeeded > 0"
+            class="lobby__hint"
+            data-testid="lobby-start-hint"
+          >
+            {{ typeLabel }} needs at least {{ minPlayers }} players to start ({{
+              playersNeeded
+            }}
+            more)
+          </span>
+        </template>
         <span v-else class="lobby__waiting">Waiting for host to start...</span>
       </div>
 
@@ -72,12 +95,15 @@
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
-import type { PlayerInfo } from "@shared/engine-types";
+import type { PlayerInfo, GameType } from "@shared/engine-types";
+import { gameTypeLabel } from "@/component/statsView";
 
 const props = defineProps<{
   gameId: string;
   players: readonly PlayerInfo[];
   maxPlayers: number;
+  minPlayers: number;
+  gameType: GameType;
   isHost: boolean;
   actionPending: boolean;
   joinCode: string;
@@ -92,7 +118,19 @@ const codeCopied = ref(false);
 const clipboardFallback = ref(false);
 const errorMessage = ref<string | null>(null);
 
-const canStart = computed(() => props.isHost && props.players.length >= 2);
+const canStart = computed(
+  () => props.isHost && props.players.length >= props.minPlayers,
+);
+
+const playersNeeded = computed(() =>
+  Math.max(0, props.minPlayers - props.players.length),
+);
+
+const typeLabel = computed(() => gameTypeLabel(props.gameType));
+
+const typeBadge = computed(
+  () => `${typeLabel.value} · up to ${props.maxPlayers}`,
+);
 
 const emptySlots = computed(() =>
   Math.max(0, props.maxPlayers - props.players.length),
@@ -139,24 +177,45 @@ async function copyInviteLink(): Promise<void> {
 @import "@/styles/game-variables.css";
 
 .lobby {
+  box-sizing: border-box;
   width: 100vw;
   height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--felt);
+  /* border-box so the 16px breathing room is carved out of the 100vh height
+     rather than added to it (otherwise the page overflows by 32px). Combined
+     with the panel max-height this guarantees no page scroll at 8 seats. */
+  padding: 16px;
 }
 
 .lobby__panel {
+  box-sizing: border-box;
   background: var(--panel-bg);
   border: 2px solid var(--table-rim-light);
   border-radius: 12px;
-  padding: 40px 48px;
+  padding: 32px 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
+  gap: 20px;
   min-width: 360px;
+  /* The panel itself never forces the page to scroll: it is bounded to the
+     viewport (border-box so padding/border are included) and the player list
+     (the only growable region) scrolls within it at the Tonk max of 8 seats. */
+  max-height: calc(100vh - 32px);
+  max-width: 440px;
+  width: 100%;
+}
+
+.lobby__header {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .lobby__title {
@@ -167,11 +226,44 @@ async function copyInviteLink(): Promise<void> {
   margin: 0;
 }
 
+.lobby__type-badge {
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  background: rgba(63, 208, 216, 0.1);
+  border: 1px solid rgba(63, 208, 216, 0.5);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+.lobby__type-badge[data-type="big2"] {
+  color: var(--gold-accent);
+  background: rgba(201, 168, 76, 0.1);
+  border-color: rgba(201, 168, 76, 0.5);
+}
+
+.lobby__count {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+
+.lobby__count b {
+  color: var(--text-primary);
+}
+
 .lobby__chip-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .lobby__chip-label {
@@ -215,6 +307,18 @@ async function copyInviteLink(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* The only growable/shrinkable region: at the Tonk max of 8 seats the list
+     scrolls within itself rather than pushing the chip, count, Start, and
+     invite controls off-screen. flex: 1 1 auto + min-height: 0 lets it shrink
+     below content height inside the viewport-capped panel so the page never
+     gains a scrollbar (LLD 97 E5). */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.lobby__player {
+  flex-shrink: 0;
 }
 
 .lobby__player {
@@ -244,7 +348,10 @@ async function copyInviteLink(): Promise<void> {
 .lobby__actions {
   width: 100%;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .lobby__waiting {
@@ -254,10 +361,20 @@ async function copyInviteLink(): Promise<void> {
   font-style: italic;
 }
 
+.lobby__hint {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 8px;
+  text-align: center;
+}
+
 .lobby__invite {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .lobby__copied {
@@ -310,7 +427,6 @@ async function copyInviteLink(): Promise<void> {
 @media (max-width: 767px) {
   .lobby__panel {
     min-width: unset;
-    width: calc(100% - 32px);
     padding: 28px 20px;
   }
 

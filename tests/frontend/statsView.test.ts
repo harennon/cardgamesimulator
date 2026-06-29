@@ -5,6 +5,7 @@ import {
   formatWinRate,
   statRowsFor,
   sortedEntries,
+  GAME_TYPE_UI_BOUNDS,
 } from "@/component/statsView";
 
 describe("gameTypeLabel", () => {
@@ -18,6 +19,29 @@ describe("gameTypeLabel", () => {
 
   it("falls back to the raw value for an unknown game type", () => {
     expect(gameTypeLabel("poker" as GameType)).toBe("poker");
+  });
+});
+
+describe("GAME_TYPE_UI_BOUNDS", () => {
+  it("big2 allows 2-4 players and has no deck-rounds control", () => {
+    expect(GAME_TYPE_UI_BOUNDS.big2).toEqual({
+      minPlayers: 2,
+      maxPlayers: 4,
+      hasDeckRoundsTarget: false,
+    });
+  });
+
+  it("tonk allows 3-8 players and has a deck-rounds control", () => {
+    expect(GAME_TYPE_UI_BOUNDS.tonk).toEqual({
+      minPlayers: 3,
+      maxPlayers: 8,
+      hasDeckRoundsTarget: true,
+    });
+  });
+
+  it("hasDeckRoundsTarget is true only for Tonk", () => {
+    expect(GAME_TYPE_UI_BOUNDS.tonk.hasDeckRoundsTarget).toBe(true);
+    expect(GAME_TYPE_UI_BOUNDS.big2.hasDeckRoundsTarget).toBe(false);
   });
 });
 

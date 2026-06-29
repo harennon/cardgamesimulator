@@ -10,6 +10,21 @@ export function gameTypeLabel(gameType: GameType): string {
   return GAME_TYPE_LABELS[gameType] ?? gameType;
 }
 
+// Per-game-type presentational bounds — mirrors the server-authoritative engine
+// config (big2 "2-4", tonk "3-8"; deckRoundsTarget [5,12] for Tonk). These are
+// NOT game rules: the server validates and rejects out-of-range requests; this
+// only shapes inputs and labels in the create form and lobby.
+export interface GameTypeUiBounds {
+  readonly minPlayers: number;
+  readonly maxPlayers: number;
+  readonly hasDeckRoundsTarget: boolean;
+}
+
+export const GAME_TYPE_UI_BOUNDS: Record<GameType, GameTypeUiBounds> = {
+  big2: { minPlayers: 2, maxPlayers: 4, hasDeckRoundsTarget: false },
+  tonk: { minPlayers: 3, maxPlayers: 8, hasDeckRoundsTarget: true },
+};
+
 // 0..1 fraction (server-authoritative winRate) -> integer-percent string, e.g. 0.732 -> "73%".
 // Do not recompute from gamesWon/gamesPlayed — display what the server sent.
 export function formatWinRate(winRate: number): string {

@@ -39,14 +39,22 @@ export function readStoredAuth(playerFile: string): {
 export async function createGameViaApi(
   request: APIRequestContext,
   hostAccessToken: string,
-  options?: { maxPlayers?: number },
+  options?: {
+    maxPlayers?: number;
+    gameType?: "big2" | "tonk";
+    deckRoundsTarget?: number;
+  },
 ): Promise<string> {
+  const gameType = options?.gameType ?? "big2";
   const res = await request.post(`${BACKEND_URL}/createGame`, {
     headers: { Authorization: `Bearer ${hostAccessToken}` },
     data: {
-      gameType: "big2",
+      gameType,
       maxPlayers: options?.maxPlayers ?? 2,
       turnTimerSeconds: 30,
+      ...(gameType === "tonk" && options?.deckRoundsTarget != null
+        ? { deckRoundsTarget: options.deckRoundsTarget }
+        : {}),
     },
   });
   if (!res.ok()) {
@@ -82,12 +90,15 @@ export async function joinGameViaApi(
  */
 export async function createGame(
   page: Page,
-  options?: { maxPlayers?: number },
+  options?: { maxPlayers?: number; gameType?: "big2" | "tonk" },
 ): Promise<string> {
   await page.goto("/");
   await page.click('[data-testid="create-game-link"]');
   // Select game type
-  await page.selectOption('[data-testid="game-type-select"]', "big2");
+  await page.selectOption(
+    '[data-testid="game-type-select"]',
+    options?.gameType ?? "big2",
+  );
   // Select player count if provided
   if (options?.maxPlayers) {
     await page.fill(

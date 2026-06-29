@@ -16,6 +16,8 @@
     :game-id="gameId"
     :players="lobbyPlayers"
     :max-players="maxPlayers"
+    :min-players="minPlayers"
+    :game-type="gameType"
     :is-host="isHost"
     :action-pending="actionPending"
     :join-code="lobbyJoinCode"
@@ -88,7 +90,8 @@
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import type { PlayerInfo } from "@shared/engine-types";
+import type { PlayerInfo, GameType } from "@shared/engine-types";
+import { GAME_TYPE_UI_BOUNDS } from "@/component/statsView";
 import type { Big2PublicState, Big2Play } from "@shared/big2-types";
 import { axiosInstance } from "@/service/http";
 import type { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
@@ -154,6 +157,13 @@ const lobbyJoinCode = ref("");
 // the live socket value). "" means unknown / no code → chip renders nothing.
 const roomCode = ref("");
 const maxPlayers = ref(4);
+// Defaults to "big2" until the REST getGameState response sets the real type.
+// The lobby only renders after that response resolves (see onMounted), so the
+// badge/Start gate never render with a stale type.
+const gameType = ref<GameType>("big2");
+const minPlayers = computed(
+  () => GAME_TYPE_UI_BOUNDS[gameType.value].minPlayers,
+);
 const isHost = ref(false);
 const isGuest = ref(false);
 const turnTimerSeconds = ref<number | null>(null);
@@ -253,6 +263,7 @@ onMounted(async () => {
       await axiosInstance.get("/api/getGameState", { params: request });
     const game = response.data.gameState;
     maxPlayers.value = game.maxPlayers;
+    gameType.value = game.gameType;
     turnTimerSeconds.value = game.turnTimerSeconds;
     roomCode.value = game.joinCode ?? "";
     initialPlayerIds = game.playerIds;
