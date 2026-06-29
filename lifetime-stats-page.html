@@ -3,33 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lifetime Stats - Card Game Simulator</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
-      rel="stylesheet"
-    />
+    <title>Lifetime Stats (per game type) — Mockups</title>
     <style>
-      /* Design tokens (matching game-variables.css) */
-      :root {
-        --felt: #1a4a2e;
-        --felt-light: #256b42;
-        --table-rim: #2d1810;
-        --table-rim-light: #4a2c1e;
-        --gold-accent: #c9a84c;
-        --gold-glow: rgba(201, 168, 76, 0.3);
-        --text-primary: #e8dcc8;
-        --text-muted: #8a7e6e;
-        --bg-dark: #0d0d0d;
-        --panel-bg: rgba(20, 12, 8, 0.85);
-        --font-ui: "DM Sans", sans-serif;
-        --font-card: "Libre Baskerville", serif;
-        --card-panel-border: #4a2c1e;
-        --card-panel-radius: 12px;
-        --btn-primary-bg: var(--gold-accent);
-        --btn-primary-text: #1a0f06;
-        --btn-primary-hover: #d4b45a;
-        --btn-radius: 6px;
-      }
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Libre+Baskerville:wght@400;700&display=swap");
 
       * {
         margin: 0;
@@ -37,102 +13,525 @@
         box-sizing: border-box;
       }
 
-      body {
-        background: var(--felt);
-        min-height: 100vh;
-        font-family: var(--font-ui);
-        color: var(--text-primary);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 40px 20px;
-        /* Subtle radial glow to simulate table lighting */
-        background-image: radial-gradient(
-          ellipse at 50% 40%,
-          var(--felt-light) 0%,
-          var(--felt) 70%
-        );
+      :root {
+        /* Tokens mirror src/frontend/styles/game-variables.css */
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-mono: "JetBrains Mono", "Courier New", monospace;
+        --font-card: "Libre Baskerville", serif;
+        --card-panel-border: var(--table-rim-light);
+        --card-panel-radius: 12px;
+        --btn-primary-bg: var(--gold-accent);
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-radius: 6px;
+        --win: #5cb85c;
+        --loss: #c9645c;
       }
 
-      .stats-page {
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 24px 96px;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 8px;
+      }
+      .page-head h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+      }
+      .page-head p {
+        margin-top: 8px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 820px;
+        line-height: 1.55;
+      }
+      .page-head .note {
+        margin-top: 10px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        max-width: 820px;
+        line-height: 1.5;
+        border-left: 2px solid var(--table-rim-light);
+        padding-left: 12px;
+      }
+      .page-head .note strong {
+        color: var(--text-primary);
+      }
+
+      /* ---- State switcher (demo chrome only) ---- */
+      .state-switcher {
+        max-width: 1180px;
+        margin: 22px auto 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .state-switcher span {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-right: 4px;
+      }
+      .state-switcher button {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        padding: 6px 14px;
+        border-radius: 4px;
+        border: 1px solid var(--card-panel-border);
+        background: var(--panel-bg);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .state-switcher button:hover,
+      .state-switcher button.active {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+
+      /* ---- Direction frame ---- */
+      .direction {
+        max-width: 1180px;
+        margin: 0 auto 56px;
+      }
+      .direction__head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin: 36px 0 6px;
+        flex-wrap: wrap;
+      }
+      .direction__tag {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--bg-dark);
+        background: var(--gold-accent);
+        padding: 3px 9px;
+        border-radius: 4px;
+        letter-spacing: 0.04em;
+      }
+      .direction__name {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+      .direction__desc {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        line-height: 1.55;
+        margin: 4px 0 24px;
+        max-width: 820px;
+      }
+
+      /* Felt stage that each direction renders inside (simulates the app shell) */
+      .stage {
+        background-image: radial-gradient(
+          ellipse at 50% 38%,
+          var(--felt-light) 0%,
+          var(--felt) 72%
+        );
+        background-color: var(--felt);
+        border-radius: 14px;
+        border: 1px solid rgba(0, 0, 0, 0.4);
+        padding: 40px 28px 48px;
+        min-height: 420px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      /* Shared inner wrapper so each direction is centered & width-bounded */
+      .sheet {
         width: 100%;
-        max-width: 480px;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 24px;
+        gap: 22px;
       }
 
-      /* Back navigation */
-      .stats-page__back {
+      .sheet__back {
         align-self: flex-start;
-        font-family: var(--font-ui);
         font-size: 0.85rem;
         color: var(--text-muted);
         text-decoration: none;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 6px;
         transition: color 0.15s ease;
       }
-
-      .stats-page__back:hover {
+      .sheet__back:hover {
         color: var(--text-primary);
       }
-
-      .stats-page__back svg {
+      .sheet__back svg {
         width: 14px;
         height: 14px;
       }
 
-      /* Main panel */
-      .stats-panel {
-        background: var(--panel-bg);
-        border: 2px solid var(--card-panel-border);
-        border-radius: var(--card-panel-radius);
-        padding: 40px 48px;
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 32px;
-        /* Subtle inner shadow for depth */
-        box-shadow:
-          inset 0 1px 0 rgba(201, 168, 76, 0.08),
-          0 8px 32px rgba(0, 0, 0, 0.4);
-      }
-
-      /* Header */
-      .stats-panel__header {
+      .sheet__title {
         text-align: center;
       }
-
-      .stats-panel__title {
-        font-family: var(--font-ui);
+      .sheet__title h2 {
         font-size: 1.5rem;
         font-weight: 700;
         color: var(--gold-accent);
-        margin: 0 0 4px;
         letter-spacing: -0.01em;
       }
-
-      .stats-panel__subtitle {
-        font-family: var(--font-ui);
+      .sheet__title p {
         font-size: 0.85rem;
         color: var(--text-muted);
+        margin-top: 3px;
       }
 
-      /* Hero stat — Win Rate */
-      .stats-hero {
+      .suit {
+        font-size: 0.95em;
+        line-height: 1;
+      }
+      .suit--red {
+        color: #d96a5e;
+      }
+      .suit--black {
+        color: var(--text-primary);
+      }
+
+      /* ============================================================
+         DIRECTION A — GAME CARDS (stacked panels, per-game headline)
+         ============================================================ */
+      .dirA .sheet {
+        max-width: 560px;
+      }
+      .gamecard {
+        position: relative;
+        width: 100%;
+        background: var(--panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        padding: 26px 28px 24px;
+        box-shadow:
+          inset 0 1px 0 rgba(201, 168, 76, 0.08),
+          0 10px 30px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+        opacity: 0;
+        transform: translateY(14px);
+        animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+      }
+      .gamecard:nth-child(2) {
+        animation-delay: 0.06s;
+      }
+      .gamecard:nth-child(3) {
+        animation-delay: 0.12s;
+      }
+      @keyframes rise {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      /* corner pip, like a playing card index */
+      .gamecard__pip {
+        position: absolute;
+        top: 16px;
+        right: 18px;
+        font-family: var(--font-card);
+        font-size: 1.6rem;
+        color: var(--table-rim-light);
+        line-height: 1;
+        user-select: none;
+      }
+      .gamecard__head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .gamecard__name {
+        font-family: var(--font-card);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+      .gamecard__played {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+      .gamecard__body {
+        display: grid;
+        grid-template-columns: minmax(140px, 0.9fr) 1fr;
+        gap: 24px;
+        align-items: center;
+      }
+      /* the per-game headline stat */
+      .headline {
+        text-align: center;
+        position: relative;
+        padding: 4px 0 14px;
+      }
+      .headline__value {
+        font-family: var(--font-card);
+        font-size: 3rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        line-height: 1;
+        text-shadow: 0 0 30px var(--gold-glow);
+      }
+      .headline__unit {
+        font-size: 1.4rem;
+        color: var(--gold-accent);
+        opacity: 0.7;
+      }
+      .headline__label {
+        margin-top: 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+      .headline::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 52px;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--gold-accent),
+          transparent
+        );
+      }
+      .minigrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px 18px;
+      }
+      .minigrid__item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .minigrid__value {
+        font-family: var(--font-card);
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        line-height: 1.05;
+      }
+      .minigrid__item--wins .minigrid__value {
+        color: var(--win);
+      }
+      .minigrid__item--losses .minigrid__value {
+        color: var(--loss);
+      }
+      .minigrid__label {
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+      }
+      .gamecard__foot {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(74, 44, 30, 0.5);
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.76rem;
+        color: var(--text-muted);
+      }
+      .gamecard__foot em {
+        font-style: normal;
+        color: var(--text-primary);
+      }
+
+      /* ============================================================
+         DIRECTION B — STAT LEDGER (comparison table / tally sheet)
+         ============================================================ */
+      .dirB .sheet {
+        max-width: 820px;
+      }
+      .ledger {
+        width: 100%;
+        background: var(--panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        overflow: hidden;
+        box-shadow:
+          inset 0 1px 0 rgba(201, 168, 76, 0.08),
+          0 10px 30px rgba(0, 0, 0, 0.45);
+      }
+      .ledger table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .ledger thead th {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-muted);
+        text-align: right;
+        padding: 16px 18px 12px;
+        border-bottom: 1px solid var(--table-rim-light);
+        white-space: nowrap;
+      }
+      .ledger thead th:first-child {
+        text-align: left;
+      }
+      .ledger tbody td {
+        padding: 18px 18px;
+        text-align: right;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+        font-family: var(--font-card);
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        vertical-align: middle;
+      }
+      .ledger tbody tr:last-child td {
+        border-bottom: none;
+      }
+      .ledger tbody tr {
+        transition: background 0.15s ease;
+      }
+      .ledger tbody tr:hover {
+        background: rgba(201, 168, 76, 0.05);
+      }
+      .ledger__game {
+        text-align: left !important;
+      }
+      .ledger__game-name {
+        font-family: var(--font-card);
+        font-size: 1.2rem;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .ledger__game-meta {
+        font-family: var(--font-ui);
+        font-size: 0.74rem;
+        font-weight: 400;
+        color: var(--text-muted);
+        margin-top: 3px;
+      }
+      .ledger__winrate {
+        color: var(--gold-accent) !important;
+        text-shadow: 0 0 18px var(--gold-glow);
+      }
+      .ledger__w {
+        color: var(--win) !important;
+      }
+      .ledger__l {
+        color: var(--loss) !important;
+      }
+      .ledger__headline {
+        font-family: var(--font-ui) !important;
+        font-size: 0.78rem !important;
+        font-weight: 500 !important;
+        color: var(--text-muted) !important;
+      }
+      .ledger__headline b {
+        font-family: var(--font-card);
+        font-size: 1.15rem;
+        color: var(--text-primary);
+        display: block;
+        font-weight: 700;
+      }
+      .ledger__pip {
+        font-family: var(--font-card);
+        font-size: 1.1rem;
+        color: var(--table-rim-light);
+      }
+
+      /* ============================================================
+         DIRECTION C — TABBED SPOTLIGHT (one game in focus)
+         ============================================================ */
+      .dirC .sheet {
+        max-width: 480px;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        width: 100%;
+        background: rgba(20, 12, 8, 0.6);
+        border: 1px solid var(--card-panel-border);
+        border-radius: 8px;
+        padding: 5px;
+      }
+      .tabs button {
+        flex: 1;
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 9px 10px;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.18s ease;
+      }
+      .tabs button:hover {
+        color: var(--text-primary);
+      }
+      .tabs button.active {
+        background: var(--gold-accent);
+        color: var(--btn-primary-text);
+        box-shadow: 0 2px 10px var(--gold-glow);
+      }
+      .spotlight {
+        width: 100%;
+        background: var(--panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        padding: 34px 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 28px;
+        box-shadow:
+          inset 0 1px 0 rgba(201, 168, 76, 0.08),
+          0 10px 30px rgba(0, 0, 0, 0.45);
+      }
+      .spotlight__game {
+        font-family: var(--font-card);
+        font-size: 1.1rem;
+        color: var(--text-primary);
+        text-align: center;
+      }
+      .hero {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 6px;
-        padding: 20px 0;
+        padding: 6px 0 18px;
         position: relative;
       }
-
-      .stats-hero__value {
+      .hero__value {
         font-family: var(--font-card);
         font-size: 3.5rem;
         font-weight: 700;
@@ -140,18 +539,18 @@
         line-height: 1;
         text-shadow: 0 0 32px var(--gold-glow);
       }
-
-      .stats-hero__label {
-        font-family: var(--font-ui);
+      .hero__unit {
+        font-size: 1.6rem;
+        opacity: 0.7;
+      }
+      .hero__label {
         font-size: 0.8rem;
         font-weight: 600;
         color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.12em;
       }
-
-      /* Decorative line under hero */
-      .stats-hero::after {
+      .hero::after {
         content: "";
         position: absolute;
         bottom: 0;
@@ -166,52 +565,39 @@
           transparent
         );
       }
-
-      /* Stats grid — W/L/Played/Score */
-      .stats-grid {
+      .biggrid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 20px 32px;
         width: 100%;
       }
-
-      .stats-grid__item {
+      .biggrid__item {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 4px;
       }
-
-      .stats-grid__value {
+      .biggrid__value {
         font-family: var(--font-card);
         font-size: 1.75rem;
         font-weight: 700;
         color: var(--text-primary);
         line-height: 1.1;
       }
-
-      .stats-grid__label {
-        font-family: var(--font-ui);
-        font-size: 0.75rem;
+      .biggrid__item--wins .biggrid__value {
+        color: var(--win);
+      }
+      .biggrid__item--losses .biggrid__value {
+        color: var(--loss);
+      }
+      .biggrid__label {
+        font-size: 0.72rem;
         font-weight: 500;
         color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.08em;
       }
-
-      /* Accent color for wins */
-      .stats-grid__item--wins .stats-grid__value {
-        color: #5cb85c;
-      }
-
-      /* Accent color for losses */
-      .stats-grid__item--losses .stats-grid__value {
-        color: #c9645c;
-      }
-
-      /* Last played footer */
-      .stats-panel__footer {
-        font-family: var(--font-ui);
+      .spotlight__foot {
         font-size: 0.8rem;
         color: var(--text-muted);
         text-align: center;
@@ -219,9 +605,41 @@
         padding-top: 16px;
         width: 100%;
       }
+      .spotlight__foot em {
+        font-style: normal;
+        color: var(--text-primary);
+      }
 
-      /* Action button */
-      .stats-page__action {
+      /* ---- Empty + loading shared ---- */
+      .empty {
+        width: 100%;
+        max-width: 480px;
+        background: var(--panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        padding: 48px 40px;
+        text-align: center;
+        box-shadow:
+          inset 0 1px 0 rgba(201, 168, 76, 0.08),
+          0 10px 30px rgba(0, 0, 0, 0.45);
+      }
+      .empty__icon {
+        font-size: 2.6rem;
+        margin-bottom: 14px;
+        opacity: 0.55;
+      }
+      .empty__msg {
+        font-size: 1rem;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+      }
+      .empty__hint {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 22px;
+        line-height: 1.5;
+      }
+      .empty__cta {
         font-family: var(--font-ui);
         font-size: 0.95rem;
         font-weight: 600;
@@ -232,266 +650,901 @@
         background: var(--btn-primary-bg);
         color: var(--btn-primary-text);
         text-decoration: none;
+        display: inline-block;
         transition: background 0.15s ease;
-        width: 100%;
-        text-align: center;
-        display: block;
       }
-
-      .stats-page__action:hover {
+      .empty__cta:hover {
         background: var(--btn-primary-hover);
       }
 
-      /* Loading state */
-      .stats-panel--loading .stats-hero__value,
-      .stats-panel--loading .stats-grid__value {
-        background: rgba(74, 44, 30, 0.5);
-        color: transparent;
-        border-radius: 4px;
-        animation: pulse 1.5s ease-in-out infinite;
+      .skeleton {
+        background: linear-gradient(
+          90deg,
+          rgba(74, 44, 30, 0.35) 25%,
+          rgba(74, 44, 30, 0.6) 50%,
+          rgba(74, 44, 30, 0.35) 75%
+        );
+        background-size: 200% 100%;
+        color: transparent !important;
+        text-shadow: none !important;
+        border-radius: 5px;
+        animation: shimmer 1.4s ease-in-out infinite;
       }
-
-      @keyframes pulse {
-        0%,
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
         100% {
-          opacity: 0.5;
-        }
-        50% {
-          opacity: 1;
+          background-position: -200% 0;
         }
       }
 
-      /* Empty state (no games played) */
-      .stats-empty {
-        text-align: center;
-        padding: 32px 0;
+      /* hide all state variants, show only the active one */
+      .state {
+        display: none;
+        width: 100%;
+        justify-content: center;
       }
-
-      .stats-empty__icon {
-        font-size: 2.5rem;
-        margin-bottom: 12px;
-        opacity: 0.6;
-      }
-
-      .stats-empty__message {
-        font-family: var(--font-ui);
-        font-size: 0.95rem;
-        color: var(--text-muted);
-        margin-bottom: 4px;
-      }
-
-      .stats-empty__hint {
-        font-family: var(--font-ui);
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        opacity: 0.7;
-      }
-
-      /* Mobile responsive */
-      @media (max-width: 767px) {
-        body {
-          padding: 24px 16px;
-          align-items: flex-start;
-          padding-top: 48px;
-        }
-
-        .stats-panel {
-          padding: 28px 20px;
-        }
-
-        .stats-hero__value {
-          font-size: 2.75rem;
-        }
-
-        .stats-grid__value {
-          font-size: 1.4rem;
-        }
-
-        .stats-grid {
-          gap: 16px 24px;
-        }
-
-        .stats-page__action {
-          min-height: 48px;
-          font-size: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-      }
-
-      /* State switcher (demo only) */
-      .demo-switcher {
-        position: fixed;
-        top: 16px;
-        right: 16px;
+      .state.is-active {
         display: flex;
-        gap: 8px;
-        z-index: 100;
       }
 
-      .demo-switcher button {
-        font-family: var(--font-ui);
-        font-size: 0.75rem;
-        padding: 6px 12px;
-        border-radius: 4px;
-        border: 1px solid var(--card-panel-border);
-        background: var(--panel-bg);
-        color: var(--text-muted);
-        cursor: pointer;
-        transition: all 0.15s ease;
-      }
-
-      .demo-switcher button:hover,
-      .demo-switcher button.active {
-        border-color: var(--gold-accent);
-        color: var(--gold-accent);
+      @media (max-width: 640px) {
+        .gamecard__body {
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+        .ledger thead {
+          display: none;
+        }
+        .ledger table,
+        .ledger tbody,
+        .ledger tr,
+        .ledger td {
+          display: block;
+          width: 100%;
+        }
+        .ledger tbody tr {
+          padding: 14px 16px;
+          border-bottom: 1px solid var(--table-rim-light);
+        }
+        .ledger tbody td {
+          display: flex;
+          justify-content: space-between;
+          padding: 5px 0;
+          border: none;
+          font-size: 1rem;
+        }
+        .ledger tbody td::before {
+          content: attr(data-label);
+          font-family: var(--font-ui);
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--text-muted);
+        }
+        .ledger__game::before {
+          content: "" !important;
+        }
       }
     </style>
   </head>
   <body>
-    <!-- Demo state switcher -->
-    <div class="demo-switcher">
-      <button class="active" onclick="showState('populated')">
-        With Stats
-      </button>
-      <button onclick="showState('empty')">No Games</button>
-      <button onclick="showState('loading')">Loading</button>
+    <div class="page-head">
+      <h1>Lifetime Stats — per game type</h1>
+      <p>
+        The <code>/stats</code> route. The backend
+        <code>GET /stats</code> returns
+        <code>{ userId, games: GameStatsEntry[] }</code> — one entry per game
+        type the player has actually played. Three layout directions for the
+        per-game breakdown, each with the four real states.
+      </p>
+      <p class="note">
+        <strong>Why per-game-type matters (not just cosmetic):</strong> Big 2
+        score is <strong>higher-is-better</strong> (an achievement). Tonk score
+        is <strong>lower-is-better</strong> (a penalty), so its meaningful
+        headline is <strong>average score</strong> (lower = stronger), not a
+        cumulative total. A single combined "win rate / total score" hero would
+        be misleading. Each direction adapts the headline stat per game type.
+      </p>
     </div>
 
-    <div class="stats-page" id="stats-page">
-      <!-- Back link -->
-      <a href="#" class="stats-page__back">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-        Back to Home
-      </a>
+    <div class="state-switcher">
+      <span>State</span>
+      <button class="active" data-state="multi">Multiple games</button>
+      <button data-state="single">One game</button>
+      <button data-state="empty">No games</button>
+      <button data-state="loading">Loading</button>
+    </div>
 
-      <!-- Populated state -->
-      <div class="stats-panel" id="state-populated">
-        <div class="stats-panel__header">
-          <h1 class="stats-panel__title">Your Stats</h1>
-          <p class="stats-panel__subtitle">Lifetime performance</p>
-        </div>
-
-        <div class="stats-hero">
-          <span class="stats-hero__value">58%</span>
-          <span class="stats-hero__label">Win Rate</span>
-        </div>
-
-        <div class="stats-grid">
-          <div class="stats-grid__item">
-            <span class="stats-grid__value">24</span>
-            <span class="stats-grid__label">Games Played</span>
-          </div>
-          <div class="stats-grid__item stats-grid__item--wins">
-            <span class="stats-grid__value">14</span>
-            <span class="stats-grid__label">Wins</span>
-          </div>
-          <div class="stats-grid__item stats-grid__item--losses">
-            <span class="stats-grid__value">10</span>
-            <span class="stats-grid__label">Losses</span>
-          </div>
-          <div class="stats-grid__item">
-            <span class="stats-grid__value">82</span>
-            <span class="stats-grid__label">Total Score</span>
-          </div>
-        </div>
-
-        <div class="stats-panel__footer">Last played: 2 hours ago</div>
+    <!-- ============================================================
+         DIRECTION A
+         ============================================================ -->
+    <div class="direction dirA">
+      <div class="direction__head">
+        <span class="direction__tag">A</span>
+        <span class="direction__name">Game Cards</span>
       </div>
+      <p class="direction__desc">
+        One felt panel per game type, styled like a playing card (corner pip,
+        serif index). Each card leads with a <em>game-appropriate</em> headline:
+        Big 2 → Win Rate; Tonk → Avg. Score. The smaller grid carries the shared
+        counters. Reads top-to-bottom; ideal while there are only a couple of
+        game types. Closest evolution of the previously approved single-panel
+        mockup — it just repeats the panel per game with a game-aware hero.
+      </p>
+      <div class="stage">
+        <!-- multi -->
+        <div class="state is-active" data-dir="A" data-state="multi">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="sheet__title">
+              <h2>Your Stats</h2>
+              <p>Lifetime performance by game</p>
+            </div>
 
-      <!-- Empty state -->
-      <div class="stats-panel" id="state-empty" style="display: none">
-        <div class="stats-panel__header">
-          <h1 class="stats-panel__title">Your Stats</h1>
-          <p class="stats-panel__subtitle">Lifetime performance</p>
+            <!-- Big 2 card -->
+            <div class="gamecard">
+              <span class="gamecard__pip"
+                >A<span class="suit suit--black">&spades;</span></span
+              >
+              <div class="gamecard__head">
+                <span class="gamecard__name">Big 2</span>
+                <span class="gamecard__played">24 games played</span>
+              </div>
+              <div class="gamecard__body">
+                <div class="headline">
+                  <div>
+                    <span class="headline__value">58</span
+                    ><span class="headline__unit">%</span>
+                  </div>
+                  <div class="headline__label">Win Rate</div>
+                </div>
+                <div class="minigrid">
+                  <div class="minigrid__item minigrid__item--wins">
+                    <span class="minigrid__value">14</span>
+                    <span class="minigrid__label">Wins</span>
+                  </div>
+                  <div class="minigrid__item minigrid__item--losses">
+                    <span class="minigrid__value">10</span>
+                    <span class="minigrid__label">Losses</span>
+                  </div>
+                  <div class="minigrid__item">
+                    <span class="minigrid__value">312</span>
+                    <span class="minigrid__label">Total Score</span>
+                  </div>
+                  <div class="minigrid__item">
+                    <span class="minigrid__value">13.0</span>
+                    <span class="minigrid__label">Avg / Game</span>
+                  </div>
+                </div>
+              </div>
+              <div class="gamecard__foot">
+                <span>Last played <em>2 hours ago</em></span>
+                <span>Higher score is better</span>
+              </div>
+            </div>
+
+            <!-- Tonk card -->
+            <div class="gamecard">
+              <span class="gamecard__pip"
+                >K<span class="suit suit--red">&hearts;</span></span
+              >
+              <div class="gamecard__head">
+                <span class="gamecard__name">Tonk</span>
+                <span class="gamecard__played">9 games played</span>
+              </div>
+              <div class="gamecard__body">
+                <div class="headline">
+                  <div><span class="headline__value">88.6</span></div>
+                  <div class="headline__label">
+                    Avg. Score (lower is better)
+                  </div>
+                </div>
+                <div class="minigrid">
+                  <div class="minigrid__item minigrid__item--wins">
+                    <span class="minigrid__value">7</span>
+                    <span class="minigrid__label">Wins</span>
+                  </div>
+                  <div class="minigrid__item minigrid__item--losses">
+                    <span class="minigrid__value">2</span>
+                    <span class="minigrid__label">Losses</span>
+                  </div>
+                  <div class="minigrid__item">
+                    <span class="minigrid__value">78%</span>
+                    <span class="minigrid__label">Win Rate</span>
+                  </div>
+                  <div class="minigrid__item">
+                    <span class="minigrid__value">797</span>
+                    <span class="minigrid__label">Total Penalty</span>
+                  </div>
+                </div>
+              </div>
+              <div class="gamecard__foot">
+                <span>Last played <em>yesterday</em></span>
+                <span>Lower score is better</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="stats-empty">
-          <div class="stats-empty__icon">&#9824;</div>
-          <p class="stats-empty__message">No games played yet</p>
-          <p class="stats-empty__hint">
-            Create or join a game to start tracking your stats
-          </p>
+        <!-- single -->
+        <div class="state" data-dir="A" data-state="single">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="sheet__title">
+              <h2>Your Stats</h2>
+              <p>Lifetime performance by game</p>
+            </div>
+            <div class="gamecard">
+              <span class="gamecard__pip"
+                >A<span class="suit suit--black">&spades;</span></span
+              >
+              <div class="gamecard__head">
+                <span class="gamecard__name">Big 2</span>
+                <span class="gamecard__played">3 games played</span>
+              </div>
+              <div class="gamecard__body">
+                <div class="headline">
+                  <div>
+                    <span class="headline__value">33</span
+                    ><span class="headline__unit">%</span>
+                  </div>
+                  <div class="headline__label">Win Rate</div>
+                </div>
+                <div class="minigrid">
+                  <div class="minigrid__item minigrid__item--wins">
+                    <span class="minigrid__value">1</span>
+                    <span class="minigrid__label">Wins</span>
+                  </div>
+                  <div class="minigrid__item minigrid__item--losses">
+                    <span class="minigrid__value">2</span>
+                    <span class="minigrid__label">Losses</span>
+                  </div>
+                  <div class="minigrid__item">
+                    <span class="minigrid__value">9</span>
+                    <span class="minigrid__label">Total Score</span>
+                  </div>
+                  <div class="minigrid__item">
+                    <span class="minigrid__value">3.0</span>
+                    <span class="minigrid__label">Avg / Game</span>
+                  </div>
+                </div>
+              </div>
+              <div class="gamecard__foot">
+                <span>Last played <em>3 days ago</em></span>
+                <span>Higher score is better</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- empty -->
+        <div class="state" data-dir="A" data-state="empty">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="empty">
+              <div class="empty__icon">&spades;&hearts;</div>
+              <div class="empty__msg">No games played yet</div>
+              <div class="empty__hint">
+                Finish a game and your record shows up here — split out for each
+                game you play.
+              </div>
+              <a href="#" class="empty__cta">Create a Game</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- loading -->
+        <div class="state" data-dir="A" data-state="loading">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="sheet__title">
+              <h2>Your Stats</h2>
+              <p>Lifetime performance by game</p>
+            </div>
+            <div
+              class="gamecard"
+              style="animation: none; opacity: 1; transform: none"
+            >
+              <div class="gamecard__head">
+                <span class="gamecard__name skeleton">Big 2</span>
+              </div>
+              <div class="gamecard__body">
+                <div class="headline">
+                  <div><span class="headline__value skeleton">00%</span></div>
+                  <div
+                    class="headline__label skeleton"
+                    style="display: inline-block"
+                  >
+                    Win Rate
+                  </div>
+                </div>
+                <div class="minigrid">
+                  <div class="minigrid__item">
+                    <span class="minigrid__value skeleton">00</span>
+                  </div>
+                  <div class="minigrid__item">
+                    <span class="minigrid__value skeleton">00</span>
+                  </div>
+                  <div class="minigrid__item">
+                    <span class="minigrid__value skeleton">00</span>
+                  </div>
+                  <div class="minigrid__item">
+                    <span class="minigrid__value skeleton">00</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- Loading state -->
-      <div
-        class="stats-panel stats-panel--loading"
-        id="state-loading"
-        style="display: none"
-      >
-        <div class="stats-panel__header">
-          <h1 class="stats-panel__title">Your Stats</h1>
-          <p class="stats-panel__subtitle">Lifetime performance</p>
-        </div>
-
-        <div class="stats-hero">
-          <span class="stats-hero__value">---%</span>
-          <span class="stats-hero__label">Win Rate</span>
-        </div>
-
-        <div class="stats-grid">
-          <div class="stats-grid__item">
-            <span class="stats-grid__value">---</span>
-            <span class="stats-grid__label">Games Played</span>
-          </div>
-          <div class="stats-grid__item stats-grid__item--wins">
-            <span class="stats-grid__value">---</span>
-            <span class="stats-grid__label">Wins</span>
-          </div>
-          <div class="stats-grid__item stats-grid__item--losses">
-            <span class="stats-grid__value">---</span>
-            <span class="stats-grid__label">Losses</span>
-          </div>
-          <div class="stats-grid__item">
-            <span class="stats-grid__value">---</span>
-            <span class="stats-grid__label">Total Score</span>
-          </div>
-        </div>
-
-        <div class="stats-panel__footer">Loading...</div>
+    <!-- ============================================================
+         DIRECTION B
+         ============================================================ -->
+    <div class="direction dirB">
+      <div class="direction__head">
+        <span class="direction__tag">B</span>
+        <span class="direction__name">Stat Ledger</span>
       </div>
+      <p class="direction__desc">
+        A single tally sheet — one row per game type. Shared columns (Played /
+        Wins / Losses / Win Rate) line up for instant cross-game comparison, and
+        a final <em>Headline</em> column shows the per-game signature stat (Big
+        2: Avg Score ↑ · Tonk: Avg Score ↓). Densest option; scales cleanly as
+        the game roster grows. Collapses to stacked rows on mobile.
+      </p>
+      <div class="stage">
+        <!-- multi -->
+        <div class="state is-active" data-dir="B" data-state="multi">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="sheet__title">
+              <h2>Your Stats</h2>
+              <p>Lifetime record across all games</p>
+            </div>
+            <div class="ledger">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Game</th>
+                    <th>Played</th>
+                    <th>Wins</th>
+                    <th>Losses</th>
+                    <th>Win Rate</th>
+                    <th>Headline</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="ledger__game" data-label="Game">
+                      <div class="ledger__game-name">
+                        <span class="ledger__pip"
+                          >A<span class="suit suit--black">&spades;</span></span
+                        >
+                        Big 2
+                      </div>
+                      <div class="ledger__game-meta">
+                        Last played 2 hours ago
+                      </div>
+                    </td>
+                    <td data-label="Played">24</td>
+                    <td class="ledger__w" data-label="Wins">14</td>
+                    <td class="ledger__l" data-label="Losses">10</td>
+                    <td class="ledger__winrate" data-label="Win Rate">58%</td>
+                    <td class="ledger__headline" data-label="Headline">
+                      <b>13.0</b> avg score ↑
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="ledger__game" data-label="Game">
+                      <div class="ledger__game-name">
+                        <span class="ledger__pip"
+                          >K<span class="suit suit--red">&hearts;</span></span
+                        >
+                        Tonk
+                      </div>
+                      <div class="ledger__game-meta">Last played yesterday</div>
+                    </td>
+                    <td data-label="Played">9</td>
+                    <td class="ledger__w" data-label="Wins">7</td>
+                    <td class="ledger__l" data-label="Losses">2</td>
+                    <td class="ledger__winrate" data-label="Win Rate">78%</td>
+                    <td class="ledger__headline" data-label="Headline">
+                      <b>88.6</b> avg score ↓
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
 
-      <!-- Action button (shown for all states) -->
-      <a href="#" class="stats-page__action" id="action-btn">Play a Game</a>
+        <!-- single -->
+        <div class="state" data-dir="B" data-state="single">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="sheet__title">
+              <h2>Your Stats</h2>
+              <p>Lifetime record across all games</p>
+            </div>
+            <div class="ledger">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Game</th>
+                    <th>Played</th>
+                    <th>Wins</th>
+                    <th>Losses</th>
+                    <th>Win Rate</th>
+                    <th>Headline</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="ledger__game" data-label="Game">
+                      <div class="ledger__game-name">
+                        <span class="ledger__pip"
+                          >A<span class="suit suit--black">&spades;</span></span
+                        >
+                        Big 2
+                      </div>
+                      <div class="ledger__game-meta">
+                        Last played 3 days ago
+                      </div>
+                    </td>
+                    <td data-label="Played">3</td>
+                    <td class="ledger__w" data-label="Wins">1</td>
+                    <td class="ledger__l" data-label="Losses">2</td>
+                    <td class="ledger__winrate" data-label="Win Rate">33%</td>
+                    <td class="ledger__headline" data-label="Headline">
+                      <b>3.0</b> avg score ↑
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- empty -->
+        <div class="state" data-dir="B" data-state="empty">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="empty">
+              <div class="empty__icon">&spades;&hearts;</div>
+              <div class="empty__msg">No games played yet</div>
+              <div class="empty__hint">
+                Your record will fill in here, one row per game, as you play.
+              </div>
+              <a href="#" class="empty__cta">Create a Game</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- loading -->
+        <div class="state" data-dir="B" data-state="loading">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="sheet__title">
+              <h2>Your Stats</h2>
+              <p>Lifetime record across all games</p>
+            </div>
+            <div class="ledger">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Game</th>
+                    <th>Played</th>
+                    <th>Wins</th>
+                    <th>Losses</th>
+                    <th>Win Rate</th>
+                    <th>Headline</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="ledger__game">
+                      <div class="ledger__game-name">
+                        <span class="skeleton">Big 2 xx</span>
+                      </div>
+                    </td>
+                    <td><span class="skeleton">00</span></td>
+                    <td><span class="skeleton">00</span></td>
+                    <td><span class="skeleton">00</span></td>
+                    <td><span class="skeleton">00%</span></td>
+                    <td><span class="skeleton">00.0 avg</span></td>
+                  </tr>
+                  <tr>
+                    <td class="ledger__game">
+                      <div class="ledger__game-name">
+                        <span class="skeleton">Tonk xxx</span>
+                      </div>
+                    </td>
+                    <td><span class="skeleton">00</span></td>
+                    <td><span class="skeleton">00</span></td>
+                    <td><span class="skeleton">00</span></td>
+                    <td><span class="skeleton">00%</span></td>
+                    <td><span class="skeleton">00.0 avg</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         DIRECTION C
+         ============================================================ -->
+    <div class="direction dirC">
+      <div class="direction__head">
+        <span class="direction__tag">C</span>
+        <span class="direction__name">Tabbed Spotlight</span>
+      </div>
+      <p class="direction__desc">
+        Game-type tabs at the top; the selected game gets the full spotlight
+        panel — the exact hero treatment from the previously approved
+        single-game mockup, now driven per game. One game in focus at a time, so
+        each game keeps its own headline (Big 2: Win Rate · Tonk: Avg Score)
+        without competing for attention. Best when each game's detail deserves
+        room; the trade-off is you don't see games side-by-side.
+      </p>
+      <div class="stage">
+        <!-- multi (tabs shown; switch tabs live) -->
+        <div class="state is-active" data-dir="C" data-state="multi">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="sheet__title">
+              <h2>Your Stats</h2>
+              <p>Lifetime performance</p>
+            </div>
+            <div class="tabs">
+              <button class="active" data-tab="big2">Big 2</button>
+              <button data-tab="tonk">Tonk</button>
+            </div>
+
+            <!-- Big 2 spotlight -->
+            <div class="spotlight" data-panel="big2">
+              <div class="spotlight__game">24 games of Big 2</div>
+              <div class="hero">
+                <div>
+                  <span class="hero__value">58</span
+                  ><span class="hero__unit">%</span>
+                </div>
+                <div class="hero__label">Win Rate</div>
+              </div>
+              <div class="biggrid">
+                <div class="biggrid__item">
+                  <span class="biggrid__value">24</span>
+                  <span class="biggrid__label">Played</span>
+                </div>
+                <div class="biggrid__item biggrid__item--wins">
+                  <span class="biggrid__value">14</span>
+                  <span class="biggrid__label">Wins</span>
+                </div>
+                <div class="biggrid__item biggrid__item--losses">
+                  <span class="biggrid__value">10</span>
+                  <span class="biggrid__label">Losses</span>
+                </div>
+                <div class="biggrid__item">
+                  <span class="biggrid__value">13.0</span>
+                  <span class="biggrid__label">Avg Score ↑</span>
+                </div>
+              </div>
+              <div class="spotlight__foot">
+                Last played <em>2 hours ago</em>
+              </div>
+            </div>
+
+            <!-- Tonk spotlight (hidden until tab) -->
+            <div class="spotlight" data-panel="tonk" style="display: none">
+              <div class="spotlight__game">9 games of Tonk</div>
+              <div class="hero">
+                <div><span class="hero__value">88.6</span></div>
+                <div class="hero__label">Avg. Score (lower is better)</div>
+              </div>
+              <div class="biggrid">
+                <div class="biggrid__item">
+                  <span class="biggrid__value">9</span>
+                  <span class="biggrid__label">Played</span>
+                </div>
+                <div class="biggrid__item biggrid__item--wins">
+                  <span class="biggrid__value">7</span>
+                  <span class="biggrid__label">Wins</span>
+                </div>
+                <div class="biggrid__item biggrid__item--losses">
+                  <span class="biggrid__value">2</span>
+                  <span class="biggrid__label">Losses</span>
+                </div>
+                <div class="biggrid__item">
+                  <span class="biggrid__value">78%</span>
+                  <span class="biggrid__label">Win Rate</span>
+                </div>
+              </div>
+              <div class="spotlight__foot">Last played <em>yesterday</em></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- single (no tabs needed when there's one game) -->
+        <div class="state" data-dir="C" data-state="single">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="sheet__title">
+              <h2>Your Stats</h2>
+              <p>Lifetime performance</p>
+            </div>
+            <div class="spotlight">
+              <div class="spotlight__game">3 games of Big 2</div>
+              <div class="hero">
+                <div>
+                  <span class="hero__value">33</span
+                  ><span class="hero__unit">%</span>
+                </div>
+                <div class="hero__label">Win Rate</div>
+              </div>
+              <div class="biggrid">
+                <div class="biggrid__item">
+                  <span class="biggrid__value">3</span>
+                  <span class="biggrid__label">Played</span>
+                </div>
+                <div class="biggrid__item biggrid__item--wins">
+                  <span class="biggrid__value">1</span>
+                  <span class="biggrid__label">Wins</span>
+                </div>
+                <div class="biggrid__item biggrid__item--losses">
+                  <span class="biggrid__value">2</span>
+                  <span class="biggrid__label">Losses</span>
+                </div>
+                <div class="biggrid__item">
+                  <span class="biggrid__value">3.0</span>
+                  <span class="biggrid__label">Avg Score ↑</span>
+                </div>
+              </div>
+              <div class="spotlight__foot">Last played <em>3 days ago</em></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- empty -->
+        <div class="state" data-dir="C" data-state="empty">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="empty">
+              <div class="empty__icon">&spades;&hearts;</div>
+              <div class="empty__msg">No games played yet</div>
+              <div class="empty__hint">
+                Play a game and a tab appears here for each game in your record.
+              </div>
+              <a href="#" class="empty__cta">Create a Game</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- loading -->
+        <div class="state" data-dir="C" data-state="loading">
+          <div class="sheet">
+            <a href="#" class="sheet__back">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Back to Home
+            </a>
+            <div class="sheet__title">
+              <h2>Your Stats</h2>
+              <p>Lifetime performance</p>
+            </div>
+            <div class="tabs">
+              <button class="skeleton" style="color: transparent">Big 2</button>
+              <button class="skeleton" style="color: transparent">Tonk</button>
+            </div>
+            <div class="spotlight">
+              <div
+                class="spotlight__game skeleton"
+                style="display: inline-block"
+              >
+                00 games
+              </div>
+              <div class="hero">
+                <div><span class="hero__value skeleton">00%</span></div>
+                <div class="hero__label skeleton" style="display: inline-block">
+                  Win Rate
+                </div>
+              </div>
+              <div class="biggrid">
+                <div class="biggrid__item">
+                  <span class="biggrid__value skeleton">00</span>
+                </div>
+                <div class="biggrid__item">
+                  <span class="biggrid__value skeleton">00</span>
+                </div>
+                <div class="biggrid__item">
+                  <span class="biggrid__value skeleton">00</span>
+                </div>
+                <div class="biggrid__item">
+                  <span class="biggrid__value skeleton">00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
-      function showState(state) {
-        document.getElementById("state-populated").style.display =
-          state === "populated" ? "flex" : "none";
-        document.getElementById("state-empty").style.display =
-          state === "empty" ? "flex" : "none";
-        document.getElementById("state-loading").style.display =
-          state === "loading" ? "flex" : "none";
-
-        // Update active button
-        document.querySelectorAll(".demo-switcher button").forEach((btn) => {
-          btn.classList.toggle(
-            "active",
-            btn.textContent
-              .toLowerCase()
-              .includes(
-                state === "populated"
-                  ? "with"
-                  : state === "empty"
-                    ? "no"
-                    : "load",
-              ),
-          );
+      // State switcher: toggles which state is visible across ALL directions.
+      const switcher = document.querySelector(".state-switcher");
+      switcher.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-state]");
+        if (!btn) return;
+        const state = btn.dataset.state;
+        switcher
+          .querySelectorAll("button")
+          .forEach((b) => b.classList.toggle("active", b === btn));
+        document.querySelectorAll(".state").forEach((el) => {
+          el.classList.toggle("is-active", el.dataset.state === state);
         });
-      }
+      });
+
+      // Direction C: live tab switching within the multi state.
+      document.querySelectorAll(".dirC .tabs").forEach((tabs) => {
+        if (tabs.querySelector(".skeleton")) return; // loading tabs are inert
+        const sheet = tabs.closest(".sheet");
+        tabs.addEventListener("click", (e) => {
+          const btn = e.target.closest("button[data-tab]");
+          if (!btn) return;
+          tabs
+            .querySelectorAll("button")
+            .forEach((b) => b.classList.toggle("active", b === btn));
+          sheet.querySelectorAll("[data-panel]").forEach((p) => {
+            p.style.display = p.dataset.panel === btn.dataset.tab ? "" : "none";
+          });
+        });
+      });
     </script>
   </body>
 </html>
