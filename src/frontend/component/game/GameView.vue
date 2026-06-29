@@ -29,7 +29,13 @@
     "
     class="game-view__board-container"
   >
+    <TonkBoard
+      v-if="gameState.gameType === 'tonk'"
+      :game-state="gameState"
+      :room-code="roomCode"
+    />
     <GameBoard
+      v-else
       :game-state="gameState"
       :selected-indices="selectedIndices"
       :selection-count="selectionCount"
@@ -94,6 +100,7 @@ import { getSession } from "@/service/authService";
 import { restoreGuestSession } from "@/service/guestService";
 import GameLobbyView from "@/component/game/GameLobbyView.vue";
 import GameBoard from "@/component/game/GameBoard.vue";
+import TonkBoard from "@/component/game/TonkBoard.vue";
 import GameOverView from "@/component/game/GameOverView.vue";
 
 type DisplayPhase = "CREATED" | "IN_PROGRESS" | "SHOW_FINAL_PLAY" | "COMPLETED";
