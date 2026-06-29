@@ -49,7 +49,15 @@
       <div v-if="hasHand" class="tonk-board__hand-label">
         Your hand ({{ myHand.length }})
       </div>
-      <TonkHand v-if="hasHand" :cards="myHand" />
+      <TonkHand
+        v-if="hasHand"
+        :cards="myHand"
+        :selectable="canSelectHand"
+        :selected-indices="selectedIndices"
+        :dimmed-indices="dimmedIndices"
+        :bad-select="badSelect"
+        @toggle="(index) => emit('toggleCard', index)"
+      />
     </div>
 
     <div class="tonk-board__log">
@@ -61,9 +69,20 @@
     </div>
 
     <div class="tonk-board__actions">
-      <div class="tonk-board__status">
-        {{ turnStatusLine }}
-      </div>
+      <TonkActionPanel
+        :valid-actions="gameState.validActions"
+        :turn-phase="tonkState.turnPhase"
+        :is-my-turn="isMyTurn"
+        :selection-count="selectionCount"
+        :drawable-discard="tonkState.drawableDiscard"
+        :stock-count="tonkState.stockCount"
+        :current-player-name="currentPlayerName"
+        :action-error="actionError"
+        :action-pending="actionPending"
+        @discard="emit('discard')"
+        @draw="(source) => emit('draw', source)"
+        @call-tonk="emit('callTonk')"
+      />
     </div>
   </div>
 
@@ -103,14 +122,30 @@ import TonkSeatRail from "@/component/game-ui/TonkSeatRail.vue";
 import TonkPhaseBanner from "@/component/game-ui/TonkPhaseBanner.vue";
 import TonkPiles from "@/component/game-ui/TonkPiles.vue";
 import TonkHand from "@/component/game-ui/TonkHand.vue";
+import TonkActionPanel from "@/component/game-ui/TonkActionPanel.vue";
 import TonkTallyPanel from "@/component/game-ui/TonkTallyPanel.vue";
 import TonkLog from "@/component/game-ui/TonkLog.vue";
-import { phaseLabel, turnLabel } from "@/component/game-ui/tonkDisplay";
+import type { TonkDrawSource } from "@shared/tonk-types";
+import {
+  dimmedSelectionIndices,
+  isBadSelect,
+} from "@/component/game-ui/tonkDisplay";
 
 const props = defineProps<{
   gameState: EnrichedPlayerView;
   turnTimerSeconds: number | null;
   roomCode: string;
+  selectedIndices: ReadonlySet<number>;
+  selectionCount: number;
+  actionError: string | null;
+  actionPending: boolean;
+}>();
+
+const emit = defineEmits<{
+  toggleCard: [index: number];
+  discard: [];
+  draw: [source: TonkDrawSource];
+  callTonk: [];
 }>();
 
 const tonkState = computed<TonkPublicState | null>(() => {
@@ -148,12 +183,28 @@ const currentPlayerName = computed(() => {
   return player?.displayName ?? "";
 });
 
-const turnStatusLine = computed(() => {
-  if (!tonkState.value) return "";
-  return `${turnLabel(currentPlayerName.value, isMyTurn.value)} · ${phaseLabel(
-    tonkState.value.turnPhase,
-  )}`;
-});
+// The hand is selectable only on the local player's discard-phase turn. The
+// server's validActions is the authority (empty when it is not our turn).
+const canSelectHand = computed(
+  () =>
+    isMyTurn.value &&
+    tonkState.value?.turnPhase === "discard" &&
+    props.gameState.validActions.some((a) => a.type === "discard"),
+);
+
+// Presentational same-rank hints (LLD 99 E3/E4) — derived purely from the
+// selection, never gating submission. Only meaningful while selecting.
+const dimmedIndices = computed<ReadonlySet<number>>(() =>
+  canSelectHand.value
+    ? dimmedSelectionIndices(myHand.value, props.selectedIndices)
+    : new Set<number>(),
+);
+
+const badSelect = computed<boolean>(() =>
+  canSelectHand.value
+    ? isBadSelect(myHand.value, props.selectedIndices)
+    : false,
+);
 
 const displayCode = computed<string>(
   () => props.gameState.joinCode ?? props.roomCode,
@@ -286,14 +337,8 @@ watch(logDrawerOpen, (open) => {
 .tonk-board__actions {
   grid-area: actions;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-}
-
-.tonk-board__status {
-  font-family: var(--font-ui);
-  font-size: 0.85rem;
-  color: var(--text-primary);
 }
 
 .tonk-board__hand-label {

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ref } from "vue";
 import type { Card } from "../../src/shared/engine-types.js";
+import type { TonkCard } from "../../src/shared/tonk-types.js";
+import { isJoker } from "../../src/shared/tonk-types.js";
 import { useCardSelection } from "../../src/frontend/composables/useCardSelection.js";
 
 function makeHand(count: number): Card[] {
@@ -207,6 +209,40 @@ describe("useCardSelection", () => {
 
       clearSelection();
       expect(selectionCount.value).toBe(0);
+    });
+  });
+
+  describe("Tonk hand (TonkCard widening, LLD 99)", () => {
+    it("toggles and selects a joker by index, returning the joker object", () => {
+      const joker: TonkCard = { joker: true, id: 0 };
+      const hand = ref<readonly TonkCard[]>([
+        { suit: "clubs", rank: "Q" },
+        joker,
+        { suit: "spades", rank: "Q" },
+      ]);
+      const { toggleCard, selectedCards } = useCardSelection(hand);
+
+      toggleCard(1);
+
+      expect(selectedCards.value).toEqual([joker]);
+      expect(isJoker(selectedCards.value[0] as TonkCard)).toBe(true);
+    });
+
+    it("selects same-rank standard cards across a hand that includes jokers", () => {
+      const cards: TonkCard[] = [
+        { suit: "clubs", rank: "Q" },
+        { joker: true, id: 0 },
+        { suit: "spades", rank: "Q" },
+      ];
+      const hand = ref<readonly TonkCard[]>(cards);
+      const { toggleCard, selectedCards, selectionCount } =
+        useCardSelection(hand);
+
+      toggleCard(0);
+      toggleCard(2);
+
+      expect(selectionCount.value).toBe(2);
+      expect(selectedCards.value).toEqual([cards[0], cards[2]]);
     });
   });
 

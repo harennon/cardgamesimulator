@@ -34,8 +34,16 @@
     <TonkBoard
       v-if="gameState.gameType === 'tonk'"
       :game-state="gameState"
+      :selected-indices="selectedIndices"
+      :selection-count="selectionCount"
+      :action-error="actionError"
+      :action-pending="actionPending"
       :turn-timer-seconds="turnTimerSeconds"
       :room-code="roomCode"
+      @toggle-card="toggleCard"
+      @discard="onDiscard"
+      @draw="onDraw"
+      @call-tonk="onCallTonk"
     />
     <GameBoard
       v-else
@@ -93,6 +101,11 @@ import { useRouter } from "vue-router";
 import type { PlayerInfo, GameType } from "@shared/engine-types";
 import { GAME_TYPE_UI_BOUNDS } from "@/component/statsView";
 import type { Big2PublicState, Big2Play } from "@shared/big2-types";
+import type {
+  TonkPublicState,
+  TonkDrawSource,
+  TonkCard,
+} from "@shared/tonk-types";
 import { axiosInstance } from "@/service/http";
 import type { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
 import type { AxiosResponse } from "axios";
@@ -132,6 +145,9 @@ const {
   rematch,
   playCards,
   pass,
+  discard,
+  drawCard,
+  callTonk,
   actionError,
   actionPending,
   bind: bindActions,
@@ -377,6 +393,44 @@ async function onPass(): Promise<void> {
   await pass(props.gameId);
   clearSelection();
 }
+
+async function onDiscard(): Promise<void> {
+  // selectedCards is (Card | TonkCard)[]; for Tonk it is a TonkCard[].
+  const result = await discard(
+    props.gameId,
+    selectedCards.value as readonly TonkCard[],
+  );
+  if (result.success) {
+    clearSelection();
+  }
+}
+
+async function onDraw(source: TonkDrawSource): Promise<void> {
+  await drawCard(props.gameId, source);
+}
+
+async function onCallTonk(): Promise<void> {
+  await callTonk(props.gameId);
+}
+
+// Defensive selection reset: when our own discard advances the phase to "draw",
+// or the turn hands off to another seat, clear stale highlights (LLD 99 §D,
+// E14/E15). Index-based selection stays valid across renders that do not change
+// the hand, so this only fires on the two transitions above.
+const tonkTurnPhase = computed<string | null>(() => {
+  if (gameState.value?.gameType !== "tonk") return null;
+  const publicState = gameState.value.gameSpecificPublicState as
+    | TonkPublicState
+    | undefined;
+  return publicState?.turnPhase ?? null;
+});
+
+watch(
+  () => [tonkTurnPhase.value, gameState.value?.currentPlayerIndex] as const,
+  () => {
+    clearSelection();
+  },
+);
 </script>
 
 <style scoped>
