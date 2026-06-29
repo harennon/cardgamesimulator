@@ -1,6 +1,6 @@
 {
-  "$comment": "LLD 77 §5.5 — captured/fixture diff representing a CLEAN prod baseline (post-#83): no drift, nothing pending. The drift gate exits 0 against this. Used as the autonomous-safe / local / placeholder target so the gate runs green with no prod access.",
+  "$comment": "LLD 77 §5.5 — captured/fixture diff representing a CLEAN prod baseline with migration 009 (add games.deck_rounds_target, LLD 93) in-tree but not yet applied to prod: no residual drift, 009 pending. The pending array mirrors the allowlist's expectedPending so the stale-allowlist check passes; with no observed objects there is no residual to subtract. The drift gate exits 0 against this. Used as the autonomous-safe / local / placeholder target so the gate runs green with no prod access.",
   "objects": [],
   "expectedFromPending": [],
-  "pending": []
+  "pending": ["009_add_games_deck_rounds_target.sql"]
 }
