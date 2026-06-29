@@ -11,6 +11,7 @@ export interface GameRepository {
     maxPlayers: number,
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
+    deckRoundsTarget: number | null,
     joinCode: string | null,
   ): Promise<Game>;
   getGame(gameId: string): Promise<Game | null>;

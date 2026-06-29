@@ -99,7 +99,13 @@ export class GameService {
     }));
 
     const prng = new SeededPRNG();
-    const config = { maxPlayers: game.maxPlayers, minPlayers, options: {} };
+    const config = {
+      maxPlayers: game.maxPlayers,
+      minPlayers,
+      // NULL = creator did not choose → DEFAULT_DECK_ROUNDS_TARGET (8) from
+      // engine/tonk/constants.ts. Tonk re-clamps; Big2 ignores options entirely.
+      options: { deckRoundsTarget: game.deckRoundsTarget ?? 8 },
+    };
 
     const state = engine.initialize(gameId, players, config, prng);
 
@@ -176,6 +182,7 @@ export class GameService {
       oldGame.maxPlayers,
       hostDisplayName,
       oldGame.turnTimerSeconds,
+      oldGame.deckRoundsTarget,
       transferCode,
     );
 

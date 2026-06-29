@@ -157,6 +157,7 @@ describe("SupabaseDB mappers", () => {
         status: "CREATED",
         state: { round: 1 },
         turn_timer_seconds: 30,
+        deck_rounds_target: 10,
         created_at: "2026-01-01T00:00:00.000Z",
         updated_at: "2026-01-02T00:00:00.000Z",
         version: 2,
@@ -184,9 +185,42 @@ describe("SupabaseDB mappers", () => {
       expect(game!.status).toBe("CREATED");
       expect(game!.state).toEqual({ round: 1 });
       expect(game!.turnTimerSeconds).toBe(30);
+      expect(game!.deckRoundsTarget).toBe(10);
       expect(game!.createdAt.toISOString()).toBe("2026-01-01T00:00:00.000Z");
       expect(game!.updatedAt.toISOString()).toBe("2026-01-02T00:00:00.000Z");
       expect(game!.version).toBe(2);
+    });
+
+    it("maps a NULL deck_rounds_target to null", async () => {
+      const row = {
+        game_id: "abc-456",
+        game_type: "big2",
+        player_ids: ["uid-1"],
+        player_display_names: { "uid-1": "Alice" },
+        max_players: 4,
+        status: "CREATED",
+        state: {},
+        turn_timer_seconds: 30,
+        deck_rounds_target: null,
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-02T00:00:00.000Z",
+        version: 1,
+      };
+
+      mockFrom.mockReturnValueOnce({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi
+              .fn()
+              .mockResolvedValueOnce({ data: row, error: null }),
+          })),
+        })),
+      });
+
+      const game = await db.getGame("abc-456");
+
+      expect(game).not.toBeNull();
+      expect(game!.deckRoundsTarget).toBeNull();
     });
 
     it("returns null when game is not found", async () => {

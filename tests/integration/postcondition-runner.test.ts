@@ -63,7 +63,7 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
   // post-condition failing — that case is covered by the drift-toggle test in
   // prod-shaped-fixture.test.ts. This test proves the migrations + 006 together
   // satisfy every post-condition on a prod-shaped (name-drifted) baseline.
-  it("all post-conditions pass against a name-drifted prod-shaped fixture migrated 001..006", async () => {
+  it("all post-conditions pass against a name-drifted prod-shaped fixture migrated 001..009", async () => {
     const fixture = await createProdShapedFixture({
       baseline: "typeorm-era",
       drift: { pkey1ConstraintNames: true, strayAnonWriteGrants: false },
@@ -76,6 +76,9 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
         "004_player_stats_game_type.sql",
         "005_increment_stats_rpc_game_type.sql",
         "006_fix_player_stats_composite_pk.sql",
+        "007_normalize_pk_names.sql",
+        "008_revoke_anon_writes.sql",
+        "009_add_games_deck_rounds_target.sql",
       ]);
 
       const result = await runPostconditions(fixture.client);
@@ -86,7 +89,7 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
     }
   });
 
-  it("all post-conditions pass against a fresh baseline migrated 001..006 (same .sql, two contexts)", async () => {
+  it("all post-conditions pass against a fresh baseline migrated 001..009 (same .sql, two contexts)", async () => {
     const fixture = await createProdShapedFixture({ baseline: "fresh" });
     try {
       await fixture.applyMigrations([
@@ -96,11 +99,71 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
         "004_player_stats_game_type.sql",
         "005_increment_stats_rpc_game_type.sql",
         "006_fix_player_stats_composite_pk.sql",
+        "007_normalize_pk_names.sql",
+        "008_revoke_anon_writes.sql",
+        "009_add_games_deck_rounds_target.sql",
       ]);
 
       const result = await runPostconditions(fixture.client);
       expect(result.failures).toEqual([]);
       expect(result.ok).toBe(true);
+    } finally {
+      await fixture.teardown();
+    }
+  });
+
+  it("009 post-condition resolves against a typeorm-era prod-shaped fixture (name-agnostic)", async () => {
+    // Prod's games PK is the drifted games_pkey1, but 009 is a bare ADD COLUMN
+    // touching no constraint — the post-condition inspects only the column shape
+    // (presence + integer type), never the PK name, so it resolves here.
+    const fixture = await createProdShapedFixture({
+      baseline: "typeorm-era",
+      drift: { pkey1ConstraintNames: true, strayAnonWriteGrants: false },
+    });
+    try {
+      await fixture.applyMigrations([
+        "001_create_tables.sql",
+        "002_enable_rls.sql",
+        "003_increment_stats_rpc.sql",
+        "004_player_stats_game_type.sql",
+        "005_increment_stats_rpc_game_type.sql",
+        "006_fix_player_stats_composite_pk.sql",
+        "007_normalize_pk_names.sql",
+        "008_revoke_anon_writes.sql",
+        "009_add_games_deck_rounds_target.sql",
+      ]);
+
+      await expect(
+        fixture.runPostcondition(
+          "009_add_games_deck_rounds_target.postcondition.sql",
+        ),
+      ).resolves.toBeUndefined();
+    } finally {
+      await fixture.teardown();
+    }
+  });
+
+  it("009 post-condition RAISEs when the column is absent (release-blocking)", async () => {
+    // Apply everything EXCEPT 009 — games has no deck_rounds_target column, so
+    // the 009 post-condition must RAISE (the gate would block the release).
+    const fixture = await createProdShapedFixture({ baseline: "fresh" });
+    try {
+      await fixture.applyMigrations([
+        "001_create_tables.sql",
+        "002_enable_rls.sql",
+        "003_increment_stats_rpc.sql",
+        "004_player_stats_game_type.sql",
+        "005_increment_stats_rpc_game_type.sql",
+        "006_fix_player_stats_composite_pk.sql",
+        "007_normalize_pk_names.sql",
+        "008_revoke_anon_writes.sql",
+      ]);
+
+      await expect(
+        fixture.runPostcondition(
+          "009_add_games_deck_rounds_target.postcondition.sql",
+        ),
+      ).rejects.toThrow(/POSTCONDITION FAILED \(009/);
     } finally {
       await fixture.teardown();
     }

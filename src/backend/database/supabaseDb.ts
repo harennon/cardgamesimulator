@@ -53,6 +53,7 @@ export class SupabaseDB
     maxPlayers: number,
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
+    deckRoundsTarget: number | null,
     joinCode: string | null,
   ): Promise<Game> {
     const row = {
@@ -64,6 +65,7 @@ export class SupabaseDB
       status: "CREATED",
       state: {},
       turn_timer_seconds: turnTimerSeconds,
+      deck_rounds_target: deckRoundsTarget,
       join_code: joinCode,
     };
     const { data, error } = await this.db
@@ -109,6 +111,7 @@ export class SupabaseDB
         status: game.status,
         state: game.state,
         turn_timer_seconds: game.turnTimerSeconds,
+        deck_rounds_target: game.deckRoundsTarget,
         version: expectedVersion + 1,
         updated_at: new Date().toISOString(),
       })
@@ -229,6 +232,7 @@ export class SupabaseDB
     game.state = row.state as Record<string, unknown>;
     game.turnTimerSeconds = row.turn_timer_seconds as number | null;
     game.joinCode = (row.join_code as string) ?? null;
+    game.deckRoundsTarget = (row.deck_rounds_target as number | null) ?? null;
     game.createdAt = new Date(row.created_at as string);
     game.updatedAt = new Date(row.updated_at as string);
     game.version = row.version as number;

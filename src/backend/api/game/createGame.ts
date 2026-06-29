@@ -9,6 +9,12 @@ import type { GameType } from "@shared/engine-types";
 
 const VALID_TIMER_VALUES: ReadonlySet<number> = new Set([30, 60, 90]);
 
+// deckRoundsTarget is a continuous range, validated here as the authoritative API
+// boundary (the Tonk engine re-clamps as defense-in-depth). Mirrors engine
+// constants MIN/MAX_DECK_ROUNDS_TARGET (engine/tonk/constants.ts).
+const MIN_DECK_ROUNDS_TARGET = 5;
+const MAX_DECK_ROUNDS_TARGET = 12;
+
 export class CreateGameHandler extends Handler {
   public static INSTANCE: CreateGameHandler = new CreateGameHandler();
 
@@ -21,6 +27,15 @@ export class CreateGameHandler extends Handler {
     if (turnTimerSeconds == null || !VALID_TIMER_VALUES.has(turnTimerSeconds)) {
       throw new BadRequestError();
     }
+    const deckRoundsTarget = request.body.deckRoundsTarget;
+    if (
+      deckRoundsTarget != null &&
+      (!Number.isInteger(deckRoundsTarget) ||
+        deckRoundsTarget < MIN_DECK_ROUNDS_TARGET ||
+        deckRoundsTarget > MAX_DECK_ROUNDS_TARGET)
+    ) {
+      throw new BadRequestError();
+    }
     const gameId = crypto.randomUUID();
     const game = await this.createGameWithCode(
       gameId,
@@ -29,6 +44,7 @@ export class CreateGameHandler extends Handler {
       request.body.maxPlayers,
       request.displayName ?? request.userId!,
       turnTimerSeconds,
+      deckRoundsTarget ?? null,
     );
     const createGameResponse: CreateGameResponse = {
       gameId: game.gameId,
@@ -45,6 +61,7 @@ export class CreateGameHandler extends Handler {
     maxPlayers: number,
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
+    deckRoundsTarget: number | null,
   ): Promise<Game> {
     const MAX_RETRIES = 5;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -56,6 +73,7 @@ export class CreateGameHandler extends Handler {
           maxPlayers,
           creatorDisplayName,
           turnTimerSeconds,
+          deckRoundsTarget,
           generateJoinCode(),
         );
       } catch (err: unknown) {

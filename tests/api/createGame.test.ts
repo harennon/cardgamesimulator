@@ -25,6 +25,7 @@ const mockCreateGame =
       maxPlayers: number,
       creatorDisplayName: string,
       turnTimerSeconds: number | null,
+      deckRoundsTarget: number | null,
       joinCode: string | null,
     ) => Promise<Game>
   >();
@@ -38,6 +39,7 @@ vi.mock("@/database", () => ({
         string,
         number,
         string,
+        number | null,
         number | null,
         string | null,
       ]
@@ -60,11 +62,12 @@ function makeRequest(
   maxPlayers: number,
   displayName?: string,
   turnTimerSeconds?: number,
+  deckRoundsTarget?: number,
 ) {
   return {
     userId,
     displayName,
-    body: { gameType, maxPlayers, turnTimerSeconds },
+    body: { gameType, maxPlayers, turnTimerSeconds, deckRoundsTarget },
     headers: {},
   } as unknown as Parameters<(typeof CreateGameHandler.INSTANCE)["post"]>[0];
 }
@@ -120,8 +123,10 @@ describe("CreateGameHandler", () => {
 
       expect(mockCreateGame).toHaveBeenCalledOnce();
       const args = mockCreateGame.mock.calls[0];
-      // Last arg is joinCode
-      expect(args[6]).toBe("H7K3");
+      // joinCode is the last arg (index 7); deckRoundsTarget (index 6) defaults
+      // to null when the field is omitted.
+      expect(args[6]).toBeNull();
+      expect(args[7]).toBe("H7K3");
     });
 
     it("passes displayName to gameRepo.createGame", async () => {
@@ -220,6 +225,136 @@ describe("CreateGameHandler", () => {
           res,
         ),
       ).rejects.toMatchObject({ status: 400 });
+    });
+  });
+
+  describe("deckRoundsTarget validation", () => {
+    it("accepts an omitted deckRoundsTarget and forwards null", async () => {
+      mockCreateGame.mockResolvedValue(makeGame());
+
+      const { res, data } = makeResponse();
+      await CreateGameHandler.INSTANCE.post(
+        makeRequest("user-1", "tonk", 4, "Alice", 30),
+        res,
+      );
+
+      expect(data.statusCode).toBe(200);
+      expect(mockCreateGame).toHaveBeenCalledOnce();
+      expect(mockCreateGame.mock.calls[0][6]).toBeNull();
+    });
+
+    it("accepts the lower boundary (5) and forwards it", async () => {
+      mockCreateGame.mockResolvedValue(makeGame());
+
+      const { res, data } = makeResponse();
+      await CreateGameHandler.INSTANCE.post(
+        makeRequest("user-1", "tonk", 4, "Alice", 30, 5),
+        res,
+      );
+
+      expect(data.statusCode).toBe(200);
+      expect(mockCreateGame.mock.calls[0][6]).toBe(5);
+    });
+
+    it("accepts the upper boundary (12) and forwards it", async () => {
+      mockCreateGame.mockResolvedValue(makeGame());
+
+      const { res, data } = makeResponse();
+      await CreateGameHandler.INSTANCE.post(
+        makeRequest("user-1", "tonk", 4, "Alice", 30, 12),
+        res,
+      );
+
+      expect(data.statusCode).toBe(200);
+      expect(mockCreateGame.mock.calls[0][6]).toBe(12);
+    });
+
+    it("accepts a mid-range value (8) and forwards it", async () => {
+      mockCreateGame.mockResolvedValue(makeGame());
+
+      const { res, data } = makeResponse();
+      await CreateGameHandler.INSTANCE.post(
+        makeRequest("user-1", "tonk", 4, "Alice", 30, 8),
+        res,
+      );
+
+      expect(data.statusCode).toBe(200);
+      expect(mockCreateGame.mock.calls[0][6]).toBe(8);
+    });
+
+    it("throws 400 below range (4)", async () => {
+      const { res } = makeResponse();
+      await expect(
+        CreateGameHandler.INSTANCE.post(
+          makeRequest("user-1", "tonk", 4, "Alice", 30, 4),
+          res,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockCreateGame).not.toHaveBeenCalled();
+    });
+
+    it("throws 400 above range (13)", async () => {
+      const { res } = makeResponse();
+      await expect(
+        CreateGameHandler.INSTANCE.post(
+          makeRequest("user-1", "tonk", 4, "Alice", 30, 13),
+          res,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockCreateGame).not.toHaveBeenCalled();
+    });
+
+    it("throws 400 for a non-integer (7.5)", async () => {
+      const { res } = makeResponse();
+      await expect(
+        CreateGameHandler.INSTANCE.post(
+          makeRequest("user-1", "tonk", 4, "Alice", 30, 7.5),
+          res,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockCreateGame).not.toHaveBeenCalled();
+    });
+
+    it("throws 400 for a non-number string", async () => {
+      const { res } = makeResponse();
+      const req = makeRequest("user-1", "tonk", 4, "Alice", 30);
+      (req.body as Record<string, unknown>).deckRoundsTarget = "8";
+      await expect(
+        CreateGameHandler.INSTANCE.post(req, res),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockCreateGame).not.toHaveBeenCalled();
+    });
+
+    it("throws 400 for NaN", async () => {
+      const { res } = makeResponse();
+      const req = makeRequest("user-1", "tonk", 4, "Alice", 30);
+      (req.body as Record<string, unknown>).deckRoundsTarget = NaN;
+      await expect(
+        CreateGameHandler.INSTANCE.post(req, res),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockCreateGame).not.toHaveBeenCalled();
+    });
+
+    it("throws 400 for Infinity", async () => {
+      const { res } = makeResponse();
+      const req = makeRequest("user-1", "tonk", 4, "Alice", 30);
+      (req.body as Record<string, unknown>).deckRoundsTarget = Infinity;
+      await expect(
+        CreateGameHandler.INSTANCE.post(req, res),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockCreateGame).not.toHaveBeenCalled();
+    });
+
+    it("treats explicit null as omitted (accepted, forwards null)", async () => {
+      mockCreateGame.mockResolvedValue(makeGame());
+
+      const { res, data } = makeResponse();
+      const req = makeRequest("user-1", "tonk", 4, "Alice", 30);
+      (req.body as Record<string, unknown>).deckRoundsTarget = null;
+      await CreateGameHandler.INSTANCE.post(req, res);
+
+      expect(data.statusCode).toBe(200);
+      expect(mockCreateGame.mock.calls[0][6]).toBeNull();
     });
   });
 });

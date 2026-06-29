@@ -174,6 +174,7 @@ function makeInMemoryRepo(seed: Game[] = []): GameRepository {
           maxPlayers: number,
           creatorDisplayName: string,
           turnTimerSeconds: number | null,
+          deckRoundsTarget: number | null,
           joinCode: string | null,
         ) => {
           assertJoinCodeUnique(gameId, joinCode);
@@ -186,6 +187,7 @@ function makeInMemoryRepo(seed: Game[] = []): GameRepository {
           game.status = "CREATED";
           game.state = {};
           game.turnTimerSeconds = turnTimerSeconds;
+          game.deckRoundsTarget = deckRoundsTarget;
           game.joinCode = joinCode;
           game.version = 1;
           rows.set(gameId, game);
@@ -385,6 +387,73 @@ describe("GameService", () => {
       expect(cache.get("game-1")).toBe(initialState);
     });
 
+    it("passes the persisted deckRoundsTarget into the engine config options", async () => {
+      const cache = new GameCache();
+      const initialState = makeState("game-1", { status: "IN_PROGRESS" });
+      const initialize = vi.fn().mockReturnValue(initialState);
+      const engine = makeEngine({ initialize });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({
+        gameType: "tonk",
+        playerIds: ["player-a", "player-b"],
+        deckRoundsTarget: 10,
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await service.startGame("game-1", "player-a");
+
+      const config = initialize.mock.calls[0][2] as {
+        options: { deckRoundsTarget: number };
+      };
+      expect(config.options.deckRoundsTarget).toBe(10);
+    });
+
+    it("coalesces a NULL deckRoundsTarget to the engine default (8)", async () => {
+      const cache = new GameCache();
+      const initialState = makeState("game-1", { status: "IN_PROGRESS" });
+      const initialize = vi.fn().mockReturnValue(initialState);
+      const engine = makeEngine({ initialize });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({
+        gameType: "tonk",
+        playerIds: ["player-a", "player-b"],
+        deckRoundsTarget: null,
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await service.startGame("game-1", "player-a");
+
+      const config = initialize.mock.calls[0][2] as {
+        options: { deckRoundsTarget: number };
+      };
+      expect(config.options.deckRoundsTarget).toBe(8);
+    });
+
+    it("still starts a Big2 game (deckRoundsTarget present in options but ignored)", async () => {
+      const cache = new GameCache();
+      const initialState = makeState("game-1", { status: "IN_PROGRESS" });
+      const initialize = vi.fn().mockReturnValue(initialState);
+      const engine = makeEngine({ initialize });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({
+        gameType: "big2",
+        playerIds: ["player-a", "player-b"],
+        deckRoundsTarget: null,
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const result = await service.startGame("game-1", "player-a");
+
+      expect(result).toBe(initialState);
+      const config = initialize.mock.calls[0][2] as {
+        options: { deckRoundsTarget: number };
+      };
+      expect(config.options.deckRoundsTarget).toBe(8);
+    });
+
     it("throws GAME_NOT_FOUND when the game does not exist", async () => {
       const cache = new GameCache();
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(null) });
@@ -494,6 +563,26 @@ describe("GameService", () => {
       expect(resolved?.gameId).toBe(newGameId);
     });
 
+    it("carries the original deckRoundsTarget into the rematch (Edge Case §7)", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({
+        gameType: "tonk",
+        deckRoundsTarget: 11,
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "player-b"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.deckRoundsTarget).toBe(11);
+    });
+
     it("clears the old code BEFORE inserting the new row (constraint regression)", async () => {
       const cache = new GameCache();
       const oldGame = makeCompletedGame({ joinCode: "H7K3" });
@@ -515,7 +604,16 @@ describe("GameService", () => {
       // Inserting a second row with the same non-null code while the old row
       // still holds it must collide.
       await expect(
-        repo.createGame("new-game", "big2", "player-a", 4, "Alice", 30, "H7K3"),
+        repo.createGame(
+          "new-game",
+          "big2",
+          "player-a",
+          4,
+          "Alice",
+          30,
+          null,
+          "H7K3",
+        ),
       ).rejects.toThrow(/unique|duplicate/);
     });
 

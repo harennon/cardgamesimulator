@@ -125,4 +125,51 @@ describe("Game CRUD integration", () => {
     expect(gameState.playerIds).toContain(userB.id);
     expect(gameState.status).toBe("CREATED");
   });
+
+  it("round-trips a creator-chosen deckRoundsTarget through create → getGameState", async () => {
+    const user = await createTestUser("DeckRoundsCreator");
+
+    const createRes = await request(ctx.app)
+      .post("/createGame")
+      .set("Authorization", `Bearer ${user.accessToken}`)
+      .send({
+        gameType: "tonk",
+        maxPlayers: 4,
+        turnTimerSeconds: 30,
+        deckRoundsTarget: 10,
+      });
+
+    expect(createRes.status).toBe(200);
+    const gameId = createRes.body.gameId as string;
+
+    const stateRes = await request(ctx.app)
+      .get(`/getGameState?gameId=${gameId}`)
+      .set("Authorization", `Bearer ${user.accessToken}`);
+
+    expect(stateRes.status).toBe(200);
+    const gameState = stateRes.body.gameState as { deckRoundsTarget: number };
+    expect(gameState.deckRoundsTarget).toBe(10);
+  });
+
+  it("stores deckRoundsTarget as null when the field is omitted", async () => {
+    const user = await createTestUser("DeckRoundsOmitted");
+
+    const createRes = await request(ctx.app)
+      .post("/createGame")
+      .set("Authorization", `Bearer ${user.accessToken}`)
+      .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 30 });
+
+    expect(createRes.status).toBe(200);
+    const gameId = createRes.body.gameId as string;
+
+    const stateRes = await request(ctx.app)
+      .get(`/getGameState?gameId=${gameId}`)
+      .set("Authorization", `Bearer ${user.accessToken}`);
+
+    expect(stateRes.status).toBe(200);
+    const gameState = stateRes.body.gameState as {
+      deckRoundsTarget: number | null;
+    };
+    expect(gameState.deckRoundsTarget).toBeNull();
+  });
 });

@@ -7,6 +7,7 @@ export interface CreateGameRequest {
   maxPlayers: number;
   gameOptions: { [key: string]: string };
   turnTimerSeconds: 30 | 60 | 90;
+  deckRoundsTarget?: number; // Tonk only; integer 5–12. Omitted → engine default (8). Big2 ignores it.
 }
 
 export interface CreateGameResponse {
@@ -47,6 +48,7 @@ export interface SerializableGame {
   state: SerializableGameState;
   turnTimerSeconds: number | null; // null means no timer
   joinCode: string | null; // 4-char room code; null if game has none
+  deckRoundsTarget: number | null; // null = creator did not choose; engine uses default (8)
 }
 
 export type SerializableGameState = Record<string, unknown>;
