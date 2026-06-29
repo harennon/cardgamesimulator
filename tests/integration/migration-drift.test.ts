@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { makePgClient, readMigrationSql } from "./helpers/pgClient.js";
+import { createProdShapedFixture } from "./helpers/prodShapedFixture.js";
 
 // ---------------------------------------------------------------------------
 // LLD 75: Clean up prod schema drift inherited from the TypeORM era.
@@ -302,6 +303,112 @@ describe("Migration 008 anon write-grant revocation", () => {
       await pg.query(`SET search_path TO public;`);
       await pg.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE;`);
       await pg.end();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LLD 95: Migration 009 adds the generic game_config JSONB column. A bare
+// ADD COLUMN IF NOT EXISTS touches no constraint, so it is immune to the
+// TypeORM-era PK-name drift (games_pkey1) and is idempotent. These tests run
+// the REAL 009 SQL against a prod-shaped (name-drifted) fixture and assert the
+// column SHAPE (jsonb, NOT NULL, DEFAULT '{}'), then verify idempotency and
+// that the 009 post-condition passes — exactly the legs that caught prior
+// failure modes.
+// ---------------------------------------------------------------------------
+describe("Migration 009 game_config column", () => {
+  async function gameConfigShape(
+    fixture: Awaited<ReturnType<typeof createProdShapedFixture>>,
+  ): Promise<{ type: string; notnull: boolean; def: string | null } | null> {
+    const { rows } = await fixture.client.query<{
+      type: string;
+      notnull: boolean;
+      def: string | null;
+    }>(
+      `SELECT format_type(a.atttypid, a.atttypmod) AS type,
+              a.attnotnull AS notnull,
+              pg_get_expr(ad.adbin, ad.adrelid) AS def
+       FROM pg_attribute a
+       LEFT JOIN pg_attrdef ad
+         ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+       WHERE a.attrelid = to_regclass('games')
+         AND a.attname = 'game_config'
+         AND NOT a.attisdropped;`,
+    );
+    return rows[0] ?? null;
+  }
+
+  it("prod-like (games_pkey1 drift): adds a jsonb NOT NULL DEFAULT '{}' game_config column", async () => {
+    const fixture = await createProdShapedFixture({
+      baseline: "typeorm-era",
+      drift: { pkey1ConstraintNames: true },
+    });
+    try {
+      // Pre-009: the prod-shaped games table has no game_config column.
+      expect(await gameConfigShape(fixture)).toBeNull();
+
+      await fixture.applyMigrations(["009_add_game_config.sql"]);
+
+      const shape = await gameConfigShape(fixture);
+      expect(shape).not.toBeNull();
+      expect(shape!.type).toBe("jsonb");
+      expect(shape!.notnull).toBe(true);
+      // The default backfills existing rows to {} (Edge Case 4).
+      expect(shape!.def).toMatch(/'\{\}'::jsonb/);
+
+      // The 009 post-condition (shape-only, name-agnostic) passes on drifted prod.
+      await expect(
+        fixture.runPostcondition("009_add_game_config.postcondition.sql"),
+      ).resolves.toBeUndefined();
+    } finally {
+      await fixture.teardown();
+    }
+  });
+
+  it("backfills existing rows to {} (Edge Case 4)", async () => {
+    const fixture = await createProdShapedFixture({ baseline: "fresh" });
+    try {
+      // Seed a pre-009 row (no game_config column yet).
+      await fixture.client.query(
+        `INSERT INTO games (game_id) VALUES (gen_random_uuid());`,
+      );
+      await fixture.applyMigrations(["009_add_game_config.sql"]);
+
+      const { rows } = await fixture.client.query<{ cfg: unknown }>(
+        `SELECT game_config AS cfg FROM games;`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.cfg).toEqual({});
+    } finally {
+      await fixture.teardown();
+    }
+  });
+
+  it("is idempotent: applying 009 twice is a no-op (IF NOT EXISTS)", async () => {
+    const fixture = await createProdShapedFixture({ baseline: "fresh" });
+    try {
+      await fixture.applyMigrations(["009_add_game_config.sql"]);
+      await fixture.applyMigrations(["009_add_game_config.sql"]);
+
+      const shape = await gameConfigShape(fixture);
+      expect(shape!.type).toBe("jsonb");
+      await expect(
+        fixture.runPostcondition("009_add_game_config.postcondition.sql"),
+      ).resolves.toBeUndefined();
+    } finally {
+      await fixture.teardown();
+    }
+  });
+
+  it("the 009 post-condition RAISEs when the column is absent", async () => {
+    const fixture = await createProdShapedFixture({ baseline: "fresh" });
+    try {
+      // No 009 applied → the column is missing → the post-condition must RAISE.
+      await expect(
+        fixture.runPostcondition("009_add_game_config.postcondition.sql"),
+      ).rejects.toThrow(/POSTCONDITION FAILED \(009/);
+    } finally {
+      await fixture.teardown();
     }
   });
 });

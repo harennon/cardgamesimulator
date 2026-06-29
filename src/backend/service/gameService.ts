@@ -99,7 +99,11 @@ export class GameService {
     }));
 
     const prng = new SeededPRNG();
-    const config = { maxPlayers: game.maxPlayers, minPlayers, options: {} };
+    const config = {
+      maxPlayers: game.maxPlayers,
+      minPlayers,
+      options: { deckRoundsTarget: game.gameConfig.deckRoundsTarget ?? 8 },
+    };
 
     const state = engine.initialize(gameId, players, config, prng);
 
@@ -177,6 +181,7 @@ export class GameService {
       hostDisplayName,
       oldGame.turnTimerSeconds,
       transferCode,
+      oldGame.gameConfig,
     );
 
     // Attach the remaining carried-over players (createGame only seeds the host).
