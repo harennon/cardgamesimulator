@@ -3,6 +3,25 @@
     <div class="game-over__panel">
       <h1 class="game-over__winner">{{ winner }} wins!</h1>
 
+      <div
+        v-if="hasFinalPlay"
+        class="game-over__final-play"
+        data-testid="game-over-final-play"
+      >
+        <div class="game-over__final-play-label">Final Play</div>
+        <div class="game-over__final-play-cards">
+          <GameCard
+            v-for="card in finalPlay!.cards"
+            :key="`${card.rank}-${card.suit}`"
+            :card="card"
+            size="small"
+          />
+        </div>
+        <div class="game-over__final-play-meta">
+          {{ finalPlayLabel }} · played by {{ finalPlayByName }}
+        </div>
+      </div>
+
       <table class="game-over__scores game-over__fade-in">
         <thead>
           <tr>
@@ -101,12 +120,22 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import type { PlayerScore, PlayerPublicInfo } from "@shared/engine-types";
-import type { Big2HistoryEntry } from "@shared/big2-types";
+import type { Big2HistoryEntry, Big2Play } from "@shared/big2-types";
+import GameCard from "@/component/game-ui/GameCard.vue";
 import {
   deriveBig2Stats,
   getBadgeForPosition,
   getBadgeClass,
 } from "./gameOverStats";
+
+const HAND_TYPE_LABELS: Record<string, string> = {
+  single: "Single",
+  pair: "Pair",
+  straight: "Straight",
+  fullHouse: "Full House",
+  fourOfAKind: "Four of a Kind",
+  straightFlush: "Straight Flush",
+};
 
 const props = defineProps<{
   scores: readonly PlayerScore[];
@@ -120,6 +149,7 @@ const props = defineProps<{
   playHistory?: readonly Big2HistoryEntry[];
   currentPlayerId?: string;
   totalTurns?: number;
+  finalPlay?: Big2Play | null;
 }>();
 
 const emit = defineEmits<{
@@ -156,6 +186,26 @@ const stats = computed(() => {
 });
 
 const totalTurns = computed(() => props.totalTurns ?? 0);
+
+const hasFinalPlay = computed(
+  () => !!props.finalPlay && props.finalPlay.cards.length > 0,
+);
+
+const finalPlayLabel = computed(() => {
+  if (!props.finalPlay) return "";
+  return (
+    HAND_TYPE_LABELS[props.finalPlay.handType.kind] ??
+    props.finalPlay.handType.kind
+  );
+});
+
+const finalPlayByName = computed(() => {
+  if (!props.finalPlay) return "";
+  const player = props.players.find(
+    (p) => p.playerId === props.finalPlay!.playerId,
+  );
+  return player?.displayName ?? props.finalPlay.playerId;
+});
 
 function goHome(): void {
   router.push("/");
@@ -199,6 +249,37 @@ function onRematch(): void {
   color: var(--gold-accent);
   margin: 0;
   text-shadow: 0 0 24px var(--gold-glow);
+}
+
+.game-over__final-play {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.game-over__final-play-label {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gold-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.game-over__final-play-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.game-over__final-play-meta {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .game-over__scores {

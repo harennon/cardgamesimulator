@@ -1,0 +1,6 @@
+{
+  "$comment": "LLD 77 §5.5 — captured/fixture diff representing a CLEAN prod baseline (post-#83): no drift, nothing pending. The drift gate exits 0 against this. Used as the autonomous-safe / local / placeholder target so the gate runs green with no prod access.",
+  "objects": [],
+  "expectedFromPending": [],
+  "pending": []
+}

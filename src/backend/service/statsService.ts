@@ -19,6 +19,7 @@ export class StatsService {
     if (state.status !== "COMPLETED") return;
     if (!state.scores || state.scores.length === 0) return;
 
+    const gameType = state.gameType; // already on InternalGameState — no new dependency
     const winnerId = state.winner;
 
     for (const playerScore of state.scores) {
@@ -32,7 +33,11 @@ export class StatsService {
       };
 
       try {
-        await this.statsRepo.incrementStats(playerScore.playerId, delta);
+        await this.statsRepo.incrementStats(
+          playerScore.playerId,
+          gameType,
+          delta,
+        );
       } catch (err: unknown) {
         console.error(
           `Failed to record stats for player ${playerScore.playerId}:`,

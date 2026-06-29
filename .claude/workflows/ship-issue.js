@@ -761,6 +761,21 @@ if (issueNum && !shipResult.closesIssue) {
 
 log(`PR raised: ${shipResult.prUrl}`);
 
+// Consume the Restart: a Restart comment is "active" only while it's the last
+// comment on the issue (see ship-batch fetch classification). After a restart-
+// triggered ship raises its PR, post a comment so the Restart is no longer the
+// last comment — otherwise the next batch run re-triggers the restart and
+// re-ships the same issue every hour, closing and recreating the PR.
+if (context.restart && issueNum) {
+  await agent(
+    `Post a comment on issue #${issueNum} acknowledging the restart was handled, so the Restart comment is no longer the most recent comment:
+
+gh issue comment ${issueNum} --body "Restart handled — re-shipped from a fresh branch. PR: ${shipResult.prUrl}"`,
+    { label: "consume-restart" },
+  );
+  log(`Restart consumed for #${issueNum} via acknowledgement comment`);
+}
+
 // Move mockup from "Awaiting decision" to "Shipped" on gh-pages (if this was a frontend issue)
 if (context.hasFrontend && issueNum) {
   await agent(

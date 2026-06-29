@@ -1,0 +1,104 @@
+# Prod migration apply — gated, fail-closed (LLD 77 §8, criterion 4, SCHEDULED TIER).
+#
+# This is the DEFERRED scheduled tier. It encodes the §8.2 ordering so the
+# boundary is locked, but it does NOT touch live prod until a human wires the
+# secrets below. The autonomous-safe deliverable is the WORKFLOW STRUCTURE
+# (gate -> push -> verify -> deploy ordering) pointed at a placeholder/local
+# target with the prod credential read from a secret reference that is EMPTY in
+# the repo (LLD 77 §9). The prerequisite tier (drift gate logic, post-condition
+# runner, prod-shaped fixture) closes the "green CI, broken prod" gap on its own
+# and does NOT depend on this workflow ever being enabled (§4).
+#
+# Fail-closed (§8.4): any non-zero exit from the gate, the push, or the
+# verification runner aborts the release and does NOT promote the backend
+# deploy. The invariant this preserves: THE BACKEND NEVER DEPLOYS AHEAD OF ITS
+# SCHEMA (§8.3). The entrypoint-hook alternative is rejected precisely because it
+# cannot guarantee this ordering (§8.1).
+#
+# HUMAN-OWNED WIRING (§9), none of which is present in the repo:
+#   - secrets.SUPABASE_PROJECT_REF   prod project ref for `supabase link`
+#   - secrets.SUPABASE_DB_PASSWORD   prod DB password for `db push`
+#   - secrets.RAILWAY_TOKEN          to promote the backend deploy
+# Until these are set, this workflow only runs on manual dispatch and the
+# prod-touching steps no-op (they are guarded on the secret being non-empty).
+
+name: Prod Migrate (gated)
+
+# Manual-only until a human wires the secrets and chooses the trigger. Kept off
+# push/PR so it never runs against live prod by accident in autonomous CI.
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate-and-verify:
+    runs-on: ubuntu-latest
+    # Surfaces whether the human wiring is in place; the prod-touching steps are
+    # guarded on this so the structure is exercisable with NO secrets present.
+    env:
+      PROD_LINKED: ${{ secrets.SUPABASE_PROJECT_REF != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: npm ci
+
+      # 1. DRIFT GATE (§5) — fail-closed on unexpected residual.
+      #    Autonomous/placeholder: runs against a captured fixture diff (no prod).
+      #    Human-owned: re-run with `--linked` once the prod link secret is set.
+      - name: Drift gate (placeholder/local target)
+        run: node scripts/verify-drift.mjs --diff-file scripts/fixtures/clean-diff.json
+      - name: Drift gate (linked prod) [human-wired]
+        if: env.PROD_LINKED == 'true'
+        run: |
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+          node scripts/verify-drift.mjs --linked
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # 2. APPLY pending migrations to prod (idempotent — only pending ones, §8.4).
+      #    Guarded: no-op until the prod link secret is wired.
+      - name: supabase db push [human-wired]
+        if: env.PROD_LINKED == 'true'
+        run: supabase db push
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # 3. POST-CONDITION VERIFICATION (§6) — fail the release if any RAISEs.
+      #    Against prod when wired; otherwise against the local supabase stack so
+      #    the runner is exercised with no secrets.
+      - name: supabase start (local verification target)
+        if: env.PROD_LINKED != 'true'
+        run: supabase start
+      - name: Export local Supabase DB env
+        if: env.PROD_LINKED != 'true'
+        run: |
+          echo "DB_HOST=localhost" >> $GITHUB_ENV
+          echo "DB_PORT=54322" >> $GITHUB_ENV
+          echo "DB_USER=postgres" >> $GITHUB_ENV
+          echo "DB_PASSWORD=postgres" >> $GITHUB_ENV
+          echo "DB_NAME=postgres" >> $GITHUB_ENV
+      - name: Verify post-conditions (fail-closed)
+        run: node scripts/verify-postconditions.mjs
+
+  # 4. DEPLOY the consuming backend — DOWNSTREAM of migrate-and-verify (§8.3).
+  #    `needs:` enforces the ordering invariant: this job cannot start until the
+  #    gate + push + verification all pass, so the backend never deploys ahead of
+  #    its schema. The actual Railway promotion is HUMAN-WIRED (RAILWAY_TOKEN).
+  deploy-backend:
+    needs: migrate-and-verify
+    runs-on: ubuntu-latest
+    if: ${{ secrets.RAILWAY_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Promote Railway deploy [human-wired]
+        run: |
+          echo "Schema applied + verified; promoting backend deploy."
+          # Human-owned: invoke the Railway promotion using RAILWAY_TOKEN here.
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

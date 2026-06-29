@@ -284,6 +284,29 @@ test.describe("Mobile layout (LLD 11)", () => {
     await context.close();
   });
 
+  test("mobile viewport: /join-game does not overflow vertically (LLD 60)", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      storageState: "e2e/.auth/player1.json",
+      viewport: { width: 390, height: 844 },
+    });
+    const page = await context.newPage();
+
+    await page.goto("/join-game");
+    await expect(page.locator('[data-testid="game-code-input"]')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    // The short join form must fit the visible viewport with no vertical scroll.
+    const hasOverflow = await page.evaluate(
+      () => document.scrollingElement!.scrollHeight > window.innerHeight,
+    );
+    expect(hasOverflow).toBe(false);
+
+    await context.close();
+  });
+
   test("desktop viewport: game-board--mobile class is NOT present at 1024x768", async ({
     browser,
     request,

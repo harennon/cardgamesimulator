@@ -6,7 +6,6 @@ vi.mock("@/component/JoinGameView.vue", () => ({ default: {} }));
 vi.mock("@/component/LoginView.vue", () => ({ default: {} }));
 vi.mock("@/component/SignupView.vue", () => ({ default: {} }));
 vi.mock("@/component/AboutView.vue", () => ({ default: {} }));
-vi.mock("@/component/HelloWorld.vue", () => ({ default: {} }));
 vi.mock("@/component/HomeView.vue", () => ({ default: {} }));
 vi.mock("@/component/game/GameView.vue", () => ({ default: {} }));
 vi.mock("@/component/GuestEntryView.vue", () => ({ default: {} }));

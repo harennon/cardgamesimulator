@@ -7,7 +7,6 @@ import cors from "cors";
 import morgan from "morgan";
 
 import { Handler } from "@/api/handler";
-import { EchoHandler } from "@/api/echo";
 import { ServeAppHandler } from "@/api/serveApp";
 import { SupabaseDB } from "@/database/supabaseDb";
 import { errorHandler } from "@/middleware/errorHandler";
@@ -81,9 +80,7 @@ export class Server {
     });
 
     // register api handlers
-    const handlers = new Map<string, Handler>([
-      ["/echo", EchoHandler.INSTANCE],
-    ]);
+    const handlers = new Map<string, Handler>([]);
     if (process.env.NODE_ENV !== "production") {
       handlers.set("/", ServeAppHandler.INSTANCE);
     }

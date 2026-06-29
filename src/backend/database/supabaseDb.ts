@@ -135,23 +135,40 @@ export class SupabaseDB
     if (error) throw new Error(`clearJoinCode failed: ${error.message}`);
   }
 
-  public async getStats(userId: string): Promise<PlayerStats | null> {
+  public async getStats(
+    userId: string,
+    gameType: GameType,
+  ): Promise<PlayerStats | null> {
     const { data, error } = await this.db
       .from("player_stats")
       .select("*")
       .eq("user_id", userId)
+      .eq("game_type", gameType)
       .maybeSingle();
     if (error) throw new Error(`getStats failed: ${error.message}`);
     if (!data) return null;
     return this.mapPlayerStats(data as Record<string, unknown>);
   }
 
+  public async getAllStats(userId: string): Promise<PlayerStats[]> {
+    const { data, error } = await this.db
+      .from("player_stats")
+      .select("*")
+      .eq("user_id", userId);
+    if (error) throw new Error(`getAllStats failed: ${error.message}`);
+    return (data ?? []).map((row) =>
+      this.mapPlayerStats(row as Record<string, unknown>),
+    );
+  }
+
   public async incrementStats(
     userId: string,
+    gameType: GameType,
     delta: StatsDelta,
   ): Promise<void> {
     const { error } = await this.db.rpc("increment_player_stats", {
       p_user_id: userId,
+      p_game_type: gameType,
       p_games_played: delta.gamesPlayed,
       p_games_won: delta.gamesWon,
       p_games_lost: delta.gamesLost,
@@ -221,6 +238,7 @@ export class SupabaseDB
   private mapPlayerStats(row: Record<string, unknown>): PlayerStats {
     const stats = new PlayerStats();
     stats.userId = row.user_id as string;
+    stats.gameType = row.game_type as GameType;
     stats.gamesPlayed = row.games_played as number;
     stats.gamesWon = row.games_won as number;
     stats.gamesLost = row.games_lost as number;

@@ -32,12 +32,21 @@ export interface StatsDelta {
 }
 
 export interface PlayerStatsRepository {
-  getStats(userId: string): Promise<PlayerStats | null>;
+  /** Stats for one user in one game type, or null if they've never played it. */
+  getStats(userId: string, gameType: GameType): Promise<PlayerStats | null>;
+
+  /** All per-game-type stat rows for a user (one entry per game type played; may be empty). */
+  getAllStats(userId: string): Promise<PlayerStats[]>;
+
   /**
-   * Atomically increment stats for a player. Creates the row if it doesn't exist.
-   * Uses SQL ON CONFLICT DO UPDATE to avoid read-modify-write races.
+   * Atomically increment stats for (userId, gameType). Creates the row if absent.
+   * Uses SQL ON CONFLICT (user_id, game_type) DO UPDATE to avoid read-modify-write races.
    */
-  incrementStats(userId: string, delta: StatsDelta): Promise<void>;
+  incrementStats(
+    userId: string,
+    gameType: GameType,
+    delta: StatsDelta,
+  ): Promise<void>;
 }
 
 export interface FeedbackRepository {
