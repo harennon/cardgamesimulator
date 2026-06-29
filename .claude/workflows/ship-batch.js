@@ -260,6 +260,17 @@ const ISSUE_POOL_SCHEMA = {
           number: { type: "integer" },
           title: { type: "string" },
           summary: { type: "string", description: "First 200 chars of body" },
+          labels: {
+            type: "array",
+            items: { type: "string" },
+            description: "All label names currently on this issue",
+          },
+          openDependencies: {
+            type: "array",
+            items: { type: "integer" },
+            description:
+              "Issue numbers this issue depends on that are still OPEN/unmerged (parsed from body: 'blocked by #N', 'depends on #N', task-list sub-issue refs). Empty if none or all dependencies are closed.",
+          },
         },
         required: ["number", "title"],
       },
@@ -284,6 +295,13 @@ const ISSUE_STATE_SCHEMA = {
 
 const MAX_PARALLEL_TRIAGE = 15;
 const DEFER_STALENESS_DAYS = 7;
+
+// An issue is known-unselectable if it carries any blocked:* label (e.g.
+// blocked:frontend-decision, blocked:human). These are parked on a human gate
+// and cannot be shipped autonomously until a human clears them — selection
+// must exclude them rather than pay for a full Opus CEO pass to rediscover it.
+const hasBlockedLabel = (labels) =>
+  Array.isArray(labels) && labels.some((l) => l.startsWith("blocked:"));
 
 // Decompose a large issue into shippable sub-issues: ask the CEO for the
 // breakdown, create the sub-issues (labeled triage:fix so the NEXT run ships
@@ -407,17 +425,18 @@ Step 4 — Classify each issue:
      - Has an ACTIVE "Restart:" comment (it is the last comment on the issue — override all other skip rules)
      - No label starting with "triage:" AND no "blocked:" label (never triaged)
      - Has "blocked:frontend-decision" AND a comment containing "Frontend decision:" that is MORE RECENT than the latest "Frontend Design Mockups" comment (decision provided — unblock it)
+     - Has "blocked:human" AND a HUMAN comment (not from a bot — i.e. any comment NOT containing the bot marker "Blocked: needs a human") that is MORE RECENT than the latest "Blocked: needs a human" comment (a human acted — unblock it and re-triage)
      - Has "triage:needs-info" BUT updatedAt is more than 24 hours after the issue was last labeled (info was likely provided)
      - Has "triage:defer" AND updatedAt is more than ${DEFER_STALENESS_DAYS} days ago (stale defer — reassess)
      - Has "triage:close" BUT updatedAt is more recent than when the label was likely applied (pushback received)
 
   B) SKIP (exclude):
-     - Has "blocked:frontend-decision" label (waiting on human input — never triage or promote)
+     - Has ANY label starting with "blocked:" (e.g. "blocked:frontend-decision", "blocked:human") with no unblock trigger met above — these are parked on a human gate; never triage or promote until a human clears them
      - Has "triage:fix" label AND no active Restart (handled by selection phase)
      - Has any triage label with no re-triage trigger met AND no active Restart
      - Has an open PR whose body contains "Closes #<number>" or "#<number>" AND no active Restart (already being shipped)
 
-For items in category A that have an existing triage label or "blocked:" label (including "triage:fix" when triggered by a "Restart:" comment, or "blocked:frontend-decision" when unblocked), add them to labelsToRemove with the exact label string (e.g. "triage:defer", "triage:fix", "blocked:frontend-decision").
+For items in category A that have an existing triage label or "blocked:" label (including "triage:fix" when triggered by a "Restart:" comment, or any "blocked:*" label when its unblock trigger is met), add them to labelsToRemove with the exact label string (e.g. "triage:defer", "triage:fix", "blocked:frontend-decision", "blocked:human").
 
 Do NOT run any gh issue edit commands. Only read and classify.`,
   { label: "fetch-issues", schema: FETCH_SCHEMA },
@@ -463,11 +482,11 @@ Return the issues found.`,
     existingPoolResult.issues.length === 0
   ) {
     // Fix pool is empty, but there may be deferred issues worth promoting.
-    // Check before declaring idle — exclude blocked:frontend-decision (waiting
-    // on human input, can't ship), matching the deferred fetch in the Select phase.
+    // Check before declaring idle — exclude any blocked:* issue (waiting on
+    // human input, can't ship), matching the deferred fetch in the Select phase.
     const deferredCheck = await agent(
       `Run: gh issue list --state open --label "triage:defer" --json number,title,labels --limit 20
-Exclude any issue that also has the label "blocked:frontend-decision".
+Exclude any issue that also has ANY label starting with "blocked:" (e.g. "blocked:frontend-decision", "blocked:human") — those are parked on a human gate and cannot be shipped.
 Return the remaining issues (number and title) — empty array if none.`,
       { label: "check-deferred-pool", schema: ISSUE_POOL_SCHEMA },
     );
@@ -608,11 +627,17 @@ phase("Select");
 
 // Gather full triage:fix pool (includes pre-existing + newly labeled)
 const poolResult = await agent(
-  `Run: gh issue list --state open --label "triage:fix" --json number,title,body --limit 20
+  `Run: gh issue list --state open --label "triage:fix" --json number,title,body,labels --limit 20
 
-For each issue, also fetch a brief summary by running: gh issue view <number> --json title,body --jq '.body[:200]'
+For each issue return:
+- number, title
+- summary: first 200 chars of body (gh issue view <number> --json body --jq '.body[:200]')
+- labels: ALL label names currently on the issue (from the "labels" field above — the .name of each)
+- openDependencies: issue numbers this issue depends on that are still OPEN. Parse dependencies from the body: phrases like "blocked by #N", "depends on #N", "blocked on #N", "Depends on: #N", and task-list / sub-issue references to other issues (e.g. "- [ ] #N"). For EACH referenced issue number, check whether it is still open:
+    gh issue view <N> --json state --jq '.state'
+  Include #N in openDependencies ONLY if its state is OPEN. Omit closed/merged dependencies. Empty array if the issue has no open dependencies.
 
-Return the issues with their summaries (first 200 chars of body).`,
+Return the issues with their summaries, labels, and openDependencies.`,
   { label: "fetch-fix-pool", schema: ISSUE_POOL_SCHEMA },
 );
 
@@ -632,7 +657,7 @@ if (fixPool.length === 0) {
 
 Run: gh issue list --state open --label "triage:defer" --json number,title,body,labels --limit 20
 
-Exclude any issue that also has the label "blocked:frontend-decision" — those are waiting on a human decision and cannot be shipped.
+Exclude any issue that also has ANY label starting with "blocked:" (e.g. "blocked:frontend-decision", "blocked:human") — those are parked on a human gate and cannot be shipped.
 
 For each remaining issue, also get a brief summary:
   gh issue view <number> --json title,body --jq '.body[:200]'
@@ -806,6 +831,25 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
 2. gh issue edit ${issueNumber} --add-label "blocked:frontend-decision"`,
         { label: `block-awaiting-${issueNumber}` },
       );
+    } else if (result && result.status === "blocked-human") {
+      log(
+        `#${issueNumber} cannot be shipped autonomously (${result.reason || "needs a human"}) — marking blocked:human.`,
+      );
+      await agent(
+        `Issue #${issueNumber} cannot be shipped autonomously and needs a human. Re-label it so future runs skip it:
+1. gh label create "blocked:human" --color "B60205" --description "Blocked: needs a human (gated/sensitive change)" || true
+2. gh issue edit ${issueNumber} --remove-label "triage:fix"
+3. gh issue edit ${issueNumber} --add-label "blocked:human"
+4. gh issue comment ${issueNumber} --body "$(cat <<'BLOCKEOF'
+**Blocked: needs a human**
+
+This issue cannot be shipped by the autonomous workflow: ${result.reason || "it requires a human to act."}
+
+It has been labeled \`blocked:human\` and will be skipped by future batch runs until a human comments to unblock it.
+BLOCKEOF
+)"`,
+        { label: `block-human-${issueNumber}` },
+      );
     } else {
       const failPhase = result ? result.phase || result.status : "unknown";
       log(`#${issueNumber} stopped at: ${failPhase}`);
@@ -821,9 +865,58 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
   };
 }
 
-// Build triage context for CEO — include both current-run results and pool summaries
+// Cheap early-exit when the (non-empty) fix pool is entirely blocked.
+// Filter out KNOWN-UNSELECTABLE issues before the expensive Opus ceo-select
+// pass: any issue carrying a blocked:* label (frontend-decision, human, …) or
+// any issue with an unmerged dependency (openDependencies populated by the
+// fetch agent). This is distinct from an EMPTY fix pool (handled above with
+// the deferred-promotion fallback) — here the pool has issues, but none are
+// shippable right now, so there is nothing for the CEO to select.
+const blockedReasons = [];
+const eligiblePool = fixPool.filter((i) => {
+  if (hasBlockedLabel(i.labels)) {
+    const blocking = (i.labels || [])
+      .filter((l) => l.startsWith("blocked:"))
+      .join(", ");
+    blockedReasons.push(`#${i.number} (${blocking})`);
+    return false;
+  }
+  if (Array.isArray(i.openDependencies) && i.openDependencies.length > 0) {
+    blockedReasons.push(
+      `#${i.number} (open deps: ${i.openDependencies.map((n) => `#${n}`).join(", ")})`,
+    );
+    return false;
+  }
+  return true;
+});
+
+if (eligiblePool.length === 0) {
+  log(
+    `All ${fixPool.length} triage:fix issue(s) are blocked — skipping CEO selection. ${blockedReasons.join("; ")}`,
+  );
+  return {
+    status: "idle",
+    message: "All triage:fix issues are blocked; nothing selectable this batch",
+    reasoning: `all triage:fix issues blocked: ${blockedReasons.join("; ")}`,
+    triageResults: validResults,
+  };
+}
+
+if (blockedReasons.length > 0) {
+  log(
+    `Excluded ${blockedReasons.length} blocked issue(s) from selection: ${blockedReasons.join("; ")}`,
+  );
+}
+
+// Build triage context for CEO — include both current-run results and pool
+// summaries. Restrict to the eligiblePool (blocked / dependency-blocked issues
+// were filtered out above) so the CEO never sees un-shippable candidates.
+const eligibleNumbers = new Set(eligiblePool.map((i) => i.number));
+
 const currentRunContext = validResults
-  .filter((r) => r.recommendation === "fix")
+  .filter(
+    (r) => r.recommendation === "fix" && eligibleNumbers.has(r.issueNumber),
+  )
   .map(
     (r) =>
       `#${r.issueNumber} "${r.issueTitle}" | priority: ${r.priority || "medium"} | category: ${r.category || "improvement"} | effort: ${r.effort} | risks: ${
@@ -841,7 +934,7 @@ const currentRunNumbers = new Set(
     .map((r) => r.issueNumber),
 );
 
-const priorPoolContext = fixPool
+const priorPoolContext = eligiblePool
   .filter((i) => !currentRunNumbers.has(i.number))
   .map(
     (i) =>
@@ -853,7 +946,7 @@ const selection = await agent(
   `You are selecting which issues to ship in this batch.
 
 ## Available issues (triage:fix pool)
-${fixPool.map((i) => `- #${i.number}: ${i.title}`).join("\n")}
+${eligiblePool.map((i) => `- #${i.number}: ${i.title}`).join("\n")}
 
 ## Triage assessments (current run)
 ${currentRunContext || "(No new issues triaged this run)"}
@@ -998,6 +1091,25 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
 1. gh issue edit ${issueNumber} --remove-label "triage:fix"
 2. gh issue edit ${issueNumber} --add-label "blocked:frontend-decision"`,
       { label: `block-awaiting-${issueNumber}` },
+    );
+  } else if (result && result.status === "blocked-human") {
+    log(
+      `#${issueNumber} cannot be shipped autonomously (${result.reason || "needs a human"}) — marking blocked:human. Will skip on next run until a human unblocks it.`,
+    );
+    await agent(
+      `Issue #${issueNumber} cannot be shipped autonomously and needs a human. Re-label it so future runs skip it:
+1. gh label create "blocked:human" --color "B60205" --description "Blocked: needs a human (gated/sensitive change)" || true
+2. gh issue edit ${issueNumber} --remove-label "triage:fix"
+3. gh issue edit ${issueNumber} --add-label "blocked:human"
+4. gh issue comment ${issueNumber} --body "$(cat <<'BLOCKEOF'
+**Blocked: needs a human**
+
+This issue cannot be shipped by the autonomous workflow: ${result.reason || "it requires a human to act."}
+
+It has been labeled \`blocked:human\` and will be skipped by future batch runs until a human comments to unblock it.
+BLOCKEOF
+)"`,
+      { label: `block-human-${issueNumber}` },
     );
   } else {
     const failPhase = result ? result.phase || result.status : "unknown";

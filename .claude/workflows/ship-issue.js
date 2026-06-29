@@ -65,7 +65,7 @@ const GATHER_SCHEMA = {
     hasFrontend: {
       type: "boolean",
       description:
-        "True if this issue involves frontend/UI changes (Vue components, CSS, layouts, user-facing views)",
+        "True ONLY if the planned change touches src/frontend/** (Vue components, CSS, layouts, user-facing views) or the issue declares a visual UI change. False for backend/infra/test-only work. Gates the human mockup-approval step, so be strict.",
     },
     frontendDecision: {
       type: ["string", "null"],
@@ -76,6 +76,16 @@ const GATHER_SCHEMA = {
       type: ["string", "null"],
       description:
         "If the LAST comment on the issue starts with 'Restart:' prefix, extract the text after it (reason for restart). null if the Restart is not the most recent comment or no restart exists.",
+    },
+    requiresHuman: {
+      type: "boolean",
+      description:
+        "True if this issue CANNOT be shipped autonomously because the change must edit a sensitive/gated path (e.g. files under .claude/, or other paths the autonomous agent is blocked from writing) or otherwise inherently needs a human. Default false.",
+    },
+    requiresHumanReason: {
+      type: ["string", "null"],
+      description:
+        "If requiresHuman is true, a short reason (e.g. 'edits .claude/workflows which is gated for autonomous agents'). null otherwise.",
     },
   },
   required: [
@@ -170,12 +180,16 @@ Then:
 2. Create a kebab-case slug from the issue title (e.g. "railway-sleep-on-idle")
 3. Create a branch name: lld-{number}-{slug} (e.g. "lld-13-railway-sleep-on-idle")
 4. Identify the most relevant source files the architect should read (check files referenced in the issue, or grep for relevant code). List 3-8 paths.
-5. Determine hasFrontend: true if the issue involves UI/frontend changes (Vue components, CSS, layouts, user-facing views), false if backend-only.
+5. Determine hasFrontend. This gates an expensive human-in-the-loop mockup-approval step, so be STRICT — only set it true when the change is genuinely visual:
+   - TRUE only if the planned change will touch files under "src/frontend/" (Vue components, CSS, layouts, user-facing views) OR the issue explicitly declares a visual/UI change (new screen, changed layout, restyled component, new user-facing interaction).
+   - FALSE for backend/infra/test-only work — anything whose planned file set is confined to src/backend/, src/shared/, supabase/, docs/, .claude/, tests/, config, CI, or build tooling, even if it indirectly affects what users eventually see.
+   - When unsure, look at the relevantFiles you listed in step 4: if NONE of them are under src/frontend/ and the issue does not describe a visual change, set hasFrontend FALSE.
 6. Check the LAST comment on the issue only:
    gh issue view ${issueNum || "N/A"} --json comments --jq '.comments[-1].body'
    - If it starts with "Frontend decision:" → set frontendDecision to the full comment body. Set restart to null.
    - If it starts with "Restart:" → set restart to the text after "Restart:". Set frontendDecision to null.
    - Otherwise → set both to null.
+7. Determine requiresHuman: true if this issue CANNOT be shipped by an autonomous agent because the change must edit a sensitive/gated path or otherwise inherently needs a human. Specifically set it TRUE if the planned change (based on the issue and the relevantFiles from step 4) must modify files under ".claude/" — those are gated by the sensitive-file write protection and the autonomous agent cannot write them. If true, set requiresHumanReason to a short explanation (e.g. "edits .claude/workflows which is gated for autonomous agents"). Otherwise set requiresHuman false and requiresHumanReason null.
 
 Return the structured result.`,
   { label: "gather-context", schema: GATHER_SCHEMA },
@@ -184,6 +198,21 @@ Return the structured result.`,
 if (!context) {
   log("Gather agent failed. Stopping.");
   return { status: "failed", phase: "gather" };
+}
+
+// Bail out early (before any worktree/Opus spend) if this issue cannot be
+// shipped autonomously — e.g. it must edit a sensitive/gated path under
+// .claude/. ship-batch marks it blocked:human so future runs skip it instead
+// of re-deriving this every hour.
+if (context.requiresHuman) {
+  const reason =
+    context.requiresHumanReason || "the change requires a human to act";
+  log(`Issue cannot be shipped autonomously: ${reason}. Stopping.`);
+  return {
+    status: "blocked-human",
+    issueTitle: context.issueTitle,
+    reason,
+  };
 }
 
 log(
