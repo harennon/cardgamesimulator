@@ -44,24 +44,19 @@
 
     <div
       v-if="displayPhase === 'SHOW_FINAL_PLAY'"
-      class="game-view__final-play-overlay"
+      class="game-view__final-play-ribbon"
       data-testid="final-play-overlay"
     >
-      <div class="game-view__final-play-content">
-        <h2 class="game-view__final-play-winner">
-          {{ winnerDisplayName }} wins!
-        </h2>
-        <button
-          class="game-view__final-play-btn"
-          data-testid="continue-to-results"
-          @click="skipToResults"
-        >
-          Continue to Results
-        </button>
-        <div class="game-view__final-play-progress">
-          <div class="game-view__final-play-progress-bar"></div>
-        </div>
-      </div>
+      <h2 class="game-view__final-play-winner">
+        {{ winnerDisplayName }} wins!
+      </h2>
+      <button
+        class="game-view__final-play-btn"
+        data-testid="continue-to-results"
+        @click="skipToResults"
+      >
+        Continue to Results
+      </button>
     </div>
   </div>
 
@@ -72,16 +67,22 @@
     :players="gameState.players"
     :is-guest="isGuest"
     :game-id="gameId"
+    :is-host="isHost"
+    :rematch-pending="actionPending"
+    :rematch-error="rematchError"
     :play-history="gameOverPlayHistory"
     :current-player-id="gameState.you.playerId"
     :total-turns="gameState.turnNumber"
+    :final-play="finalPlay"
+    @rematch="onRematch"
   />
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 import type { PlayerInfo } from "@shared/engine-types";
-import type { Big2PublicState } from "@shared/big2-types";
+import type { Big2PublicState, Big2Play } from "@shared/big2-types";
 import { axiosInstance } from "@/service/http";
 import type { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
 import type { AxiosResponse } from "axios";
@@ -115,6 +116,7 @@ const {
 } = useGameState();
 const {
   startGame,
+  rematch,
   playCards,
   pass,
   actionError,
@@ -122,6 +124,8 @@ const {
   bind: bindActions,
   unbind: unbindActions,
 } = useGameActions();
+
+const router = useRouter();
 
 const hand = computed(() => gameState.value?.you.hand ?? []);
 const {
@@ -143,6 +147,10 @@ const maxPlayers = ref(4);
 const isHost = ref(false);
 const isGuest = ref(false);
 const turnTimerSeconds = ref<number | null>(null);
+const rematchError = ref<string | null>(null);
+// Guards against double-navigation when the host receives both its own ack and
+// the broadcast. router.push to the same path is a no-op, but this avoids racing.
+let navigatedToRematch = false;
 
 // REST-fetched status is used for initial CREATED render before socket connects.
 // Once useGameState receives a game:state event, status.value takes precedence.
@@ -150,15 +158,10 @@ const restStatus = ref<string | null>(null);
 const effectiveStatus = computed(() => status.value ?? restStatus.value);
 
 const displayPhase = ref<DisplayPhase>("CREATED");
-const finalPlayTimerId = ref<ReturnType<typeof setTimeout> | null>(null);
 
 watch(effectiveStatus, (newStatus, oldStatus) => {
   if (newStatus === "COMPLETED" && oldStatus === "IN_PROGRESS") {
     displayPhase.value = "SHOW_FINAL_PLAY";
-    finalPlayTimerId.value = setTimeout(() => {
-      displayPhase.value = "COMPLETED";
-      finalPlayTimerId.value = null;
-    }, 4000);
   } else if (newStatus === "COMPLETED") {
     displayPhase.value = "COMPLETED";
   } else if (newStatus === "IN_PROGRESS") {
@@ -169,10 +172,6 @@ watch(effectiveStatus, (newStatus, oldStatus) => {
 });
 
 function skipToResults(): void {
-  if (finalPlayTimerId.value) {
-    clearTimeout(finalPlayTimerId.value);
-    finalPlayTimerId.value = null;
-  }
   displayPhase.value = "COMPLETED";
 }
 
@@ -189,6 +188,13 @@ const gameOverPlayHistory = computed(() => {
   const publicState = gameState.value
     .gameSpecificPublicState as Big2PublicState;
   return publicState.playHistory;
+});
+
+const finalPlay = computed<Big2Play | null>(() => {
+  const publicState = gameState.value?.gameSpecificPublicState as
+    | Big2PublicState
+    | undefined;
+  return publicState?.lastPlay ?? null;
 });
 
 onMounted(async () => {
@@ -264,6 +270,12 @@ onMounted(async () => {
     );
   });
 
+  // Pulls non-host clients (and the host, whichever arrives first) into the new
+  // game when the host starts a rematch.
+  s.on("game:rematchStarted", ({ newGameId }) => {
+    navigateToRematch(newGameId);
+  });
+
   // Bind listeners BEFORE emitting game:join so we don't miss the initial game:state
   // event (server emits it before the ack for IN_PROGRESS/COMPLETED games).
   bindState(s);
@@ -285,7 +297,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (finalPlayTimerId.value) clearTimeout(finalPlayTimerId.value);
   unbindState();
   unbindActions();
   disconnect();
@@ -293,6 +304,22 @@ onUnmounted(() => {
 
 async function onStartGame(): Promise<void> {
   await startGame(props.gameId);
+}
+
+function navigateToRematch(newGameId: string): void {
+  if (navigatedToRematch) return;
+  navigatedToRematch = true;
+  router.push(`/game/${newGameId}`);
+}
+
+async function onRematch(): Promise<void> {
+  rematchError.value = null;
+  const result = await rematch(props.gameId);
+  if (result.success && result.newGameId) {
+    navigateToRematch(result.newGameId);
+  } else {
+    rematchError.value = result.error ?? "Failed to start rematch";
+  }
 }
 
 async function onPlay(): Promise<void> {
@@ -347,29 +374,30 @@ async function onPass(): Promise<void> {
   height: 100vh;
 }
 
-.game-view__final-play-overlay {
+.game-view__final-play-ribbon {
   position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(2px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 101;
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 100;
-  animation: overlayFadeIn 200ms ease forwards;
-}
-
-.game-view__final-play-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  padding: 32px 48px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  background: linear-gradient(
+    180deg,
+    rgba(26, 15, 6, 0.92) 0%,
+    rgba(15, 9, 3, 0.96) 100%
+  );
+  border-top: 2px solid var(--gold-accent);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+  animation: ribbonSlideUp 200ms ease forwards;
 }
 
 .game-view__final-play-winner {
   font-family: var(--font-ui);
-  font-size: 2rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: var(--gold-accent);
   margin: 0;
@@ -387,6 +415,7 @@ async function onPass(): Promise<void> {
   background: var(--gold-accent);
   color: #1a0f06;
   min-height: 48px;
+  flex-shrink: 0;
   transition: background 0.15s ease;
 }
 
@@ -394,53 +423,32 @@ async function onPass(): Promise<void> {
   background: #d4b45a;
 }
 
-.game-view__final-play-progress {
-  width: 200px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.game-view__final-play-progress-bar {
-  width: 100%;
-  height: 100%;
-  background: var(--gold-accent);
-  animation: shrink 4s linear forwards;
-  transform-origin: left;
-}
-
-@keyframes overlayFadeIn {
+@keyframes ribbonSlideUp {
   from {
-    opacity: 0;
+    transform: translateY(100%);
   }
   to {
-    opacity: 1;
-  }
-}
-
-@keyframes shrink {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
+    transform: translateY(0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .game-view__final-play-overlay {
+  .game-view__final-play-ribbon {
     animation: none;
   }
 }
 
 @media (max-width: 767px) {
-  .game-view__final-play-winner {
-    font-size: 1.5rem;
+  .game-view__final-play-ribbon {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    gap: 12px;
+    padding: 14px 16px;
   }
 
-  .game-view__final-play-content {
-    padding: 24px 20px;
+  .game-view__final-play-winner {
+    font-size: 1.25rem;
   }
 
   .game-view__final-play-btn {

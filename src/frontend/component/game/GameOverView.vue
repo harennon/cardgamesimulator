@@ -3,6 +3,25 @@
     <div class="game-over__panel">
       <h1 class="game-over__winner">{{ winner }} wins!</h1>
 
+      <div
+        v-if="hasFinalPlay"
+        class="game-over__final-play"
+        data-testid="game-over-final-play"
+      >
+        <div class="game-over__final-play-label">Final Play</div>
+        <div class="game-over__final-play-cards">
+          <GameCard
+            v-for="card in finalPlay!.cards"
+            :key="`${card.rank}-${card.suit}`"
+            :card="card"
+            size="small"
+          />
+        </div>
+        <div class="game-over__final-play-meta">
+          {{ finalPlayLabel }} · played by {{ finalPlayByName }}
+        </div>
+      </div>
+
       <table class="game-over__scores game-over__fade-in">
         <thead>
           <tr>
@@ -55,15 +74,37 @@
 
       <div class="game-over__actions">
         <button
+          v-if="isHost"
           class="game-over__btn game-over__btn--rematch"
-          disabled
-          title="Coming soon"
+          data-testid="rematch-button"
+          :disabled="!canRematch || rematchPending"
+          @click="onRematch"
         >
-          Rematch
+          {{ rematchPending ? "Dealing a new hand…" : "Rematch" }}
         </button>
+        <span v-else class="game-over__waiting" data-testid="rematch-waiting">
+          <span class="game-over__pulse-dot"></span>
+          Host can start a rematch
+        </span>
         <button class="game-over__btn game-over__btn--home" @click="goHome">
           Back to Home
         </button>
+      </div>
+
+      <div
+        v-if="isHost && !canRematch"
+        class="game-over__rematch-hint"
+        data-testid="rematch-too-few"
+      >
+        Only you are still here. Need at least 2 players.
+      </div>
+
+      <div
+        v-if="rematchError"
+        class="game-over__rematch-error"
+        data-testid="rematch-error"
+      >
+        Couldn't start rematch. Try again.
       </div>
 
       <div v-if="isGuest" class="game-over__guest-nudge">
@@ -79,12 +120,22 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import type { PlayerScore, PlayerPublicInfo } from "@shared/engine-types";
-import type { Big2HistoryEntry } from "@shared/big2-types";
+import type { Big2HistoryEntry, Big2Play } from "@shared/big2-types";
+import GameCard from "@/component/game-ui/GameCard.vue";
 import {
   deriveBig2Stats,
   getBadgeForPosition,
   getBadgeClass,
 } from "./gameOverStats";
+
+const HAND_TYPE_LABELS: Record<string, string> = {
+  single: "Single",
+  pair: "Pair",
+  straight: "Straight",
+  fullHouse: "Full House",
+  fourOfAKind: "Four of a Kind",
+  straightFlush: "Straight Flush",
+};
 
 const props = defineProps<{
   scores: readonly PlayerScore[];
@@ -92,12 +143,24 @@ const props = defineProps<{
   players: readonly PlayerPublicInfo[];
   isGuest: boolean;
   gameId: string;
+  isHost: boolean;
+  rematchPending: boolean;
+  rematchError: string | null;
   playHistory?: readonly Big2HistoryEntry[];
   currentPlayerId?: string;
   totalTurns?: number;
+  finalPlay?: Big2Play | null;
+}>();
+
+const emit = defineEmits<{
+  rematch: [];
 }>();
 
 const router = useRouter();
+
+// Host can rematch only when at least 2 players are present in the results
+// roster. The server is the final authority; this drives the button's state.
+const canRematch = computed(() => props.isHost && props.players.length >= 2);
 
 const scoreRows = computed(() => {
   const totalPlayers = props.scores.length;
@@ -124,8 +187,32 @@ const stats = computed(() => {
 
 const totalTurns = computed(() => props.totalTurns ?? 0);
 
+const hasFinalPlay = computed(
+  () => !!props.finalPlay && props.finalPlay.cards.length > 0,
+);
+
+const finalPlayLabel = computed(() => {
+  if (!props.finalPlay) return "";
+  return (
+    HAND_TYPE_LABELS[props.finalPlay.handType.kind] ??
+    props.finalPlay.handType.kind
+  );
+});
+
+const finalPlayByName = computed(() => {
+  if (!props.finalPlay) return "";
+  const player = props.players.find(
+    (p) => p.playerId === props.finalPlay!.playerId,
+  );
+  return player?.displayName ?? props.finalPlay.playerId;
+});
+
 function goHome(): void {
   router.push("/");
+}
+
+function onRematch(): void {
+  emit("rematch");
 }
 </script>
 
@@ -162,6 +249,37 @@ function goHome(): void {
   color: var(--gold-accent);
   margin: 0;
   text-shadow: 0 0 24px var(--gold-glow);
+}
+
+.game-over__final-play {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.game-over__final-play-label {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gold-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.game-over__final-play-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.game-over__final-play-meta {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .game-over__scores {
@@ -281,10 +399,71 @@ function goHome(): void {
 
 .game-over__btn--rematch {
   background: transparent;
+  color: var(--gold-accent);
+  border: 1.5px solid var(--gold-accent);
+}
+
+.game-over__btn--rematch:hover:not(:disabled) {
+  background: var(--gold-glow);
+}
+
+.game-over__btn--rematch:disabled {
   color: var(--text-muted);
-  border: 1.5px solid var(--text-muted);
+  border-color: var(--text-muted);
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.game-over__waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 10px 0;
+}
+
+.game-over__pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold-accent);
+  animation: pulseDot 1.4s ease-in-out infinite;
+}
+
+.game-over__rematch-hint {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.game-over__rematch-error {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: #e05555;
+  text-align: center;
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-over__pulse-dot {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .game-over__btn--home {
@@ -384,6 +563,13 @@ function goHome(): void {
 
   .game-over__btn {
     width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .game-over__waiting {
+    width: 100%;
+    justify-content: center;
     min-height: 48px;
     font-size: 16px;
   }

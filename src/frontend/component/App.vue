@@ -12,6 +12,13 @@ const displayName = ref("");
 
 const showNav = computed(() => !route.path.match(/^\/game\/[^/]+$/));
 
+// Force a fresh GameView mount when the gameId changes (e.g. on rematch
+// navigation from /game/<old> to /game/<new>), so the component re-runs its
+// join flow. Other routes share a stable key — no remount-on-navigation change.
+const routeViewKey = computed(() =>
+  route.path.match(/^\/game\/[^/]+$/) ? route.path : "app",
+);
+
 onMounted(async () => {
   const session = await getSession();
   updateAuthState(session);
@@ -58,7 +65,7 @@ async function logout() {
         </template>
       </div>
     </nav>
-    <router-view />
+    <router-view :key="routeViewKey" />
     <FeedbackWidget />
   </div>
 </template>

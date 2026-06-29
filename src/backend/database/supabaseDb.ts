@@ -127,6 +127,14 @@ export class SupabaseDB
     return this.mapGame(data as Record<string, unknown>);
   }
 
+  public async clearJoinCode(gameId: string): Promise<void> {
+    const { error } = await this.db
+      .from("games")
+      .update({ join_code: null, updated_at: new Date().toISOString() })
+      .eq("game_id", gameId);
+    if (error) throw new Error(`clearJoinCode failed: ${error.message}`);
+  }
+
   public async getStats(
     userId: string,
     gameType: GameType,
