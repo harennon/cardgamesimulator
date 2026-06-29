@@ -29,7 +29,14 @@
     "
     class="game-view__board-container"
   >
+    <TonkBoard
+      v-if="gameState.gameType === 'tonk'"
+      :game-state="gameState"
+      :turn-timer-seconds="turnTimerSeconds"
+      :room-code="roomCode"
+    />
     <GameBoard
+      v-else
       :game-state="gameState"
       :selected-indices="selectedIndices"
       :selection-count="selectionCount"
@@ -43,7 +50,7 @@
     />
 
     <div
-      v-if="displayPhase === 'SHOW_FINAL_PLAY'"
+      v-if="displayPhase === 'SHOW_FINAL_PLAY' && gameState.gameType === 'big2'"
       class="game-view__final-play-ribbon"
       data-testid="final-play-overlay"
     >
@@ -94,6 +101,7 @@ import { getSession } from "@/service/authService";
 import { restoreGuestSession } from "@/service/guestService";
 import GameLobbyView from "@/component/game/GameLobbyView.vue";
 import GameBoard from "@/component/game/GameBoard.vue";
+import TonkBoard from "@/component/game/TonkBoard.vue";
 import GameOverView from "@/component/game/GameOverView.vue";
 
 type DisplayPhase = "CREATED" | "IN_PROGRESS" | "SHOW_FINAL_PLAY" | "COMPLETED";

@@ -68,6 +68,12 @@
   /* Card selection animation tokens */
   --card-select-duration: 150ms;
   --card-select-easing: ease;
+
+  /* Tonk board tokens (LLD 88) */
+  --tonk-cyan: #3fd0d8; /* drawable-discard ring */
+  --tonk-phase-discard: #c97b3f; /* warm/amber — discard phase */
+  --tonk-phase-draw: #3f9dc9; /* cool/blue — draw phase */
+  --tonk-near-150: #e09a30; /* near-loss-line warning tint */
 }
 
 @media (max-width: 767px) {

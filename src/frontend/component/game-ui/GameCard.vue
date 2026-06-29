@@ -1,6 +1,17 @@
 <template>
   <div v-if="faceDown" class="card card-back" :class="sizeClass"></div>
   <div
+    v-else-if="joker"
+    class="card card--joker"
+    :class="[
+      sizeClass,
+      { 'card--selected': selected, 'card--interactive': interactive },
+    ]"
+    data-testid="joker-card"
+  >
+    <span class="card__joker-icon" aria-label="Joker">&#9733;</span>
+  </div>
+  <div
     v-else
     class="card"
     :class="[
@@ -20,11 +31,13 @@
 
 <script lang="ts" setup>
 import type { Card } from "@shared/engine-types";
+import type { TonkCard } from "@shared/tonk-types";
+import { isJoker } from "@shared/tonk-types";
 import { computed } from "vue";
 
 const props = withDefaults(
   defineProps<{
-    card: Card;
+    card: Card | TonkCard;
     selected?: boolean;
     faceDown?: boolean;
     size?: "small" | "medium" | "large";
@@ -40,17 +53,24 @@ const SUIT_SYMBOLS: Record<string, string> = {
   spades: "♠",
 };
 
-const suitSymbol = computed(() => SUIT_SYMBOLS[props.card.suit] ?? "");
+// A Tonk joker has no rank/suit; render an icon face instead.
+const joker = computed(() => isJoker(props.card));
 
-const suitColorClass = computed(() =>
-  props.card.suit === "hearts" || props.card.suit === "diamonds"
-    ? "red"
-    : "black",
+const suitSymbol = computed(() =>
+  joker.value ? "" : (SUIT_SYMBOLS[(props.card as Card).suit] ?? ""),
 );
+
+const suitColorClass = computed(() => {
+  if (joker.value) return "black";
+  const suit = (props.card as Card).suit;
+  return suit === "hearts" || suit === "diamonds" ? "red" : "black";
+});
 
 const sizeClass = computed(() => `card--${props.size}`);
 
-const displayRank = computed(() => props.card.rank);
+const displayRank = computed(() =>
+  joker.value ? "" : (props.card as Card).rank,
+);
 </script>
 
 <style scoped>
@@ -81,6 +101,22 @@ const displayRank = computed(() => props.card.rank);
   width: var(--card-hand-width);
   height: var(--card-hand-height);
   font-size: 1rem;
+}
+
+/* Joker face — centered icon, no rank/suit (LLD 88 decision 5) */
+.card--joker {
+  background: linear-gradient(135deg, #faf3e8 0%, #efe2cb 100%);
+}
+
+.card__joker-icon {
+  color: var(--gold-accent);
+  font-size: 1.8em;
+  line-height: 1;
+  text-shadow: 0 0 6px var(--gold-glow);
+}
+
+.card--small .card__joker-icon {
+  font-size: 1.2em;
 }
 
 .card--large {
