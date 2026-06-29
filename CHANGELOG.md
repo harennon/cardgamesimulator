@@ -8,6 +8,10 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Documentation
+
+- **LLD 92: Tonk board rendering (reconciliation, no new code)** — `docs/lld/92-tonk-board-rendering.md` documents that issue #92's read-only Tonk board is the same feature already designed, approved, implemented, and merged under **LLD 88** (commit `3b0af93`, PR #98). The doc maps every #92 acceptance criterion to its shipped location (`TonkBoard.vue` + `TonkPiles`/`TonkPhaseBanner`/`TonkSeatRail`/`TonkTallyPanel`/`TonkHand`/`TonkLog`/`tonkDisplay.ts`, the `GameView.vue` dispatch + Big2-gated final-play ribbon, the additive `GameCard` joker support, the `game-variables.css` Tonk tokens, and the `tests/frontend/tonk*.test.ts` suite), records the user-approved frontend direction (A1 separate drawable-discard slot + B1 phase banner + compact seats at ≥6, joker-as-icon, mobile compact tallies), and defers entirely to LLD 88 as the authoritative design. No source, test, or behavior change — verified by re-running the build (passes), the full unit suite (814 tests, 71 files — all Tonk frontend tests green), and lint (clean).
+
 ### Removed
 
 - **LLD 74: Remove leftover Vue scaffold (HelloWorld / `/echo` route + EchoHandler)** — deleted the unused `npm create vue` echo scaffold end-to-end. Nothing in the live UI linked to it, and `HelloWorld.vue` POSTed to `/api/authNedEcho`, a backend route that no longer existed. Pure dead-code removal; no behavior change for users.
