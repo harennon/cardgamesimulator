@@ -24,6 +24,8 @@
     "test:e2e:debug": "npx playwright test --debug",
     "lint:check": "eslint src --ext ts --ext vue",
     "lint:fix": "eslint --fix src --ext ts --ext vue",
+    "verify:drift": "node scripts/verify-drift.mjs",
+    "verify:postconditions": "node scripts/verify-postconditions.mjs",
     "feedback": "node scripts/feedback.mjs",
     "postinstall": "git config core.hooksPath .githooks"
   },

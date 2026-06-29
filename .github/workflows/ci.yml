@@ -19,6 +19,10 @@ jobs:
       - run: npm run lint:check
       - run: npm run build
       - run: npm test
+      # Drift gate (LLD 77 §5) against a captured/fixture diff — fail-closed,
+      # no prod access. The `--linked` wiring against live prod is human-owned.
+      - name: Drift gate (fixture diff)
+        run: npm run verify:drift -- --diff-file scripts/fixtures/clean-diff.json
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -40,6 +44,12 @@ jobs:
           echo "SUPABASE_JWT_SECRET=$(supabase status -o env | grep JWT_SECRET | cut -d= -f2- | tr -d '\"')" >> $GITHUB_ENV
       - run: npm ci
       - run: npm run build:backend
+      # Post-condition verification (LLD 77 §6) against the local `supabase start`
+      # DB, which has every migration applied. Fail-closed: a RAISEd
+      # post-condition or a coverage gap exits non-zero. The scripted,
+      # non-skippable replacement for the manual post-apply SELECT.
+      - name: Verify migration post-conditions
+        run: npm run verify:postconditions
       - run: npm run test:integration
 
   e2e-tests:
