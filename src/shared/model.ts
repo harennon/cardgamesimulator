@@ -2,11 +2,20 @@
 import type { GameType, GameStatus } from "./engine-types.js";
 export type { GameType, GameStatus };
 
+// Typed, persisted game configuration. Generic across game types; fields are
+// game-specific and optional. Persisted as the games.game_config JSONB column.
+export interface GameConfig {
+  // Tonk only: target deck length in rounds, integer [5,12], default 8.
+  // Absent for Big2 and for Tonk games created before this field existed.
+  deckRoundsTarget?: number;
+}
+
 export interface CreateGameRequest {
   gameType: GameType;
   maxPlayers: number;
   gameOptions: { [key: string]: string };
   turnTimerSeconds: 30 | 60 | 90;
+  deckRoundsTarget?: number; // optional, integer [5,12]; omitted -> default 8
 }
 
 export interface CreateGameResponse {
@@ -47,6 +56,7 @@ export interface SerializableGame {
   state: SerializableGameState;
   turnTimerSeconds: number | null; // null means no timer
   joinCode: string | null; // 4-char room code; null if game has none
+  gameConfig: GameConfig; // always present; {} for Big2
 }
 
 export type SerializableGameState = Record<string, unknown>;

@@ -9,6 +9,7 @@ vi.mock("@/component/AboutView.vue", () => ({ default: {} }));
 vi.mock("@/component/HomeView.vue", () => ({ default: {} }));
 vi.mock("@/component/game/GameView.vue", () => ({ default: {} }));
 vi.mock("@/component/GuestEntryView.vue", () => ({ default: {} }));
+vi.mock("@/component/StatsView.vue", () => ({ default: {} }));
 
 vi.mock("vue-router", () => ({
   createRouter: vi.fn(() => ({

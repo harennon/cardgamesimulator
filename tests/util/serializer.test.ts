@@ -40,4 +40,19 @@ describe("serializeGameForPlayer", () => {
     expect(result.turnTimerSeconds).toBe(30);
     expect(result.playerIds).toEqual(["host-id", "joiner-id"]);
   });
+
+  it("includes gameConfig from the Game row", () => {
+    const game = makeGame({
+      gameType: "tonk",
+      gameConfig: { deckRoundsTarget: 10 },
+    });
+    const result = serializeGameForPlayer(game, "host-id");
+    expect(result.gameConfig).toEqual({ deckRoundsTarget: 10 });
+  });
+
+  it("includes gameConfig as {} for a Big2 game", () => {
+    const game = makeGame({ gameConfig: {} });
+    const result = serializeGameForPlayer(game, "host-id");
+    expect(result.gameConfig).toEqual({});
+  });
 });

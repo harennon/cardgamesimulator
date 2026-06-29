@@ -39,6 +39,13 @@ onMounted(async () => {
         >
           Join Game
         </router-link>
+        <router-link
+          to="/stats"
+          class="btn-secondary home__btn"
+          data-testid="stats-link"
+        >
+          Your Stats
+        </router-link>
       </div>
 
       <div v-else class="home__auth-prompt">

@@ -11,6 +11,7 @@ import AboutView from "@/component/AboutView.vue";
 import HomeView from "@/component/HomeView.vue";
 import GameView from "@/component/game/GameView.vue";
 import GuestEntryView from "@/component/GuestEntryView.vue";
+import StatsView from "@/component/StatsView.vue";
 import { getSession } from "@/service/authService";
 import { restoreGuestSession } from "@/service/guestService";
 import { axiosInstance } from "@/service/http";
@@ -49,6 +50,7 @@ const routes: RouteRecordSingleView[] = [
     meta: { requiresAuth: true },
   },
   { path: "/join-game", component: JoinGameView, meta: { requiresAuth: true } },
+  { path: "/stats", component: StatsView, meta: { requiresAuth: true } },
   {
     path: "/game/:gameId/join",
     component: GuestEntryView,

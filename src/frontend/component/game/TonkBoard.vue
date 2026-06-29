@@ -40,6 +40,7 @@
         :last-discard-count="tonkState.lastDiscardCount"
         :last-discard-player-index="tonkState.lastDiscardPlayerIndex"
         :drawable-discard="tonkState.drawableDiscard"
+        :turn-phase="tonkState.turnPhase"
         :players="gameState.players"
       />
     </div>

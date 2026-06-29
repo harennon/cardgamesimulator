@@ -10,6 +10,7 @@ import { PlayerStats } from "@/database/entities/PlayerStats";
 import { Feedback } from "@/database/entities/Feedback";
 import { OptimisticLockError } from "@/util/errors";
 import type { GameType } from "@shared/engine-types";
+import type { GameConfig } from "@shared/model";
 
 export class SupabaseDB
   implements GameRepository, PlayerStatsRepository, FeedbackRepository
@@ -54,6 +55,7 @@ export class SupabaseDB
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
     joinCode: string | null,
+    gameConfig: GameConfig,
   ): Promise<Game> {
     const row = {
       game_id: gameId,
@@ -65,6 +67,7 @@ export class SupabaseDB
       state: {},
       turn_timer_seconds: turnTimerSeconds,
       join_code: joinCode,
+      game_config: gameConfig,
     };
     const { data, error } = await this.db
       .from("games")
@@ -109,6 +112,7 @@ export class SupabaseDB
         status: game.status,
         state: game.state,
         turn_timer_seconds: game.turnTimerSeconds,
+        game_config: game.gameConfig,
         version: expectedVersion + 1,
         updated_at: new Date().toISOString(),
       })
@@ -229,6 +233,7 @@ export class SupabaseDB
     game.state = row.state as Record<string, unknown>;
     game.turnTimerSeconds = row.turn_timer_seconds as number | null;
     game.joinCode = (row.join_code as string) ?? null;
+    game.gameConfig = (row.game_config as GameConfig) ?? {};
     game.createdAt = new Date(row.created_at as string);
     game.updatedAt = new Date(row.updated_at as string);
     game.version = row.version as number;
