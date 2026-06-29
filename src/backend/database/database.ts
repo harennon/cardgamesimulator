@@ -2,6 +2,7 @@ import { Game } from "@/database/entities/Game";
 import { PlayerStats } from "@/database/entities/PlayerStats";
 import { Feedback } from "@/database/entities/Feedback";
 import type { GameType } from "@shared/engine-types";
+import type { GameConfig } from "@shared/model";
 
 export interface GameRepository {
   createGame(
@@ -12,6 +13,7 @@ export interface GameRepository {
     creatorDisplayName: string,
     turnTimerSeconds: number | null,
     joinCode: string | null,
+    gameConfig: GameConfig,
   ): Promise<Game>;
   getGame(gameId: string): Promise<Game | null>;
   getGameByJoinCode(code: string): Promise<Game | null>;

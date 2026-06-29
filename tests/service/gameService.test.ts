@@ -47,6 +47,7 @@ function makeGame(overrides: Partial<Game> = {}): Game {
   game.maxPlayers = 4;
   game.status = "CREATED";
   game.state = {};
+  game.gameConfig = {};
   game.version = 1;
   Object.assign(game, overrides);
   return game;
@@ -175,6 +176,7 @@ function makeInMemoryRepo(seed: Game[] = []): GameRepository {
           creatorDisplayName: string,
           turnTimerSeconds: number | null,
           joinCode: string | null,
+          gameConfig: Game["gameConfig"] = {},
         ) => {
           assertJoinCodeUnique(gameId, joinCode);
           const game = new Game();
@@ -187,6 +189,7 @@ function makeInMemoryRepo(seed: Game[] = []): GameRepository {
           game.state = {};
           game.turnTimerSeconds = turnTimerSeconds;
           game.joinCode = joinCode;
+          game.gameConfig = gameConfig;
           game.version = 1;
           rows.set(gameId, game);
           return game;
@@ -383,6 +386,51 @@ describe("GameService", () => {
       expect(engine.initialize).toHaveBeenCalled();
       expect(repo.saveGame).toHaveBeenCalled();
       expect(cache.get("game-1")).toBe(initialState);
+    });
+
+    it("passes gameConfig.deckRoundsTarget into engine.initialize options", async () => {
+      const cache = new GameCache();
+      const initialize = vi
+        .fn()
+        .mockReturnValue(makeState("game-1", { status: "IN_PROGRESS" }));
+      const engine = makeEngine({ initialize });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({
+        gameType: "tonk",
+        playerIds: ["player-a", "player-b"],
+        gameConfig: { deckRoundsTarget: 6 },
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await service.startGame("game-1", "player-a");
+
+      const config = initialize.mock.calls[0]![2] as {
+        options: Record<string, unknown>;
+      };
+      expect(config.options.deckRoundsTarget).toBe(6);
+    });
+
+    it("falls back to 8 when gameConfig.deckRoundsTarget is absent", async () => {
+      const cache = new GameCache();
+      const initialize = vi
+        .fn()
+        .mockReturnValue(makeState("game-1", { status: "IN_PROGRESS" }));
+      const engine = makeEngine({ initialize });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({
+        playerIds: ["player-a", "player-b"],
+        gameConfig: {},
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await service.startGame("game-1", "player-a");
+
+      const config = initialize.mock.calls[0]![2] as {
+        options: Record<string, unknown>;
+      };
+      expect(config.options.deckRoundsTarget).toBe(8);
     });
 
     it("throws GAME_NOT_FOUND when the game does not exist", async () => {
@@ -673,6 +721,31 @@ describe("GameService", () => {
       const newGame = await repo.getGame(newGameId);
       expect(newGame?.playerIds).toContain("guest-xyz");
       expect(newGame?.playerDisplayNames["guest-xyz"]).toBe("GuestBob");
+    });
+
+    it("carries the old game's gameConfig into the new createGame call (preserves deck length)", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({
+        gameType: "tonk",
+        gameConfig: { deckRoundsTarget: 6 },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "player-b"],
+      );
+
+      // The 8th createGame arg is the carried-over gameConfig.
+      const createArgs = (repo.createGame as ReturnType<typeof vi.fn>).mock
+        .calls[0]!;
+      expect(createArgs[7]).toEqual({ deckRoundsTarget: 6 });
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.gameConfig).toEqual({ deckRoundsTarget: 6 });
     });
   });
 

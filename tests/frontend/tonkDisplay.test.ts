@@ -83,15 +83,26 @@ describe("tonkDisplay — piles name derivation (A1)", () => {
     expect(justPlayedName(players(3), 9)).toBe("");
   });
 
-  it("drawableFromName resolves the player preceding the discarder", () => {
+  it("drawableFromName (draw phase) resolves the player preceding the discarder", () => {
+    // Draw phase: current player has already discarded, so lastDiscardPlayerIndex
+    // is the current player; the drawable came from the seat before them.
     // index 2 discarded → drawable came from index 1
-    expect(drawableFromName(players(4), 2)).toBe("Player1");
+    expect(drawableFromName(players(4), 2, "draw")).toBe("Player1");
     // wraps: index 0 discarded → preceding is the last seat
-    expect(drawableFromName(players(4), 0)).toBe("Player3");
+    expect(drawableFromName(players(4), 0, "draw")).toBe("Player3");
+  });
+
+  it("drawableFromName (discard phase) attributes the drawable to the player who just handed off", () => {
+    // Discard phase: at turn start the current player has NOT discarded yet, so
+    // lastDiscardPlayerIndex still points at the player who placed the drawable
+    // card. The provenance is that seat itself — NOT one seat further back.
+    expect(drawableFromName(players(4), 2, "discard")).toBe("Player2");
+    expect(drawableFromName(players(4), 0, "discard")).toBe("Player0");
   });
 
   it("drawableFromName returns '' when not derivable (no discarder)", () => {
-    expect(drawableFromName(players(4), null)).toBe("");
+    expect(drawableFromName(players(4), null, "discard")).toBe("");
+    expect(drawableFromName(players(4), null, "draw")).toBe("");
   });
 });
 
