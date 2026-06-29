@@ -99,7 +99,9 @@ export interface EnrichedSpectatorView extends SpectatorView {
 export interface TimerExpiredPayload {
   gameId: string;
   playerId: string; // the player whose turn was auto-acted
-  action: "pass" | "playCards"; // what was auto-played
+  // The auto-played action type. Game-agnostic: Big2 emits "pass"/"playCards",
+  // Tonk emits "discard"/"draw". Informational only; not branched on by clients.
+  action: string;
 }
 
 export interface SpectatorCountPayload {

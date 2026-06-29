@@ -541,5 +541,142 @@ describe("Turn Timer integration", () => {
         sockets.forEach(disconnectSocket);
       }
     });
+
+    // LLD 98 T5 (AC3): the widened autoPlayAbandoned cap (players.length *
+    // MAX_AUTO_ACTIONS_PER_SEAT) must not change single-phase (Big2) behavior.
+    // A single timer fire applies exactly one auto-action and re-arms exactly one
+    // timer; a multi-abandoned Big2 chain auto-plays one action per seat and arms
+    // the timer for the lone connected seat.
+    it("Big2 single-phase auto-timeout unchanged: one action per fire, one timer re-armed", async () => {
+      // Isolated server so global pending/fired counts reflect only this game.
+      const localCtx = await createTestServer();
+      const [userA, userB] = await Promise.all([
+        createTestUser("Big2SinglePhaseA"),
+        createTestUser("Big2SinglePhaseB"),
+      ]);
+
+      const createRes = await request(localCtx.app)
+        .post("/createGame")
+        .set("Authorization", `Bearer ${userA!.accessToken}`)
+        .send({ gameType: "big2", maxPlayers: 2, turnTimerSeconds: 60 });
+      const gameId = createRes.body.gameId as string;
+
+      await request(localCtx.app)
+        .post("/joinGame")
+        .set("Authorization", `Bearer ${userB!.accessToken}`)
+        .send({ gameId });
+
+      const sockets = await Promise.all([
+        createAuthenticatedSocket(localCtx.baseUrl, userA!.accessToken),
+        createAuthenticatedSocket(localCtx.baseUrl, userB!.accessToken),
+      ]);
+
+      try {
+        await joinGameRoom(sockets, gameId);
+        const initialStates = await startGame(sockets, gameId);
+        const versionBefore = initialStates[0]!.version;
+
+        const nextStatePromise = new Promise<EnrichedPlayerView>((resolve) => {
+          sockets[0]!.once("game:state", resolve);
+        });
+
+        // Both players connected — one fire = one auto-action, seat advances.
+        const fired = localCtx.timerProvider.fireAll();
+        expect(fired).toBe(1);
+
+        const nextState = await nextStatePromise;
+        // Exactly one auto-action advanced the turn (single phase).
+        expect(nextState.version).toBe(versionBefore + 1);
+        // Exactly one timer re-armed for the next seat.
+        expect(localCtx.timerProvider.pendingCount).toBe(1);
+        expect(nextState.turnDeadline).not.toBeNull();
+      } finally {
+        sockets.forEach(disconnectSocket);
+        await localCtx.close();
+      }
+    });
+
+    it("Big2 multi-abandoned chain (4-player, 3 abandoned): one action per seat, timer armed for connected seat", async () => {
+      // Isolated server so global pending counts reflect only this game.
+      const localCtx = await createTestServer();
+      const [userA, userB, userC, userD] = await Promise.all([
+        createTestUser("Big2MultiAbandA"),
+        createTestUser("Big2MultiAbandB"),
+        createTestUser("Big2MultiAbandC"),
+        createTestUser("Big2MultiAbandD"),
+      ]);
+
+      const createRes = await request(localCtx.app)
+        .post("/createGame")
+        .set("Authorization", `Bearer ${userA!.accessToken}`)
+        .send({ gameType: "big2", maxPlayers: 4, turnTimerSeconds: 60 });
+      const gameId = createRes.body.gameId as string;
+
+      for (const user of [userB, userC, userD]) {
+        await request(localCtx.app)
+          .post("/joinGame")
+          .set("Authorization", `Bearer ${user!.accessToken}`)
+          .send({ gameId });
+      }
+
+      const sockets = await Promise.all([
+        createAuthenticatedSocket(localCtx.baseUrl, userA!.accessToken),
+        createAuthenticatedSocket(localCtx.baseUrl, userB!.accessToken),
+        createAuthenticatedSocket(localCtx.baseUrl, userC!.accessToken),
+        createAuthenticatedSocket(localCtx.baseUrl, userD!.accessToken),
+      ]);
+
+      try {
+        await joinGameRoom(sockets, gameId);
+        const initialStates = await startGame(sockets, gameId);
+
+        const currentIdx = initialStates[0]!.currentPlayerIndex;
+        const playerIds = initialStates[0]!.players.map((p) => p.playerId);
+        const numPlayers = playerIds.length;
+
+        // Abandon the TWO seats immediately after the current one, so the
+        // auto-play chain must skip both before reaching the connected survivor
+        // (the seat two further along). This exercises the multi-abandoned loop.
+        const abandonedIdxs = [
+          (currentIdx + 1) % numPlayers,
+          (currentIdx + 2) % numPlayers,
+        ];
+        const survivorIdx = (currentIdx + 3) % numPlayers;
+        for (const idx of abandonedIdxs) {
+          localCtx.connectionManager.markAbandoned(gameId, playerIds[idx]!);
+        }
+
+        // Fire the current seat's timer: it auto-passes/plays, advancing to the
+        // first abandoned seat; autoPlayAbandoned skips both abandoned seats with
+        // one single-phase auto-action each, then arms for the connected survivor.
+        const survivorSocket = sockets[survivorIdx]!;
+        const settled = new Promise<EnrichedPlayerView>((resolve) => {
+          const handler = (state: EnrichedPlayerView): void => {
+            if (state.currentPlayerIndex === survivorIdx) {
+              survivorSocket.off("game:state", handler);
+              resolve(state);
+            }
+          };
+          survivorSocket.on("game:state", handler);
+        });
+        localCtx.timerProvider.fireAll();
+        const settledState = await settled;
+
+        // Settled on the connected survivor with a timer armed — no stall.
+        expect(settledState.status).toBe("IN_PROGRESS");
+        expect(settledState.currentPlayerIndex).toBe(survivorIdx);
+        expect(
+          localCtx.connectionManager.isAbandoned(
+            gameId,
+            playerIds[survivorIdx]!,
+          ),
+        ).toBe(false);
+        expect(localCtx.turnTimerService.getDeadline(gameId)).not.toBeNull();
+        expect(localCtx.timerProvider.pendingCount).toBe(1);
+      } finally {
+        sockets.forEach(disconnectSocket);
+        await localCtx.close();
+      }
+    });
   });
 });
