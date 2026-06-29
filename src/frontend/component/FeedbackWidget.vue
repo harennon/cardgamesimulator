@@ -4,6 +4,8 @@ import { useRoute } from "vue-router";
 import { axiosInstance } from "@/service/http";
 import type { FeedbackCategory, SubmitFeedbackResponse } from "@shared/model";
 import { restoreGuestSession } from "@/service/guestService";
+import { getSession } from "@/service/authService";
+import { useFeedbackContext } from "@/composables/useFeedbackContext";
 
 const isOpen = ref(false);
 const category = ref<FeedbackCategory>("bug");
@@ -26,12 +28,21 @@ function closeModal() {
   errorMessage.value = "";
 }
 
-function buildMetadata() {
-  const session = restoreGuestSession();
+async function buildMetadata() {
+  let session = null;
+  try {
+    session = await getSession();
+  } catch {
+    session = null;
+  }
+  const guestSession = restoreGuestSession();
+  const { gamePhase } = useFeedbackContext();
   return {
     route: route.fullPath,
     gameId: (route.params.gameId as string) || undefined,
-    userType: session ? "guest" : "registered",
+    gamePhase: gamePhase.value,
+    userType: guestSession ? "guest" : "registered",
+    authState: session ? "authenticated" : "anonymous",
     browser: navigator.userAgent.slice(0, 200),
     viewport: { width: window.innerWidth, height: window.innerHeight },
     timestamp: new Date().toISOString(),
@@ -48,7 +59,7 @@ async function submit() {
     await axiosInstance.post<SubmitFeedbackResponse>("/api/feedback", {
       category: category.value,
       description: description.value,
-      metadata: buildMetadata(),
+      metadata: await buildMetadata(),
     });
     closeModal();
     showToast.value = true;

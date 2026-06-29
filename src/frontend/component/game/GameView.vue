@@ -97,6 +97,8 @@ import { useSocket } from "@/composables/useSocket";
 import { useGameState } from "@/composables/useGameState";
 import { useGameActions } from "@/composables/useGameActions";
 import { useCardSelection } from "@/composables/useCardSelection";
+import { useFeedbackContext } from "@/composables/useFeedbackContext";
+import type { FeedbackGamePhase } from "@/composables/useFeedbackContext";
 import { getSession } from "@/service/authService";
 import { restoreGuestSession } from "@/service/guestService";
 import GameLobbyView from "@/component/game/GameLobbyView.vue";
@@ -178,6 +180,28 @@ watch(effectiveStatus, (newStatus, oldStatus) => {
     displayPhase.value = "CREATED";
   }
 });
+
+const { setGamePhase, clearGamePhase } = useFeedbackContext();
+
+function toFeedbackPhase(phase: DisplayPhase): FeedbackGamePhase {
+  switch (phase) {
+    case "CREATED":
+      return "lobby";
+    case "COMPLETED":
+      return "game-over";
+    case "IN_PROGRESS":
+    case "SHOW_FINAL_PLAY":
+      return "in-progress";
+  }
+}
+
+watch(
+  displayPhase,
+  (phase) => {
+    setGamePhase(toFeedbackPhase(phase));
+  },
+  { immediate: true },
+);
 
 function skipToResults(): void {
   displayPhase.value = "COMPLETED";
@@ -308,6 +332,7 @@ onUnmounted(() => {
   unbindState();
   unbindActions();
   disconnect();
+  clearGamePhase();
 });
 
 async function onStartGame(): Promise<void> {
