@@ -187,6 +187,61 @@ export function trickResultSummary(
   return `Trick ${r.trickNumber} ended — ${reason}. ${parts.join(", ")}`;
 }
 
+/**
+ * The same-rank group key for a card, used only for the discard-selection
+ * dimming/bad-select HINTS (LLD 99 §Interfaces — these are presentational, not
+ * rule decisions; the server is the sole authority on discard legality). All
+ * jokers share the "joker" group (jokers group only with jokers); standard
+ * cards group by rank.
+ */
+export function selectionRankKey(card: TonkCard): string {
+  return isJoker(card) ? "joker" : card.rank;
+}
+
+/**
+ * Indices that should be dimmed in the hand: when a selection exists and is a
+ * single same-rank group, every card NOT in that group is dimmed (LLD 99 E4).
+ * Empty selection → nothing dimmed. A mixed-rank selection → nothing dimmed
+ * (the bad-select flag carries the feedback instead).
+ */
+export function dimmedSelectionIndices(
+  hand: readonly TonkCard[],
+  selectedIndices: ReadonlySet<number>,
+): Set<number> {
+  if (selectedIndices.size === 0) return new Set();
+
+  const selectedKeys = new Set<string>();
+  for (const i of selectedIndices) {
+    const card = hand[i];
+    if (card) selectedKeys.add(selectionRankKey(card));
+  }
+  // Mixed-rank selection: no dimming (bad-select flag is the feedback).
+  if (selectedKeys.size !== 1) return new Set();
+
+  const [groupKey] = selectedKeys;
+  const dimmed = new Set<number>();
+  hand.forEach((card, index) => {
+    if (selectionRankKey(card) !== groupKey) dimmed.add(index);
+  });
+  return dimmed;
+}
+
+/**
+ * Whether the current selection spans more than one rank group (LLD 99 E3).
+ * A hint only — submission is still allowed; the server rejects a mixed discard.
+ */
+export function isBadSelect(
+  hand: readonly TonkCard[],
+  selectedIndices: ReadonlySet<number>,
+): boolean {
+  const selectedKeys = new Set<string>();
+  for (const i of selectedIndices) {
+    const card = hand[i];
+    if (card) selectedKeys.add(selectionRankKey(card));
+  }
+  return selectedKeys.size > 1;
+}
+
 export interface RankedTallyRow {
   readonly seatIndex: number;
   readonly tally: number;

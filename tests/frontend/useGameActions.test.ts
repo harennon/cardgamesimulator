@@ -414,4 +414,275 @@ describe("useGameActions", () => {
       expect(actionPending.value).toBe(false);
     });
   });
+
+  describe("discard (Tonk)", () => {
+    const tonkCards: Card[] = [
+      { suit: "clubs", rank: "Q" },
+      { suit: "diamonds", rank: "Q" },
+      { suit: "spades", rank: "Q" },
+    ];
+
+    it("throws before bind", async () => {
+      const { discard } = useGameActions();
+      await expect(discard("game-1", tonkCards)).rejects.toThrow(
+        "bind() must be called before emitting actions",
+      );
+    });
+
+    it("emits game:action with discard type, the cards, and playerId ''", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true });
+      });
+      const { discard, bind } = useGameActions();
+      bind(socket);
+
+      await discard("game-1", tonkCards);
+
+      expect(socket.emit).toHaveBeenCalledWith(
+        "game:action",
+        {
+          gameId: "game-1",
+          action: { type: "discard", cards: tonkCards, playerId: "" },
+        },
+        expect.any(Function),
+      );
+    });
+
+    it("sends a copy of the cards array (not the caller's reference)", async () => {
+      let sentCards: unknown;
+      const { socket } = makeMockSocket((_, payload, ack) => {
+        sentCards = (payload as { action: { cards: unknown } }).action.cards;
+        ack({ success: true });
+      });
+      const { discard, bind } = useGameActions();
+      bind(socket);
+
+      await discard("game-1", tonkCards);
+
+      expect(sentCards).toEqual(tonkCards);
+      expect(sentCards).not.toBe(tonkCards);
+    });
+
+    it("returns success: true on a successful ack", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true } satisfies GameActionResponse);
+      });
+      const { discard, bind } = useGameActions();
+      bind(socket);
+
+      const result = await discard("game-1", tonkCards);
+
+      expect(result.success).toBe(true);
+    });
+
+    it("sets actionError from a failed ack", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({
+          success: false,
+          error: "Discard must be a single rank.",
+        } satisfies GameActionResponse);
+      });
+      const { discard, actionError, bind } = useGameActions();
+      bind(socket);
+
+      const result = await discard("game-1", tonkCards);
+
+      expect(result.success).toBe(false);
+      expect(actionError.value).toBe("Discard must be a single rank.");
+    });
+
+    it("uses the fallback 'Invalid discard' when error is absent", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: false } satisfies GameActionResponse);
+      });
+      const { discard, actionError, bind } = useGameActions();
+      bind(socket);
+
+      await discard("game-1", tonkCards);
+
+      expect(actionError.value).toBe("Invalid discard");
+    });
+
+    it("resets actionPending to false after completion", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true });
+      });
+      const { discard, actionPending, bind } = useGameActions();
+      bind(socket);
+
+      await discard("game-1", tonkCards);
+
+      expect(actionPending.value).toBe(false);
+    });
+
+    it("emits a joker discard payload unchanged", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true });
+      });
+      const { discard, bind } = useGameActions();
+      bind(socket);
+
+      const jokers = [
+        { joker: true, id: 0 },
+        { joker: true, id: 1 },
+      ] as const;
+      await discard("game-1", jokers);
+
+      expect(socket.emit).toHaveBeenCalledWith(
+        "game:action",
+        {
+          gameId: "game-1",
+          action: { type: "discard", cards: [...jokers], playerId: "" },
+        },
+        expect.any(Function),
+      );
+    });
+  });
+
+  describe("drawCard (Tonk)", () => {
+    it("throws before bind", async () => {
+      const { drawCard } = useGameActions();
+      await expect(drawCard("game-1", "stock")).rejects.toThrow(
+        "bind() must be called before emitting actions",
+      );
+    });
+
+    it("emits game:action with draw type and source 'stock'", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true });
+      });
+      const { drawCard, bind } = useGameActions();
+      bind(socket);
+
+      await drawCard("game-1", "stock");
+
+      expect(socket.emit).toHaveBeenCalledWith(
+        "game:action",
+        {
+          gameId: "game-1",
+          action: { type: "draw", source: "stock", playerId: "" },
+        },
+        expect.any(Function),
+      );
+    });
+
+    it("emits game:action with draw type and source 'discard'", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true });
+      });
+      const { drawCard, bind } = useGameActions();
+      bind(socket);
+
+      await drawCard("game-1", "discard");
+
+      expect(socket.emit).toHaveBeenCalledWith(
+        "game:action",
+        {
+          gameId: "game-1",
+          action: { type: "draw", source: "discard", playerId: "" },
+        },
+        expect.any(Function),
+      );
+    });
+
+    it("sets actionError from a failed ack", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: false, error: "Cannot draw" });
+      });
+      const { drawCard, actionError, bind } = useGameActions();
+      bind(socket);
+
+      await drawCard("game-1", "stock");
+
+      expect(actionError.value).toBe("Cannot draw");
+    });
+
+    it("uses the fallback 'Cannot draw' when error is absent", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: false });
+      });
+      const { drawCard, actionError, bind } = useGameActions();
+      bind(socket);
+
+      await drawCard("game-1", "stock");
+
+      expect(actionError.value).toBe("Cannot draw");
+    });
+
+    it("resets actionPending to false after completion", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true });
+      });
+      const { drawCard, actionPending, bind } = useGameActions();
+      bind(socket);
+
+      await drawCard("game-1", "stock");
+
+      expect(actionPending.value).toBe(false);
+    });
+  });
+
+  describe("callTonk", () => {
+    it("throws before bind", async () => {
+      const { callTonk } = useGameActions();
+      await expect(callTonk("game-1")).rejects.toThrow(
+        "bind() must be called before emitting actions",
+      );
+    });
+
+    it("emits game:action with callTonk type and playerId ''", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true });
+      });
+      const { callTonk, bind } = useGameActions();
+      bind(socket);
+
+      await callTonk("game-1");
+
+      expect(socket.emit).toHaveBeenCalledWith(
+        "game:action",
+        {
+          gameId: "game-1",
+          action: { type: "callTonk", playerId: "" },
+        },
+        expect.any(Function),
+      );
+    });
+
+    it("sets actionError from a failed ack", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: false, error: "TONK gate is closed." });
+      });
+      const { callTonk, actionError, bind } = useGameActions();
+      bind(socket);
+
+      await callTonk("game-1");
+
+      expect(actionError.value).toBe("TONK gate is closed.");
+    });
+
+    it("uses the fallback 'Cannot call TONK' when error is absent", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: false });
+      });
+      const { callTonk, actionError, bind } = useGameActions();
+      bind(socket);
+
+      await callTonk("game-1");
+
+      expect(actionError.value).toBe("Cannot call TONK");
+    });
+
+    it("resets actionPending to false after completion", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true });
+      });
+      const { callTonk, actionPending, bind } = useGameActions();
+      bind(socket);
+
+      await callTonk("game-1");
+
+      expect(actionPending.value).toBe(false);
+    });
+  });
 });

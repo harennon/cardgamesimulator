@@ -5,8 +5,10 @@ import {
   LOSS_LINE,
   NEAR_LINE_THRESHOLD,
   cardLabel,
+  dimmedSelectionIndices,
   drawSourceLabel,
   drawableFromName,
+  isBadSelect,
   isCompactRail,
   isNearLine,
   isWrappingRail,
@@ -18,6 +20,7 @@ import {
   phaseTag,
   railSeats,
   rankedTallies,
+  selectionRankKey,
   trickLabel,
   trickResultSummary,
   turnLabel,
@@ -269,5 +272,86 @@ describe("tonkDisplay — log rendering", () => {
       discardCount: 1,
     };
     expect(trickResultSummary(entry, players(2))).toBeNull();
+  });
+});
+
+describe("tonkDisplay — same-rank discard selection hints (LLD 99)", () => {
+  function c(rank: Card["rank"], suit: Card["suit"]): Card {
+    return { rank, suit };
+  }
+
+  // Q♣ Q♦ K♠ J + a joker, by index.
+  const hand: TonkCard[] = [
+    c("Q", "clubs"),
+    c("Q", "diamonds"),
+    c("K", "spades"),
+    c("J", "hearts"),
+    { joker: true, id: 0 },
+  ];
+
+  describe("selectionRankKey", () => {
+    it("groups standard cards by rank", () => {
+      expect(selectionRankKey(c("Q", "clubs"))).toBe("Q");
+      expect(selectionRankKey(c("Q", "diamonds"))).toBe("Q");
+    });
+
+    it("groups all jokers under the 'joker' key (jokers group only with jokers)", () => {
+      expect(selectionRankKey({ joker: true, id: 0 })).toBe("joker");
+      expect(selectionRankKey({ joker: true, id: 7 })).toBe("joker");
+    });
+  });
+
+  describe("dimmedSelectionIndices", () => {
+    it("empty selection → nothing dimmed", () => {
+      expect(dimmedSelectionIndices(hand, new Set()).size).toBe(0);
+    });
+
+    it("a same-rank group dims every other-rank index (E4)", () => {
+      // Select both Queens (indices 0,1). Dimmed = K, J, joker (2,3,4).
+      const dimmed = dimmedSelectionIndices(hand, new Set([0, 1]));
+      expect([...dimmed].sort()).toEqual([2, 3, 4]);
+    });
+
+    it("selecting a single card dims all non-matching ranks", () => {
+      const dimmed = dimmedSelectionIndices(hand, new Set([0]));
+      expect([...dimmed].sort()).toEqual([2, 3, 4]);
+    });
+
+    it("selecting a joker dims all non-joker cards", () => {
+      const dimmed = dimmedSelectionIndices(hand, new Set([4]));
+      expect([...dimmed].sort()).toEqual([0, 1, 2, 3]);
+    });
+
+    it("a mixed-rank selection dims nothing (bad-select carries the feedback, E3)", () => {
+      const dimmed = dimmedSelectionIndices(hand, new Set([0, 2]));
+      expect(dimmed.size).toBe(0);
+    });
+  });
+
+  describe("isBadSelect", () => {
+    it("empty selection is not a bad select", () => {
+      expect(isBadSelect(hand, new Set())).toBe(false);
+    });
+
+    it("a single-rank selection is not a bad select (E4)", () => {
+      expect(isBadSelect(hand, new Set([0, 1]))).toBe(false);
+    });
+
+    it("a multi-rank selection is a bad select (E3)", () => {
+      expect(isBadSelect(hand, new Set([0, 2]))).toBe(true);
+    });
+
+    it("joker + a ranked card is a bad select (E16)", () => {
+      expect(isBadSelect(hand, new Set([0, 4]))).toBe(true);
+    });
+
+    it("two jokers are a single group, not a bad select", () => {
+      const jokerHand: TonkCard[] = [
+        { joker: true, id: 0 },
+        { joker: true, id: 1 },
+        c("Q", "clubs"),
+      ];
+      expect(isBadSelect(jokerHand, new Set([0, 1]))).toBe(false);
+    });
   });
 });
