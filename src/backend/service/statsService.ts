@@ -25,10 +25,24 @@ export class StatsService {
     for (const playerScore of state.scores) {
       if (this.isGuest(playerScore.playerId)) continue;
 
+      const breakdown = playerScore.breakdown;
+      const isLossCentric =
+        breakdown !== undefined && breakdown.trueLoser !== undefined;
+
+      let gamesWon: number;
+      let gamesLost: number;
+      if (isLossCentric) {
+        gamesLost = breakdown.trueLoser === 1 ? 1 : 0;
+        gamesWon = 1 - gamesLost;
+      } else {
+        gamesWon = playerScore.playerId === winnerId ? 1 : 0;
+        gamesLost = playerScore.playerId !== winnerId ? 1 : 0;
+      }
+
       const delta: StatsDelta = {
         gamesPlayed: 1,
-        gamesWon: playerScore.playerId === winnerId ? 1 : 0,
-        gamesLost: playerScore.playerId !== winnerId ? 1 : 0,
+        gamesWon,
+        gamesLost,
         totalScore: playerScore.score,
       };
 

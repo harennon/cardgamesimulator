@@ -240,4 +240,225 @@ describe("StatsService.recordGameCompletion", () => {
     // Both players were attempted
     expect(callCount).toBe(2);
   });
+
+  // -------------------------------------------------------------------------
+  // LLD 94: loss-centric (Tonk) win/loss derivation from breakdown.trueLoser
+  // -------------------------------------------------------------------------
+
+  // Tonk: multiple 150-crossers, but exactly one TRUE LOSER (joker-drawer).
+  // Every other player — including the second 150-crosser — won.
+  it("Tonk: only the true loser gets gamesLost:1; all others (incl. other 150-crossers) get gamesWon:1", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    const tonkState = makeCompletedState({
+      gameType: "tonk",
+      // winner is DISPLAY-only (lowest tally). Set it to a NON-true-loser to
+      // prove derivation ignores state.winner.
+      winner: "player-c",
+      players: [
+        { playerId: "player-a", displayName: "Alice" },
+        { playerId: "player-b", displayName: "Bob" },
+        { playerId: "player-c", displayName: "Carol" },
+      ],
+      scores: [
+        // player-a crossed 150 AND is the true loser
+        {
+          playerId: "player-a",
+          score: 160,
+          breakdown: { lost: 1, trueLoser: 1, finalTally: 160 },
+        },
+        // player-b ALSO crossed 150 but is NOT the true loser -> still won
+        {
+          playerId: "player-b",
+          score: 155,
+          breakdown: { lost: 1, trueLoser: 0, finalTally: 155 },
+        },
+        // player-c did not cross -> won
+        {
+          playerId: "player-c",
+          score: 40,
+          breakdown: { lost: 0, trueLoser: 0, finalTally: 40 },
+        },
+      ],
+    });
+
+    await service.recordGameCompletion(tonkState);
+
+    const calls = vi.mocked(repo.incrementStats).mock.calls;
+    const aDelta = calls.find((c) => c[0] === "player-a")![2] as StatsDelta;
+    const bDelta = calls.find((c) => c[0] === "player-b")![2] as StatsDelta;
+    const cDelta = calls.find((c) => c[0] === "player-c")![2] as StatsDelta;
+
+    // true loser
+    expect(aDelta.gamesLost).toBe(1);
+    expect(aDelta.gamesWon).toBe(0);
+
+    // second 150-crosser still won
+    expect(bDelta.gamesLost).toBe(0);
+    expect(bDelta.gamesWon).toBe(1);
+
+    // non-crosser (and the display-only winner) won
+    expect(cDelta.gamesLost).toBe(0);
+    expect(cDelta.gamesWon).toBe(1);
+
+    // across all players: exactly one loss, N-1 wins
+    const allDeltas = [aDelta, bDelta, cDelta];
+    expect(allDeltas.filter((d) => d.gamesLost === 1)).toHaveLength(1);
+    expect(allDeltas.filter((d) => d.gamesWon === 1)).toHaveLength(2);
+  });
+
+  // Tonk: gamesPlayed and totalScore (final tally) pass-through, delta keys unchanged.
+  it("Tonk: gamesPlayed:1 and totalScore == final tally for every player", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    const tonkState = makeCompletedState({
+      gameType: "tonk",
+      winner: "player-b",
+      players: [
+        { playerId: "player-a", displayName: "Alice" },
+        { playerId: "player-b", displayName: "Bob" },
+      ],
+      scores: [
+        {
+          playerId: "player-a",
+          score: 160,
+          breakdown: { lost: 1, trueLoser: 1, finalTally: 160 },
+        },
+        {
+          playerId: "player-b",
+          score: 35,
+          breakdown: { lost: 0, trueLoser: 0, finalTally: 35 },
+        },
+      ],
+    });
+
+    await service.recordGameCompletion(tonkState);
+
+    const calls = vi.mocked(repo.incrementStats).mock.calls;
+    const aDelta = calls.find((c) => c[0] === "player-a")![2] as StatsDelta;
+    const bDelta = calls.find((c) => c[0] === "player-b")![2] as StatsDelta;
+
+    expect(aDelta.gamesPlayed).toBe(1);
+    expect(bDelta.gamesPlayed).toBe(1);
+    expect(aDelta.totalScore).toBe(160);
+    expect(bDelta.totalScore).toBe(35);
+
+    expect(Object.keys(aDelta).sort()).toEqual(
+      ["gamesLost", "gamesPlayed", "gamesWon", "totalScore"].sort(),
+    );
+  });
+
+  // Defensive: breakdown present but lacking the trueLoser key -> single-winner path.
+  it("falls back to state.winner derivation when breakdown lacks a trueLoser key", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    const state = makeCompletedState({
+      gameType: "tonk",
+      winner: "player-a",
+      players: [
+        { playerId: "player-a", displayName: "Alice" },
+        { playerId: "player-b", displayName: "Bob" },
+      ],
+      scores: [
+        { playerId: "player-a", score: 10, breakdown: { lost: 0 } },
+        { playerId: "player-b", score: 50, breakdown: { lost: 1 } },
+      ],
+    });
+
+    await service.recordGameCompletion(state);
+
+    const calls = vi.mocked(repo.incrementStats).mock.calls;
+    const aDelta = calls.find((c) => c[0] === "player-a")![2] as StatsDelta;
+    const bDelta = calls.find((c) => c[0] === "player-b")![2] as StatsDelta;
+
+    // winner (player-a) by state.winner
+    expect(aDelta.gamesWon).toBe(1);
+    expect(aDelta.gamesLost).toBe(0);
+    // non-winner
+    expect(bDelta.gamesWon).toBe(0);
+    expect(bDelta.gamesLost).toBe(1);
+  });
+
+  // Guest who is the true loser is skipped; non-guest players still recorded correctly.
+  it("Tonk: a guest true loser is skipped; non-guests recorded with correct win/loss", async () => {
+    const repo = makeStatsRepo();
+    // player-a (the true loser) is a guest
+    const guestStore = makeGuestSessionStore(["player-a"]);
+    const service = new StatsService(repo, guestStore);
+
+    const tonkState = makeCompletedState({
+      gameType: "tonk",
+      winner: "player-b",
+      players: [
+        { playerId: "player-a", displayName: "Alice" },
+        { playerId: "player-b", displayName: "Bob" },
+        { playerId: "player-c", displayName: "Carol" },
+      ],
+      scores: [
+        {
+          playerId: "player-a",
+          score: 160,
+          breakdown: { lost: 1, trueLoser: 1, finalTally: 160 },
+        },
+        {
+          playerId: "player-b",
+          score: 30,
+          breakdown: { lost: 0, trueLoser: 0, finalTally: 30 },
+        },
+        {
+          playerId: "player-c",
+          score: 80,
+          breakdown: { lost: 0, trueLoser: 0, finalTally: 80 },
+        },
+      ],
+    });
+
+    await service.recordGameCompletion(tonkState);
+
+    const calls = vi.mocked(repo.incrementStats).mock.calls;
+    // guest true loser not recorded
+    expect(calls.find((c) => c[0] === "player-a")).toBeUndefined();
+    expect(repo.incrementStats).toHaveBeenCalledTimes(2);
+
+    // non-guest non-losers recorded as wins
+    const bDelta = calls.find((c) => c[0] === "player-b")![2] as StatsDelta;
+    const cDelta = calls.find((c) => c[0] === "player-c")![2] as StatsDelta;
+    expect(bDelta.gamesWon).toBe(1);
+    expect(bDelta.gamesLost).toBe(0);
+    expect(cDelta.gamesWon).toBe(1);
+    expect(cDelta.gamesLost).toBe(0);
+  });
+
+  // Edge case 4: trueLoser present but value !== 1 (e.g. 0) -> win.
+  it("Tonk: trueLoser value other than 1 yields a win", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    const state = makeCompletedState({
+      gameType: "tonk",
+      winner: "player-a",
+      players: [{ playerId: "player-a", displayName: "Alice" }],
+      scores: [
+        {
+          playerId: "player-a",
+          score: 20,
+          breakdown: { lost: 0, trueLoser: 0, finalTally: 20 },
+        },
+      ],
+    });
+
+    await service.recordGameCompletion(state);
+
+    const calls = vi.mocked(repo.incrementStats).mock.calls;
+    const aDelta = calls.find((c) => c[0] === "player-a")![2] as StatsDelta;
+    expect(aDelta.gamesWon).toBe(1);
+    expect(aDelta.gamesLost).toBe(0);
+  });
 });
