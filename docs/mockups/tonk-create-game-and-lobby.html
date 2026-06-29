@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tonk — Create Game &amp; Lobby Mockups</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===== Tokens lifted from src/frontend/styles/game-variables.css ===== */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --input-border: var(--table-rim-light);
+        --input-border-focus: var(--gold-accent);
+        --input-text: var(--text-primary);
+        --input-placeholder: var(--text-muted);
+        --input-radius: 6px;
+
+        --btn-primary-bg: var(--gold-accent);
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-radius: 6px;
+        --btn-disabled-opacity: 0.4;
+
+        --page-max-width: 420px;
+        --card-panel-bg: var(--panel-bg);
+        --card-panel-border: var(--table-rim-light);
+        --card-panel-radius: 12px;
+        --card-panel-padding: 40px 48px;
+        --error-text: #e05555;
+
+        /* Tonk board tokens (LLD 88) — reused so Tonk has a recognizable accent */
+        --tonk-cyan: #3fd0d8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            1200px 800px at 50% -10%,
+            rgba(37, 107, 66, 0.35),
+            transparent 60%
+          ),
+          var(--felt);
+        background-attachment: fixed;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        padding: 32px 16px 96px;
+      }
+
+      /* faint felt weave so it doesn't read as a flat fill */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        background-image:
+          repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(-45deg, #000 0 1px, transparent 1px 3px);
+        background-size: 6px 6px;
+      }
+
+      .doc-head {
+        max-width: 1100px;
+        margin: 0 auto 28px;
+        text-align: center;
+      }
+      .doc-head h1 {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.7rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.02em;
+        margin: 0 0 6px;
+      }
+      .doc-head p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin: 0 auto;
+        max-width: 620px;
+        line-height: 1.5;
+      }
+
+      .section-label {
+        max-width: 1100px;
+        margin: 44px auto 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--gold-accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .section-label::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          rgba(201, 168, 76, 0.5),
+          transparent
+        );
+      }
+      .section-label .hint {
+        color: var(--text-muted);
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-transform: none;
+        font-size: 0.78rem;
+      }
+
+      .stage {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .panel-caption {
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        margin: 10px 0 0;
+      }
+      .panel-caption b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* ===================== FORM CARD (mirrors flows.css) ===================== */
+      .frame {
+        width: 100%;
+        max-width: var(--page-max-width);
+      }
+
+      .form-card {
+        background: var(--card-panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        padding: var(--card-panel-padding);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(2px);
+      }
+      .form-card__title {
+        font-family: var(--font-ui);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-align: center;
+        margin: 0;
+      }
+      .form-card__field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .form-card__label {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .form-card__input {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        padding: 10px 14px;
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: var(--input-radius);
+        color: var(--input-text);
+        outline: none;
+        transition: border-color 0.15s ease;
+        width: 100%;
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23c9a84c' stroke-width='1.6' stroke-linecap='round'/></svg>");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+      }
+      .form-card__input:focus {
+        border-color: var(--input-border-focus);
+      }
+      .form-card__input option {
+        background: #1a0f06;
+        color: var(--text-primary);
+      }
+
+      .form-card__range {
+        width: 100%;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: var(--input-bg);
+        border: 1px solid var(--input-border);
+        border-radius: 3px;
+        outline: none;
+        cursor: pointer;
+      }
+      .form-card__range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        cursor: pointer;
+        box-shadow: 0 0 0 4px rgba(201, 168, 76, 0.15);
+      }
+      .form-card__range::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        border: none;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: var(--btn-radius);
+        border: none;
+        cursor: pointer;
+        background: var(--btn-primary-bg);
+        color: var(--btn-primary-text);
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease;
+        width: 100%;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--btn-primary-hover);
+      }
+      .btn-primary:disabled {
+        opacity: var(--btn-disabled-opacity);
+        cursor: not-allowed;
+      }
+
+      /* Range header row: label on the left, live value chip on the right */
+      .range-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .range-value {
+        font-family: var(--font-ui);
+        font-weight: 700;
+        color: var(--gold-accent);
+        font-size: 0.95rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .range-scale {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 4px;
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Conditional Tonk-only block reveal */
+      .tonk-only {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        border-left: 2px solid var(--tonk-cyan);
+        padding-left: 12px;
+        margin-left: -2px;
+        animation: revealDown 0.22s ease;
+      }
+      @keyframes revealDown {
+        from {
+          opacity: 0;
+          transform: translateY(-4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .help-text {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+        margin: 2px 0 0;
+      }
+
+      /* ----- Direction B: segmented "deck longevity" stepper ----- */
+      .seg {
+        display: flex;
+        gap: 4px;
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: var(--input-radius);
+        padding: 4px;
+        flex-wrap: wrap;
+      }
+      .seg button {
+        flex: 1 1 0;
+        min-width: 30px;
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        padding: 7px 0;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition:
+          background 0.12s ease,
+          color 0.12s ease;
+      }
+      .seg button:hover {
+        color: var(--text-primary);
+      }
+      .seg button[aria-pressed="true"] {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .seg-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+      .seg-meta b {
+        color: var(--tonk-cyan);
+        font-weight: 700;
+      }
+
+      /* ===================== LOBBY (mirrors GameLobbyView.vue) ===================== */
+      .lobby__panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 36px 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        min-width: 360px;
+        width: 100%;
+        max-width: 440px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+      }
+      /* NEW for Tonk: header row carrying title + game-type badge */
+      .lobby__header {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .lobby__title {
+        font-family: var(--font-ui);
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0;
+      }
+      .lobby__type-badge {
+        font-family: var(--font-ui);
+        font-size: 0.74rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-primary);
+        background: rgba(63, 208, 216, 0.1);
+        border: 1px solid rgba(63, 208, 216, 0.5);
+        border-radius: 999px;
+        padding: 4px 12px;
+      }
+      .lobby__type-badge[data-type="big2"] {
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.1);
+        border-color: rgba(201, 168, 76, 0.5);
+      }
+
+      .lobby__chip-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .lobby__chip-label {
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+      .lobby__chip {
+        font-family: "Courier New", Courier, monospace;
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: 0.3em;
+        color: var(--gold-accent);
+        background: transparent;
+        border: 3px solid var(--gold-accent);
+        border-radius: 12px;
+        padding: 12px 24px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        text-transform: uppercase;
+        line-height: 1;
+      }
+      .lobby__chip:hover {
+        background: rgba(212, 180, 90, 0.1);
+      }
+
+      /* NEW: count line so player count is always visible (CX: "Players (3/5)") */
+      .lobby__count {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        align-self: flex-start;
+      }
+      .lobby__count b {
+        color: var(--text-primary);
+      }
+
+      .lobby__players {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .lobby__player {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        padding: 10px 16px;
+        background: rgba(45, 24, 16, 0.6);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lobby__player .host-tag {
+        margin-left: auto;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+      }
+      .lobby__player .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--tonk-cyan);
+        box-shadow: 0 0 8px rgba(63, 208, 216, 0.7);
+      }
+      .lobby__player--empty {
+        color: var(--text-muted);
+        font-weight: 400;
+        font-style: italic;
+      }
+      .lobby__player--empty .dot {
+        background: transparent;
+        border: 1.5px solid var(--text-muted);
+        box-shadow: none;
+      }
+
+      .lobby__actions {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+      }
+      .lobby__btn {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 10px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease;
+      }
+      .lobby__btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .lobby__btn--start {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        width: 100%;
+      }
+      .lobby__btn--start:not(:disabled):hover {
+        background: #d4b45a;
+      }
+      .lobby__hint {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        font-style: italic;
+        margin-top: 8px;
+        text-align: center;
+      }
+      .lobby__btn--copy {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+        font-size: 0.85rem;
+        padding: 8px 16px;
+      }
+      .lobby__btn--copy:hover {
+        border-color: var(--text-primary);
+        background: rgba(232, 220, 200, 0.08);
+      }
+      .lobby__invite {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      /* toggle pills for live demo */
+      .demo-toggle {
+        max-width: 1100px;
+        margin: 4px auto 0;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .demo-toggle button {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 7px 16px;
+        border-radius: 999px;
+        border: 1.5px solid var(--table-rim-light);
+        background: var(--input-bg);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .demo-toggle button.active {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      @media (max-width: 767px) {
+        .form-card,
+        .lobby__panel {
+          padding: 28px 20px;
+        }
+        .lobby__panel {
+          min-width: unset;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc-head">
+      <h1>Tonk · Create Game &amp; Lobby</h1>
+      <p>
+        Frontend mockups for issue&nbsp;#104. The create form gains a Tonk
+        option, an adaptive player-count range (Big&nbsp;2: 2–4, Tonk: 3–8), and
+        a
+        <em>Deck Length</em> control (<code>deckRoundsTarget</code>, 5–12,
+        default&nbsp;8) shown only for Tonk. The lobby gains a game-type label
+        and a min-players-aware Start button. The deck-length control is shown
+        in <b>two directions</b> below — pick one.
+      </p>
+    </div>
+
+    <!-- =========================================================
+       CREATE FORM — live demo (switches game type)
+       ========================================================= -->
+    <div class="section-label">
+      Create Game form
+      <span class="hint"
+        >live — switch the game type to see the form adapt</span
+      >
+    </div>
+
+    <div class="demo-toggle">
+      <button id="t-big2" onclick="setType('big2')">Big&nbsp;2</button>
+      <button id="t-tonk" class="active" onclick="setType('tonk')">Tonk</button>
+    </div>
+
+    <div class="stage" style="margin-top: 18px">
+      <!-- ---------- Direction A: slider deck-length control ---------- -->
+      <div class="frame">
+        <form class="form-card" onsubmit="return false;">
+          <h2 class="form-card__title">Create a Game</h2>
+
+          <div class="form-card__field">
+            <label class="form-card__label">Game Type</label>
+            <select
+              class="form-card__input"
+              id="gametypeA"
+              onchange="setType(this.value)"
+            >
+              <option value="big2">Big 2</option>
+              <option value="tonk" selected>Tonk</option>
+            </select>
+          </div>
+
+          <div class="form-card__field">
+            <div class="range-head">
+              <label class="form-card__label">Players</label>
+              <span class="range-value"><span id="pcA">3</span></span>
+            </div>
+            <input
+              class="form-card__range"
+              type="range"
+              id="prangeA"
+              min="3"
+              max="8"
+              step="1"
+              value="3"
+              oninput="onPlayers('A', this.value)"
+            />
+            <div class="range-scale">
+              <span id="pminA">3</span><span id="pmaxA">8</span>
+            </div>
+          </div>
+
+          <!-- TONK-ONLY: Deck Length slider -->
+          <div class="form-card__field tonk-only" id="deckA">
+            <div class="range-head">
+              <label class="form-card__label">Deck Length</label>
+              <span class="range-value"><span id="drA">8</span> rounds</span>
+            </div>
+            <input
+              class="form-card__range"
+              type="range"
+              id="drrangeA"
+              min="5"
+              max="12"
+              step="1"
+              value="8"
+              oninput="document.getElementById('drA').textContent = this.value"
+            />
+            <div class="range-scale"><span>5</span><span>12</span></div>
+            <p class="help-text">
+              How many rounds the deck should last before it’s recut. Lower =
+              the deck shrinks and the card set changes more often.
+            </p>
+          </div>
+
+          <div class="form-card__field">
+            <label class="form-card__label">Turn Timer</label>
+            <select class="form-card__input">
+              <option>30 seconds</option>
+              <option selected>60 seconds</option>
+              <option>90 seconds</option>
+            </select>
+          </div>
+
+          <button class="btn-primary">Create Game</button>
+        </form>
+        <p class="panel-caption">
+          <b>Direction A</b> — Deck Length as a slider (mirrors the Players
+          range).
+        </p>
+      </div>
+
+      <!-- ---------- Direction B: segmented deck-length stepper ---------- -->
+      <div class="frame">
+        <form class="form-card" onsubmit="return false;">
+          <h2 class="form-card__title">Create a Game</h2>
+
+          <div class="form-card__field">
+            <label class="form-card__label">Game Type</label>
+            <select
+              class="form-card__input"
+              id="gametypeB"
+              onchange="setType(this.value)"
+            >
+              <option value="big2">Big 2</option>
+              <option value="tonk" selected>Tonk</option>
+            </select>
+          </div>
+
+          <div class="form-card__field">
+            <div class="range-head">
+              <label class="form-card__label">Players</label>
+              <span class="range-value"><span id="pcB">3</span></span>
+            </div>
+            <input
+              class="form-card__range"
+              type="range"
+              id="prangeB"
+              min="3"
+              max="8"
+              step="1"
+              value="3"
+              oninput="onPlayers('B', this.value)"
+            />
+            <div class="range-scale">
+              <span id="pminB">3</span><span id="pmaxB">8</span>
+            </div>
+          </div>
+
+          <!-- TONK-ONLY: Deck Length segmented stepper -->
+          <div class="form-card__field tonk-only" id="deckB">
+            <label class="form-card__label">Deck Length (rounds)</label>
+            <div
+              class="seg"
+              id="segB"
+              role="group"
+              aria-label="Deck length in rounds"
+            >
+              <!-- buttons injected by JS for 5..12 -->
+            </div>
+            <div class="seg-meta">
+              <span>shorter deck</span>
+              <span>default <b>8</b></span>
+              <span>longer deck</span>
+            </div>
+            <p class="help-text">
+              How many rounds the deck should last before it’s recut. Discrete
+              choice, 5–12, default 8.
+            </p>
+          </div>
+
+          <div class="form-card__field">
+            <label class="form-card__label">Turn Timer</label>
+            <select class="form-card__input">
+              <option>30 seconds</option>
+              <option selected>60 seconds</option>
+              <option>90 seconds</option>
+            </select>
+          </div>
+
+          <button class="btn-primary">Create Game</button>
+        </form>
+        <p class="panel-caption">
+          <b>Direction B</b> — Deck Length as a segmented stepper (5–12, tap to
+          pick).
+        </p>
+      </div>
+    </div>
+
+    <p class="panel-caption" style="max-width: 680px; margin: 20px auto 0">
+      Switch to <b>Big&nbsp;2</b> above: the Deck Length block disappears in
+      both forms, the Players range snaps to 2–4, and a count above 4 re-clamps
+      down — demonstrating the type-change re-clamp acceptance criterion.
+    </p>
+
+    <!-- =========================================================
+       LOBBY — Tonk, two states side by side (static)
+       ========================================================= -->
+    <div class="section-label">
+      Game Lobby — Tonk
+      <span class="hint"
+        >left: not enough players (Start disabled) · right: ready to start</span
+      >
+    </div>
+
+    <div class="stage">
+      <!-- Lobby state 1: below min players -->
+      <div>
+        <div class="lobby__panel">
+          <div class="lobby__header">
+            <h2 class="lobby__title">Game Lobby</h2>
+            <span class="lobby__type-badge" data-type="tonk"
+              >Tonk · up to 5</span
+            >
+          </div>
+
+          <div class="lobby__chip-container">
+            <span class="lobby__chip-label">Room Code</span>
+            <button class="lobby__chip">7QK2</button>
+          </div>
+
+          <div class="lobby__count">Players <b>2</b> / 5</div>
+          <div class="lobby__players">
+            <div class="lobby__player">
+              <span class="dot"></span>Mara<span class="host-tag">Host</span>
+            </div>
+            <div class="lobby__player"><span class="dot"></span>Devon</div>
+            <div class="lobby__player lobby__player--empty">
+              <span class="dot"></span>Waiting for player…
+            </div>
+            <div class="lobby__player lobby__player--empty">
+              <span class="dot"></span>Waiting for player…
+            </div>
+            <div class="lobby__player lobby__player--empty">
+              <span class="dot"></span>Waiting for player…
+            </div>
+          </div>
+
+          <div
+            class="lobby__actions"
+            style="flex-direction: column; width: 100%"
+          >
+            <button class="lobby__btn lobby__btn--start" disabled>
+              Start Game
+            </button>
+            <span class="lobby__hint"
+              >Tonk needs at least 3 players to start (1 more)</span
+            >
+          </div>
+
+          <div class="lobby__invite">
+            <button class="lobby__btn lobby__btn--copy">
+              Copy Invite Link
+            </button>
+          </div>
+        </div>
+        <p class="panel-caption">
+          Min-players gate is <b>3 for Tonk</b> (Big&nbsp;2 is 2). Start stays
+          disabled.
+        </p>
+      </div>
+
+      <!-- Lobby state 2: ready to start -->
+      <div>
+        <div class="lobby__panel">
+          <div class="lobby__header">
+            <h2 class="lobby__title">Game Lobby</h2>
+            <span class="lobby__type-badge" data-type="tonk"
+              >Tonk · up to 5</span
+            >
+          </div>
+
+          <div class="lobby__chip-container">
+            <span class="lobby__chip-label">Room Code</span>
+            <button class="lobby__chip">7QK2</button>
+          </div>
+
+          <div class="lobby__count">Players <b>4</b> / 5</div>
+          <div class="lobby__players">
+            <div class="lobby__player">
+              <span class="dot"></span>Mara<span class="host-tag">Host</span>
+            </div>
+            <div class="lobby__player"><span class="dot"></span>Devon</div>
+            <div class="lobby__player"><span class="dot"></span>Priya</div>
+            <div class="lobby__player"><span class="dot"></span>Jules</div>
+            <div class="lobby__player lobby__player--empty">
+              <span class="dot"></span>Waiting for player…
+            </div>
+          </div>
+
+          <div class="lobby__actions">
+            <button class="lobby__btn lobby__btn--start">Start Game</button>
+          </div>
+
+          <div class="lobby__invite">
+            <button class="lobby__btn lobby__btn--copy">
+              Copy Invite Link
+            </button>
+          </div>
+        </div>
+        <p class="panel-caption">
+          ≥ 3 players present → host can start. Count line + type badge always
+          visible.
+        </p>
+      </div>
+    </div>
+
+    <!-- For contrast: Big2 lobby badge uses gold, range label says up to 4 -->
+    <div class="section-label">
+      Game Lobby — Big&nbsp;2 (regression check)
+      <span class="hint"
+        >same component, no Tonk-specific assumptions leak in</span
+      >
+    </div>
+    <div class="stage">
+      <div>
+        <div class="lobby__panel">
+          <div class="lobby__header">
+            <h2 class="lobby__title">Game Lobby</h2>
+            <span class="lobby__type-badge" data-type="big2"
+              >Big 2 · up to 4</span
+            >
+          </div>
+          <div class="lobby__chip-container">
+            <span class="lobby__chip-label">Room Code</span>
+            <button class="lobby__chip">A3F9</button>
+          </div>
+          <div class="lobby__count">Players <b>2</b> / 4</div>
+          <div class="lobby__players">
+            <div class="lobby__player">
+              <span class="dot"></span>Alice<span class="host-tag">Host</span>
+            </div>
+            <div class="lobby__player"><span class="dot"></span>Bob</div>
+            <div class="lobby__player lobby__player--empty">
+              <span class="dot"></span>Waiting for player…
+            </div>
+            <div class="lobby__player lobby__player--empty">
+              <span class="dot"></span>Waiting for player…
+            </div>
+          </div>
+          <div class="lobby__actions">
+            <button class="lobby__btn lobby__btn--start">Start Game</button>
+          </div>
+          <div class="lobby__invite">
+            <button class="lobby__btn lobby__btn--copy">
+              Copy Invite Link
+            </button>
+          </div>
+        </div>
+        <p class="panel-caption">
+          Big&nbsp;2 min is <b>2</b>, so Start is enabled at 2 players — gate is
+          data-driven, not hardcoded.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      // Per-game-type config the real component will derive (client only renders;
+      // these limits mirror LLD 65 §9.1 / engine config — no rule logic here).
+      const RANGE = {
+        big2: {
+          min: 2,
+          max: 4,
+          deck: false,
+          label: "Big 2 · up to 4",
+          badge: "big2",
+        },
+        tonk: {
+          min: 3,
+          max: 8,
+          deck: true,
+          label: "Tonk · up to 8",
+          badge: "tonk",
+        },
+      };
+
+      function clamp(v, lo, hi) {
+        return Math.min(hi, Math.max(lo, v));
+      }
+
+      function applyRange(suffix, type) {
+        const cfg = RANGE[type];
+        const range = document.getElementById("prange" + suffix);
+        const cur = parseInt(range.value, 10);
+        const next = clamp(cur, cfg.min, cfg.max); // re-clamp on type change
+        range.min = cfg.min;
+        range.max = cfg.max;
+        range.value = next;
+        document.getElementById("pc" + suffix).textContent = next;
+        document.getElementById("pmin" + suffix).textContent = cfg.min;
+        document.getElementById("pmax" + suffix).textContent = cfg.max;
+      }
+
+      function onPlayers(suffix, val) {
+        document.getElementById("pc" + suffix).textContent = val;
+      }
+
+      function setType(type) {
+        // keep both selects + toggle pills in sync (single demo of one state)
+        document.getElementById("gametypeA").value = type;
+        document.getElementById("gametypeB").value = type;
+        document
+          .getElementById("t-big2")
+          .classList.toggle("active", type === "big2");
+        document
+          .getElementById("t-tonk")
+          .classList.toggle("active", type === "tonk");
+
+        const showDeck = RANGE[type].deck;
+        document.getElementById("deckA").style.display = showDeck
+          ? "flex"
+          : "none";
+        document.getElementById("deckB").style.display = showDeck
+          ? "flex"
+          : "none";
+
+        applyRange("A", type);
+        applyRange("B", type);
+      }
+
+      // Build the segmented stepper for Direction B (5..12, default 8)
+      (function buildSeg() {
+        const seg = document.getElementById("segB");
+        for (let r = 5; r <= 12; r++) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.textContent = r;
+          b.setAttribute("aria-pressed", r === 8 ? "true" : "false");
+          b.onclick = () => {
+            seg
+              .querySelectorAll("button")
+              .forEach((x) => x.setAttribute("aria-pressed", "false"));
+            b.setAttribute("aria-pressed", "true");
+          };
+          seg.appendChild(b);
+        }
+      })();
+
+      setType("tonk"); // initial state
+    </script>
+  </body>
+</html>
