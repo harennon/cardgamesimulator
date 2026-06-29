@@ -114,6 +114,89 @@ export class GameService {
   }
 
   /**
+   * Create and start a fresh game from a finished one.
+   * - requesterId must be the finished game's host (playerIds[0]).
+   * - oldGame.status must be COMPLETED.
+   * - connectedPlayerIds is the eligible roster (connected players from the old
+   *   game), passed in by the socket layer (the service has no connection knowledge).
+   * - Reuses oldGame.joinCode (transferred), maxPlayers, gameType, turnTimerSeconds.
+   * Returns the new game's id and started state.
+   * Throws: GAME_NOT_FOUND, NOT_HOST, GAME_NOT_FINISHED, REMATCH_ALREADY_STARTED,
+   *   NOT_ENOUGH_PLAYERS.
+   */
+  async createRematch(
+    oldGameId: string,
+    requesterId: PlayerId,
+    connectedPlayerIds: readonly PlayerId[],
+  ): Promise<{ newGameId: string; state: InternalGameState }> {
+    const oldGame = await this.gameRepo.getGame(oldGameId);
+    if (!oldGame) {
+      throw new Error("GAME_NOT_FOUND");
+    }
+    if (oldGame.status !== "COMPLETED") {
+      throw new Error("GAME_NOT_FINISHED");
+    }
+    if (oldGame.playerIds[0] !== requesterId) {
+      throw new Error("NOT_HOST");
+    }
+    // Idempotency guard: a finished game may be rematched at most once. A prior
+    // rematch transferred the code away, leaving join_code === null.
+    if (oldGame.joinCode === null) {
+      throw new Error("REMATCH_ALREADY_STARTED");
+    }
+    const transferCode = oldGame.joinCode;
+
+    // Carry over only connected players, preserving old order, host first.
+    const connectedSet = new Set(connectedPlayerIds);
+    const rematchPlayerIds = oldGame.playerIds.filter((id) =>
+      connectedSet.has(id),
+    );
+    const hostIndex = rematchPlayerIds.indexOf(requesterId);
+    if (hostIndex > 0) {
+      rematchPlayerIds.splice(hostIndex, 1);
+      rematchPlayerIds.unshift(requesterId);
+    }
+    if (rematchPlayerIds.length < 2) {
+      throw new Error("NOT_ENOUGH_PLAYERS");
+    }
+
+    const newGameId = crypto.randomUUID();
+
+    // Free the code on the old row and invalidate its cache entry BEFORE inserting
+    // the new row, so the partial unique index on join_code is satisfied.
+    await this.gameRepo.clearJoinCode(oldGameId);
+    this.joinCodeCache.set(oldGameId, null);
+
+    const hostDisplayName =
+      oldGame.playerDisplayNames?.[requesterId] ?? requesterId;
+    const newGame = await this.gameRepo.createGame(
+      newGameId,
+      oldGame.gameType,
+      requesterId,
+      oldGame.maxPlayers,
+      hostDisplayName,
+      oldGame.turnTimerSeconds,
+      transferCode,
+    );
+
+    // Attach the remaining carried-over players (createGame only seeds the host).
+    newGame.playerIds = [...rematchPlayerIds];
+    newGame.playerDisplayNames = Object.fromEntries(
+      rematchPlayerIds.map((id) => [
+        id,
+        oldGame.playerDisplayNames?.[id] ?? id,
+      ]),
+    );
+    await this.gameRepo.saveGame(newGame);
+
+    this.joinCodeCache.set(newGameId, transferCode);
+
+    const state = await this.startGame(newGameId, requesterId);
+
+    return { newGameId, state };
+  }
+
+  /**
    * Apply a game action. Returns the new state on success.
    * Throws on invalid action or game not found.
    */

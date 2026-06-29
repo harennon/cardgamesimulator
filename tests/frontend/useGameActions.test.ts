@@ -3,6 +3,7 @@ import type { Card } from "../../src/shared/engine-types.js";
 import type {
   GameStartResponse,
   GameActionResponse,
+  GameRematchResponse,
 } from "../../src/shared/socket-events.js";
 import type { TypedClientSocket } from "../../src/frontend/composables/useSocket.js";
 import { useGameActions } from "../../src/frontend/composables/useGameActions.js";
@@ -179,6 +180,87 @@ describe("useGameActions", () => {
       bind(socket);
 
       await startGame("game-1");
+
+      expect(actionPending.value).toBe(false);
+    });
+  });
+
+  describe("rematch", () => {
+    it("throws before bind", async () => {
+      const { rematch } = useGameActions();
+      await expect(rematch("game-1")).rejects.toThrow(
+        "bind() must be called before emitting actions",
+      );
+    });
+
+    it("emits game:rematch with the given gameId", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true, newGameId: "new-1" });
+      });
+      const { rematch, bind } = useGameActions();
+      bind(socket);
+
+      await rematch("game-42");
+
+      expect(socket.emit).toHaveBeenCalledWith(
+        "game:rematch",
+        { gameId: "game-42" },
+        expect.any(Function),
+      );
+    });
+
+    it("returns success and newGameId on a successful response", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({
+          success: true,
+          newGameId: "new-1",
+        } satisfies GameRematchResponse);
+      });
+      const { rematch, bind } = useGameActions();
+      bind(socket);
+
+      const result = await rematch("game-1");
+
+      expect(result.success).toBe(true);
+      expect(result.newGameId).toBe("new-1");
+    });
+
+    it("returns success: false and sets actionError on failure", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({
+          success: false,
+          error: "NOT_ENOUGH_PLAYERS",
+        } satisfies GameRematchResponse);
+      });
+      const { rematch, actionError, bind } = useGameActions();
+      bind(socket);
+
+      const result = await rematch("game-1");
+
+      expect(result.success).toBe(false);
+      expect(actionError.value).toBe("NOT_ENOUGH_PLAYERS");
+    });
+
+    it("uses a fallback error message when the error field is absent", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: false } satisfies GameRematchResponse);
+      });
+      const { rematch, actionError, bind } = useGameActions();
+      bind(socket);
+
+      await rematch("game-1");
+
+      expect(actionError.value).toBe("Failed to start rematch");
+    });
+
+    it("resets actionPending to false after completion", async () => {
+      const { socket } = makeMockSocket((_, __, ack) => {
+        ack({ success: true, newGameId: "new-1" });
+      });
+      const { rematch, actionPending, bind } = useGameActions();
+      bind(socket);
+
+      await rematch("game-1");
 
       expect(actionPending.value).toBe(false);
     });

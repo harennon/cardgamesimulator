@@ -74,15 +74,37 @@
 
       <div class="game-over__actions">
         <button
+          v-if="isHost"
           class="game-over__btn game-over__btn--rematch"
-          disabled
-          title="Coming soon"
+          data-testid="rematch-button"
+          :disabled="!canRematch || rematchPending"
+          @click="onRematch"
         >
-          Rematch
+          {{ rematchPending ? "Dealing a new hand…" : "Rematch" }}
         </button>
+        <span v-else class="game-over__waiting" data-testid="rematch-waiting">
+          <span class="game-over__pulse-dot"></span>
+          Host can start a rematch
+        </span>
         <button class="game-over__btn game-over__btn--home" @click="goHome">
           Back to Home
         </button>
+      </div>
+
+      <div
+        v-if="isHost && !canRematch"
+        class="game-over__rematch-hint"
+        data-testid="rematch-too-few"
+      >
+        Only you are still here. Need at least 2 players.
+      </div>
+
+      <div
+        v-if="rematchError"
+        class="game-over__rematch-error"
+        data-testid="rematch-error"
+      >
+        Couldn't start rematch. Try again.
       </div>
 
       <div v-if="isGuest" class="game-over__guest-nudge">
@@ -121,13 +143,24 @@ const props = defineProps<{
   players: readonly PlayerPublicInfo[];
   isGuest: boolean;
   gameId: string;
+  isHost: boolean;
+  rematchPending: boolean;
+  rematchError: string | null;
   playHistory?: readonly Big2HistoryEntry[];
   currentPlayerId?: string;
   totalTurns?: number;
   finalPlay?: Big2Play | null;
 }>();
 
+const emit = defineEmits<{
+  rematch: [];
+}>();
+
 const router = useRouter();
+
+// Host can rematch only when at least 2 players are present in the results
+// roster. The server is the final authority; this drives the button's state.
+const canRematch = computed(() => props.isHost && props.players.length >= 2);
 
 const scoreRows = computed(() => {
   const totalPlayers = props.scores.length;
@@ -176,6 +209,10 @@ const finalPlayByName = computed(() => {
 
 function goHome(): void {
   router.push("/");
+}
+
+function onRematch(): void {
+  emit("rematch");
 }
 </script>
 
@@ -362,10 +399,71 @@ function goHome(): void {
 
 .game-over__btn--rematch {
   background: transparent;
+  color: var(--gold-accent);
+  border: 1.5px solid var(--gold-accent);
+}
+
+.game-over__btn--rematch:hover:not(:disabled) {
+  background: var(--gold-glow);
+}
+
+.game-over__btn--rematch:disabled {
   color: var(--text-muted);
-  border: 1.5px solid var(--text-muted);
+  border-color: var(--text-muted);
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.game-over__waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 10px 0;
+}
+
+.game-over__pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold-accent);
+  animation: pulseDot 1.4s ease-in-out infinite;
+}
+
+.game-over__rematch-hint {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.game-over__rematch-error {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: #e05555;
+  text-align: center;
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-over__pulse-dot {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .game-over__btn--home {
@@ -465,6 +563,13 @@ function goHome(): void {
 
   .game-over__btn {
     width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .game-over__waiting {
+    width: 100%;
+    justify-content: center;
     min-height: 48px;
     font-size: 16px;
   }

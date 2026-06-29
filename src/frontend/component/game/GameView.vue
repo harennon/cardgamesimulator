@@ -67,15 +67,20 @@
     :players="gameState.players"
     :is-guest="isGuest"
     :game-id="gameId"
+    :is-host="isHost"
+    :rematch-pending="actionPending"
+    :rematch-error="rematchError"
     :play-history="gameOverPlayHistory"
     :current-player-id="gameState.you.playerId"
     :total-turns="gameState.turnNumber"
     :final-play="finalPlay"
+    @rematch="onRematch"
   />
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 import type { PlayerInfo } from "@shared/engine-types";
 import type { Big2PublicState, Big2Play } from "@shared/big2-types";
 import { axiosInstance } from "@/service/http";
@@ -111,6 +116,7 @@ const {
 } = useGameState();
 const {
   startGame,
+  rematch,
   playCards,
   pass,
   actionError,
@@ -118,6 +124,8 @@ const {
   bind: bindActions,
   unbind: unbindActions,
 } = useGameActions();
+
+const router = useRouter();
 
 const hand = computed(() => gameState.value?.you.hand ?? []);
 const {
@@ -139,6 +147,10 @@ const maxPlayers = ref(4);
 const isHost = ref(false);
 const isGuest = ref(false);
 const turnTimerSeconds = ref<number | null>(null);
+const rematchError = ref<string | null>(null);
+// Guards against double-navigation when the host receives both its own ack and
+// the broadcast. router.push to the same path is a no-op, but this avoids racing.
+let navigatedToRematch = false;
 
 // REST-fetched status is used for initial CREATED render before socket connects.
 // Once useGameState receives a game:state event, status.value takes precedence.
@@ -258,6 +270,12 @@ onMounted(async () => {
     );
   });
 
+  // Pulls non-host clients (and the host, whichever arrives first) into the new
+  // game when the host starts a rematch.
+  s.on("game:rematchStarted", ({ newGameId }) => {
+    navigateToRematch(newGameId);
+  });
+
   // Bind listeners BEFORE emitting game:join so we don't miss the initial game:state
   // event (server emits it before the ack for IN_PROGRESS/COMPLETED games).
   bindState(s);
@@ -286,6 +304,22 @@ onUnmounted(() => {
 
 async function onStartGame(): Promise<void> {
   await startGame(props.gameId);
+}
+
+function navigateToRematch(newGameId: string): void {
+  if (navigatedToRematch) return;
+  navigatedToRematch = true;
+  router.push(`/game/${newGameId}`);
+}
+
+async function onRematch(): Promise<void> {
+  rematchError.value = null;
+  const result = await rematch(props.gameId);
+  if (result.success && result.newGameId) {
+    navigateToRematch(result.newGameId);
+  } else {
+    rematchError.value = result.error ?? "Failed to start rematch";
+  }
 }
 
 async function onPlay(): Promise<void> {

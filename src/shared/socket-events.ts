@@ -27,6 +27,12 @@ export interface ClientToServerEvents {
     payload: GameStartPayload,
     ack: (response: GameStartResponse) => void,
   ) => void;
+
+  /** Host starts a rematch from the game-over screen. */
+  "game:rematch": (
+    payload: GameRematchPayload,
+    ack: (response: GameRematchResponse) => void,
+  ) => void;
 }
 
 export interface GameJoinPayload {
@@ -63,6 +69,19 @@ export interface GameStartPayload {
 
 export interface GameStartResponse {
   success: boolean;
+  error?: string;
+}
+
+export interface GameRematchPayload {
+  gameId: string; // the FINISHED game's id
+}
+
+export interface GameRematchResponse {
+  success: boolean;
+  newGameId?: string; // present on success
+  // Free-form string, matching the existing ack convention. The rematch handler
+  // populates this with one of: NOT_HOST, GAME_NOT_FINISHED, NOT_ENOUGH_PLAYERS,
+  // GAME_NOT_FOUND, SPECTATOR_CANNOT_ACT, REMATCH_ALREADY_STARTED, INTERNAL_ERROR.
   error?: string;
 }
 
@@ -114,6 +133,9 @@ export interface ServerToClientEvents {
   /** The game has started (lobby-to-game transition). Clients receive their first game:state immediately after. */
   "game:started": () => void;
 
+  /** A rematch was started by the host. Connected clients navigate to newGameId. */
+  "game:rematchStarted": (payload: GameRematchStartedPayload) => void;
+
   /** A player disconnected mid-game. */
   "game:playerDisconnected": (payload: PlayerDisconnectedPayload) => void;
 
@@ -140,6 +162,10 @@ export interface LobbyPlayerLeftPayload {
   playerCount: number;
 }
 
+export interface GameRematchStartedPayload {
+  newGameId: string;
+}
+
 export interface PlayerDisconnectedPayload {
   playerId: string;
   displayName: string;
@@ -164,6 +190,7 @@ export type SocketErrorCode =
   | "INVALID_ACTION"
   | "GAME_NOT_STARTED"
   | "GAME_ALREADY_STARTED"
+  | "GAME_NOT_FINISHED"
   | "NOT_HOST"
   | "NOT_ENOUGH_PLAYERS"
   | "INTERNAL_ERROR";
