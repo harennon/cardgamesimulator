@@ -8,7 +8,6 @@ import JoinGameView from "@/component/JoinGameView.vue";
 import LoginView from "@/component/LoginView.vue";
 import SignupView from "@/component/SignupView.vue";
 import AboutView from "@/component/AboutView.vue";
-import HelloWorld from "@/component/HelloWorld.vue";
 import HomeView from "@/component/HomeView.vue";
 import GameView from "@/component/game/GameView.vue";
 import GuestEntryView from "@/component/GuestEntryView.vue";
@@ -44,7 +43,6 @@ const routes: RouteRecordSingleView[] = [
   { path: "/login", component: LoginView, meta: { requiresAuth: false } },
   { path: "/signup", component: SignupView, meta: { requiresAuth: false } },
   { path: "/about", component: AboutView, meta: { requiresAuth: false } },
-  { path: "/echo", component: HelloWorld, meta: { requiresAuth: true } },
   {
     path: "/create-game",
     component: CreateGameView,
