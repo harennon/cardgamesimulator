@@ -137,3 +137,42 @@ describe("GameView display phase transition", () => {
     expect(displayPhase.value).toBe("COMPLETED");
   });
 });
+
+// ---------------------------------------------------------------------------
+// LLD 105: the gameOver boolean threaded into GameBoard/PlayArea/TurnTimer/
+// OpponentRow to suppress stale turn-state UI is DERIVED, not stored:
+//   gameOver = displayPhase === "SHOW_FINAL_PLAY"
+// It is true only on the reveal screen and false in every other phase, so the
+// suppression is scoped exactly to the reveal.
+// ---------------------------------------------------------------------------
+
+function gameOverFromPhase(phase: DisplayPhase): boolean {
+  return phase === "SHOW_FINAL_PLAY";
+}
+
+describe("GameView gameOver derivation (LLD 105)", () => {
+  it("displayPhase SHOW_FINAL_PLAY derives gameOver = true", () => {
+    expect(gameOverFromPhase("SHOW_FINAL_PLAY")).toBe(true);
+  });
+
+  it("displayPhase IN_PROGRESS / COMPLETED / CREATED derive gameOver = false", () => {
+    expect(gameOverFromPhase("IN_PROGRESS")).toBe(false);
+    expect(gameOverFromPhase("COMPLETED")).toBe(false);
+    expect(gameOverFromPhase("CREATED")).toBe(false);
+  });
+
+  it("gameOver follows displayPhase across the reveal transition", async () => {
+    const { effectiveStatus, displayPhase, skipToResults } =
+      createDisplayPhaseLogic("IN_PROGRESS");
+    expect(gameOverFromPhase(displayPhase.value)).toBe(false);
+
+    effectiveStatus.value = "COMPLETED";
+    await nextTick();
+    expect(displayPhase.value).toBe("SHOW_FINAL_PLAY");
+    expect(gameOverFromPhase(displayPhase.value)).toBe(true);
+
+    skipToResults();
+    expect(displayPhase.value).toBe("COMPLETED");
+    expect(gameOverFromPhase(displayPhase.value)).toBe(false);
+  });
+});

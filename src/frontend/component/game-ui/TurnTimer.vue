@@ -4,7 +4,10 @@
     :class="`turn-timer--${urgency}`"
     data-testid="turn-timer"
   >
-    <div v-if="turnDeadline !== null" class="turn-timer__ring-wrap">
+    <div
+      v-if="!gameOver && turnDeadline !== null"
+      class="turn-timer__ring-wrap"
+    >
       <svg class="turn-timer__ring" viewBox="0 0 44 44" aria-hidden="true">
         <circle
           class="turn-timer__ring-track"
@@ -36,6 +39,7 @@
     </div>
 
     <div
+      v-if="!gameOver"
       class="turn-timer__label"
       :class="{ 'turn-timer__label--mine': isMyTurn }"
     >
@@ -51,12 +55,16 @@ import { useTurnCountdown } from "@/composables/useTurnCountdown";
 
 const CIRCUMFERENCE = 2 * Math.PI * 18; // ≈ 113.1
 
-const props = defineProps<{
-  turnDeadline: number | null;
-  isMyTurn: boolean;
-  currentPlayerName: string;
-  totalSeconds: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    turnDeadline: number | null;
+    isMyTurn: boolean;
+    currentPlayerName: string;
+    totalSeconds: number;
+    gameOver?: boolean;
+  }>(),
+  { gameOver: false },
+);
 
 const deadlineRef = toRef(props, "turnDeadline");
 const totalSecondsRef = toRef(props, "totalSeconds");

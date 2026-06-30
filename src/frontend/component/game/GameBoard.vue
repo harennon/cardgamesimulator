@@ -12,6 +12,7 @@
         :my-player-index="myPlayerIndex"
         :turn-deadline="turnDeadline"
         :total-seconds="totalSeconds"
+        :game-over="props.gameOver"
       />
     </div>
 
@@ -25,6 +26,7 @@
         :total-seconds="totalSeconds"
         :play-history="big2State?.playHistory ?? []"
         :trick-start-index="big2State?.trickStartIndex ?? 0"
+        :game-over="props.gameOver"
       />
     </div>
 
@@ -109,15 +111,19 @@ import DevOverlay from "@/component/DevOverlay.vue";
 
 const isDev = import.meta.env.DEV;
 
-const props = defineProps<{
-  gameState: EnrichedPlayerView;
-  selectedIndices: Set<number>;
-  selectionCount: number;
-  actionError: string | null;
-  actionPending: boolean;
-  turnTimerSeconds: number | null;
-  roomCode: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    gameState: EnrichedPlayerView;
+    selectedIndices: Set<number>;
+    selectionCount: number;
+    actionError: string | null;
+    actionPending: boolean;
+    turnTimerSeconds: number | null;
+    roomCode: string;
+    gameOver?: boolean;
+  }>(),
+  { gameOver: false },
+);
 
 const emit = defineEmits<{
   "toggle-card": [index: number];

@@ -39,13 +39,17 @@ import type { PlayerPublicInfo } from "@shared/engine-types";
 import { computed } from "vue";
 import OpponentTimer from "./OpponentTimer.vue";
 
-const props = defineProps<{
-  players: readonly PlayerPublicInfo[];
-  currentPlayerIndex: number;
-  myPlayerIndex: number;
-  turnDeadline: number | null;
-  totalSeconds: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    players: readonly PlayerPublicInfo[];
+    currentPlayerIndex: number;
+    myPlayerIndex: number;
+    turnDeadline: number | null;
+    totalSeconds: number;
+    gameOver?: boolean;
+  }>(),
+  { gameOver: false },
+);
 
 const opponents = computed(() =>
   props.players
@@ -54,6 +58,7 @@ const opponents = computed(() =>
 );
 
 function isActive(originalIndex: number): boolean {
+  if (props.gameOver) return false;
   return originalIndex === props.currentPlayerIndex;
 }
 </script>
