@@ -157,3 +157,47 @@ test.describe("Tonk lobby — 8-player no-scroll (LLD 97 E5)", () => {
     });
   }
 });
+
+test.describe("Tonk join-by-code (LLD 100 S3)", () => {
+  test("a second player enters the lobby join code and lands in the Tonk lobby", async ({
+    browser,
+  }) => {
+    // Host creates a Tonk game through the real UI and reads the join code chip.
+    const hostContext = await browser.newContext({
+      storageState: "e2e/.auth/player1.json",
+    });
+    const hostPage = await hostContext.newPage();
+    await hostPage.goto("/create-game");
+    await hostPage.selectOption('[data-testid="game-type-select"]', "tonk");
+    await hostPage.click('[data-testid="submit-create-game"]');
+    await hostPage.waitForURL(/\/game\/.+/);
+    await expect(hostPage.locator('[data-testid="game-lobby"]')).toBeVisible();
+
+    const codeChip = hostPage.locator('[data-testid="join-code-chip"]');
+    await expect(codeChip).toBeVisible();
+    // The code arrives via lobby:state / REST; wait for the 4-char value to fill.
+    await expect(codeChip).toHaveText(/^[A-Z0-9]{4}$/, { timeout: 10_000 });
+    const joinCode = (await codeChip.innerText()).trim();
+
+    // A second player resolves the code on the Join Game screen and joins the
+    // SAME Tonk lobby — the Tonk badge proves the resolved game is the Tonk game.
+    const guestContext = await browser.newContext({
+      storageState: "e2e/.auth/player2.json",
+    });
+    const joinerPage = await guestContext.newPage();
+    await joinerPage.goto("/join-game");
+    await joinerPage.fill('[data-testid="game-code-input"]', joinCode);
+    await joinerPage.click('[data-testid="join-game-button"]');
+
+    await joinerPage.waitForURL(/\/game\/.+/);
+    await expect(joinerPage.locator('[data-testid="game-lobby"]')).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(
+      joinerPage.locator('[data-testid="lobby-type-badge"]'),
+    ).toContainText("Tonk");
+
+    await guestContext.close();
+    await hostContext.close();
+  });
+});

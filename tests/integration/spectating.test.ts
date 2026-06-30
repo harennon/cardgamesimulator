@@ -15,8 +15,10 @@ import type {
   EnrichedSpectatorView,
   SpectatorCountPayload,
 } from "../../src/shared/socket-events.js";
-import type { Card } from "../../src/shared/engine-types.js";
+import type { Card, InternalGameState } from "../../src/shared/engine-types.js";
 import type { Big2PublicState } from "../../src/shared/big2-types.js";
+import type { TonkState } from "../../src/backend/engine/tonk/tonk-types.js";
+import type { TonkCard } from "../../src/shared/tonk-types.js";
 
 // Rank order for Big2: 3 is lowest, 2 is highest.
 const RANK_ORDER = [
@@ -817,6 +819,186 @@ describe("Spectating integration", () => {
       expect(["pass", "playCards"]).toContain(timerExpiredPayload.action);
     } finally {
       playerSockets.forEach(disconnectSocket);
+      disconnectSocket(spectatorSocket);
+    }
+  });
+
+  // --- Tonk spectating (LLD 100 S1/E7/E8) ---------------------------------
+  // The browser has no spectator UI consumer (GameView always joins as a player
+  // and useGameState binds only game:state), so the spectator information-hiding
+  // contract for Tonk is asserted here at the socket tier, where it lives. The
+  // exhaustive per-field engine proof is tests/engine/tonk/information-hiding.ts.
+
+  function tonkCard(rank: string, suit: string): TonkCard {
+    return { rank, suit } as unknown as TonkCard;
+  }
+
+  /** Recursively collect TonkCard-like objects from a value (incl. jokers). */
+  function allCards(value: unknown): Array<Record<string, unknown>> {
+    const found: Array<Record<string, unknown>> = [];
+    const walk = (v: unknown): void => {
+      if (v === null || typeof v !== "object") return;
+      const o = v as Record<string, unknown>;
+      if (
+        (typeof o["rank"] === "string" && typeof o["suit"] === "string") ||
+        o["joker"] === true
+      ) {
+        found.push(o);
+      }
+      for (const child of Object.values(o)) walk(child);
+    };
+    walk(value);
+    return found;
+  }
+
+  /** Start a 3-player Tonk game and seed a deterministic discard-phase state. */
+  async function setupInProgressTonkGame(): Promise<{
+    sockets: TypedClientSocket[];
+    gameId: string;
+    tonk: TonkState;
+  }> {
+    const users = await Promise.all([
+      createTestUser("TonkSpecA"),
+      createTestUser("TonkSpecB"),
+      createTestUser("TonkSpecC"),
+    ]);
+
+    const createRes = await request(ctx.app)
+      .post("/createGame")
+      .set("Authorization", `Bearer ${users[0]!.accessToken}`)
+      .send({
+        gameType: "tonk",
+        maxPlayers: 3,
+        turnTimerSeconds: 30,
+        deckRoundsTarget: 6,
+      });
+    const gameId = createRes.body.gameId as string;
+    for (const u of users.slice(1)) {
+      await request(ctx.app)
+        .post("/joinGame")
+        .set("Authorization", `Bearer ${u.accessToken}`)
+        .send({ gameId });
+    }
+
+    const sockets = await Promise.all(
+      users.map((u) => createAuthenticatedSocket(ctx.baseUrl, u.accessToken)),
+    );
+    await joinGameRoom(sockets, gameId);
+    await startGame(sockets, gameId);
+
+    // Seed distinct cards in every zone so a leak is unambiguous.
+    const tonk: TonkState = {
+      hands: [
+        [tonkCard("K", "spades"), tonkCard("4", "clubs")],
+        [tonkCard("Q", "hearts"), tonkCard("5", "diamonds")],
+        [tonkCard("J", "clubs"), tonkCard("6", "spades")],
+      ],
+      stock: [tonkCard("7", "hearts"), tonkCard("8", "diamonds")],
+      discardPile: [tonkCard("3", "clubs")],
+      drawableDiscard: tonkCard("3", "clubs"),
+      lastDiscardCount: 1,
+      lastDiscardPlayerIndex: null,
+      turnPhase: "discard",
+      trickNumber: 1,
+      trickTurnCount: 0,
+      tallies: [0, 0, 0],
+      tonkCallerIndex: null,
+      lostPlayerIndices: [],
+      trueLoserIndex: null,
+      trickDeckSize: 999,
+      log: [],
+    };
+    const seedRes = await request(ctx.app)
+      .post("/test/seed-state")
+      .send({
+        gameId,
+        state: {
+          status: "IN_PROGRESS",
+          currentPlayerIndex: 0,
+          version: 5,
+          gameSpecificState: tonk,
+        } satisfies Partial<InternalGameState>,
+      });
+    expect(seedRes.status).toBe(200);
+
+    return { sockets, gameId, tonk };
+  }
+
+  it("Tonk spectator state exposes counts/piles but leaks no hand or stock card", async () => {
+    const { sockets, gameId, tonk } = await setupInProgressTonkGame();
+    const spectatorUser = await createTestUser("TonkSpecWatcher");
+    const spectatorSocket = await createAuthenticatedSocket(
+      ctx.baseUrl,
+      spectatorUser.accessToken,
+    );
+
+    try {
+      const spectatorState = await joinAsSpectator(spectatorSocket, gameId);
+
+      expect(spectatorState.gameType).toBe("tonk");
+      expect(spectatorState.status).toBe("IN_PROGRESS");
+      // No per-player hand field, and no top-level "you" hand.
+      for (const player of spectatorState.players) {
+        expect(typeof player.cardCount).toBe("number");
+        expect("hand" in player).toBe(false);
+      }
+      expect("you" in spectatorState).toBe(false);
+
+      // Deep-scan the whole spectator payload: no hidden hand or stock card
+      // appears anywhere. Only the public discard pile / drawable discard may.
+      const leaked = allCards(spectatorState);
+      const publicKeys = new Set(
+        [...tonk.discardPile, tonk.drawableDiscard]
+          .filter((c): c is TonkCard => c !== null)
+          .map((c) => JSON.stringify(c)),
+      );
+      const hidden = [...tonk.hands.flat(), ...tonk.stock].map((c) =>
+        JSON.stringify(c),
+      );
+      for (const card of leaked) {
+        const key = JSON.stringify(card);
+        if (!publicKeys.has(key)) {
+          expect(hidden).not.toContain(key);
+        }
+      }
+    } finally {
+      sockets.forEach(disconnectSocket);
+      disconnectSocket(spectatorSocket);
+    }
+  });
+
+  it("Tonk spectator cannot discard (rejected with SPECTATOR_CANNOT_ACT)", async () => {
+    const { sockets, gameId } = await setupInProgressTonkGame();
+    const spectatorUser = await createTestUser("TonkSpecActGuard");
+    const spectatorSocket = await createAuthenticatedSocket(
+      ctx.baseUrl,
+      spectatorUser.accessToken,
+    );
+
+    try {
+      await joinAsSpectator(spectatorSocket, gameId);
+
+      const ack = await new Promise<{ success: boolean; error?: string }>(
+        (resolve) => {
+          spectatorSocket.emit(
+            "game:action",
+            {
+              gameId,
+              action: {
+                type: "discard",
+                playerId: "",
+                cards: [tonkCard("K", "spades")],
+              },
+            },
+            resolve,
+          );
+        },
+      );
+
+      expect(ack.success).toBe(false);
+      expect(ack.error).toBe("SPECTATOR_CANNOT_ACT");
+    } finally {
+      sockets.forEach(disconnectSocket);
       disconnectSocket(spectatorSocket);
     }
   });
