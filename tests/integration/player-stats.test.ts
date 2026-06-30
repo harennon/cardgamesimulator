@@ -830,6 +830,161 @@ describe("Player stats integration", () => {
     expect(tonk!.totalScore).toBe(99);
   });
 
+  // LLD 101: recordGameHistory + getWindowedStats + getTrackingSince against
+  // the live migrated DB (real SupabaseDB, real game_history table + RPC).
+  // Each test uses a unique user id so it is isolated across runs.
+  it("recordGameHistory + getWindowedStats aggregate by game_type within the window", async () => {
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+    const userId = makeTestUserId("a101");
+
+    // Two big2 (1 win + 1 loss) and one tonk loss for this user.
+    await db.recordGameHistory({
+      userId,
+      gameType: "big2",
+      won: true,
+      lost: false,
+      score: 5,
+    });
+    await db.recordGameHistory({
+      userId,
+      gameType: "big2",
+      won: false,
+      lost: true,
+      score: 3,
+    });
+    await db.recordGameHistory({
+      userId,
+      gameType: "tonk",
+      won: false,
+      lost: true,
+      score: 40,
+    });
+
+    // A cutoff comfortably in the past includes all three just-written rows.
+    const since = new Date(Date.now() - 60 * 1000);
+    const windowed = await db.getWindowedStats(userId, since);
+
+    const big2 = windowed.find((s) => s.gameType === "big2")!;
+    const tonk = windowed.find((s) => s.gameType === "tonk")!;
+    expect(big2).toBeDefined();
+    expect(tonk).toBeDefined();
+
+    expect(big2.gamesPlayed).toBe(2);
+    expect(big2.gamesWon).toBe(1);
+    expect(big2.gamesLost).toBe(1);
+    expect(big2.totalScore).toBe(8);
+    expect(big2.lastPlayedAt).toBeInstanceOf(Date);
+
+    expect(tonk.gamesPlayed).toBe(1);
+    expect(tonk.gamesWon).toBe(0);
+    expect(tonk.gamesLost).toBe(1);
+    expect(tonk.totalScore).toBe(40);
+  });
+
+  it("getWindowedStats excludes rows older than the cutoff and returns [] when none qualify", async () => {
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+    const userId = makeTestUserId("b101");
+
+    await db.recordGameHistory({
+      userId,
+      gameType: "big2",
+      won: true,
+      lost: false,
+      score: 5,
+    });
+
+    // A cutoff in the FUTURE excludes the just-written row → no qualifying rows.
+    const futureCutoff = new Date(Date.now() + 60 * 60 * 1000);
+    const windowed = await db.getWindowedStats(userId, futureCutoff);
+    expect(windowed).toEqual([]);
+  });
+
+  it("getTrackingSince returns the earliest played_at, or null with no rows", async () => {
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+    const userId = makeTestUserId("c101");
+
+    // No rows yet → null.
+    expect(await db.getTrackingSince(userId)).toBeNull();
+
+    const before = Date.now();
+    await db.recordGameHistory({
+      userId,
+      gameType: "big2",
+      won: true,
+      lost: false,
+      score: 5,
+    });
+    await db.recordGameHistory({
+      userId,
+      gameType: "tonk",
+      won: false,
+      lost: true,
+      score: 40,
+    });
+    const after = Date.now();
+
+    const earliest = await db.getTrackingSince(userId);
+    expect(earliest).toBeInstanceOf(Date);
+    // The earliest is the first write; both defaulted to NOW() between before/after.
+    expect(earliest!.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(earliest!.getTime()).toBeLessThanOrEqual(after + 1000);
+  });
+
+  // GET /stats?window=… end-to-end through the real handler + DB.
+  it("GET /stats?window=30d returns windowed entries and a trackingSince label", async () => {
+    const { SupabaseDB } =
+      await import("../../src/backend/database/supabaseDb.js");
+    const db = SupabaseDB.INSTANCE;
+    const user = await createTestUser("StatsWindow30d");
+
+    await db.recordGameHistory({
+      userId: user.id,
+      gameType: "big2",
+      won: true,
+      lost: false,
+      score: 5,
+    });
+
+    const res = await request(ctx.app)
+      .get("/stats?window=30d")
+      .set("Authorization", `Bearer ${user.accessToken}`);
+    expect(res.status).toBe(200);
+    const body = res.body as GetStatsResponse;
+    expect(body.window).toBe("30d");
+    expect(body.trackingSince).not.toBeNull();
+    const entry = body.games.find((g) => g.gameType === "big2")!;
+    expect(entry).toBeDefined();
+    expect(entry.gamesPlayed).toBe(1);
+    expect(entry.gamesWon).toBe(1);
+  });
+
+  it("GET /stats (no window) is unchanged: lifetime path, window 'lifetime', trackingSince null", async () => {
+    const user = await createTestUser("StatsLifetimeDefault");
+
+    const res = await request(ctx.app)
+      .get("/stats")
+      .set("Authorization", `Bearer ${user.accessToken}`);
+    expect(res.status).toBe(200);
+    const body = res.body as GetStatsResponse;
+    expect(body.window).toBe("lifetime");
+    expect(body.trackingSince).toBeNull();
+    expect(body.games).toEqual([]);
+  });
+
+  it("GET /stats?window=bogus → 400 (E5)", async () => {
+    const user = await createTestUser("StatsBadWindow");
+    const res = await request(ctx.app)
+      .get("/stats?window=lastweek")
+      .set("Authorization", `Bearer ${user.accessToken}`);
+    expect(res.status).toBe(400);
+  });
+
   // I7: the 6-arg increment_player_stats succeeds, and the old 5-arg overload
   // no longer exists after 005.
   it("RPC signature — 6-arg increment_player_stats works; old 5-arg overload is gone", async () => {

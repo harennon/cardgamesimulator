@@ -4,6 +4,7 @@ import {
   PlayerStatsRepository,
   FeedbackRepository,
   StatsDelta,
+  GameHistoryRow,
 } from "@/database/database";
 import { Game } from "@/database/entities/Game";
 import { PlayerStats } from "@/database/entities/PlayerStats";
@@ -179,6 +180,52 @@ export class SupabaseDB
       p_total_score: delta.totalScore,
     });
     if (error) throw new Error(`incrementStats failed: ${error.message}`);
+  }
+
+  public async recordGameHistory(row: GameHistoryRow): Promise<void> {
+    const { error } = await this.db.from("game_history").insert({
+      user_id: row.userId,
+      game_type: row.gameType,
+      won: row.won,
+      lost: row.lost,
+      score: row.score,
+    });
+    if (error) throw new Error(`recordGameHistory failed: ${error.message}`);
+  }
+
+  public async getWindowedStats(
+    userId: string,
+    since: Date,
+  ): Promise<PlayerStats[]> {
+    const { data, error } = await this.db.rpc("get_windowed_stats", {
+      p_user_id: userId,
+      p_since: since.toISOString(),
+    });
+    if (error) throw new Error(`getWindowedStats failed: ${error.message}`);
+    return ((data ?? []) as Record<string, unknown>[]).map((row) => {
+      const stats = new PlayerStats();
+      stats.userId = userId;
+      stats.gameType = row.game_type as GameType;
+      stats.gamesPlayed = Number(row.games_played);
+      stats.gamesWon = Number(row.games_won);
+      stats.gamesLost = Number(row.games_lost);
+      stats.totalScore = Number(row.total_score);
+      stats.lastPlayedAt = new Date(row.last_played_at as string);
+      return stats;
+    });
+  }
+
+  public async getTrackingSince(userId: string): Promise<Date | null> {
+    const { data, error } = await this.db
+      .from("game_history")
+      .select("played_at")
+      .eq("user_id", userId)
+      .order("played_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`getTrackingSince failed: ${error.message}`);
+    if (!data) return null;
+    return new Date((data as { played_at: string }).played_at);
   }
 
   public async createFeedback(feedback: Feedback): Promise<Feedback> {

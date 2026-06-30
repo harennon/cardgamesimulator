@@ -33,6 +33,14 @@ export interface StatsDelta {
   totalScore: number; // placement score from the game
 }
 
+export interface GameHistoryRow {
+  userId: string;
+  gameType: GameType;
+  won: boolean;
+  lost: boolean;
+  score: number;
+}
+
 export interface PlayerStatsRepository {
   /** Stats for one user in one game type, or null if they've never played it. */
   getStats(userId: string, gameType: GameType): Promise<PlayerStats | null>;
@@ -49,6 +57,18 @@ export interface PlayerStatsRepository {
     gameType: GameType,
     delta: StatsDelta,
   ): Promise<void>;
+
+  /** Append one completed-game row. Plain INSERT (append-only, atomic). */
+  recordGameHistory(row: GameHistoryRow): Promise<void>;
+
+  /**
+   * Aggregate game_history for a user since `since`, grouped by game_type.
+   * Returns the same per-game-type shape getAllStats does (counts + lastPlayedAt).
+   */
+  getWindowedStats(userId: string, since: Date): Promise<PlayerStats[]>;
+
+  /** Earliest played_at across all of the user's history rows, or null. */
+  getTrackingSince(userId: string): Promise<Date | null>;
 }
 
 export interface FeedbackRepository {

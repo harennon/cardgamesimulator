@@ -3,6 +3,7 @@ import { StatsService } from "../../src/backend/service/statsService.js";
 import type {
   PlayerStatsRepository,
   StatsDelta,
+  GameHistoryRow,
 } from "../../src/backend/database/database.js";
 import type { GuestSessionStore } from "../../src/backend/guest/guestSessionStore.js";
 import type { InternalGameState } from "../../src/shared/engine-types.js";
@@ -16,7 +17,11 @@ function makeStatsRepo(
 ): PlayerStatsRepository {
   return {
     getStats: vi.fn().mockResolvedValue(null),
+    getAllStats: vi.fn().mockResolvedValue([]),
     incrementStats: vi.fn().mockResolvedValue(undefined),
+    recordGameHistory: vi.fn().mockResolvedValue(undefined),
+    getWindowedStats: vi.fn().mockResolvedValue([]),
+    getTrackingSince: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
 }
@@ -460,5 +465,183 @@ describe("StatsService.recordGameCompletion", () => {
     const aDelta = calls.find((c) => c[0] === "player-a")![2] as StatsDelta;
     expect(aDelta.gamesWon).toBe(1);
     expect(aDelta.gamesLost).toBe(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // LLD 101: history append rides the same per-player loop as the aggregate.
+  // -------------------------------------------------------------------------
+
+  // Both writes fire once per non-guest player, from the SAME derived values.
+  it("writes both incrementStats and recordGameHistory once per non-guest player (Big2 winner-centric)", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await service.recordGameCompletion(makeCompletedState());
+
+    expect(repo.incrementStats).toHaveBeenCalledTimes(2);
+    expect(repo.recordGameHistory).toHaveBeenCalledTimes(2);
+
+    const histCalls = vi.mocked(repo.recordGameHistory).mock.calls;
+    const winnerRow = histCalls.find(
+      (c) => (c[0] as GameHistoryRow).userId === "player-a",
+    )![0] as GameHistoryRow;
+    const loserRow = histCalls.find(
+      (c) => (c[0] as GameHistoryRow).userId === "player-b",
+    )![0] as GameHistoryRow;
+
+    expect(winnerRow).toEqual({
+      userId: "player-a",
+      gameType: "big2",
+      won: true,
+      lost: false,
+      score: 10,
+    });
+    expect(loserRow).toEqual({
+      userId: "player-b",
+      gameType: "big2",
+      won: false,
+      lost: true,
+      score: 5,
+    });
+  });
+
+  // Tonk loss-centric branch: history won/lost mirror the same trueLoser derivation.
+  it("recordGameHistory uses the loss-centric (Tonk) derivation, matching the aggregate", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    const tonkState = makeCompletedState({
+      gameType: "tonk",
+      winner: "player-c",
+      players: [
+        { playerId: "player-a", displayName: "Alice" },
+        { playerId: "player-b", displayName: "Bob" },
+        { playerId: "player-c", displayName: "Carol" },
+      ],
+      scores: [
+        {
+          playerId: "player-a",
+          score: 160,
+          breakdown: { lost: 1, trueLoser: 1, finalTally: 160 },
+        },
+        {
+          playerId: "player-b",
+          score: 155,
+          breakdown: { lost: 1, trueLoser: 0, finalTally: 155 },
+        },
+        {
+          playerId: "player-c",
+          score: 40,
+          breakdown: { lost: 0, trueLoser: 0, finalTally: 40 },
+        },
+      ],
+    });
+
+    await service.recordGameCompletion(tonkState);
+
+    const histCalls = vi.mocked(repo.recordGameHistory).mock.calls;
+    const rows = histCalls.map((c) => c[0] as GameHistoryRow);
+
+    expect(rows).toHaveLength(3);
+    const a = rows.find((r) => r.userId === "player-a")!;
+    const b = rows.find((r) => r.userId === "player-b")!;
+    const c = rows.find((r) => r.userId === "player-c")!;
+
+    // true loser
+    expect(a).toEqual({
+      userId: "player-a",
+      gameType: "tonk",
+      won: false,
+      lost: true,
+      score: 160,
+    });
+    // second 150-crosser still won
+    expect(b).toEqual({
+      userId: "player-b",
+      gameType: "tonk",
+      won: true,
+      lost: false,
+      score: 155,
+    });
+    // non-crosser won
+    expect(c).toEqual({
+      userId: "player-c",
+      gameType: "tonk",
+      won: true,
+      lost: false,
+      score: 40,
+    });
+
+    // Exactly one lost row, N-1 won rows.
+    expect(rows.filter((r) => r.lost)).toHaveLength(1);
+    expect(rows.filter((r) => r.won)).toHaveLength(2);
+  });
+
+  // E3: guests trigger NEITHER write.
+  it("skips guests for both incrementStats and recordGameHistory", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore(["player-b"]);
+    const service = new StatsService(repo, guestStore);
+
+    await service.recordGameCompletion(makeCompletedState());
+
+    expect(repo.incrementStats).toHaveBeenCalledTimes(1);
+    expect(repo.recordGameHistory).toHaveBeenCalledTimes(1);
+    const histCalls = vi.mocked(repo.recordGameHistory).mock.calls;
+    expect((histCalls[0]![0] as GameHistoryRow).userId).toBe("player-a");
+    expect(
+      histCalls.find((c) => (c[0] as GameHistoryRow).userId === "player-b"),
+    ).toBeUndefined();
+  });
+
+  // E4: a failing recordGameHistory does NOT prevent incrementStats for the
+  // same player, nor processing of other players.
+  it("a rejecting recordGameHistory does not skip incrementStats or other players", async () => {
+    const repo = makeStatsRepo({
+      recordGameHistory: vi.fn().mockRejectedValue(new Error("history down")),
+    });
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await expect(
+      service.recordGameCompletion(makeCompletedState()),
+    ).resolves.toBeUndefined();
+
+    // Both players' aggregate increments still happened.
+    expect(repo.incrementStats).toHaveBeenCalledTimes(2);
+    // Both players' history was attempted.
+    expect(repo.recordGameHistory).toHaveBeenCalledTimes(2);
+  });
+
+  // E4 (vice-versa): a failing incrementStats does NOT prevent recordGameHistory
+  // for the same player, nor processing of other players.
+  it("a rejecting incrementStats does not skip recordGameHistory or other players", async () => {
+    const repo = makeStatsRepo({
+      incrementStats: vi.fn().mockRejectedValue(new Error("aggregate down")),
+    });
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await expect(
+      service.recordGameCompletion(makeCompletedState()),
+    ).resolves.toBeUndefined();
+
+    expect(repo.incrementStats).toHaveBeenCalledTimes(2);
+    expect(repo.recordGameHistory).toHaveBeenCalledTimes(2);
+  });
+
+  // History is NOT written when the game is not COMPLETED / scores empty.
+  it("does not write history when status is not COMPLETED", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await service.recordGameCompletion(
+      makeCompletedState({ status: "IN_PROGRESS" }),
+    );
+
+    expect(repo.recordGameHistory).not.toHaveBeenCalled();
   });
 });

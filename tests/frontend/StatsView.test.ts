@@ -76,7 +76,12 @@ describe("StatsView load() state machine", () => {
   it("registered + populated: ready state with the returned entries", async () => {
     getSession.mockResolvedValue(fakeSession);
     const games = [makeEntry("big2"), makeEntry("tonk")];
-    fetchStats.mockResolvedValue({ userId: "u", games });
+    fetchStats.mockResolvedValue({
+      userId: "u",
+      window: "lifetime",
+      trackingSince: null,
+      games,
+    });
 
     await load(setState, { getSession, fetchStats });
 
@@ -85,7 +90,12 @@ describe("StatsView load() state machine", () => {
 
   it("registered + empty: ready state with an empty games array (no error)", async () => {
     getSession.mockResolvedValue(fakeSession);
-    fetchStats.mockResolvedValue({ userId: "u", games: [] });
+    fetchStats.mockResolvedValue({
+      userId: "u",
+      window: "lifetime",
+      trackingSince: null,
+      games: [],
+    });
 
     await load(setState, { getSession, fetchStats });
 
@@ -106,7 +116,12 @@ describe("StatsView load() state machine", () => {
 
     expect(state.status).toBe("loading");
 
-    resolve({ userId: "u", games: [] });
+    resolve({
+      userId: "u",
+      window: "lifetime",
+      trackingSince: null,
+      games: [],
+    });
     await inFlight;
     expect(state.status).toBe("ready");
   });
@@ -122,6 +137,8 @@ describe("StatsView load() state machine", () => {
     // Retry: re-run load(); succeeds this time.
     fetchStats.mockResolvedValueOnce({
       userId: "u",
+      window: "lifetime",
+      trackingSince: null,
       games: [makeEntry("big2")],
     });
     await load(setState, { getSession, fetchStats });

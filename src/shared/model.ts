@@ -71,8 +71,12 @@ export interface GameStatsEntry {
   lastPlayedAt: string | null; // ISO 8601
 }
 
+export type StatsWindow = "lifetime" | "30d" | "ytd";
+
 export interface GetStatsResponse {
   userId: string;
+  window: StatsWindow; // echoes the resolved window (default "lifetime")
+  trackingSince: string | null; // ISO 8601; earliest history row, null if none / lifetime path
   games: GameStatsEntry[]; // one entry per game type the user has played; [] if none
 }
 

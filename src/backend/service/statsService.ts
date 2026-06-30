@@ -46,6 +46,10 @@ export class StatsService {
         totalScore: playerScore.score,
       };
 
+      // The aggregate increment (lifetime fast path) and the history append
+      // (windowed source) are two writes from the same derived values. Each is
+      // caught independently so one failing does not skip the other or block
+      // other players (best-effort, fire-and-forget — LLD 101 A1/E4).
       try {
         await this.statsRepo.incrementStats(
           playerScore.playerId,
@@ -55,6 +59,21 @@ export class StatsService {
       } catch (err: unknown) {
         console.error(
           `Failed to record stats for player ${playerScore.playerId}:`,
+          err,
+        );
+      }
+
+      try {
+        await this.statsRepo.recordGameHistory({
+          userId: playerScore.playerId,
+          gameType,
+          won: gamesWon === 1,
+          lost: gamesLost === 1,
+          score: playerScore.score,
+        });
+      } catch (err: unknown) {
+        console.error(
+          `Failed to record game history for player ${playerScore.playerId}:`,
           err,
         );
       }
