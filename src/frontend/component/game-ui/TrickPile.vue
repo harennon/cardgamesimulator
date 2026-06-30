@@ -46,23 +46,27 @@
               class="trick-entry"
               :class="`trick-entry--${entry.action}`"
             >
-              <span class="trick-entry__name">{{ entry.displayName }}</span>
-              <template v-if="entry.action === 'pass'">
-                <span class="trick-entry__pass">passed</span>
-              </template>
-              <template v-else>
-                <span v-if="entry.handType" class="trick-entry__hand-type">{{
-                  HAND_TYPE_LABELS[entry.handType] ?? entry.handType
-                }}</span>
-                <span class="trick-entry__cards">
-                  <GameCard
-                    v-for="card in entry.cards"
-                    :key="`${card.rank}-${card.suit}`"
-                    :card="card"
-                    size="medium"
-                  />
-                </span>
-              </template>
+              <div class="trick-entry__meta">
+                <span class="trick-entry__name">{{ entry.displayName }}</span>
+                <template v-if="entry.action === 'pass'">
+                  <span class="trick-entry__pass">passed</span>
+                </template>
+                <span
+                  v-else-if="entry.handType"
+                  class="trick-entry__hand-type"
+                  >{{
+                    HAND_TYPE_LABELS[entry.handType] ?? entry.handType
+                  }}</span
+                >
+              </div>
+              <span v-if="entry.action !== 'pass'" class="trick-entry__cards">
+                <GameCard
+                  v-for="card in entry.cards"
+                  :key="`${card.rank}-${card.suit}`"
+                  :card="card"
+                  size="medium"
+                />
+              </span>
             </div>
           </div>
         </div>
@@ -266,12 +270,19 @@ onUnmounted(() => {
 
 .trick-entry {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   font-family: var(--font-ui);
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+.trick-entry__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .trick-entry__name {
@@ -284,9 +295,14 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
+/* Cards sit on their own full-width row, fanned/overlapping, always starting
+   at the entry's left edge — so display-name length no longer shifts start-x. */
 .trick-entry__cards {
   display: flex;
-  gap: 4px;
+}
+
+.trick-entry__cards .card + .card {
+  margin-left: -18px;
 }
 
 .trick-entry--pass {

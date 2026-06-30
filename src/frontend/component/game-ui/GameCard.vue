@@ -124,9 +124,15 @@ const displayRank = computed(() =>
 }
 
 .card--small {
-  width: 28px;
-  height: 40px;
-  font-size: 0.6rem;
+  width: 30px;
+  height: 42px;
+  font-size: 0.72rem;
+}
+
+/* Option B: a 30px-wide thumbnail shows only the centered rank+suit.
+   The corner index is redundant at this size and produced the squished look. */
+.card--small .card__corner {
+  display: none;
 }
 
 .card__corner {
