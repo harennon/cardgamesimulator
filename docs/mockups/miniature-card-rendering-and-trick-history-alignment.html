@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      Miniature Cards + Trick History Alignment — Card Game UI Mockup
+    </title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: radial-gradient(
+          ellipse 90% 70% at 50% 20%,
+          var(--felt-light) 0%,
+          var(--felt) 45%,
+          #0f2e1c 100%
+        );
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 40px 24px 80px;
+      }
+
+      .page-head {
+        max-width: 960px;
+        margin: 0 auto 36px;
+        text-align: center;
+      }
+      .page-head h1 {
+        font-family: var(--font-ui);
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-shadow: 0 0 24px var(--gold-glow);
+        margin-bottom: 8px;
+      }
+      .page-head p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        max-width: 640px;
+        margin: 0 auto;
+        line-height: 1.5;
+      }
+
+      .section {
+        max-width: 960px;
+        margin: 0 auto 28px;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 14px;
+        padding: 28px 32px;
+      }
+      .section > h2 {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        border-bottom: 1px solid var(--table-rim-light);
+        padding-bottom: 10px;
+        margin-bottom: 22px;
+      }
+      .section > p.lede {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        line-height: 1.55;
+        margin-bottom: 22px;
+        margin-top: -8px;
+      }
+
+      .options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+      }
+      .option {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 20px 18px 22px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        position: relative;
+      }
+      .option.recommended {
+        border-color: var(--gold-accent);
+        box-shadow:
+          0 0 0 1px var(--gold-glow),
+          0 8px 28px rgba(0, 0, 0, 0.35);
+      }
+      .option .tag {
+        position: absolute;
+        top: -10px;
+        left: 16px;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-size: 0.6rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 3px 8px;
+        border-radius: 5px;
+      }
+      .option h3 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        text-align: center;
+      }
+      .option .desc {
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        text-align: center;
+        line-height: 1.5;
+      }
+      .swatch-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        min-height: 64px;
+        padding: 10px 0;
+      }
+      .swatch-label {
+        font-size: 0.62rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .dim {
+        font-size: 0.66rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ============ BASE CARD ============ */
+      .card {
+        position: relative;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+      }
+      .card.red .card__rank,
+      .card.red .card__suit,
+      .card.red .card__corner-rank,
+      .card.red .card__corner-suit {
+        color: var(--red-suit);
+      }
+      .card.black .card__rank,
+      .card.black .card__suit,
+      .card.black .card__corner-rank,
+      .card.black .card__corner-suit {
+        color: var(--black-suit);
+      }
+      .card__corner {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+      }
+      .card__corner-rank {
+        font-family: var(--font-card);
+        font-weight: 700;
+        line-height: 1;
+      }
+      .card__corner-suit {
+        line-height: 1;
+        margin-top: -2px;
+      }
+      .card__rank {
+        line-height: 1;
+      }
+      .card__suit {
+        line-height: 1;
+        font-size: 1.2em;
+      }
+      .card--medium {
+        width: 64px;
+        height: 90px;
+        font-size: 1rem;
+      }
+      .card--medium .card__corner-rank {
+        font-size: 13px;
+      }
+      .card--medium .card__corner-suit {
+        font-size: 12px;
+      }
+
+      /* ============ CURRENT (BROKEN) SMALL CARD ============ */
+      .card--small-current {
+        width: 28px;
+        height: 40px;
+        font-size: 0.6rem;
+      }
+      /* fixed pixel corner glyphs that DO NOT scale — the bug */
+      .card--small-current .card__corner-rank {
+        font-size: 11px;
+      }
+      .card--small-current .card__corner-suit {
+        font-size: 10px;
+      }
+
+      /* ============ OPTION A: SIMPLIFIED CORNER-ONLY FACE ============ */
+      /* Drop the centered rank+suit. Show a single, slightly larger
+         top-left rank+suit block, vertically centered for balance. */
+      .card--small-a {
+        width: 30px;
+        height: 42px;
+        font-size: 0.6rem;
+      }
+      .card--small-a .card__rank,
+      .card--small-a .card__suit {
+        display: none;
+      }
+      .card--small-a .card__corner {
+        position: static;
+        gap: 1px;
+      }
+      .card--small-a .card__corner-rank {
+        font-size: 14px;
+      }
+      .card--small-a .card__corner-suit {
+        font-size: 13px;
+        margin-top: 0;
+      }
+
+      /* ============ OPTION B: CENTERED PIP ONLY (no corner) ============ */
+      /* Drop the corner block entirely. Show rank over suit, centered,
+         large and legible. Reads like a poker chip / index. */
+      .card--small-b {
+        width: 30px;
+        height: 42px;
+      }
+      .card--small-b .card__corner {
+        display: none;
+      }
+      .card--small-b .card__rank {
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .card--small-b .card__suit {
+        font-size: 13px;
+        margin-top: 1px;
+      }
+
+      /* ============ OPTION C: ENLARGE + SCALED CORNER (keep both) ============ */
+      /* Keep the corner + centered face like medium, but bump the card to
+         36x50 and make the corner glyphs scale via em so nothing overlaps. */
+      .card--small-c {
+        width: 36px;
+        height: 50px;
+        font-size: 0.72rem;
+      }
+      .card--small-c .card__corner {
+        top: 3px;
+        left: 4px;
+      }
+      .card--small-c .card__corner-rank {
+        font-size: 0.92em;
+      }
+      .card--small-c .card__corner-suit {
+        font-size: 0.8em;
+      }
+      .card--small-c .card__rank {
+        font-size: 1.1em;
+      }
+      .card--small-c .card__suit {
+        font-size: 1.15em;
+      }
+
+      /* ============ STACK DEMO (collapsed trick pile) ============ */
+      .stack-demos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 40px;
+        align-items: flex-start;
+      }
+      .stack-demo {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .trick-pile__stack {
+        position: relative;
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+      }
+      .trick-pile__layer {
+        position: absolute;
+        display: block;
+      }
+      .trick-pile__badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        z-index: 10;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        border-radius: 9px;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-family: var(--font-ui);
+        font-size: 0.65rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 4px var(--card-shadow);
+      }
+      .stack-cap {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      /* ============ TRICK OVERLAY (always shown inline for the mockup) ============ */
+      .overlay-demos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 28px;
+      }
+      .overlay-demo h3 {
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .overlay-demo .desc {
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+        line-height: 1.5;
+      }
+      .overlay-demo.recommended h3 {
+        color: var(--gold-accent);
+      }
+      .trick-overlay__panel {
+        width: 100%;
+        background: rgba(10, 6, 4, 0.7);
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .trick-overlay__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--gold-accent);
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .trick-overlay__close {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 1.4rem;
+        cursor: pointer;
+      }
+      .trick-overlay__entries {
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      /* --- CURRENT (BROKEN) trick entry: inline, name pushes cards --- */
+      .trick-entry--current {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .trick-entry--current .name {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .trick-entry--current .hand-type {
+        color: var(--gold-accent);
+        font-weight: 500;
+      }
+      .trick-entry--current .cards {
+        display: flex;
+        gap: 4px;
+      }
+
+      /* --- OPTION 1: fixed-width name column (grid) --- */
+      .trick-entry--col {
+        display: grid;
+        grid-template-columns: 96px 1fr;
+        align-items: center;
+        gap: 8px 12px;
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .trick-entry--col .meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .trick-entry--col .name {
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .trick-entry--col .hand-type {
+        color: var(--gold-accent);
+        font-weight: 500;
+        font-size: 0.72rem;
+      }
+      .trick-entry--col .cards {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .trick-entry--col.pass {
+        opacity: 0.7;
+      }
+      .trick-entry--col .pass-label {
+        font-style: italic;
+      }
+
+      /* --- OPTION 2: stacked rows — meta on top, cards below, left-aligned --- */
+      .trick-entry--stacked {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+      }
+      .trick-entry--stacked:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      .trick-entry--stacked .meta {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .trick-entry--stacked .name {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .trick-entry--stacked .hand-type {
+        color: var(--gold-accent);
+        font-weight: 500;
+        font-size: 0.72rem;
+      }
+      .trick-entry--stacked .cards {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        padding-left: 2px;
+      }
+      .trick-entry--stacked.pass {
+        opacity: 0.7;
+      }
+      .trick-entry--stacked .pass-label {
+        font-style: italic;
+      }
+
+      /* --- OPTION 3: fanned/overlapped cards on their own row --- */
+      .trick-entry--fan {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .trick-entry--fan .meta {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .trick-entry--fan .name {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .trick-entry--fan .hand-type {
+        color: var(--gold-accent);
+        font-weight: 500;
+        font-size: 0.72rem;
+      }
+      .trick-entry--fan .cards {
+        display: flex;
+        padding-left: 18px;
+      }
+      .trick-entry--fan .cards .card {
+        margin-left: -16px;
+      }
+
+      .legend {
+        max-width: 960px;
+        margin: 0 auto 28px;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+        padding: 0 8px;
+      }
+      .legend strong {
+        color: var(--text-primary);
+      }
+      .pill {
+        display: inline-block;
+        background: rgba(201, 168, 76, 0.14);
+        color: var(--gold-accent);
+        border-radius: 5px;
+        padding: 1px 7px;
+        font-size: 0.72rem;
+        font-weight: 600;
+      }
+      .bad {
+        color: #e05555;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Miniature Cards + Trick-History Alignment</h1>
+      <p>
+        Two cosmetic fixes for Big2: the cramped 28×40 "small" card face
+        (final-play reveal + collapsed trick-pile thumbnails), and the
+        trick-history popup whose card rows shift horizontally with each
+        player's display-name length. Pick one small-card option and one
+        alignment option.
+      </p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PART 1: SMALL CARD FACE -->
+    <!-- ============================================================ -->
+    <div class="section">
+      <h2>Part 1 · Small card face — the "squished" problem</h2>
+      <p class="lede">
+        On the 28px-wide card, the fixed 11px corner rank + 10px corner suit
+        collide with the centered rank (~9.6px) and suit (~11.5px). Four glyphs
+        fight for ~28×40px. Reference (left, current) vs. three fixes. Medium
+        card shown for scale — <strong>medium/large are unchanged</strong>.
+      </p>
+
+      <div class="options">
+        <div class="option">
+          <span class="tag" style="background: #e05555; color: #fff"
+            >Current</span
+          >
+          <div class="swatch-label">Reference / broken</div>
+          <div class="swatch-row">
+            <div class="card black card--small-current">
+              <div class="card__corner">
+                <span class="card__corner-rank">10</span>
+                <span class="card__corner-suit">♠</span>
+              </div>
+              <span class="card__rank">10</span>
+              <span class="card__suit">♠</span>
+            </div>
+            <div class="card red card--small-current">
+              <div class="card__corner">
+                <span class="card__corner-rank">Q</span>
+                <span class="card__corner-suit">♦</span>
+              </div>
+              <span class="card__rank">Q</span>
+              <span class="card__suit">♦</span>
+            </div>
+          </div>
+          <h3>28×40 · 4 glyphs</h3>
+          <p class="desc">
+            <span class="bad">Corner + centered glyphs overlap.</span> Fixed-px
+            corner ignores the small size.
+          </p>
+          <div class="dim">28 × 40px</div>
+        </div>
+
+        <div class="option">
+          <span class="tag">Option A</span>
+          <div class="swatch-label">Corner-only, centered</div>
+          <div class="swatch-row">
+            <div class="card black card--small-a">
+              <div class="card__corner">
+                <span class="card__corner-rank">10</span>
+                <span class="card__corner-suit">♠</span>
+              </div>
+            </div>
+            <div class="card red card--small-a">
+              <div class="card__corner">
+                <span class="card__corner-rank">Q</span>
+                <span class="card__corner-suit">♦</span>
+              </div>
+            </div>
+          </div>
+          <h3>Simplify: one block</h3>
+          <p class="desc">
+            Drop the centered rank/suit. Show a single rank-over-suit block,
+            centered. Smallest footprint.
+          </p>
+          <div class="dim">30 × 42px</div>
+        </div>
+
+        <div class="option recommended">
+          <span class="tag">Option B · Rec</span>
+          <div class="swatch-label">Centered index only</div>
+          <div class="swatch-row">
+            <div class="card black card--small-b">
+              <div class="card__corner">
+                <span class="card__corner-rank"></span>
+                <span class="card__corner-suit"></span>
+              </div>
+              <span class="card__rank">10</span>
+              <span class="card__suit">♠</span>
+            </div>
+            <div class="card red card--small-b">
+              <div class="card__corner">
+                <span class="card__corner-rank"></span>
+                <span class="card__corner-suit"></span>
+              </div>
+              <span class="card__rank">Q</span>
+              <span class="card__suit">♦</span>
+            </div>
+          </div>
+          <h3>Simplify: drop corner</h3>
+          <p class="desc">
+            Hide the corner block; keep only the centered rank + suit, enlarged.
+            Cleanest read at thumbnail size.
+          </p>
+          <div class="dim">30 × 42px</div>
+        </div>
+
+        <div class="option">
+          <span class="tag">Option C</span>
+          <div class="swatch-label">Enlarge + scale corner</div>
+          <div class="swatch-row">
+            <div class="card black card--small-c">
+              <div class="card__corner">
+                <span class="card__corner-rank">10</span>
+                <span class="card__corner-suit">♠</span>
+              </div>
+              <span class="card__rank">10</span>
+              <span class="card__suit">♠</span>
+            </div>
+            <div class="card red card--small-c">
+              <div class="card__corner">
+                <span class="card__corner-rank">Q</span>
+                <span class="card__corner-suit">♦</span>
+              </div>
+              <span class="card__rank">Q</span>
+              <span class="card__suit">♦</span>
+            </div>
+          </div>
+          <h3>Keep both, bigger</h3>
+          <p class="desc">
+            Grow to 36×50 and switch corner glyphs to
+            <span class="pill">em</span>
+            units so they scale. Looks most like a "real" mini card.
+          </p>
+          <div class="dim">36 × 50px</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PART 1b: CONTEXT — collapsed trick-pile stack + final play -->
+    <!-- ============================================================ -->
+    <div class="section">
+      <h2>Part 1b · In context — collapsed trick-pile stack & final play</h2>
+      <p class="lede">
+        How each small-card option reads where it actually appears: the
+        collapsed trick-pile thumbnail stack (top cards layered) and the
+        game-over Final Play row.
+      </p>
+
+      <div class="stack-demos">
+        <div class="stack-demo">
+          <div class="trick-pile__stack" style="width: 46px; height: 58px">
+            <span class="trick-pile__layer" style="left: 0; top: 0; z-index: 1">
+              <div class="card black card--small-current">
+                <div class="card__corner">
+                  <span class="card__corner-rank">3</span
+                  ><span class="card__corner-suit">♣</span>
+                </div>
+                <span class="card__rank">3</span
+                ><span class="card__suit">♣</span>
+              </div>
+            </span>
+            <span
+              class="trick-pile__layer"
+              style="left: 6px; top: 6px; z-index: 2"
+            >
+              <div class="card red card--small-current">
+                <div class="card__corner">
+                  <span class="card__corner-rank">7</span
+                  ><span class="card__corner-suit">♥</span>
+                </div>
+                <span class="card__rank">7</span
+                ><span class="card__suit">♥</span>
+              </div>
+            </span>
+            <span
+              class="trick-pile__layer"
+              style="left: 12px; top: 12px; z-index: 3"
+            >
+              <div class="card black card--small-current">
+                <div class="card__corner">
+                  <span class="card__corner-rank">K</span
+                  ><span class="card__corner-suit">♠</span>
+                </div>
+                <span class="card__rank">K</span
+                ><span class="card__suit">♠</span>
+              </div>
+            </span>
+            <span class="trick-pile__badge">3</span>
+          </div>
+          <div class="stack-cap"><span class="bad">Current</span></div>
+        </div>
+
+        <div class="stack-demo">
+          <div class="trick-pile__stack" style="width: 48px; height: 60px">
+            <span class="trick-pile__layer" style="left: 0; top: 0; z-index: 1">
+              <div class="card black card--small-a">
+                <div class="card__corner">
+                  <span class="card__corner-rank">3</span
+                  ><span class="card__corner-suit">♣</span>
+                </div>
+              </div>
+            </span>
+            <span
+              class="trick-pile__layer"
+              style="left: 6px; top: 6px; z-index: 2"
+            >
+              <div class="card red card--small-a">
+                <div class="card__corner">
+                  <span class="card__corner-rank">7</span
+                  ><span class="card__corner-suit">♥</span>
+                </div>
+              </div>
+            </span>
+            <span
+              class="trick-pile__layer"
+              style="left: 12px; top: 12px; z-index: 3"
+            >
+              <div class="card black card--small-a">
+                <div class="card__corner">
+                  <span class="card__corner-rank">K</span
+                  ><span class="card__corner-suit">♠</span>
+                </div>
+              </div>
+            </span>
+            <span class="trick-pile__badge">3</span>
+          </div>
+          <div class="stack-cap">Option A</div>
+        </div>
+
+        <div class="stack-demo">
+          <div class="trick-pile__stack" style="width: 48px; height: 60px">
+            <span class="trick-pile__layer" style="left: 0; top: 0; z-index: 1">
+              <div class="card black card--small-b">
+                <span class="card__rank">3</span
+                ><span class="card__suit">♣</span>
+              </div>
+            </span>
+            <span
+              class="trick-pile__layer"
+              style="left: 6px; top: 6px; z-index: 2"
+            >
+              <div class="card red card--small-b">
+                <span class="card__rank">7</span
+                ><span class="card__suit">♥</span>
+              </div>
+            </span>
+            <span
+              class="trick-pile__layer"
+              style="left: 12px; top: 12px; z-index: 3"
+            >
+              <div class="card black card--small-b">
+                <span class="card__rank">K</span
+                ><span class="card__suit">♠</span>
+              </div>
+            </span>
+            <span class="trick-pile__badge">3</span>
+          </div>
+          <div class="stack-cap">Option B · Rec</div>
+        </div>
+
+        <div class="stack-demo">
+          <div class="trick-pile__stack" style="width: 60px; height: 74px">
+            <span class="trick-pile__layer" style="left: 0; top: 0; z-index: 1">
+              <div class="card black card--small-c">
+                <div class="card__corner">
+                  <span class="card__corner-rank">3</span
+                  ><span class="card__corner-suit">♣</span>
+                </div>
+                <span class="card__rank">3</span
+                ><span class="card__suit">♣</span>
+              </div>
+            </span>
+            <span
+              class="trick-pile__layer"
+              style="left: 7px; top: 7px; z-index: 2"
+            >
+              <div class="card red card--small-c">
+                <div class="card__corner">
+                  <span class="card__corner-rank">7</span
+                  ><span class="card__corner-suit">♥</span>
+                </div>
+                <span class="card__rank">7</span
+                ><span class="card__suit">♥</span>
+              </div>
+            </span>
+            <span
+              class="trick-pile__layer"
+              style="left: 14px; top: 14px; z-index: 3"
+            >
+              <div class="card black card--small-c">
+                <div class="card__corner">
+                  <span class="card__corner-rank">K</span
+                  ><span class="card__corner-suit">♠</span>
+                </div>
+                <span class="card__rank">K</span
+                ><span class="card__suit">♠</span>
+              </div>
+            </span>
+            <span class="trick-pile__badge">3</span>
+          </div>
+          <div class="stack-cap">Option C</div>
+        </div>
+      </div>
+
+      <div
+        style="
+          margin-top: 34px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+        "
+      >
+        <div class="swatch-label" style="color: var(--gold-accent)">
+          Final Play (game over) — Option B
+        </div>
+        <div style="display: flex; gap: 4px; margin: 6px 0">
+          <div class="card red card--small-b">
+            <span class="card__rank">A</span><span class="card__suit">♥</span>
+          </div>
+          <div class="card red card--small-b">
+            <span class="card__rank">A</span><span class="card__suit">♦</span>
+          </div>
+          <div class="card black card--small-b">
+            <span class="card__rank">A</span><span class="card__suit">♠</span>
+          </div>
+          <div class="card black card--small-b">
+            <span class="card__rank">K</span><span class="card__suit">♣</span>
+          </div>
+          <div class="card red card--small-b">
+            <span class="card__rank">K</span><span class="card__suit">♥</span>
+          </div>
+        </div>
+        <div style="font-size: 0.7rem; color: var(--text-muted)">
+          Full House · played by Alice
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PART 2: TRICK HISTORY ALIGNMENT -->
+    <!-- ============================================================ -->
+    <div class="section">
+      <h2>Part 2 · Trick-history popup alignment</h2>
+      <p class="lede">
+        Today the entry is one inline flex row: <span class="pill">name</span>
+        <span class="pill">hand-type</span> <span class="pill">cards</span>. The
+        cards' start position floats with name length, so rows look ragged. All
+        three fixes use <strong>medium</strong> cards (unchanged) — only the
+        layout changes. Compare against "Current" first.
+      </p>
+
+      <div class="overlay-demos">
+        <!-- CURRENT / BROKEN -->
+        <div class="overlay-demo">
+          <h3 style="color: #e05555">Current (ragged)</h3>
+          <p class="desc">
+            Cards start after the name + label, so "Christopher" pushes them far
+            right while "Bo" leaves them near the left edge.
+          </p>
+          <div class="trick-overlay__panel">
+            <div class="trick-overlay__header">
+              <span>This Trick</span
+              ><button class="trick-overlay__close">×</button>
+            </div>
+            <div class="trick-overlay__entries">
+              <div class="trick-entry--current">
+                <span class="name">Bo</span
+                ><span class="hand-type">Single</span>
+                <span class="cards"
+                  ><div class="card black card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">9</span
+                      ><span class="card__corner-suit">♠</span>
+                    </div>
+                    <span class="card__rank">9</span
+                    ><span class="card__suit">♠</span>
+                  </div></span
+                >
+              </div>
+              <div class="trick-entry--current">
+                <span class="name">Christopher</span
+                ><span class="hand-type">Single</span>
+                <span class="cards"
+                  ><div class="card red card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">J</span
+                      ><span class="card__corner-suit">♥</span>
+                    </div>
+                    <span class="card__rank">J</span
+                    ><span class="card__suit">♥</span>
+                  </div></span
+                >
+              </div>
+              <div class="trick-entry--current" style="opacity: 0.7">
+                <span class="name">Mei</span
+                ><span style="font-style: italic">passed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OPTION 1: fixed-width name column -->
+        <div class="overlay-demo recommended">
+          <h3>Option 1 · Fixed name column (Rec)</h3>
+          <p class="desc">
+            Grid: a fixed 96px name/label column, then cards. Every row's cards
+            start at the same x. Long names ellipsize.
+          </p>
+          <div class="trick-overlay__panel">
+            <div class="trick-overlay__header">
+              <span>This Trick</span
+              ><button class="trick-overlay__close">×</button>
+            </div>
+            <div class="trick-overlay__entries">
+              <div class="trick-entry--col">
+                <span class="meta"
+                  ><span class="name">Bo</span
+                  ><span class="hand-type">Single</span></span
+                >
+                <span class="cards"
+                  ><div class="card black card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">9</span
+                      ><span class="card__corner-suit">♠</span>
+                    </div>
+                    <span class="card__rank">9</span
+                    ><span class="card__suit">♠</span>
+                  </div></span
+                >
+              </div>
+              <div class="trick-entry--col">
+                <span class="meta"
+                  ><span class="name">Christopher</span
+                  ><span class="hand-type">Single</span></span
+                >
+                <span class="cards"
+                  ><div class="card red card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">J</span
+                      ><span class="card__corner-suit">♥</span>
+                    </div>
+                    <span class="card__rank">J</span
+                    ><span class="card__suit">♥</span>
+                  </div></span
+                >
+              </div>
+              <div class="trick-entry--col pass">
+                <span class="meta"><span class="name">Mei</span></span>
+                <span class="pass-label">passed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OPTION 2: stacked rows -->
+        <div class="overlay-demo">
+          <h3>Option 2 · Cards on their own row</h3>
+          <p class="desc">
+            Meta line on top (name + label), cards left-aligned on the line
+            below. Name length can't shift the cards at all. Roomier per entry.
+          </p>
+          <div class="trick-overlay__panel">
+            <div class="trick-overlay__header">
+              <span>This Trick</span
+              ><button class="trick-overlay__close">×</button>
+            </div>
+            <div class="trick-overlay__entries">
+              <div class="trick-entry--stacked">
+                <span class="meta"
+                  ><span class="name">Bo</span
+                  ><span class="hand-type">Single</span></span
+                >
+                <span class="cards"
+                  ><div class="card black card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">9</span
+                      ><span class="card__corner-suit">♠</span>
+                    </div>
+                    <span class="card__rank">9</span
+                    ><span class="card__suit">♠</span>
+                  </div></span
+                >
+              </div>
+              <div class="trick-entry--stacked">
+                <span class="meta"
+                  ><span class="name">Christopher</span
+                  ><span class="hand-type">Pair</span></span
+                >
+                <span class="cards"
+                  ><div class="card red card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">J</span
+                      ><span class="card__corner-suit">♥</span>
+                    </div>
+                    <span class="card__rank">J</span
+                    ><span class="card__suit">♥</span>
+                  </div>
+                  <div class="card black card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">J</span
+                      ><span class="card__corner-suit">♠</span>
+                    </div>
+                    <span class="card__rank">J</span
+                    ><span class="card__suit">♠</span>
+                  </div></span
+                >
+              </div>
+              <div class="trick-entry--stacked pass">
+                <span class="meta"
+                  ><span class="name">Mei</span
+                  ><span class="pass-label">passed</span></span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OPTION 3: fanned cards on own row -->
+        <div class="overlay-demo">
+          <h3>Option 3 · Fanned cards (own row)</h3>
+          <p class="desc">
+            Like Option 2 but cards overlap into a natural fan — denser for
+            5-card hands (straights, full houses). More "table-like".
+          </p>
+          <div class="trick-overlay__panel">
+            <div class="trick-overlay__header">
+              <span>This Trick</span
+              ><button class="trick-overlay__close">×</button>
+            </div>
+            <div class="trick-overlay__entries" style="gap: 14px">
+              <div class="trick-entry--fan">
+                <span class="meta"
+                  ><span class="name">Bo</span
+                  ><span class="hand-type">Straight</span></span
+                >
+                <span class="cards">
+                  <div class="card black card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">5</span
+                      ><span class="card__corner-suit">♣</span>
+                    </div>
+                    <span class="card__rank">5</span
+                    ><span class="card__suit">♣</span>
+                  </div>
+                  <div class="card red card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">6</span
+                      ><span class="card__corner-suit">♦</span>
+                    </div>
+                    <span class="card__rank">6</span
+                    ><span class="card__suit">♦</span>
+                  </div>
+                  <div class="card black card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">7</span
+                      ><span class="card__corner-suit">♠</span>
+                    </div>
+                    <span class="card__rank">7</span
+                    ><span class="card__suit">♠</span>
+                  </div>
+                  <div class="card red card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">8</span
+                      ><span class="card__corner-suit">♥</span>
+                    </div>
+                    <span class="card__rank">8</span
+                    ><span class="card__suit">♥</span>
+                  </div>
+                  <div class="card black card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">9</span
+                      ><span class="card__corner-suit">♣</span>
+                    </div>
+                    <span class="card__rank">9</span
+                    ><span class="card__suit">♣</span>
+                  </div>
+                </span>
+              </div>
+              <div class="trick-entry--fan">
+                <span class="meta"
+                  ><span class="name">Christopher</span
+                  ><span class="hand-type">Single</span></span
+                >
+                <span class="cards">
+                  <div class="card red card--medium">
+                    <div class="card__corner">
+                      <span class="card__corner-rank">A</span
+                      ><span class="card__corner-suit">♥</span>
+                    </div>
+                    <span class="card__rank">A</span
+                    ><span class="card__suit">♥</span>
+                  </div>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <strong>Recommendation.</strong> Small card:
+      <span class="pill">Option B</span> (drop the corner; centered rank + suit
+      only) — cleanest at thumbnail scale, smallest code change, and adds
+      <span class="pill">.card--small</span>-scoped rules without touching
+      medium/large. Alignment: <span class="pill">Option 1</span> (fixed-width
+      name column) — minimal markup change, keeps each entry compact, and
+      guarantees a consistent card start x regardless of display-name length.
+      Options 2/3 are stronger if you want roomier rows or a more "table-like"
+      fan.
+    </div>
+  </body>
+</html>
