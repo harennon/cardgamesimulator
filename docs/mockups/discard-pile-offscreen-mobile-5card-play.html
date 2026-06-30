@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mobile discard pile fit — 5-card play (iteration 2)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===== Tokens copied from src/frontend/styles/game-variables.css (mobile block) ===== */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        /* Mobile card sizing (the values that cause the overflow) */
+        --card-hand-width: 52px;
+        --card-hand-height: 73px;
+        --mobile-rim-width: 4px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #14110d;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        padding: 32px 20px 80px;
+        line-height: 1.5;
+      }
+
+      .page-head {
+        max-width: 1100px;
+        margin: 0 auto 28px;
+      }
+      .page-head h1 {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.6rem;
+        letter-spacing: 0.01em;
+        margin: 0 0 8px;
+        color: var(--text-primary);
+      }
+      .page-head .lede {
+        max-width: 760px;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin: 0 0 14px;
+      }
+      .page-head .key {
+        max-width: 760px;
+        font-size: 0.9rem;
+        background: rgba(201, 168, 76, 0.08);
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 8px;
+        padding: 12px 16px;
+      }
+      .page-head .key b {
+        color: var(--gold-accent);
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.85em;
+        background: rgba(255, 255, 255, 0.06);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+
+      /* ===== Option columns ===== */
+      .options {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+      }
+      .option {
+        flex: 1 1 300px;
+        min-width: 300px;
+        display: flex;
+        flex-direction: column;
+      }
+      .option__head h2 {
+        font-family: var(--font-card);
+        font-size: 1.15rem;
+        margin: 0 0 4px;
+        color: var(--gold-accent);
+      }
+      .option__head p {
+        margin: 0 0 14px;
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        min-height: 3.6em;
+      }
+      .option__verdict {
+        font-size: 0.8rem;
+        color: var(--text-primary);
+        background: rgba(255, 255, 255, 0.04);
+        border-left: 3px solid var(--gold-accent);
+        padding: 8px 12px;
+        margin: 14px 0 0;
+        border-radius: 0 6px 6px 0;
+      }
+
+      /* ===== Phone frame — emulates a 360px (and 320px) viewport ===== */
+      .phones {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .phone-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .phone-col__cap {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .phone {
+        border: 8px solid #000;
+        border-radius: 26px;
+        overflow: hidden;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+        flex-shrink: 0;
+      }
+      .phone--360 {
+        width: 360px;
+      }
+      .phone--320 {
+        width: 320px;
+      }
+
+      /* ===== The game board (mirrors GameBoard.vue --mobile grid) ===== */
+      .board {
+        position: relative;
+        height: 460px;
+        display: grid;
+        grid-template-rows: 38px 1fr 120px 44px;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand"
+          "actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        overflow: clip; /* <- the production constraint that clips overflow */
+        font-size: 13px;
+      }
+      .board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: var(--mobile-rim-width) solid var(--table-rim);
+        pointer-events: none;
+        z-index: 100;
+      }
+
+      .b-opponents {
+        grid-area: opponents;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 8px;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      .opp-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--text-muted);
+      }
+      .opp-dot.active {
+        background: var(--gold-accent);
+        box-shadow: 0 0 6px var(--gold-glow);
+      }
+
+      .b-hand {
+        grid-area: hand;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 6px 8px;
+        overflow: hidden;
+      }
+      .b-hand__label {
+        font-size: 0.55rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+      .b-hand__cards {
+        display: flex;
+      }
+      .b-hand__cards .card {
+        margin-right: -18px;
+      }
+
+      .b-actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: rgba(0, 0, 0, 0.2);
+      }
+      .b-actions button {
+        font-family: var(--font-ui);
+        font-weight: 600;
+        font-size: 0.8rem;
+        border-radius: 6px;
+        padding: 8px 18px;
+        border: none;
+        cursor: pointer;
+      }
+      .b-actions .play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .b-actions .pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--text-muted);
+      }
+
+      /* ===== Play area (the focus) — mirrors PlayArea.vue ===== */
+      .b-table {
+        grid-area: table;
+        min-height: 0;
+      }
+      .play-area {
+        position: relative;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px;
+      }
+      .play-area__center {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+      }
+      .play-area__cards {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+      }
+      .hand-label {
+        font-size: 0.65rem;
+        font-weight: 500;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .played-by {
+        font-size: 0.62rem;
+        color: var(--text-muted);
+      }
+
+      /* The unshrinkable production row (baseline) */
+      .card-row {
+        display: flex;
+        gap: 4px;
+      }
+
+      /* ===== Card (mirrors GameCard.vue medium) ===== */
+      .card {
+        position: relative;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        width: var(--card-hand-width);
+        height: var(--card-hand-height);
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1rem;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        user-select: none;
+      }
+      .card .corner {
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .card .corner-rank {
+        font-size: 10px;
+        line-height: 1;
+      }
+      .card .corner-suit {
+        font-size: 9px;
+        line-height: 1;
+        margin-top: -1px;
+      }
+      .card .rank {
+        line-height: 1;
+      }
+      .card .suit {
+        line-height: 1;
+        font-size: 1.2em;
+      }
+      .card.red .rank,
+      .card.red .suit,
+      .card.red .corner-rank,
+      .card.red .corner-suit {
+        color: var(--red-suit);
+      }
+      .card.black .rank,
+      .card.black .suit,
+      .card.black .corner-rank,
+      .card.black .corner-suit {
+        color: var(--black-suit);
+      }
+      .card.back {
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1.5px solid #c9a84c;
+      }
+
+      /* ===== Trick pile mini-stack (mirrors TrickPile.vue collapsed) ===== */
+      .trick-pile {
+        position: relative;
+        width: 46px;
+        height: 58px;
+      }
+      .trick-pile .layer {
+        position: absolute;
+        display: block;
+      }
+      .trick-pile .mini {
+        width: 28px;
+        height: 40px;
+        border-radius: 4px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        box-shadow: 1px 2px 5px var(--card-shadow);
+        position: relative;
+      }
+      .trick-pile .mini .corner {
+        top: 2px;
+        left: 2px;
+      }
+      .trick-pile .mini .corner-rank {
+        font-size: 7px;
+      }
+      .trick-pile .mini .corner-suit {
+        font-size: 6px;
+      }
+      .trick-pile .badge {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        z-index: 10;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 3px;
+        border-radius: 8px;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-size: 0.6rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 4px var(--card-shadow);
+      }
+
+      /* ============================================================= */
+      /* BASELINE (broken) — shown small for reference inside option 0  */
+      /* ============================================================= */
+      .baseline .play-area__trick-pile {
+        position: absolute;
+        left: -64px;
+        top: 50%;
+        transform: translateY(-50%) scale(0.85);
+        transform-origin: top left;
+      }
+
+      /* ============================================================= */
+      /* OPTION A — Felt-corner anchor + scale-to-fit play row          */
+      /*  Trick pile is REMOVED from the play composition and pinned to */
+      /*  the bottom-left of the felt. The play row scales down only    */
+      /*  when its natural width would overflow.                        */
+      /* ============================================================= */
+      .optA .play-area__trick-pile {
+        position: absolute;
+        left: 6px;
+        bottom: 6px;
+        top: auto;
+        transform: none;
+      }
+      .optA .fit-cell {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        overflow: hidden;
+      }
+      .optA .fit-wrap {
+        transform-origin: center center;
+      }
+
+      /* ============================================================= */
+      /* OPTION B — Felt-corner anchor + dedicated smaller on-table     */
+      /*  card size that always fits five cards at 320px.               */
+      /* ============================================================= */
+      .optB .play-area__trick-pile {
+        position: absolute;
+        left: 6px;
+        bottom: 6px;
+        top: auto;
+        transform: none;
+      }
+      .optB .card-row .card {
+        /* 5*40 + 4*4 = 216px, fits inside a 320px felt with margins */
+        width: 40px;
+        height: 56px;
+        font-size: 0.8rem;
+      }
+      .optB .card-row .card .rank {
+        font-size: 0.9em;
+      }
+
+      /* ============================================================= */
+      /* OPTION C — Felt-corner anchor + responsive proportional row    */
+      /*  The row is width-constrained; cards share available width via */
+      /*  flex-basis and shrink, capped at the normal size.             */
+      /* ============================================================= */
+      .optC .play-area__trick-pile {
+        position: absolute;
+        left: 6px;
+        bottom: 6px;
+        top: auto;
+        transform: none;
+      }
+      .optC .card-row {
+        width: 100%;
+        max-width: 260px;
+        justify-content: center;
+      }
+      .optC .card-row .card {
+        flex: 1 1 0;
+        flex-shrink: 1;
+        min-width: 0;
+        max-width: var(--card-hand-width);
+        aspect-ratio: 52 / 73;
+        height: auto;
+      }
+
+      .legend {
+        max-width: 1100px;
+        margin: 36px auto 0;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+      .legend h3 {
+        font-family: var(--font-card);
+        color: var(--text-primary);
+        font-size: 1rem;
+        margin-bottom: 8px;
+      }
+      .legend ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .legend li {
+        margin-bottom: 6px;
+      }
+
+      .state-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      .state-tabs button {
+        font-family: var(--font-ui);
+        font-size: 0.72rem;
+        font-weight: 600;
+        border: 1px solid var(--table-rim-light);
+        background: transparent;
+        color: var(--text-muted);
+        border-radius: 999px;
+        padding: 4px 12px;
+        cursor: pointer;
+      }
+      .state-tabs button.active {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border-color: var(--gold-accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Mobile discard pile fit — 5-card play (iteration 2)</h1>
+      <p class="lede">
+        Re-design after feedback that the first pass (scale / shrink only) did
+        not keep the discard on screen, and that the discard pile should not
+        shift around relative to the played cards. Every option below applies
+        the same structural change first, then varies how the played row is fit.
+      </p>
+      <div class="key">
+        <b>Core change shared by all options:</b> the discard (trick) pile is
+        <b>decoupled from the played-cards composition</b>. On mobile it is
+        anchored to a <b>fixed spot — bottom-left of the felt</b> — so it never
+        moves when the play gets wider, and it stops pushing the centered play
+        past the right edge. The options differ only in how the played row
+        itself is made to fit.
+      </div>
+    </div>
+
+    <div class="state-tabs" style="max-width: 1100px; margin: 0 auto 18px">
+      <span
+        style="
+          font-size: 0.78rem;
+          color: var(--text-muted);
+          align-self: center;
+          margin-right: 6px;
+        "
+        >Current play:</span
+      >
+      <button data-state="fullHouse" class="active">Full House (5)</button>
+      <button data-state="straightFlush">Straight Flush (5)</button>
+      <button data-state="pair">Pair (2)</button>
+      <button data-state="single">Single (1)</button>
+    </div>
+
+    <div class="options">
+      <!-- ===== reference / baseline ===== -->
+      <div class="option">
+        <div class="option__head">
+          <h2>Today (broken)</h2>
+          <p>
+            Production: pile pinned <code>left:-64px</code> relative to the
+            centered play. A 5-card row overflows the felt and is clipped by
+            <code>overflow:clip</code>.
+          </p>
+        </div>
+        <div class="phones">
+          <div class="phone-col">
+            <span class="phone-col__cap">360px</span>
+            <div class="phone phone--360">
+              <div class="board baseline" data-board></div>
+            </div>
+          </div>
+        </div>
+        <p class="option__verdict">
+          Rightmost cards disappear off the right edge. Pile rides with the
+          play.
+        </p>
+      </div>
+
+      <!-- ===== OPTION A ===== -->
+      <div class="option">
+        <div class="option__head">
+          <h2>A · Corner pile + scale-to-fit</h2>
+          <p>
+            Pile pinned to felt bottom-left. Played row keeps real card size,
+            and only when it would overflow is the whole row scaled down to fit
+            the felt width.
+          </p>
+        </div>
+        <div class="phones">
+          <div class="phone-col">
+            <span class="phone-col__cap">360px</span>
+            <div class="phone phone--360">
+              <div class="board optA" data-board data-fit="A"></div>
+            </div>
+          </div>
+          <div class="phone-col">
+            <span class="phone-col__cap">320px</span>
+            <div class="phone phone--320">
+              <div class="board optA" data-board data-fit="A"></div>
+            </div>
+          </div>
+        </div>
+        <p class="option__verdict">
+          Single/pair stay full-size and centered; 5-card shrinks uniformly.
+          Pile fixed.
+        </p>
+      </div>
+
+      <!-- ===== OPTION B ===== -->
+      <div class="option">
+        <div class="option__head">
+          <h2>B · Corner pile + smaller on-table size</h2>
+          <p>
+            Pile pinned to felt bottom-left. The on-table play always uses a
+            dedicated compact card (40&times;56) that fits five at 320px — no
+            measuring, pure CSS.
+          </p>
+        </div>
+        <div class="phones">
+          <div class="phone-col">
+            <span class="phone-col__cap">360px</span>
+            <div class="phone phone--360">
+              <div class="board optB" data-board></div>
+            </div>
+          </div>
+          <div class="phone-col">
+            <span class="phone-col__cap">320px</span>
+            <div class="phone phone--320">
+              <div class="board optB" data-board></div>
+            </div>
+          </div>
+        </div>
+        <p class="option__verdict">
+          Every play renders at the same compact size. Simplest; cards a touch
+          smaller.
+        </p>
+      </div>
+
+      <!-- ===== OPTION C ===== -->
+      <div class="option">
+        <div class="option__head">
+          <h2>C · Corner pile + proportional row</h2>
+          <p>
+            Pile pinned to felt bottom-left. Row is width-capped; cards
+            flex-shrink to share the available width (capped at normal size),
+            keeping aspect ratio.
+          </p>
+        </div>
+        <div class="phones">
+          <div class="phone-col">
+            <span class="phone-col__cap">360px</span>
+            <div class="phone phone--360">
+              <div class="board optC" data-board></div>
+            </div>
+          </div>
+          <div class="phone-col">
+            <span class="phone-col__cap">320px</span>
+            <div class="phone phone--320">
+              <div class="board optC" data-board></div>
+            </div>
+          </div>
+        </div>
+        <p class="option__verdict">
+          Fewer cards = full size; five cards auto-shrink. One row, no JS, no
+          transform.
+        </p>
+      </div>
+    </div>
+
+    <div class="legend">
+      <h3>How to read this</h3>
+      <ul>
+        <li>
+          Each phone is a real CSS viewport width (360px / 320px) with
+          <code>overflow:clip</code>, exactly like the production mobile board.
+        </li>
+        <li>
+          The <b>discard/trick pile</b> is the small angled mini-stack with the
+          gold count badge. In every option it now sits in the
+          <b>bottom-left corner of the felt</b> and never moves when the play
+          changes.
+        </li>
+        <li>
+          Switch the <b>Current play</b> tabs above to confirm single, pair, and
+          5-card combinations all stay fully on screen and centered.
+        </li>
+        <li>
+          <b>Option A</b> needs a tiny ResizeObserver/JS measure to set the
+          scale; <b>B</b> and <b>C</b> are pure CSS.
+        </li>
+      </ul>
+    </div>
+
+    <script>
+      // ---- Card data per play state ----
+      const PLAYS = {
+        fullHouse: {
+          label: "Full House",
+          cards: [
+            ["7", "♠"],
+            ["7", "♥"],
+            ["7", "♦"],
+            ["K", "♣"],
+            ["K", "♠"],
+          ],
+        },
+        straightFlush: {
+          label: "Straight Flush",
+          cards: [
+            ["9", "♥"],
+            ["10", "♥"],
+            ["J", "♥"],
+            ["Q", "♥"],
+            ["K", "♥"],
+          ],
+        },
+        pair: {
+          label: "Pair",
+          cards: [
+            ["A", "♠"],
+            ["A", "♦"],
+          ],
+        },
+        single: { label: "Single", cards: [["2", "♠"]] },
+      };
+      const PILE = [
+        ["3", "♦"],
+        ["5", "♣"],
+        ["8", "♠"],
+        ["J", "♦"],
+      ]; // 4 plays this trick
+
+      const RED = new Set(["♥", "♦"]);
+
+      function cardHtml(rank, suit, cls = "") {
+        const color = RED.has(suit) ? "red" : "black";
+        return `<div class="card ${color} ${cls}">
+      <div class="corner"><span class="corner-rank">${rank}</span><span class="corner-suit">${suit}</span></div>
+      <span class="rank">${rank}</span><span class="suit">${suit}</span>
+    </div>`;
+      }
+      function miniHtml(rank, suit) {
+        const color = RED.has(suit) ? "red" : "black";
+        return `<div class="mini ${color}"><div class="corner"><span class="corner-rank">${rank}</span><span class="corner-suit">${suit}</span></div></div>`;
+      }
+
+      function pileHtml() {
+        const layers = PILE.map((c, i) => {
+          const off = i * 5;
+          return `<span class="layer" style="left:${off}px;top:${off}px;z-index:${i + 1}">${miniHtml(c[0], c[1])}</span>`;
+        }).join("");
+        return `<div class="play-area__trick-pile trick-pile">${layers}<span class="badge">${PILE.length}</span></div>`;
+      }
+
+      function rowHtml(play) {
+        return `<div class="card-row">${play.cards.map((c) => cardHtml(c[0], c[1])).join("")}</div>`;
+      }
+
+      function playAreaHtml(stateKey, fit) {
+        const play = PLAYS[stateKey];
+        let row = rowHtml(play);
+        if (fit === "A") {
+          row = `<div class="fit-cell"><div class="fit-wrap">${row}</div></div>`;
+        }
+        return `<div class="play-area">
+      <div class="play-area__center">
+        ${pileHtml()}
+        <div class="play-area__cards">
+          <div class="hand-label">${play.label}</div>
+          ${row}
+          <div class="played-by">played by Alice</div>
+        </div>
+      </div>
+    </div>`;
+      }
+
+      function boardHtml(stateKey, fit) {
+        return `
+      <div class="b-opponents">
+        <span class="opp-dot active"></span><span>Alice</span>
+        <span class="opp-dot"></span><span>Bob</span>
+        <span class="opp-dot"></span><span>Cara</span>
+        <span style="margin-left:auto;font-size:0.6rem;">ROOM 4F9X</span>
+      </div>
+      <div class="b-table">${playAreaHtml(stateKey, fit)}</div>
+      <div class="b-hand">
+        <div class="b-hand__label">Your hand (9)</div>
+        <div class="b-hand__cards">
+          ${cardHtml("3", "♣")}${cardHtml("6", "♦")}${cardHtml("9", "♠")}${cardHtml("Q", "♥")}${cardHtml("A", "♣")}
+        </div>
+      </div>
+      <div class="b-actions"><button class="play">Play</button><button class="pass">Pass</button></div>
+    `;
+      }
+
+      let currentState = "fullHouse";
+
+      function render() {
+        document.querySelectorAll("[data-board]").forEach((board) => {
+          const fit = board.getAttribute("data-fit");
+          board.innerHTML = boardHtml(currentState, fit);
+        });
+        // Option A: measure and scale row to fit felt width
+        requestAnimationFrame(() => {
+          document.querySelectorAll(".board.optA .fit-wrap").forEach((wrap) => {
+            wrap.style.transform = "scale(1)";
+            const cell = wrap.parentElement; // .fit-cell
+            const avail = cell.clientWidth - 8; // small breathing room
+            const natural = wrap.scrollWidth;
+            const scale = natural > avail ? avail / natural : 1;
+            wrap.style.transform = `scale(${scale})`;
+          });
+        });
+      }
+
+      document.querySelectorAll(".state-tabs button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document
+            .querySelectorAll(".state-tabs button")
+            .forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          currentState = btn.getAttribute("data-state");
+          render();
+        });
+      });
+
+      render();
+      window.addEventListener("resize", render);
+    </script>
+  </body>
+</html>
