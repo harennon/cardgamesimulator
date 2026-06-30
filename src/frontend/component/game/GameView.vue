@@ -30,6 +30,10 @@
       gameState
     "
     class="game-view__board-container"
+    :class="{
+      'game-view__board-container--revealing':
+        displayPhase === 'SHOW_FINAL_PLAY' && gameState.gameType === 'big2',
+    }"
   >
     <TonkBoard
       v-if="gameState.gameType === 'tonk'"
@@ -54,6 +58,7 @@
       :action-pending="actionPending"
       :turn-timer-seconds="turnTimerSeconds"
       :room-code="roomCode"
+      :game-over="displayPhase === 'SHOW_FINAL_PLAY'"
       @toggle-card="toggleCard"
       @play="onPlay"
       @pass="onPass"
@@ -61,19 +66,39 @@
 
     <div
       v-if="displayPhase === 'SHOW_FINAL_PLAY' && gameState.gameType === 'big2'"
-      class="game-view__final-play-ribbon"
+      class="game-view__reveal"
       data-testid="final-play-overlay"
     >
-      <h2 class="game-view__final-play-winner">
-        {{ winnerDisplayName }} wins!
-      </h2>
-      <button
-        class="game-view__final-play-btn"
-        data-testid="continue-to-results"
-        @click="skipToResults"
+      <div class="game-view__reveal-crown" aria-hidden="true">&#127942;</div>
+      <h2 class="game-view__reveal-winner">{{ winnerDisplayName }} wins!</h2>
+
+      <div
+        v-if="finalPlay && finalPlay.cards.length > 0"
+        class="game-view__reveal-final"
       >
-        Continue to Results
-      </button>
+        <span class="game-view__reveal-final-label">Final Play</span>
+        <div class="game-view__reveal-card-row">
+          <GameCard
+            v-for="card in finalPlay.cards"
+            :key="`${card.rank}-${card.suit}`"
+            :card="card"
+            size="medium"
+          />
+        </div>
+        <span class="game-view__reveal-final-by">
+          {{ finalPlayLabel }} &middot; played by {{ finalPlayByName }}
+        </span>
+      </div>
+
+      <div class="game-view__reveal-cta">
+        <button
+          class="game-view__final-play-btn"
+          data-testid="continue-to-results"
+          @click="skipToResults"
+        >
+          Continue to Results
+        </button>
+      </div>
     </div>
   </div>
 
@@ -121,6 +146,7 @@ import GameLobbyView from "@/component/game/GameLobbyView.vue";
 import GameBoard from "@/component/game/GameBoard.vue";
 import TonkBoard from "@/component/game/TonkBoard.vue";
 import GameOverView from "@/component/game/GameOverView.vue";
+import GameCard from "@/component/game-ui/GameCard.vue";
 
 type DisplayPhase = "CREATED" | "IN_PROGRESS" | "SHOW_FINAL_PLAY" | "COMPLETED";
 
@@ -259,6 +285,31 @@ const finalPlay = computed<Big2Play | null>(() => {
     | Big2PublicState
     | undefined;
   return publicState?.lastPlay ?? null;
+});
+
+const HAND_TYPE_LABELS: Record<string, string> = {
+  single: "Single",
+  pair: "Pair",
+  straight: "Straight",
+  fullHouse: "Full House",
+  fourOfAKind: "Four of a Kind",
+  straightFlush: "Straight Flush",
+};
+
+const finalPlayLabel = computed(() => {
+  if (!finalPlay.value) return "";
+  return (
+    HAND_TYPE_LABELS[finalPlay.value.handType.kind] ??
+    finalPlay.value.handType.kind
+  );
+});
+
+const finalPlayByName = computed(() => {
+  if (!finalPlay.value) return "";
+  const player = gameState.value?.players.find(
+    (p) => p.playerId === finalPlay.value!.playerId,
+  );
+  return player?.displayName ?? finalPlay.value.playerId;
 });
 
 onMounted(async () => {
@@ -475,88 +526,174 @@ watch(
 .game-view__board-container {
   position: relative;
   width: 100vw;
-  height: 100vh;
+  height: 100vh; /* fallback for older browsers */
+  height: 100dvh; /* dynamic viewport — accounts for mobile URL bar */
 }
 
-.game-view__final-play-ribbon {
+/* Direction A — blur + dim the live board behind the reveal layer. The blur is
+   applied to the child GameBoard's root (:deep) so the reveal layer's winner,
+   final cards, and CTA stay crisp on top. */
+.game-view__board-container--revealing :deep(.game-board) {
+  filter: blur(7px) brightness(0.55) saturate(0.8);
+  transform: scale(1.02); /* hides blur-edge gutter */
+  transition:
+    filter 0.4s ease,
+    transform 0.4s ease;
+  pointer-events: none; /* board is non-interactive during reveal */
+}
+
+/* Direction A reveal layer — full-bleed radial scrim hosting the winner text,
+   final cards, and the pinned CTA, all crisp above the blurred board. */
+.game-view__reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 101; /* above the board wood-rim (z-index 100) */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 32px;
+  background: radial-gradient(
+    ellipse 70% 55% at 50% 42%,
+    rgba(10, 6, 3, 0.55) 0%,
+    rgba(8, 5, 2, 0.82) 100%
+  );
+}
+
+.game-view__reveal-crown {
+  font-size: 2.4rem;
+  filter: drop-shadow(0 0 14px var(--gold-glow));
+  animation: revealCrownPop 0.5s cubic-bezier(0.18, 0.9, 0.3, 1.4) both;
+}
+
+.game-view__reveal-winner {
+  font-family: var(--font-card);
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--gold-accent);
+  text-shadow: 0 0 28px var(--gold-glow);
+  text-align: center;
+  margin: 0;
+  animation: revealRise 0.5s ease 0.05s both;
+}
+
+.game-view__reveal-final {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: revealRise 0.5s ease 0.12s both;
+}
+
+.game-view__reveal-final-label {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gold-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.game-view__reveal-card-row {
+  display: flex;
+  gap: 4px;
+}
+
+/* Gold-rimmed lift on the final cards (mockup .reveal__final .card). */
+.game-view__reveal-card-row :deep(.card) {
+  outline: 1px solid rgba(201, 168, 76, 0.5);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.7),
+    0 0 0 4px rgba(201, 168, 76, 0.12);
+}
+
+.game-view__reveal-final-by {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* CTA pinned to the visual-viewport bottom, safe-area-aware. */
+.game-view__reveal-cta {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 101;
+  padding: 18px 24px calc(18px + env(safe-area-inset-bottom, 0px));
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 24px;
-  background: linear-gradient(
-    180deg,
-    rgba(26, 15, 6, 0.92) 0%,
-    rgba(15, 9, 3, 0.96) 100%
-  );
-  border-top: 2px solid var(--gold-accent);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
-  animation: ribbonSlideUp 200ms ease forwards;
-}
-
-.game-view__final-play-winner {
-  font-family: var(--font-ui);
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--gold-accent);
-  margin: 0;
-  text-shadow: 0 0 24px var(--gold-glow);
+  justify-content: center;
+  animation: revealRise 0.5s ease 0.2s both;
 }
 
 .game-view__final-play-btn {
   font-family: var(--font-ui);
   font-size: 0.95rem;
-  font-weight: 600;
-  padding: 12px 32px;
-  border-radius: 6px;
+  font-weight: 700;
+  padding: 14px 40px;
+  border-radius: 8px;
   border: none;
   cursor: pointer;
   background: var(--gold-accent);
   color: #1a0f06;
-  min-height: 48px;
-  flex-shrink: 0;
-  transition: background 0.15s ease;
+  min-height: 52px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
 }
 
 .game-view__final-play-btn:hover {
   background: #d4b45a;
 }
 
-@keyframes ribbonSlideUp {
+.game-view__final-play-btn:active {
+  transform: translateY(1px);
+}
+
+@keyframes revealCrownPop {
   from {
-    transform: translateY(100%);
+    transform: scale(0.5);
+    opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .game-view__final-play-ribbon {
-    animation: none;
+@keyframes revealRise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
 }
 
 @media (max-width: 767px) {
-  .game-view__final-play-ribbon {
-    flex-direction: column;
-    align-items: stretch;
-    text-align: center;
-    gap: 12px;
-    padding: 14px 16px;
-  }
-
-  .game-view__final-play-winner {
-    font-size: 1.25rem;
+  .game-view__reveal-winner {
+    font-size: 1.5rem;
   }
 
   .game-view__final-play-btn {
-    font-size: 16px;
+    width: 100%;
+    font-size: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-view__reveal-crown,
+  .game-view__reveal-winner,
+  .game-view__reveal-final,
+  .game-view__reveal-cta {
+    animation: none;
+  }
+
+  .game-view__board-container--revealing :deep(.game-board) {
+    transition: none;
   }
 }
 </style>

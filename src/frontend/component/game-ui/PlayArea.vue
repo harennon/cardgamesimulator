@@ -5,6 +5,7 @@
       :is-my-turn="isMyTurn"
       :current-player-name="currentPlayerName"
       :total-seconds="totalSeconds"
+      :game-over="gameOver"
     />
 
     <div class="play-area__center">
@@ -53,16 +54,20 @@ const HAND_TYPE_LABELS: Record<string, string> = {
   straightFlush: "Straight Flush",
 };
 
-const props = defineProps<{
-  lastPlay: Big2PublicState["lastPlay"] | null;
-  isMyTurn: boolean;
-  currentPlayerName: string;
-  players: readonly PlayerPublicInfo[];
-  turnDeadline: number | null;
-  totalSeconds: number;
-  playHistory: readonly Big2HistoryEntry[];
-  trickStartIndex: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    lastPlay: Big2PublicState["lastPlay"] | null;
+    isMyTurn: boolean;
+    currentPlayerName: string;
+    players: readonly PlayerPublicInfo[];
+    turnDeadline: number | null;
+    totalSeconds: number;
+    playHistory: readonly Big2HistoryEntry[];
+    trickStartIndex: number;
+    gameOver?: boolean;
+  }>(),
+  { gameOver: false },
+);
 
 const handTypeLabel = computed(() => {
   if (!props.lastPlay) return "";
