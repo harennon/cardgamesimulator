@@ -1,5 +1,5 @@
 {
-  "$comment": "LLD 77 §5.3 — drift-gate expected-diff allowlist. expectedPending lists the in-tree migration filenames NOT YET applied to prod on this branch (the diff hunks they produce are benign and subtracted by the gate). acknowledgedResidual lists reviewed, issue-linked residual diffs that are not yet cleaned up; it MUST stay empty after #83 — a non-empty entry is a deliberate, auditable exception, never a default. 009_add_game_config.sql (LLD 95) is pending against prod; it must also appear in scripts/fixtures/clean-diff.json's pending array or the gate fails 'Stale expectedPending'.",
-  "expectedPending": ["009_add_game_config.sql"],
+  "$comment": "LLD 77 §5.3 — drift-gate expected-diff allowlist. expectedPending lists the in-tree migration filenames NOT YET applied to prod on this branch (the diff hunks they produce are benign and subtracted by the gate). acknowledgedResidual lists reviewed, issue-linked residual diffs that are not yet cleaned up; it MUST stay empty after #83 — a non-empty entry is a deliberate, auditable exception, never a default. 009_add_game_config.sql (LLD 95) and 010_create_game_history.sql (LLD 101) are pending against prod; each must also appear in scripts/fixtures/clean-diff.json's pending array or the gate fails 'Stale expectedPending'.",
+  "expectedPending": ["009_add_game_config.sql", "010_create_game_history.sql"],
   "acknowledgedResidual": []
 }

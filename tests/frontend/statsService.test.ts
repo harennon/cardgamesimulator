@@ -20,6 +20,8 @@ describe("fetchStats", () => {
   it("calls GET /api/stats and returns the parsed response body", async () => {
     const body: GetStatsResponse = {
       userId: "user-1",
+      window: "lifetime",
+      trackingSince: null,
       games: [
         {
           gameType: "big2",
