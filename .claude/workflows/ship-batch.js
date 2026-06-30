@@ -153,8 +153,18 @@ const FETCH_SCHEMA = {
         properties: {
           number: { type: "integer" },
           title: { type: "string" },
+          hasActiveRestart: {
+            type: "boolean",
+            description:
+              "True if this issue's LAST comment is an active 'Restart:' comment (per Step 3).",
+          },
+          restartReason: {
+            type: "string",
+            description:
+              "If hasActiveRestart, the text after 'Restart:' (the user's new direction). Empty string otherwise.",
+          },
         },
-        required: ["number", "title"],
+        required: ["number", "title", "hasActiveRestart"],
       },
       description: "Issues that need (re-)triage",
     },
@@ -438,6 +448,8 @@ Step 4 — Classify each issue:
 
 For items in category A that have an existing triage label or "blocked:" label (including "triage:fix" when triggered by a "Restart:" comment, or any "blocked:*" label when its unblock trigger is met), add them to labelsToRemove with the exact label string (e.g. "triage:defer", "triage:fix", "blocked:frontend-decision", "blocked:human").
 
+For each issue you place in needsTriage, set hasActiveRestart and restartReason from your Step 3 analysis: if the issue has an ACTIVE "Restart:" comment (it is the last comment on the issue), set hasActiveRestart=true and restartReason to the text after "Restart:". Otherwise set hasActiveRestart=false and restartReason="".
+
 Do NOT run any gh issue edit commands. Only read and classify.`,
   { label: "fetch-issues", schema: FETCH_SCHEMA },
 );
@@ -529,7 +541,15 @@ if (issuesToTriage.length > 0) {
       (issue) => () =>
         agent(
           `Triage GitHub issue #${issue.number}: "${issue.title}"
-
+${
+  issue.hasActiveRestart
+    ? `
+⚠️ This issue has an ACTIVE "Restart:" comment — the user is rejecting the prior approach and giving NEW direction:
+"${issue.restartReason}"
+The Restart comment IS the new information. This issue is real and actionable — recommend "fix" so it re-enters the ship pipeline, where the design/implementation is regenerated incorporating this feedback. Do NOT recommend "needs-info" or "defer" merely because a prior approach (e.g. a mockup) was rejected.
+`
+    : ""
+}
 1. Read the issue: gh issue view ${issue.number}
 2. Read relevant source files to understand the scope (use grep/find to locate related code)
 3. Read docs/architecture-principles.md, docs/execution-plan.md, and docs/customer-experience.md for context
