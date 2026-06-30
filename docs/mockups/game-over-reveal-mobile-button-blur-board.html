@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game-Over Reveal — Blur Board + Mobile-Safe Button — Mockup</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ===================== PAGE CHROME (mockup only) ===================== */
+      .doc {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 32px 24px 96px;
+      }
+
+      .doc__title {
+        font-family: var(--font-card);
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: -0.01em;
+      }
+
+      .doc__sub {
+        margin-top: 8px;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        max-width: 70ch;
+        line-height: 1.55;
+      }
+
+      .doc__sub code {
+        background: rgba(201, 168, 76, 0.12);
+        color: var(--gold-accent);
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 0.85em;
+      }
+
+      /* control bar */
+      .controls {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        margin: 28px 0;
+        padding: 14px 16px;
+        background: rgba(13, 13, 13, 0.92);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px 28px;
+        align-items: center;
+      }
+
+      .controls__group {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      .controls__label {
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+
+      .seg {
+        display: inline-flex;
+        background: rgba(45, 24, 16, 0.5);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        padding: 3px;
+        gap: 2px;
+      }
+
+      .seg button {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        padding: 7px 14px;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        white-space: nowrap;
+      }
+
+      .seg button:hover {
+        color: var(--text-primary);
+      }
+
+      .seg button[aria-pressed="true"] {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .controls__note {
+        margin-left: auto;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        max-width: 30ch;
+        line-height: 1.45;
+      }
+
+      .direction-blurb {
+        margin: 0 0 18px;
+        padding: 14px 18px;
+        border-left: 3px solid var(--gold-accent);
+        background: rgba(201, 168, 76, 0.06);
+        border-radius: 0 8px 8px 0;
+        font-size: 0.9rem;
+        line-height: 1.55;
+        color: var(--text-primary);
+      }
+
+      .direction-blurb b {
+        color: var(--gold-accent);
+      }
+
+      /* ===================== STAGE (device frame) ===================== */
+      .stage {
+        display: flex;
+        justify-content: center;
+      }
+
+      .device {
+        position: relative;
+        background: #000;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow:
+          0 30px 80px rgba(0, 0, 0, 0.6),
+          0 0 0 1px rgba(0, 0, 0, 0.5);
+      }
+
+      .device--desktop {
+        width: 100%;
+        max-width: 980px;
+        height: 620px;
+      }
+
+      .device--mobile {
+        width: 390px;
+        height: 720px;
+      }
+
+      /* The simulated browser URL bar for the mobile "scroll reveals URL bar" story.
+         In the live app this is the real browser chrome; here it is faked so the
+         100vh-vs-100dvh difference is visible. */
+      .urlbar {
+        display: none;
+        height: 0;
+        background: #1c1c1e;
+        color: #9a9a9e;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        font-size: 0.72rem;
+        overflow: hidden;
+        transition: height 0.3s ease;
+        border-bottom: 1px solid #000;
+      }
+
+      .device--mobile .urlbar {
+        display: flex;
+      }
+
+      .device--mobile.urlbar-shown .urlbar {
+        height: 44px;
+      }
+
+      .urlbar__dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #3a3a3c;
+        flex-shrink: 0;
+      }
+
+      .urlbar__addr {
+        flex: 1;
+        background: #2c2c2e;
+        border-radius: 6px;
+        padding: 5px 10px;
+        color: #c8c8cc;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* viewport = the actual visible area the app sees. When URL bar is shown on
+         mobile, the visual viewport shrinks (we shrink .viewport height to match).
+         This is the crux of the bug the design must survive. */
+      .viewport {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        transition: height 0.3s ease;
+      }
+
+      .device--mobile .viewport {
+        height: 720px;
+      }
+
+      .device--mobile.urlbar-shown .viewport {
+        height: 676px;
+      }
+
+      /* ===================== GAME BOARD (behind the reveal) ===================== */
+      .board {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-rows: 64px 1fr 150px 56px;
+        grid-template-columns: 1fr 220px;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 45%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        transition:
+          filter 0.4s ease,
+          opacity 0.4s ease,
+          transform 0.4s ease;
+      }
+
+      .device--mobile .board {
+        grid-template-rows: 52px 1fr 140px 52px;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand"
+          "actions";
+      }
+
+      .board::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 10px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        pointer-events: none;
+        z-index: 5;
+      }
+
+      .board > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* opponents */
+      .opponents {
+        grid-area: opponents;
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 14px;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+      }
+
+      .opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 5px 10px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        position: relative;
+      }
+
+      .opp__name {
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+
+      .opp__count {
+        font-size: 0.66rem;
+        color: var(--text-muted);
+      }
+
+      .opp__count--zero {
+        color: var(--gold-accent);
+      }
+
+      .opp__crown {
+        position: absolute;
+        top: -12px;
+        font-size: 0.85rem;
+      }
+
+      .opp--winner {
+        border-color: var(--gold-accent);
+        box-shadow: 0 0 14px var(--gold-glow);
+      }
+
+      /* table / play area */
+      .table {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      /* the stale turn label this design must suppress */
+      .turn-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        padding: 4px 16px;
+        border-radius: 20px;
+        background: var(--panel-bg);
+        border: 1px solid rgba(138, 126, 110, 0.3);
+      }
+
+      .turn-label--ghost {
+        outline: 2px dashed var(--red-suit);
+        outline-offset: 3px;
+        color: #c98080;
+      }
+
+      .play-cards {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .play-cards__label {
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .play-cards__by {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+      }
+
+      .card-row {
+        display: flex;
+        gap: 4px;
+      }
+
+      /* card */
+      .card {
+        width: 56px;
+        height: 80px;
+        background: var(--card-face);
+        border-radius: 6px;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+        font-family: var(--font-card);
+        position: relative;
+        flex-shrink: 0;
+      }
+
+      .card--lg {
+        width: 72px;
+        height: 102px;
+      }
+
+      .card--sm {
+        width: 40px;
+        height: 57px;
+      }
+
+      .card__corner {
+        position: absolute;
+        top: 5px;
+        left: 6px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        line-height: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card--lg .card__corner {
+        font-size: 1.05rem;
+      }
+
+      .card--sm .card__corner {
+        font-size: 0.62rem;
+        top: 3px;
+        left: 4px;
+      }
+
+      .card__pip {
+        position: absolute;
+        bottom: 6px;
+        right: 7px;
+        font-size: 1.5rem;
+        line-height: 1;
+      }
+
+      .card--lg .card__pip {
+        font-size: 2rem;
+      }
+
+      .card--sm .card__pip {
+        font-size: 1rem;
+        bottom: 3px;
+        right: 4px;
+      }
+
+      .card--red {
+        color: var(--red-suit);
+      }
+
+      .card--black {
+        color: var(--black-suit);
+      }
+
+      .card-back {
+        width: 26px;
+        height: 38px;
+        border-radius: 4px;
+        background: repeating-linear-gradient(
+          45deg,
+          #6b1f1f,
+          #6b1f1f 3px,
+          #8b2a2a 3px,
+          #8b2a2a 6px
+        );
+        border: 1.5px solid #faf3e8;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        flex-shrink: 0;
+      }
+
+      /* my hand row */
+      .hand {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+        padding: 0 16px;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+      }
+
+      .hand__label {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .hand__cards {
+        display: flex;
+      }
+
+      .hand__cards .card {
+        margin-right: -18px;
+        width: 50px;
+        height: 71px;
+      }
+
+      /* log */
+      .log {
+        grid-area: log;
+        background: var(--panel-bg);
+        border-left: 1px solid var(--table-rim-light);
+        padding: 12px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .device--mobile .log {
+        display: none;
+      }
+
+      .log__title {
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--gold-accent);
+        margin-bottom: 2px;
+      }
+
+      /* actions */
+      .actions {
+        grid-area: actions;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: center;
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+      }
+
+      .actions button {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 9px 26px;
+        border-radius: 6px;
+        border: 1.5px solid var(--text-muted);
+        background: transparent;
+        color: var(--text-muted);
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      /* =================================================================
+         REVEAL OVERLAY — shared structure, per-direction styling
+         ================================================================= */
+      .reveal {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 32px;
+        /* pin the action area to the VISUAL viewport bottom safely */
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.35s ease;
+      }
+
+      .reveal.is-on {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .reveal__crown {
+        font-size: 2.4rem;
+        filter: drop-shadow(0 0 14px var(--gold-glow));
+        animation: pop 0.5s cubic-bezier(0.18, 0.9, 0.3, 1.4) both;
+      }
+
+      .reveal__winner {
+        font-family: var(--font-card);
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-shadow: 0 0 28px var(--gold-glow);
+        text-align: center;
+        animation: rise 0.5s ease 0.05s both;
+      }
+
+      .device--mobile .reveal__winner {
+        font-size: 1.5rem;
+      }
+
+      .reveal__final {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        animation: rise 0.5s ease 0.12s both;
+      }
+
+      .reveal__final-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+      }
+
+      .reveal__final-by {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .reveal__spacer {
+        flex: 1;
+        min-height: 0;
+      }
+
+      /* the continue button + its pinned container */
+      .reveal__cta-wrap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 18px 24px calc(18px + env(safe-area-inset-bottom, 0px));
+        display: flex;
+        justify-content: center;
+        animation: rise 0.5s ease 0.2s both;
+      }
+
+      .cta {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 700;
+        padding: 14px 40px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        min-height: 52px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+        transition:
+          background 0.15s ease,
+          transform 0.1s ease;
+      }
+
+      .device--mobile .cta {
+        width: 100%;
+        font-size: 1rem;
+      }
+
+      .cta:hover {
+        background: #d4b45a;
+      }
+
+      .cta:active {
+        transform: translateY(1px);
+      }
+
+      .cta__hint {
+        margin-top: 8px;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      @keyframes pop {
+        from {
+          transform: scale(0.5);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      @keyframes rise {
+        from {
+          transform: translateY(14px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      /* ----- DIRECTION A: full blur + dim scrim (board recedes entirely) ----- */
+      .viewport[data-dir="A"] .board.dimmed {
+        filter: blur(7px) brightness(0.55) saturate(0.8);
+        transform: scale(1.02);
+      }
+
+      .viewport[data-dir="A"] .reveal {
+        background: radial-gradient(
+          ellipse 70% 55% at 50% 42%,
+          rgba(10, 6, 3, 0.55) 0%,
+          rgba(8, 5, 2, 0.82) 100%
+        );
+      }
+
+      .viewport[data-dir="A"] .reveal__final .card {
+        outline: 1px solid rgba(201, 168, 76, 0.5);
+        box-shadow:
+          0 8px 28px rgba(0, 0, 0, 0.7),
+          0 0 0 4px rgba(201, 168, 76, 0.12);
+      }
+
+      /* ----- DIRECTION B: spotlight — board blurred, a clear gold-rimmed
+         focus card panel floats the winning cards above the haze ----- */
+      .viewport[data-dir="B"] .board.dimmed {
+        filter: blur(9px) brightness(0.45) saturate(0.7);
+      }
+
+      .viewport[data-dir="B"] .reveal {
+        background: rgba(6, 4, 2, 0.72);
+      }
+
+      .viewport[data-dir="B"] .reveal__focus {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 28px 34px;
+        border-radius: 16px;
+        background: linear-gradient(
+          165deg,
+          rgba(40, 28, 14, 0.96),
+          rgba(20, 12, 6, 0.98)
+        );
+        border: 1px solid rgba(201, 168, 76, 0.35);
+        box-shadow:
+          0 24px 70px rgba(0, 0, 0, 0.7),
+          0 0 60px rgba(201, 168, 76, 0.1) inset;
+      }
+
+      /* gold radial spotlight bleed behind the focus panel */
+      .viewport[data-dir="B"] .reveal__focus::before {
+        content: "";
+        position: absolute;
+        inset: -60px;
+        background: radial-gradient(
+          ellipse 60% 60% at 50% 45%,
+          rgba(201, 168, 76, 0.18),
+          transparent 70%
+        );
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      .viewport:not([data-dir="B"]) .reveal__focus {
+        display: contents;
+      }
+
+      .viewport[data-dir="B"] .reveal__focus .card {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      }
+
+      /* ----- DIRECTION C: curtain — dim+blur the board, slide a felt-toned
+         sheet up from the bottom that the cards rest on; board peeks at top ----- */
+      .viewport[data-dir="C"] .board.dimmed {
+        filter: blur(5px) brightness(0.6);
+      }
+
+      .viewport[data-dir="C"] .reveal {
+        justify-content: flex-end;
+        padding: 0;
+        background: linear-gradient(
+          180deg,
+          rgba(8, 5, 2, 0.1) 0%,
+          rgba(8, 5, 2, 0.45) 30%,
+          transparent 31%
+        );
+      }
+
+      .viewport[data-dir="C"] .reveal__sheet {
+        width: 100%;
+        background: linear-gradient(
+          180deg,
+          rgba(26, 15, 6, 0.97),
+          rgba(13, 8, 3, 0.99)
+        );
+        border-top: 2px solid var(--gold-accent);
+        box-shadow: 0 -16px 50px rgba(0, 0, 0, 0.6);
+        padding: 26px 28px;
+        padding-bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        animation: sheetUp 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+
+      .viewport:not([data-dir="C"]) .reveal__sheet {
+        display: contents;
+      }
+
+      .viewport[data-dir="C"] .reveal__cta-wrap {
+        position: static;
+        padding: 0;
+        animation: none;
+        width: 100%;
+      }
+
+      .viewport[data-dir="C"] .reveal__spacer {
+        display: none;
+      }
+
+      @keyframes sheetUp {
+        from {
+          transform: translateY(100%);
+        }
+        to {
+          transform: translateY(0);
+        }
+      }
+
+      /* hidden-by-default direction wrappers collapse cleanly */
+      .reveal__focus,
+      .reveal__sheet {
+        position: relative;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .reveal__crown,
+        .reveal__winner,
+        .reveal__final,
+        .reveal__cta-wrap,
+        .reveal__sheet {
+          animation: none !important;
+        }
+      }
+
+      /* checklist footer */
+      .checklist {
+        margin-top: 34px;
+        padding: 22px 24px;
+        background: rgba(20, 12, 8, 0.6);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 12px;
+      }
+
+      .checklist h3 {
+        font-family: var(--font-card);
+        color: var(--gold-accent);
+        font-size: 1.05rem;
+        margin-bottom: 12px;
+      }
+
+      .checklist ul {
+        list-style: none;
+        display: grid;
+        gap: 10px;
+      }
+
+      .checklist li {
+        position: relative;
+        padding-left: 26px;
+        font-size: 0.88rem;
+        line-height: 1.5;
+        color: var(--text-primary);
+      }
+
+      .checklist li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        top: 0;
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+
+      .checklist code {
+        background: rgba(201, 168, 76, 0.12);
+        color: var(--gold-accent);
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 0.85em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc">
+      <h1 class="doc__title">
+        Game-Over Reveal — Blur Board &amp; Mobile-Safe Continue
+      </h1>
+      <p class="doc__sub">
+        The <code>SHOW_FINAL_PLAY</code> phase for Big2 game over. Three
+        distinct treatments for de-emphasizing the live board behind the final
+        cards. Toggle <b>Direction</b>, <b>Device</b>, the simulated
+        <b>URL bar</b> (mobile only — proves the Continue button survives the
+        visual-viewport shrink), and the <b>stale turn label</b> (shows the bug
+        vs the fix).
+      </p>
+
+      <div class="controls">
+        <div class="controls__group">
+          <span class="controls__label">Direction</span>
+          <div class="seg" id="dir-seg">
+            <button data-dir="A" aria-pressed="true">
+              A · Full Blur Scrim
+            </button>
+            <button data-dir="B" aria-pressed="false">
+              B · Spotlight Panel
+            </button>
+            <button data-dir="C" aria-pressed="false">C · Felt Curtain</button>
+          </div>
+        </div>
+
+        <div class="controls__group">
+          <span class="controls__label">Device</span>
+          <div class="seg" id="device-seg">
+            <button data-device="desktop" aria-pressed="true">Desktop</button>
+            <button data-device="mobile" aria-pressed="false">Mobile</button>
+          </div>
+        </div>
+
+        <div class="controls__group">
+          <span class="controls__label">Mobile URL bar</span>
+          <div class="seg" id="urlbar-seg">
+            <button data-urlbar="hidden" aria-pressed="true">Hidden</button>
+            <button data-urlbar="shown" aria-pressed="false">
+              Shown (scrolled)
+            </button>
+          </div>
+        </div>
+
+        <div class="controls__group">
+          <span class="controls__label">Turn label behind</span>
+          <div class="seg" id="turn-seg">
+            <button data-turn="suppressed" aria-pressed="true">
+              Suppressed (fix)
+            </button>
+            <button data-turn="stale" aria-pressed="false">
+              Stale "'s turn" (bug)
+            </button>
+          </div>
+        </div>
+
+        <p class="controls__note">
+          Switch to Mobile + Shown URL bar: the Continue button stays inside the
+          shrunken viewport in every direction.
+        </p>
+      </div>
+
+      <div class="direction-blurb" id="blurb"></div>
+
+      <div class="stage">
+        <div class="device device--desktop" id="device">
+          <div class="urlbar">
+            <span class="urlbar__dot"></span>
+            <span class="urlbar__addr">danbing.app/game/23e8ec2e-8a66…</span>
+          </div>
+          <div class="viewport" id="viewport" data-dir="A">
+            <!-- ===== LIVE BOARD (de-emphasized behind reveal) ===== -->
+            <div class="board dimmed" id="board">
+              <div class="opponents">
+                <div class="opp opp--winner">
+                  <span class="opp__crown">👑</span>
+                  <span class="opp__name">Alice</span>
+                  <span class="opp__count opp__count--zero">0 cards</span>
+                </div>
+                <div class="opp">
+                  <span class="opp__name">Bob</span>
+                  <span class="opp__count">3 cards</span>
+                </div>
+                <div class="opp">
+                  <span class="opp__name">Charlie</span>
+                  <span class="opp__count">7 cards</span>
+                </div>
+                <div class="opp">
+                  <span class="opp__name">Dave</span>
+                  <span class="opp__count">12 cards</span>
+                </div>
+              </div>
+
+              <div class="table">
+                <!-- the stale turn UI this fix suppresses -->
+                <div class="turn-label" id="turn-label">&nbsp;'s turn</div>
+                <div class="play-cards">
+                  <span class="play-cards__label">Pair</span>
+                  <div class="card-row">
+                    <div class="card card--black">
+                      <span class="card__corner">A<span>♠</span></span>
+                      <span class="card__pip">♠</span>
+                    </div>
+                    <div class="card card--red">
+                      <span class="card__corner">A<span>♥</span></span>
+                      <span class="card__pip">♥</span>
+                    </div>
+                  </div>
+                  <span class="play-cards__by">played by Alice</span>
+                </div>
+              </div>
+
+              <div class="hand">
+                <span class="hand__label">Your hand (3)</span>
+                <div class="hand__cards">
+                  <div class="card card--black">
+                    <span class="card__corner">4<span>♣</span></span>
+                  </div>
+                  <div class="card card--red">
+                    <span class="card__corner">9<span>♦</span></span>
+                  </div>
+                  <div class="card card--black">
+                    <span class="card__corner">J<span>♠</span></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="log">
+                <span class="log__title">Game Log</span>
+                <span>Alice: Pair A♠ A♥</span>
+                <span>Charlie: Pass</span>
+                <span>Dave: Pass</span>
+                <span>Bob: Pass</span>
+                <span style="color: var(--gold-accent)">Alice wins!</span>
+              </div>
+
+              <div class="actions">
+                <button>Play</button>
+                <button>Pass</button>
+              </div>
+            </div>
+
+            <!-- ===== REVEAL OVERLAY ===== -->
+            <div class="reveal is-on" id="reveal">
+              <!-- Direction B wraps content in a focus panel; A/C let it flow -->
+              <div class="reveal__focus">
+                <div class="reveal__crown">🏆</div>
+                <div class="reveal__winner">Alice wins!</div>
+
+                <!-- Direction C wraps the cards+cta in a felt sheet at the bottom;
+                     A/B render inline (display:contents collapses the wrapper) -->
+                <div class="reveal__sheet">
+                  <div class="reveal__final">
+                    <span class="reveal__final-label">Final Play</span>
+                    <div class="card-row">
+                      <div class="card card--lg card--black">
+                        <span class="card__corner">A<span>♠</span></span>
+                        <span class="card__pip">♠</span>
+                      </div>
+                      <div class="card card--lg card--red">
+                        <span class="card__corner">A<span>♥</span></span>
+                        <span class="card__pip">♥</span>
+                      </div>
+                    </div>
+                    <span class="reveal__final-by">Pair · played by Alice</span>
+                  </div>
+
+                  <div class="reveal__cta-wrap reveal__cta-wrap--inline">
+                    <div>
+                      <button class="cta">Continue to Results</button>
+                      <div class="cta__hint">Take your time — no countdown</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="reveal__spacer"></div>
+              <!-- A/B pin CTA to visual-viewport bottom; C uses the sheet's CTA -->
+              <div
+                class="reveal__cta-wrap reveal__cta-wrap--pinned"
+                id="pinned-cta"
+              >
+                <div>
+                  <button class="cta">Continue to Results</button>
+                  <div class="cta__hint">Take your time — no countdown</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="checklist">
+        <h3>What every direction guarantees (the acceptance criteria)</h3>
+        <ul>
+          <li>
+            Continue button uses <code>100dvh</code>-based sizing and is pinned
+            to the <b>visual</b> viewport bottom (<code
+              >env(safe-area-inset-bottom)</code
+            >
+            aware), so it stays fully visible and tappable when the mobile URL
+            bar reveals on scroll. Toggle Mobile + URL bar Shown to confirm.
+          </li>
+          <li>
+            The board behind the reveal is <b>blurred + dimmed</b>, so leftover
+            board detail (turn timer, room code, action panel) reads as
+            background, not interactive UI.
+          </li>
+          <li>
+            The stale <code>"'s turn"</code> label is <b>suppressed</b> at game
+            over (no current turn). Toggle "Stale 's turn (bug)" to see the
+            orphaned text this fix removes — the timer/turn UI is hidden once
+            the game is over.
+          </li>
+          <li>
+            Final winning cards stay <b>crisp and prominent</b> above the blur,
+            with winner announcement and the click-to-continue affordance (no
+            auto-advance timer, per LLD 73).
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      const viewport = document.getElementById("viewport");
+      const device = document.getElementById("device");
+      const turnLabel = document.getElementById("turn-label");
+      const blurb = document.getElementById("blurb");
+
+      const blurbs = {
+        A: "<b>Direction A · Full Blur Scrim.</b> The whole board recedes behind a heavy blur + dark radial scrim. The winner, final cards, and Continue button float directly on the haze — gold-rimmed cards keep them legible. Simplest to implement (one overlay element, a filter on the board) and the most dramatic 'everything stops' moment. Closest evolution of the current ribbon overlay.",
+        B: "<b>Direction B · Spotlight Panel.</b> The board blurs hard and goes dark; a single gold-rimmed focus panel with a radial light-bleed holds the winner + final cards like a trophy case. Most 'designed' and premium-feeling; draws the eye to one object. Slightly more markup (the focus panel) but reads as the most intentional reveal.",
+        C: "<b>Direction C · Felt Curtain.</b> The board dims/blurs and a felt-toned sheet slides up from the bottom carrying the final cards and the Continue button. The top of the board peeks above the curtain for continuity. The button lives <i>inside</i> the sheet (no separate pinned element), which is the most robust against URL-bar shifts. Closest in spirit to the reporter's 'reveal screen with the cards' mental model.",
+      };
+
+      function setBlurb(dir) {
+        blurb.innerHTML = blurbs[dir];
+      }
+      setBlurb("A");
+
+      // Direction
+      document.getElementById("dir-seg").addEventListener("click", (e) => {
+        const btn = e.target.closest("button");
+        if (!btn) return;
+        const dir = btn.dataset.dir;
+        viewport.setAttribute("data-dir", dir);
+        [...e.currentTarget.children].forEach((b) =>
+          b.setAttribute("aria-pressed", String(b === btn)),
+        );
+        setBlurb(dir);
+      });
+
+      // Device
+      document.getElementById("device-seg").addEventListener("click", (e) => {
+        const btn = e.target.closest("button");
+        if (!btn) return;
+        const d = btn.dataset.device;
+        device.className = "device device--" + d;
+        [...e.currentTarget.children].forEach((b) =>
+          b.setAttribute("aria-pressed", String(b === btn)),
+        );
+      });
+
+      // URL bar (mobile only)
+      document.getElementById("urlbar-seg").addEventListener("click", (e) => {
+        const btn = e.target.closest("button");
+        if (!btn) return;
+        device.classList.toggle("urlbar-shown", btn.dataset.urlbar === "shown");
+        [...e.currentTarget.children].forEach((b) =>
+          b.setAttribute("aria-pressed", String(b === btn)),
+        );
+      });
+
+      // Stale turn label toggle (bug vs fix)
+      document.getElementById("turn-seg").addEventListener("click", (e) => {
+        const btn = e.target.closest("button");
+        if (!btn) return;
+        const stale = btn.dataset.turn === "stale";
+        turnLabel.style.display = stale ? "" : "none";
+        turnLabel.classList.toggle("turn-label--ghost", stale);
+        turnLabel.innerHTML = stale ? "&nbsp;'s turn" : "";
+        [...e.currentTarget.children].forEach((b) =>
+          b.setAttribute("aria-pressed", String(b === btn)),
+        );
+      });
+
+      // default: suppressed
+      turnLabel.style.display = "none";
+
+      // Continue button = demo only (toggles overlay off to peek at board)
+      document.querySelectorAll(".cta").forEach((cta) => {
+        cta.addEventListener("click", () => {
+          const reveal = document.getElementById("reveal");
+          reveal.classList.toggle("is-on");
+          document.getElementById("board").classList.toggle("dimmed");
+        });
+      });
+    </script>
+  </body>
+</html>
