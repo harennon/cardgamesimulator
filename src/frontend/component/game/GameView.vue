@@ -197,7 +197,13 @@ const displayPhase = ref<DisplayPhase>("CREATED");
 
 watch(effectiveStatus, (newStatus, oldStatus) => {
   if (newStatus === "COMPLETED" && oldStatus === "IN_PROGRESS") {
-    displayPhase.value = "SHOW_FINAL_PLAY";
+    // Big2 lingers on SHOW_FINAL_PLAY so the winning play stays visible behind a
+    // "Continue to Results" ribbon. Tonk has no final-play concept and no such
+    // affordance, so a live Tonk completion goes straight to the game-over screen
+    // (otherwise the completing player is stranded on the board). The final winner
+    // + tallies live on GameOverView for Tonk.
+    displayPhase.value =
+      gameType.value === "big2" ? "SHOW_FINAL_PLAY" : "COMPLETED";
   } else if (newStatus === "COMPLETED") {
     displayPhase.value = "COMPLETED";
   } else if (newStatus === "IN_PROGRESS") {
