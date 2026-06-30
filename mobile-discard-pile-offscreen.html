@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mobile discard pile fit — design options</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============ Tokens lifted from src/frontend/styles/game-variables.css ============ */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        /* Mobile card tokens (from the @media max-width:767px block) */
+        --card-hand-width: 52px;
+        --card-hand-height: 73px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(ellipse at 20% 0%, #1c1c22 0%, #0d0d0d 60%), #0d0d0d;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        padding: 32px 20px 80px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 28px;
+      }
+      .page-head h1 {
+        font-family: var(--font-card);
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0 0 6px;
+        color: var(--text-primary);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        max-width: 720px;
+        line-height: 1.55;
+      }
+      .page-head .tag {
+        display: inline-block;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 999px;
+        padding: 3px 10px;
+        margin-bottom: 12px;
+      }
+
+      /* ============ Control bar ============ */
+      .controls {
+        max-width: 1180px;
+        margin: 0 auto 30px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 22px;
+        padding: 16px 18px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+      }
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .control-group > span {
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .seg button {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        background: transparent;
+        color: var(--text-muted);
+        border: none;
+        padding: 7px 13px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s;
+        border-right: 1px solid var(--table-rim-light);
+      }
+      .seg button:last-child {
+        border-right: none;
+      }
+      .seg button.active {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-weight: 600;
+      }
+      .seg button:not(.active):hover {
+        color: var(--text-primary);
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      /* ============ Phone frames row ============ */
+      .frames {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 40px 36px;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .option {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      .option__title {
+        text-align: center;
+      }
+      .option__title h2 {
+        font-family: var(--font-card);
+        font-size: 1rem;
+        margin: 0 0 4px;
+        color: var(--gold-accent);
+      }
+      .option__title p {
+        margin: 0;
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        max-width: 280px;
+        line-height: 1.45;
+      }
+
+      /* Phone bezel — width is driven by a CSS var so the viewport toggle works */
+      .phone {
+        --vw: 360px;
+        width: var(--vw);
+        height: 540px;
+        border-radius: 30px;
+        padding: 10px;
+        background: linear-gradient(160deg, #2a2a30, #131316);
+        box-shadow:
+          0 18px 50px rgba(0, 0, 0, 0.55),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+        transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .phone__notch {
+        width: 110px;
+        height: 5px;
+        border-radius: 3px;
+        background: #000;
+        margin: 2px auto 6px;
+        opacity: 0.6;
+      }
+      .phone__vw-label {
+        text-align: center;
+        font-size: 0.62rem;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-top: 8px;
+      }
+
+      /* ============ Game board (mobile) — mirrors GameBoard.vue mobile grid ============ */
+      .game-board {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 22px;
+        display: grid;
+        grid-template-rows: 44px 1fr 96px 44px;
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand"
+          "actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 45%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        /* THE constraint that produces the clip in production */
+        overflow: clip;
+        border: 4px solid var(--table-rim);
+      }
+
+      .gb-opponents {
+        grid-area: opponents;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        font-size: 0.62rem;
+        color: var(--text-primary);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+      }
+      .gb-opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+      .gb-opp__mini {
+        width: 14px;
+        height: 20px;
+        border-radius: 2px;
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1px solid #c9a84c;
+      }
+      .gb-opp__name {
+        font-size: 0.56rem;
+        color: var(--text-muted);
+      }
+      .gb-opp--active .gb-opp__name {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      .gb-table {
+        grid-area: table;
+        min-height: 0;
+        position: relative;
+      }
+
+      .gb-hand {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 6px 8px;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        overflow: hidden;
+      }
+      .gb-hand__label {
+        font-size: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        padding-left: 6px;
+        margin-bottom: 3px;
+      }
+      .gb-hand__cards {
+        display: flex;
+        padding-left: 14px;
+      }
+      .gb-hand__cards .card {
+        margin-left: -18px;
+      }
+      .gb-hand__cards .card:first-child {
+        margin-left: 0;
+      }
+
+      .gb-actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: var(--panel-bg);
+        border-top: 1px solid var(--table-rim-light);
+      }
+      .gb-actions button {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-radius: 6px;
+        padding: 7px 22px;
+        cursor: default;
+        border: none;
+      }
+      .gb-actions .play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .gb-actions .pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--text-muted);
+      }
+
+      /* ============ Play area — mirrors PlayArea.vue ============ */
+      .play-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        height: 100%;
+        padding: 12px 16px;
+      }
+      .play-area__turn {
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .play-area__turn .timer {
+        color: var(--text-muted);
+        letter-spacing: 0.04em;
+      }
+
+      .play-area__center {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        /* This is the key: the center must know how wide it is allowed to be.
+       In production the table cell already constrains it; here we pin it for
+       a faithful demo of the available width. */
+      }
+
+      /* Trick pile — absolutely positioned to the left, as in production */
+      .play-area__trick-pile {
+        position: absolute;
+        left: -64px;
+        top: 50%;
+        transform: translateY(-50%) scale(0.85);
+        transform-origin: top left;
+        width: 46px;
+        height: 58px;
+      }
+      .trick-stack {
+        position: relative;
+        width: 46px;
+        height: 58px;
+      }
+      .trick-stack .mini {
+        position: absolute;
+        width: 28px;
+        height: 40px;
+        border-radius: 4px;
+        background: var(--card-face);
+        border: 1px solid #c8b89a;
+        box-shadow: 1px 2px 4px var(--card-shadow);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-size: 0.5rem;
+        font-weight: 700;
+      }
+      .trick-stack .mini:nth-child(1) {
+        left: 0;
+        top: 0;
+      }
+      .trick-stack .mini:nth-child(2) {
+        left: 6px;
+        top: 6px;
+      }
+      .trick-stack .mini:nth-child(3) {
+        left: 12px;
+        top: 12px;
+      }
+      .trick-stack .badge {
+        position: absolute;
+        top: -7px;
+        right: -10px;
+        z-index: 5;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-size: 0.56rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .play-area__hand-label {
+        font-size: 0.66rem;
+        font-weight: 500;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .play-area__played-by {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+      }
+
+      /* ============ Card ============ */
+      .card {
+        position: relative;
+        width: var(--card-hand-width);
+        height: var(--card-hand-height);
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        flex-shrink: 0;
+        font-family: var(--font-card);
+        font-weight: 700;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .card__corner {
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+      }
+      .card__corner-rank {
+        font-size: 10px;
+      }
+      .card__corner-suit {
+        font-size: 9px;
+        margin-top: -1px;
+      }
+      .card__rank {
+        font-size: 0.95rem;
+        line-height: 1;
+      }
+      .card.red,
+      .card.red .card__corner {
+        color: var(--red-suit);
+      }
+      .card.black,
+      .card.black .card__corner {
+        color: var(--black-suit);
+      }
+
+      /* ============ Card-row variants per option ============ */
+
+      /* Production (broken) baseline — fixed row, no wrap/scale */
+      .row--baseline {
+        display: flex;
+        gap: 4px;
+      }
+
+      /* OPTION A — scale-to-fit transform.
+     The inner row keeps its natural pixel size; an outer wrapper measures the
+     available width and applies transform: scale() via --fit-scale (set by JS).
+     Layout footprint is corrected with a negative margin so neighbours don't shift. */
+      .fit-wrap {
+        display: flex;
+        justify-content: center;
+      }
+      .fit-inner {
+        display: flex;
+        gap: 4px;
+        transform: scale(var(--fit-scale, 1));
+        transform-origin: center center;
+      }
+
+      /* OPTION B — dedicated smaller on-table card size that always fits 5 cards.
+     Uses a fixed --card-play-width chosen so 5 cards + gaps < min available width. */
+      .row--compact {
+        display: flex;
+        gap: 3px;
+      }
+      .row--compact .card {
+        --card-hand-width: 40px;
+        --card-hand-height: 56px;
+      }
+      .row--compact .card__rank {
+        font-size: 0.78rem;
+      }
+      .row--compact .card__corner-rank {
+        font-size: 8px;
+      }
+      .row--compact .card__corner-suit {
+        font-size: 7px;
+      }
+
+      /* OPTION C — wrap to two rows when content exceeds available width. */
+      .row--wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        justify-content: center;
+        max-width: 100%;
+        row-gap: 5px;
+      }
+
+      /* The fit cell that constrains width for A and C demos (simulates table cell width) */
+      .fit-cell {
+        width: 100%;
+        max-width: 100%;
+        display: flex;
+        justify-content: center;
+      }
+
+      /* Notes under each board */
+      .opt-note {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+        max-width: 300px;
+        text-align: center;
+      }
+      .opt-note b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .pill {
+        display: inline-block;
+        font-size: 0.6rem;
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid var(--table-rim-light);
+        color: var(--gold-accent);
+        margin-top: 4px;
+      }
+      .pill--warn {
+        color: #e0a0a0;
+        border-color: #6b3030;
+      }
+      .pill--good {
+        color: #9ed09e;
+        border-color: #306b30;
+      }
+
+      .legend {
+        max-width: 1180px;
+        margin: 36px auto 0;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding-top: 20px;
+      }
+      .legend h3 {
+        color: var(--text-primary);
+        font-family: var(--font-card);
+        font-size: 0.95rem;
+        margin: 0 0 8px;
+      }
+      .legend code {
+        color: var(--gold-accent);
+        font-size: 0.85em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <span class="tag">LLD 102 · Mobile fix</span>
+      <h1>Discard pile fit on mobile — three approaches</h1>
+      <p>
+        On a narrow viewport, a 5-card current play (full house, straight,
+        flush, four-of-a-kind, straight flush) renders in a fixed
+        <code style="color: var(--gold-accent)">.play-area__card-row</code>
+        wider than the table, and
+        <code style="color: var(--gold-accent)">overflow: clip</code> on the
+        mobile board cuts off the rightmost cards. Use the controls to reproduce
+        the bug (Baseline) and compare the three candidate fixes across viewport
+        widths and play types.
+      </p>
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <span>Viewport width</span>
+        <div class="seg" id="seg-vw">
+          <button data-vw="320">320px</button>
+          <button data-vw="360" class="active">360px</button>
+          <button data-vw="412">412px</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span>Current play</span>
+        <div class="seg" id="seg-play">
+          <button data-play="single">Single</button>
+          <button data-play="pair">Pair</button>
+          <button data-play="fullHouse" class="active">Full House (5)</button>
+          <button data-play="straight">Straight (5)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="frames" id="frames"></div>
+
+    <div class="legend">
+      <h3>How to read this</h3>
+      <p>
+        Each phone renders the same mobile game board. The
+        <b>Baseline</b> column is current production behaviour — switch to
+        <b>Full House (5)</b> at <b>320px</b> and the 5th card is clipped at the
+        felt edge (the bug). The three option columns each keep the play fully
+        on-screen, centered, with the trick pile pinned left.
+      </p>
+      <p>
+        <b>Option A — Scale-to-fit:</b> measure available width, apply
+        <code>transform: scale()</code> only when the natural row overflows.
+        Cards stay full size for 1–4 card plays; 5-card plays shrink just enough
+        to fit. Preserves a single straight line. GPU-composited, no reflow.
+        <br />
+        <b>Option B — Dedicated on-table size:</b> the on-table play uses a
+        smaller fixed card size (e.g. <code>--card-play-width</code>, already
+        defined but unused) so 5 cards always fit at any supported width.
+        Simplest; consistent look but on-table cards are always smaller than the
+        hand. <br />
+        <b>Option C — Wrap:</b> add <code>flex-wrap: wrap</code> so a 5-card
+        play breaks onto a second centered row when it can't fit. No scaling;
+        cards stay full size, but the play occupies two rows and the vertical
+        center shifts.
+      </p>
+    </div>
+
+    <script>
+      // ---- Card data for realistic Big2 scenarios ----
+      const SUIT = { clubs: "♣", diamonds: "♦", hearts: "♥", spades: "♠" };
+      const isRed = (s) => s === "hearts" || s === "diamonds";
+
+      const PLAYS = {
+        single: [["2", "spades"]],
+        pair: [
+          ["7", "spades"],
+          ["7", "hearts"],
+        ],
+        fullHouse: [
+          ["9", "clubs"],
+          ["9", "diamonds"],
+          ["9", "spades"],
+          ["J", "hearts"],
+          ["J", "spades"],
+        ],
+        straight: [
+          ["3", "clubs"],
+          ["4", "diamonds"],
+          ["5", "hearts"],
+          ["6", "spades"],
+          ["7", "diamonds"],
+        ],
+      };
+      const LABEL = {
+        single: "Single",
+        pair: "Pair",
+        fullHouse: "Full House",
+        straight: "Straight",
+      };
+
+      // Player's own hand (just for visual fidelity at the bottom)
+      const HAND = [
+        ["3", "clubs"],
+        ["4", "diamonds"],
+        ["6", "hearts"],
+        ["8", "spades"],
+        ["10", "clubs"],
+        ["J", "diamonds"],
+        ["Q", "hearts"],
+        ["K", "spades"],
+        ["A", "clubs"],
+        ["2", "hearts"],
+      ];
+
+      function cardEl(rank, suit, cls = "") {
+        const color = isRed(suit) ? "red" : "black";
+        return `<div class="card ${color} ${cls}">
+      <div class="card__corner">
+        <span class="card__corner-rank">${rank}</span>
+        <span class="card__corner-suit">${SUIT[suit]}</span>
+      </div>
+      <span class="card__rank">${SUIT[suit]}</span>
+    </div>`;
+      }
+
+      function trickPile() {
+        return `<div class="play-area__trick-pile">
+      <div class="trick-stack">
+        <span class="mini">7♠</span>
+        <span class="mini">9♦</span>
+        <span class="mini">Q♣</span>
+        <span class="badge">5</span>
+      </div>
+    </div>`;
+      }
+
+      function opponents() {
+        const opp = (name, n, active = false) =>
+          `<div class="gb-opp ${active ? "gb-opp--active" : ""}">
+        <div class="gb-opp__mini"></div>
+        <span class="gb-opp__name">${name} · ${n}</span>
+      </div>`;
+        return `<div class="gb-opponents">
+      ${opp("Bob", 9)} ${opp("Charlie", 11, true)} ${opp("Dave", 8)}
+    </div>`;
+      }
+
+      function hand() {
+        return `<div class="gb-hand">
+      <div class="gb-hand__label">Your hand (10)</div>
+      <div class="gb-hand__cards">
+        ${HAND.map(([r, s]) => cardEl(r, s)).join("")}
+      </div>
+    </div>`;
+      }
+
+      function actions() {
+        return `<div class="gb-actions">
+      <button class="play">Play</button>
+      <button class="pass">Pass</button>
+    </div>`;
+      }
+
+      // Build the inner card-row markup for a given play + option
+      function cardRow(playKey, option) {
+        const cards = PLAYS[playKey];
+        const inner = cards.map(([r, s]) => cardEl(r, s)).join("");
+
+        if (option === "baseline") {
+          return `<div class="row--baseline">${inner}</div>`;
+        }
+        if (option === "A") {
+          return `<div class="fit-cell"><div class="fit-wrap"><div class="fit-inner">${inner}</div></div></div>`;
+        }
+        if (option === "B") {
+          return `<div class="row--compact">${inner}</div>`;
+        }
+        if (option === "C") {
+          return `<div class="fit-cell"><div class="row--wrap">${inner}</div></div>`;
+        }
+      }
+
+      function playArea(playKey, option) {
+        return `<div class="play-area">
+      <div class="play-area__turn">◄ Your turn ► <span class="timer">0:42</span></div>
+      <div class="play-area__center">
+        ${trickPile()}
+        <div class="play-area__hand-label">${LABEL[playKey]}</div>
+        ${cardRow(playKey, option)}
+        <div class="play-area__played-by">played by Charlie</div>
+      </div>
+    </div>`;
+      }
+
+      function board(playKey, option) {
+        return `<div class="game-board">
+      ${opponents()}
+      <div class="gb-table">${playArea(playKey, option)}</div>
+      ${hand()}
+      ${actions()}
+    </div>`;
+      }
+
+      const OPTIONS = [
+        {
+          key: "baseline",
+          title: "Baseline (current)",
+          desc: "Fixed row, no wrap or scale. Reproduces the bug — switch to Full House at 320px.",
+          warn: true,
+        },
+        {
+          key: "A",
+          title: "Option A — Scale to fit",
+          desc: "Shrink the whole row with transform: scale() only when it overflows the table width.",
+        },
+        {
+          key: "B",
+          title: "Option B — Dedicated on-table size",
+          desc: "Smaller fixed card size for the on-table play; 5 cards always fit.",
+        },
+        {
+          key: "C",
+          title: "Option C — Wrap to two rows",
+          desc: "flex-wrap lets a 5-card play break onto a second centered row.",
+        },
+      ];
+
+      let state = { vw: 360, play: "fullHouse" };
+
+      function render() {
+        const frames = document.getElementById("frames");
+        frames.innerHTML = OPTIONS.map(
+          (opt) => `
+      <div class="option" data-opt="${opt.key}">
+        <div class="option__title">
+          <h2>${opt.title}</h2>
+          <p>${opt.desc}</p>
+          ${opt.warn ? '<span class="pill pill--warn">may clip</span>' : '<span class="pill pill--good">always fits</span>'}
+        </div>
+        <div class="phone" style="--vw:${state.vw}px">
+          <div class="phone__notch"></div>
+          ${board(state.play, opt.key === "baseline" ? "baseline" : opt.key)}
+        </div>
+        <div class="phone__vw-label">${state.vw}px viewport</div>
+      </div>
+    `,
+        ).join("");
+
+        applyFitScale();
+      }
+
+      // Option A: compute scale = min(1, available / natural) per fit-inner
+      function applyFitScale() {
+        document.querySelectorAll(".fit-wrap").forEach((wrap) => {
+          const inner = wrap.querySelector(".fit-inner");
+          if (!inner) return;
+          inner.style.setProperty("--fit-scale", "1"); // reset to measure natural width
+          const avail = wrap.clientWidth;
+          const natural = inner.scrollWidth;
+          const scale = natural > avail ? Math.max(0.6, avail / natural) : 1;
+          inner.style.setProperty("--fit-scale", scale.toFixed(3));
+        });
+      }
+
+      // ---- Controls ----
+      document.getElementById("seg-vw").addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        state.vw = +b.dataset.vw;
+        document
+          .querySelectorAll("#seg-vw button")
+          .forEach((x) => x.classList.toggle("active", x === b));
+        render();
+      });
+      document.getElementById("seg-play").addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        state.play = b.dataset.play;
+        document
+          .querySelectorAll("#seg-play button")
+          .forEach((x) => x.classList.toggle("active", x === b));
+        render();
+      });
+
+      window.addEventListener("resize", applyFitScale);
+      render();
+    </script>
+  </body>
+</html>
