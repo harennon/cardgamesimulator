@@ -1,4 +1,5 @@
 import type { Card } from "@shared/engine-types";
+import type { TonkCard } from "@shared/tonk-types";
 
 // A scene is a declarative descriptor the shell maps to real components.
 // Discriminated union so adding a future scene kind is additive and type-checked.
@@ -6,7 +7,9 @@ export type WalkthroughScene =
   // A row of real GameCards rendered from hard-coded fixture props.
   | {
       kind: "cards";
-      cards: readonly Card[];
+      // A fixture card may be a standard Card OR a Tonk joker (Option B, LLD 115).
+      // GameCard already accepts Card | TonkCard and renders jokers via isJoker().
+      cards: readonly (Card | TonkCard)[];
       // Indices (into `cards`) to render as selected/lifted (mirrors card selection).
       selectedIndices?: readonly number[];
       // Indices to highlight (e.g. dashed outline on the "lowest card").
