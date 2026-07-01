@@ -6,6 +6,9 @@ import {
   statRowsFor,
   sortedEntries,
   GAME_TYPE_UI_BOUNDS,
+  WINDOW_TABS,
+  stepWindow,
+  formatTrackingSince,
 } from "@/component/statsView";
 
 describe("gameTypeLabel", () => {
@@ -152,5 +155,56 @@ describe("sortedEntries", () => {
     ];
     sortedEntries(games);
     expect(games[0].gameType).toBe("tonk");
+  });
+});
+
+describe("WINDOW_TABS", () => {
+  it("has the three windows in render order, lifetime first (default index 0)", () => {
+    expect(WINDOW_TABS.map((t) => t.window)).toEqual([
+      "lifetime",
+      "30d",
+      "ytd",
+    ]);
+  });
+
+  it("labels are the approved copy", () => {
+    expect(WINDOW_TABS.map((t) => t.label)).toEqual([
+      "Lifetime",
+      "Last 30 days",
+      "Year to date",
+    ]);
+  });
+});
+
+describe("stepWindow (swipe/arrow, clamped — no wrap)", () => {
+  it("advances lifetime -> 30d -> ytd", () => {
+    expect(stepWindow("lifetime", 1)).toBe("30d");
+    expect(stepWindow("30d", 1)).toBe("ytd");
+  });
+
+  it("retreats ytd -> 30d -> lifetime", () => {
+    expect(stepWindow("ytd", -1)).toBe("30d");
+    expect(stepWindow("30d", -1)).toBe("lifetime");
+  });
+
+  it("clamps at the ends (no wrap-around) — E9", () => {
+    expect(stepWindow("lifetime", -1)).toBe("lifetime");
+    expect(stepWindow("ytd", 1)).toBe("ytd");
+  });
+});
+
+describe("formatTrackingSince", () => {
+  it("returns null for a null value (render nothing)", () => {
+    expect(formatTrackingSince(null)).toBeNull();
+  });
+
+  it("returns null for an unparseable value rather than 'Invalid Date' — E12", () => {
+    expect(formatTrackingSince("not-a-date")).toBeNull();
+  });
+
+  it("formats a valid ISO date to a non-empty locale string", () => {
+    const out = formatTrackingSince("2026-01-15T00:00:00.000Z");
+    expect(out).not.toBeNull();
+    expect(out).toBe(new Date("2026-01-15T00:00:00.000Z").toLocaleDateString());
   });
 });
