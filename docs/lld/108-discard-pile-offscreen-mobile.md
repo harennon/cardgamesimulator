@@ -30,13 +30,22 @@ Plus one supporting change carried by the frontend decision note:
 
 ### Decision 1 — Fixed-corner pile on mobile (decouple)
 
-The pile currently lives inside `.play-area__center` and is positioned relative to the centered play. On mobile only, re-anchor it to `.play-area` (which is `position: relative`-eligible — it is the flex column that fills the table grid cell) at a fixed bottom-left corner:
+The pile currently lives inside `.play-area__center` and is positioned relative to the centered play. On mobile only, re-anchor it so it resolves against the full-height `.play-area` box (the flex column that fills the table grid cell) at a fixed bottom-left corner.
 
-In `PlayArea.vue`:
+**Containing-block correction (critical).** An absolutely-positioned element resolves against its *nearest positioned ancestor*. Today `.play-area__trick-pile` is rendered as a child of `.play-area__center` (PlayArea.vue lines 11–16), and `.play-area__center` is `position: relative` (PlayArea.vue line 103) **solely** so it can be that ancestor for the pile. Therefore simply adding `position: relative` to `.play-area` does **not** re-anchor the pile — `.play-area__center` is closer and still wins. To make the pile resolve against `.play-area` (the full-height felt column), the mobile block must (a) establish `.play-area` as a positioned containing block **and** (b) demote `.play-area__center` to `position: static` so it stops being the nearest positioned ancestor.
+
+**Side-effect check for `.play-area__center { position: static }` on mobile:** `.play-area__center`'s `position: relative` today has exactly one purpose — parenting the absolutely-positioned `.play-area__trick-pile`. It has no `top/left/right/bottom`, no `z-index`, no `overflow`/clip, and its only absolutely-positioned descendant is the pile (which this LLD is re-anchoring away from it). Demoting it to `static` on mobile therefore has no other layout effect: the centered flex-column content (`.play-area__cards` / `.play-area__free`) is unaffected. This is a required override, not an implementer choice.
+
+In `PlayArea.vue`, mobile block:
 
 ```
 @media (max-width: 767px) {
-  .play-area { position: relative; }        /* establish containing block */
+  /* (a) Make .play-area the containing block for the pile. */
+  .play-area { position: relative; }
+  /* (b) Demote the centered box so it is no longer the nearest positioned
+         ancestor — otherwise the pile still anchors to the shrink-wrapped
+         centered play, not the felt corner. */
+  .play-area__center { position: static; }
   .play-area__trick-pile {
     position: absolute;
     left: 8px;
@@ -47,7 +56,9 @@ In `PlayArea.vue`:
 }
 ```
 
-Because the pile is now absolutely positioned against `.play-area` (not against the centered play), the width of the played row no longer moves the pile, and the pile can never push the play off-screen. The centered `.play-area__center` keeps its existing centering.
+With both (a) and (b) in place, the pile is absolutely positioned against `.play-area` (the full-height felt column), not against the centered, shrink-wrapped `.play-area__center` that sits right at the play. So the width and vertical center of the played row no longer move the pile: it is pinned to the felt's true bottom-left corner, vertically separated from the vertically-centered play (which is the separation Decision 4's primary non-overlap guarantee depends on). The centered `.play-area__center` keeps its existing centering. The pile markup stays a child of `.play-area__center` (no template relocation needed) — the `static`/`relative` override is what re-parents its positioning.
+
+> Alternative (rejected): relocating `.play-area__trick-pile` to be a direct child of `.play-area` in the template would also work, but it changes markup structure for both breakpoints (or forces two branches) and is more invasive than the two-line CSS override above. The CSS override is preferred as the surgical change.
 
 **The mobile inner scale is removed, not merely wrapped.** `TrickPile.vue` today applies `transform: scale(0.85); transform-origin: top left;` to `.trick-pile__stack` inside its own `@media (max-width: 767px)` block (TrickPile.vue lines 316–320). The `transform: none` above is on the *outer* `.play-area__trick-pile` wrapper and does **not** cancel that inner scale — so the pile's real footprint today is the scaled box, not the nominal `28px+18px` / `40px+18px`. This LLD removes the `transform: scale(0.85)` rule on `.trick-pile__stack` in the mobile block of `TrickPile.vue` so the collapsed pile has a single, unscaled, deterministic footprint. The mobile static-icon layer (Decision 3) is instead given explicit `width`/`height` sized for mobile, so the collapsed box is exactly the icon + badge with no residual scale transform. This is the "constant, known footprint" that Decisions 3 and 4 depend on; the footprint math in Decision 2 and the non-overlap zone in Decision 4 reference this unscaled box.
 
@@ -106,6 +117,7 @@ On **mobile only**, replace the collapsed layered card stack with a single stati
 </template>
 ```
 
+- **Invariant — the mobile static layer must retain the `.trick-pile__layer` class** (the second class `trick-pile__layer--static` is additive, for mobile-only styling). Both the desktop layered spans and the mobile static span carry the shared `.trick-pile__layer` class, so the E2E count selector `.play-area__trick-pile .trick-pile__layer` matches exactly one element on mobile and up to `MAX_LAYERS` on desktop. An implementer must **not** rename the static layer's shared class to something that drops `trick-pile__layer` (e.g. only `trick-pile__static`) — doing so silently breaks the mobile count assertion (Test Requirements → E2E) with no compile error.
 - The single mobile layer shows the top (most recent) play's representative card — reuse a `GameCard size="small"` for visual consistency with the overlay and desktop stack (a dedicated CSS glyph is an acceptable alternative but not preferred).
 - The existing `.trick-pile__badge` (play count) stays unchanged on both breakpoints as the affordance that communicates depth.
 - `latestPlay` is the last entry of `playEntries` (the most-recent play); it feeds only the mobile static layer. `stackLayers`, `layerStyle`, `topCardOf`, and `MAX_LAYERS` are **retained** because desktop still uses them. Nothing in the collapsed logic is deleted — this keeps desktop byte-for-byte and avoids the "no logic left to assert" problem (see Test Requirements).
@@ -116,7 +128,7 @@ The **expanded overlay is unchanged** on both breakpoints — it still lists eve
 
 ### Decision 4 — Pile must not overlap the played cards (rider requirement)
 
-The fixed bottom-left pile and the centered played row share the `.play-area` box. At 320px the played row is width-capped and centered; the pile occupies a fixed bottom-left rectangle. Guarantee non-overlap by:
+The fixed bottom-left pile and the centered played row share the `.play-area` box. This vertical separation only holds because Decision 1's containing-block correction makes the pile resolve against the full-height `.play-area` (so `bottom: 8px` reaches the felt's true bottom edge, well below the vertically-centered play) rather than against the shrink-wrapped `.play-area__center` (where `bottom: 8px` would sit right at the play and defeat this guarantee). At 320px the played row is width-capped and centered; the pile occupies a fixed bottom-left rectangle. Guarantee non-overlap by:
 - Constraining `--play-row-max-width` so the centered row's left edge stays right of the pile's right edge **at the pile's vertical band**, OR
 - Placing the pile in the bottom-left corner (below the vertical center where the play sits) so their vertical bands don't intersect even if horizontal extents would.
 
@@ -209,7 +221,7 @@ Keep existing callers working by defaulting the overrides to today's empty-trick
 - **Pile is fixed and non-overlapping:** assert the trick pile's bounding rect does not intersect any played card's rect (Decision 4), at both widths, for a 5-card play.
 - **Pile position is play-invariant:** capture the pile's rect for a single-card play and for a 5-card play in the same game/viewport; assert the pile's `left`/`bottom` are unchanged between the two (the pile does not move when the play widens).
 - **Single-card and pair still centered:** assert a 1-card and a 2-card play render centered and un-clipped (regression guard for Edge Cases 1–2).
-- **Collapsed pile is a single element on mobile regardless of depth:** at 320/360, seed a deep trick (e.g. 4+ plays) and assert the collapsed pile renders exactly one `.play-area__trick-pile .trick-pile__layer` element (the mobile static branch), while the badge still shows the true count. This is the DOM assertion the node-only unit test cannot make (finding: unit-test premise).
+- **Collapsed pile is a single element on mobile regardless of depth:** at 320/360, seed a deep trick (e.g. 4+ plays) and assert the collapsed pile renders exactly one `.play-area__trick-pile .trick-pile__layer` element (the mobile static branch), while the badge still shows the true count. This assertion depends on the Decision 3 invariant that the mobile static layer retains the shared `.trick-pile__layer` class (plus its additive `--static` modifier); the count selector matches it precisely because of that shared class. This is the DOM assertion the node-only unit test cannot make (finding: unit-test premise).
 - **Desktop unchanged:** at 1024×768, seed a deep trick (e.g. 4+ plays) and assert desktop still renders the **layered stack** — i.e. more than one `.play-area__trick-pile .trick-pile__layer` element (the mobile static branch renders exactly one; desktop must render up to `MAX_LAYERS`). Also assert `.play-area__trick-pile` retains its desktop offset (`left: -88px`-derived position) and the played row is not width-capped — i.e. the mobile rules did not leak. (Reuse the existing desktop-class test pattern.)
 
 ### Manual / visual (documented steps, minimal)
