@@ -1,13 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Card, Rank, Suit } from "@shared/engine-types";
+import type { Card, GameType, Rank, Suit } from "@shared/engine-types";
+import type { TonkCard } from "@shared/tonk-types";
+import { isJoker } from "@shared/tonk-types";
 import {
   WALKTHROUGHS,
   getWalkthrough,
   GAME_LABEL,
 } from "@/component/howto/walkthroughs";
 import { BIG2_WALKTHROUGH } from "@/component/howto/big2Walkthrough";
+import { TONK_WALKTHROUGH } from "@/component/howto/tonkWalkthrough";
 import type {
   WalkthroughStep,
   WalkthroughScene,
@@ -38,7 +41,10 @@ const RANKS: readonly Rank[] = [
 ];
 const SUITS: readonly Suit[] = ["clubs", "diamonds", "hearts", "spades"];
 
-function isValidCard(c: Card): boolean {
+// A fixture is valid if it is a Tonk joker OR a standard Card (rank in Rank,
+// suit in Suit). Widened for LLD 115 Option B (a cards scene may hold a joker).
+function isValidFixture(c: Card | TonkCard): boolean {
+  if (isJoker(c)) return true;
   return RANKS.includes(c.rank) && SUITS.includes(c.suit);
 }
 
@@ -49,10 +55,17 @@ describe("getWalkthrough — registry lookup + fallback (E6)", () => {
     expect(w.length).toBeGreaterThan(0);
   });
 
-  it("falls back to Big2 for a type with no content yet (never empty)", () => {
-    // tonk has no entry in WALKTHROUGHS in this slice (#123 adds it).
-    expect(WALKTHROUGHS.tonk).toBeUndefined();
+  it("returns the Tonk walkthrough for 'tonk' (non-empty) — LLD 115", () => {
+    // #123/LLD 115 registers a real Tonk entry; the fallback for tonk no longer holds.
+    expect(WALKTHROUGHS.tonk).toBe(TONK_WALKTHROUGH);
     const w = getWalkthrough("tonk");
+    expect(w).toBe(TONK_WALKTHROUGH);
+    expect(w.length).toBeGreaterThan(0);
+  });
+
+  it("falls back to Big2 for a still-unregistered type (never empty) — E6", () => {
+    // A future game type with no content still resolves to Big2, not an empty modal.
+    const w = getWalkthrough("nonexistent" as GameType);
     expect(w).toBe(BIG2_WALKTHROUGH);
     expect(w.length).toBeGreaterThan(0);
   });
@@ -96,7 +109,7 @@ describe("BIG2_WALKTHROUGH — content shape & fixture validity", () => {
     for (const step of BIG2_WALKTHROUGH) {
       if (step.scene.kind !== "cards") continue;
       for (const c of step.scene.cards) {
-        expect(isValidCard(c)).toBe(true);
+        expect(isValidFixture(c)).toBe(true);
       }
     }
   });
@@ -117,6 +130,74 @@ describe("BIG2_WALKTHROUGH — content shape & fixture validity", () => {
 
   it("every callout scene has a non-empty icon and at least one line", () => {
     for (const step of BIG2_WALKTHROUGH) {
+      if (step.scene.kind !== "callout") continue;
+      expect(step.scene.icon.length).toBeGreaterThan(0);
+      expect(step.scene.lines.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("TONK_WALKTHROUGH — content shape & fixture validity (LLD 115)", () => {
+  it("has the expected step count (6)", () => {
+    expect(TONK_WALKTHROUGH).toHaveLength(6);
+  });
+
+  it("every step has a non-empty tag, a valid scene discriminant, and a non-empty caption", () => {
+    for (const step of TONK_WALKTHROUGH) {
+      expect(step.tag.trim().length).toBeGreaterThan(0);
+      expect(["cards", "callout"]).toContain(step.scene.kind);
+      expect(step.caption.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("every caption segment is a non-empty text or strong segment", () => {
+    for (const step of TONK_WALKTHROUGH) {
+      for (const seg of step.caption) {
+        const value = "strong" in seg ? seg.strong : seg.text;
+        expect(value.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("at least one caption uses a <strong> emphasis segment", () => {
+    const hasStrong = TONK_WALKTHROUGH.some((s) =>
+      s.caption.some((seg) => "strong" in seg),
+    );
+    expect(hasStrong).toBe(true);
+  });
+
+  it("every cards scene holds only valid fixtures (Card or Tonk joker) — E10", () => {
+    for (const step of TONK_WALKTHROUGH) {
+      if (step.scene.kind !== "cards") continue;
+      for (const c of step.scene.cards) {
+        expect(isValidFixture(c)).toBe(true);
+      }
+    }
+  });
+
+  it("at least one step renders a joker fixture (Option B guard)", () => {
+    const hasJoker = TONK_WALKTHROUGH.some(
+      (s) => s.scene.kind === "cards" && s.scene.cards.some((c) => isJoker(c)),
+    );
+    expect(hasJoker).toBe(true);
+  });
+
+  it("every cards scene's selectedIndices/highlightIndices are within [0, cards.length)", () => {
+    for (const step of TONK_WALKTHROUGH) {
+      if (step.scene.kind !== "cards") continue;
+      const n = step.scene.cards.length;
+      for (const idx of [
+        ...(step.scene.selectedIndices ?? []),
+        ...(step.scene.highlightIndices ?? []),
+      ]) {
+        expect(idx).toBeGreaterThanOrEqual(0);
+        expect(idx).toBeLessThan(n);
+      }
+    }
+  });
+
+  it("every callout scene has a non-empty icon and at least one line", () => {
+    for (const step of TONK_WALKTHROUGH) {
       if (step.scene.kind !== "callout") continue;
       expect(step.scene.icon.length).toBeGreaterThan(0);
       expect(step.scene.lines.length).toBeGreaterThan(0);
@@ -183,6 +264,7 @@ describe("information hiding — walkthrough modules touch no live state (decisi
     "src/frontend/component/howto/walkthroughs.ts",
     "src/frontend/component/howto/walkthroughTypes.ts",
     "src/frontend/component/howto/big2Walkthrough.ts",
+    "src/frontend/component/howto/tonkWalkthrough.ts",
     "src/frontend/component/howto/stepNav.ts",
     "src/frontend/component/howto/WalkthroughScene.vue",
     "src/frontend/component/howto/WalkthroughModal.vue",

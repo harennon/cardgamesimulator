@@ -30,7 +30,7 @@ const highlightSet = computed(
     <div v-if="scene.kind === 'cards'" class="wt-scene__cards">
       <span
         v-for="(c, i) in scene.cards"
-        :key="`${c.rank}-${c.suit}-${i}`"
+        :key="i"
         class="wt-scene__card"
         :class="{ 'wt-scene__card--highlight': highlightSet.has(i) }"
       >
