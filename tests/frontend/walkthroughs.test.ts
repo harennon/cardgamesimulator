@@ -23,6 +23,10 @@ import {
   prevIndex,
   primaryAction,
 } from "@/component/howto/stepNav";
+import {
+  clusterPlacement,
+  shouldFireGameStartToast,
+} from "@/component/howto/clusterPlacement";
 
 const RANKS: readonly Rank[] = [
   "3",
@@ -250,6 +254,77 @@ describe("step-nav reducer (E1)", () => {
   });
 });
 
+describe("clusterPlacement — surface-aware placement (LLD 117 §7.1)", () => {
+  it("board path + narrow → onBoard && collapseBug (single-FAB collapse)", () => {
+    expect(clusterPlacement("/game/abc123", true)).toEqual({
+      onBoard: true,
+      collapseBug: true,
+    });
+  });
+
+  it("board path + wide → onBoard && !collapseBug (both buttons)", () => {
+    expect(clusterPlacement("/game/abc123", false)).toEqual({
+      onBoard: true,
+      collapseBug: false,
+    });
+  });
+
+  it("non-board path → !onBoard && !collapseBug at any width", () => {
+    expect(clusterPlacement("/", false)).toEqual({
+      onBoard: false,
+      collapseBug: false,
+    });
+    expect(clusterPlacement("/create-game", true)).toEqual({
+      onBoard: false,
+      collapseBug: false,
+    });
+    expect(clusterPlacement("/stats", true)).toEqual({
+      onBoard: false,
+      collapseBug: false,
+    });
+  });
+
+  it("a nested /game/<id>/<sub> path is NOT the board (only /game/<id> matches)", () => {
+    // Mirrors App.vue showNav: the board is the sole /game/<id> route.
+    expect(clusterPlacement("/game/abc/extra", false).onBoard).toBe(false);
+  });
+
+  it("rematch: both /game/abc and /game/xyz resolve to onBoard (E10)", () => {
+    expect(clusterPlacement("/game/abc", false).onBoard).toBe(true);
+    expect(clusterPlacement("/game/xyz", false).onBoard).toBe(true);
+  });
+});
+
+describe("shouldFireGameStartToast — game-start toast trigger (LLD 117 §7.1)", () => {
+  it("fires only on open && 'lobby' → 'in-progress'", () => {
+    expect(shouldFireGameStartToast(true, "lobby", "in-progress")).toBe(true);
+  });
+
+  it("does not fire when the walkthrough is closed", () => {
+    expect(shouldFireGameStartToast(false, "lobby", "in-progress")).toBe(false);
+  });
+
+  it("does not fire on the E10 rematch remount edges ('in-progress' → undefined → 'lobby')", () => {
+    expect(shouldFireGameStartToast(true, "in-progress", undefined)).toBe(
+      false,
+    );
+    expect(shouldFireGameStartToast(true, undefined, "lobby")).toBe(false);
+    expect(shouldFireGameStartToast(true, "lobby", undefined)).toBe(false);
+  });
+
+  it("does not fire on 'in-progress' → 'game-over' (E16 final-play)", () => {
+    expect(shouldFireGameStartToast(true, "in-progress", "game-over")).toBe(
+      false,
+    );
+  });
+
+  it("does not fire on undefined → 'in-progress' (no lobby was seen)", () => {
+    expect(shouldFireGameStartToast(true, undefined, "in-progress")).toBe(
+      false,
+    );
+  });
+});
+
 describe("information hiding — walkthrough modules touch no live state (decision 7)", () => {
   const FORBIDDEN = [
     "useGameState",
@@ -266,6 +341,7 @@ describe("information hiding — walkthrough modules touch no live state (decisi
     "src/frontend/component/howto/big2Walkthrough.ts",
     "src/frontend/component/howto/tonkWalkthrough.ts",
     "src/frontend/component/howto/stepNav.ts",
+    "src/frontend/component/howto/clusterPlacement.ts",
     "src/frontend/component/howto/WalkthroughScene.vue",
     "src/frontend/component/howto/WalkthroughModal.vue",
   ];
