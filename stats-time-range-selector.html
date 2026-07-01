@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stats Time-Range Selector — Card Game UI Mockup</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      /* ---- Design tokens copied verbatim from
+             src/frontend/styles/game-variables.css so the mockup renders
+             identically to production. ---- */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --input-border: var(--table-rim-light);
+        --input-radius: 6px;
+
+        --btn-radius: 6px;
+        --btn-disabled-opacity: 0.4;
+
+        --page-max-width: 420px;
+        --card-panel-bg: var(--panel-bg);
+        --card-panel-border: var(--table-rim-light);
+        --card-panel-radius: 12px;
+        --card-panel-padding: 40px 48px;
+
+        --error-text: #e05555;
+        --link-color: var(--gold-accent);
+        --link-hover: #d4b45a;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        /* Same felt radial the game board uses, so the card reads in context. */
+        background:
+          radial-gradient(ellipse 90% 70% at 50% 30%, #143d26 0%, #0d0d0d 70%),
+          #0a0a0a;
+        min-height: 100vh;
+        padding: 40px 20px 80px;
+      }
+
+      /* ================= mockup harness (not shipped) ================= */
+      .harness-head {
+        max-width: 980px;
+        margin: 0 auto 32px;
+        text-align: center;
+      }
+      .harness-head h1 {
+        font-size: 1.4rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.5px;
+      }
+      .harness-head p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-top: 8px;
+        line-height: 1.5;
+      }
+      .direction-label {
+        max-width: 980px;
+        margin: 48px auto 4px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--gold-accent);
+        border-bottom: 1px solid var(--table-rim-light);
+        padding-bottom: 8px;
+      }
+      .direction-note {
+        max-width: 980px;
+        margin: 0 auto 24px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+      .state-grid {
+        max-width: 980px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 28px 24px;
+        align-items: start;
+      }
+      .state-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .state-cell > .state-caption {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      /* ================= the actual stats card ================= */
+      /* .stats-card, .stats-card__* and .stats-entry__* below are the
+         PRODUCTION classes from StatsView.vue, unchanged. New classes are
+         prefixed .stats-range__ / .stats-tabs__ (the two directions). */
+      .stats-card {
+        background: var(--card-panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        padding: var(--card-panel-padding);
+        width: 100%;
+        max-width: var(--page-max-width);
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .stats-card__title {
+        font-family: var(--font-ui);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-align: center;
+        margin: 0;
+      }
+      .stats-card__caption {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        text-align: center;
+        margin: 0;
+      }
+
+      .stats-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .stats-entry {
+        background: var(--input-bg);
+        border: 1.5px solid var(--card-panel-border);
+        border-radius: var(--input-radius);
+        padding: 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .stats-entry__name {
+        font-family: var(--font-ui);
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0;
+      }
+      .stats-entry__rows {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 16px;
+        margin: 0;
+      }
+      .stats-entry__row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .stats-entry__label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .stats-entry__value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+      }
+
+      .stats-card__message {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        font-size: 0.95rem;
+        color: var(--text-primary);
+        text-align: center;
+        padding: 16px 0;
+      }
+      .btn-primary {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: var(--btn-radius);
+        border: none;
+        cursor: pointer;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      /* ---- "tracking since" note (shared by both directions) ---- */
+      .stats-range__tracking {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-align: center;
+        margin: -6px 0 0;
+      }
+      .stats-range__tracking svg {
+        width: 12px;
+        height: 12px;
+        flex: none;
+        opacity: 0.8;
+      }
+
+      /* =========================================================
+         DIRECTION A — Segmented pill control (single track,
+         sliding gold thumb). Feels like a physical toggle chip;
+         matches the rounded --input-bg wells used elsewhere.
+         ========================================================= */
+      .stats-seg {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        background: var(--input-bg);
+        border: 1.5px solid var(--card-panel-border);
+        border-radius: 999px;
+        padding: 4px;
+        gap: 0;
+      }
+      .stats-seg__thumb {
+        position: absolute;
+        top: 4px;
+        bottom: 4px;
+        left: 4px;
+        width: calc((100% - 8px) / 3);
+        background: var(--gold-accent);
+        border-radius: 999px;
+        box-shadow: 0 2px 8px var(--gold-glow);
+        transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 0;
+      }
+      .stats-seg[data-active="1"] .stats-seg__thumb {
+        transform: translateX(100%);
+      }
+      .stats-seg[data-active="2"] .stats-seg__thumb {
+        transform: translateX(200%);
+      }
+      .stats-seg__btn {
+        position: relative;
+        z-index: 1;
+        appearance: none;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 8px 4px;
+        border-radius: 999px;
+        color: var(--text-muted);
+        transition: color 0.18s ease;
+        white-space: nowrap;
+      }
+      .stats-seg__btn[aria-selected="true"] {
+        color: #1a0f06;
+      }
+      .stats-seg__btn:hover:not([aria-selected="true"]) {
+        color: var(--text-primary);
+      }
+      .stats-seg__btn:focus-visible {
+        outline: 2px solid var(--gold-accent);
+        outline-offset: 2px;
+      }
+
+      /* =========================================================
+         DIRECTION B — Underlined tabs (flat, editorial). No well;
+         a moving gold underline. Lighter chrome, more "report".
+         ========================================================= */
+      .stats-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-bottom: 1.5px solid var(--table-rim-light);
+      }
+      .stats-tabs__btn {
+        position: relative;
+        appearance: none;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 10px 4px 12px;
+        color: var(--text-muted);
+        transition: color 0.18s ease;
+        white-space: nowrap;
+      }
+      .stats-tabs__btn::after {
+        content: "";
+        position: absolute;
+        left: 12%;
+        right: 12%;
+        bottom: -1.5px;
+        height: 2.5px;
+        border-radius: 2px;
+        background: var(--gold-accent);
+        transform: scaleX(0);
+        transform-origin: center;
+        transition: transform 0.2s ease;
+      }
+      .stats-tabs__btn[aria-selected="true"] {
+        color: var(--gold-accent);
+      }
+      .stats-tabs__btn[aria-selected="true"]::after {
+        transform: scaleX(1);
+      }
+      .stats-tabs__btn:hover:not([aria-selected="true"]) {
+        color: var(--text-primary);
+      }
+      .stats-tabs__btn:focus-visible {
+        outline: 2px solid var(--gold-accent);
+        outline-offset: 2px;
+      }
+
+      /* fade the stat list on window change */
+      .stats-list--swap {
+        animation: statsFade 0.24s ease;
+      }
+      @keyframes statsFade {
+        from {
+          opacity: 0.35;
+          transform: translateY(3px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .stats-seg__thumb,
+        .stats-tabs__btn::after,
+        .stats-list--swap {
+          transition: none;
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="harness-head">
+      <h1>Stats — Time-Range Selector</h1>
+      <p>
+        Two directions for the Lifetime / Last 30 days / Year to date control,
+        each shown across its key states. Everything below the selector is the
+        existing #40 stats card, unchanged. The last section is a live,
+        clickable version so you can feel the switch + refetch.
+      </p>
+    </div>
+
+    <!-- ============================================================
+         DIRECTION A — SEGMENTED PILL
+         ============================================================ -->
+    <div class="direction-label">
+      Direction A — Segmented pill (sliding thumb)
+    </div>
+    <p class="direction-note">
+      A single rounded well with a gold thumb that slides to the active range.
+      Reads as one cohesive control and echoes the game's chip/token language.
+      Compact — fits the 420px card without wrapping. Default = Lifetime.
+    </p>
+
+    <div class="state-grid">
+      <!-- A1: Lifetime (default, unchanged rendering) -->
+      <div class="state-cell">
+        <div class="state-caption">
+          Lifetime (default) — caption unchanged, no tracking note
+        </div>
+        <div class="stats-card">
+          <h1 class="stats-card__title">Your Stats</h1>
+          <p class="stats-card__caption">
+            Lifetime totals across all your games.
+          </p>
+          <div class="stats-seg" data-active="0">
+            <span class="stats-seg__thumb"></span>
+            <button class="stats-seg__btn" aria-selected="true">
+              Lifetime
+            </button>
+            <button class="stats-seg__btn">Last 30 days</button>
+            <button class="stats-seg__btn">Year to date</button>
+          </div>
+          <div class="stats-list">
+            <div class="stats-entry">
+              <h2 class="stats-entry__name">Big 2</h2>
+              <dl class="stats-entry__rows">
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Win Rate</dt>
+                  <dd class="stats-entry__value">62%</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Games</dt>
+                  <dd class="stats-entry__value">48</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Score</dt>
+                  <dd class="stats-entry__value">184</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Won</dt>
+                  <dd class="stats-entry__value">30</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Lost</dt>
+                  <dd class="stats-entry__value">18</dd>
+                </div>
+              </dl>
+            </div>
+            <div class="stats-entry">
+              <h2 class="stats-entry__name">Tonk</h2>
+              <dl class="stats-entry__rows">
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Win Rate</dt>
+                  <dd class="stats-entry__value">44%</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Games</dt>
+                  <dd class="stats-entry__value">25</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Score</dt>
+                  <dd class="stats-entry__value">-310</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Won</dt>
+                  <dd class="stats-entry__value">11</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Lost</dt>
+                  <dd class="stats-entry__value">14</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- A2: Last 30 days with tracking-since note -->
+      <div class="state-cell">
+        <div class="state-caption">
+          Last 30 days — tracking-since note shown
+        </div>
+        <div class="stats-card">
+          <h1 class="stats-card__title">Your Stats</h1>
+          <p class="stats-card__caption">
+            Games you finished in the last 30 days.
+          </p>
+          <div class="stats-seg" data-active="1">
+            <span class="stats-seg__thumb"></span>
+            <button class="stats-seg__btn">Lifetime</button>
+            <button class="stats-seg__btn" aria-selected="true">
+              Last 30 days
+            </button>
+            <button class="stats-seg__btn">Year to date</button>
+          </div>
+          <p class="stats-range__tracking">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            Tracking since Jun 12, 2026
+          </p>
+          <div class="stats-list">
+            <div class="stats-entry">
+              <h2 class="stats-entry__name">Big 2</h2>
+              <dl class="stats-entry__rows">
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Win Rate</dt>
+                  <dd class="stats-entry__value">70%</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Games</dt>
+                  <dd class="stats-entry__value">10</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Score</dt>
+                  <dd class="stats-entry__value">41</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Won</dt>
+                  <dd class="stats-entry__value">7</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Lost</dt>
+                  <dd class="stats-entry__value">3</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- A3: empty-window state -->
+      <div class="state-cell">
+        <div class="state-caption">
+          Year to date — empty window (has lifetime history, none this window)
+        </div>
+        <div class="stats-card">
+          <h1 class="stats-card__title">Your Stats</h1>
+          <p class="stats-card__caption">Games you finished this year.</p>
+          <div class="stats-seg" data-active="2">
+            <span class="stats-seg__thumb"></span>
+            <button class="stats-seg__btn">Lifetime</button>
+            <button class="stats-seg__btn">Last 30 days</button>
+            <button class="stats-seg__btn" aria-selected="true">
+              Year to date
+            </button>
+          </div>
+          <p class="stats-range__tracking">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            Tracking since Jun 12, 2026
+          </p>
+          <div class="stats-card__message">
+            <p>
+              No games finished in this range yet.<br />Try
+              <strong>Lifetime</strong> to see your all-time totals.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         DIRECTION B — UNDERLINED TABS
+         ============================================================ -->
+    <div class="direction-label">Direction B — Underlined tabs (editorial)</div>
+    <p class="direction-note">
+      Flat tabs with a moving gold underline — lighter, more "report" than
+      "control". Uses less vertical chrome and leans on the existing gold text
+      accent. Same states, same tracking note and empty state.
+    </p>
+
+    <div class="state-grid">
+      <!-- B1: Lifetime -->
+      <div class="state-cell">
+        <div class="state-caption">
+          Lifetime (default) — caption unchanged, no tracking note
+        </div>
+        <div class="stats-card">
+          <h1 class="stats-card__title">Your Stats</h1>
+          <p class="stats-card__caption">
+            Lifetime totals across all your games.
+          </p>
+          <div class="stats-tabs">
+            <button class="stats-tabs__btn" aria-selected="true">
+              Lifetime
+            </button>
+            <button class="stats-tabs__btn">Last 30 days</button>
+            <button class="stats-tabs__btn">Year to date</button>
+          </div>
+          <div class="stats-list">
+            <div class="stats-entry">
+              <h2 class="stats-entry__name">Big 2</h2>
+              <dl class="stats-entry__rows">
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Win Rate</dt>
+                  <dd class="stats-entry__value">62%</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Games</dt>
+                  <dd class="stats-entry__value">48</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Score</dt>
+                  <dd class="stats-entry__value">184</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Won</dt>
+                  <dd class="stats-entry__value">30</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Lost</dt>
+                  <dd class="stats-entry__value">18</dd>
+                </div>
+              </dl>
+            </div>
+            <div class="stats-entry">
+              <h2 class="stats-entry__name">Tonk</h2>
+              <dl class="stats-entry__rows">
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Win Rate</dt>
+                  <dd class="stats-entry__value">44%</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Games</dt>
+                  <dd class="stats-entry__value">25</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Score</dt>
+                  <dd class="stats-entry__value">-310</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Won</dt>
+                  <dd class="stats-entry__value">11</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Lost</dt>
+                  <dd class="stats-entry__value">14</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- B2: Last 30 days -->
+      <div class="state-cell">
+        <div class="state-caption">
+          Last 30 days — tracking-since note shown
+        </div>
+        <div class="stats-card">
+          <h1 class="stats-card__title">Your Stats</h1>
+          <p class="stats-card__caption">
+            Games you finished in the last 30 days.
+          </p>
+          <div class="stats-tabs">
+            <button class="stats-tabs__btn">Lifetime</button>
+            <button class="stats-tabs__btn" aria-selected="true">
+              Last 30 days
+            </button>
+            <button class="stats-tabs__btn">Year to date</button>
+          </div>
+          <p class="stats-range__tracking">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            Tracking since Jun 12, 2026
+          </p>
+          <div class="stats-list">
+            <div class="stats-entry">
+              <h2 class="stats-entry__name">Big 2</h2>
+              <dl class="stats-entry__rows">
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Win Rate</dt>
+                  <dd class="stats-entry__value">70%</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Games</dt>
+                  <dd class="stats-entry__value">10</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Total Score</dt>
+                  <dd class="stats-entry__value">41</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Won</dt>
+                  <dd class="stats-entry__value">7</dd>
+                </div>
+                <div class="stats-entry__row">
+                  <dt class="stats-entry__label">Lost</dt>
+                  <dd class="stats-entry__value">3</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- B3: empty window -->
+      <div class="state-cell">
+        <div class="state-caption">Year to date — empty window</div>
+        <div class="stats-card">
+          <h1 class="stats-card__title">Your Stats</h1>
+          <p class="stats-card__caption">Games you finished this year.</p>
+          <div class="stats-tabs">
+            <button class="stats-tabs__btn">Lifetime</button>
+            <button class="stats-tabs__btn">Last 30 days</button>
+            <button class="stats-tabs__btn" aria-selected="true">
+              Year to date
+            </button>
+          </div>
+          <p class="stats-range__tracking">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            Tracking since Jun 12, 2026
+          </p>
+          <div class="stats-card__message">
+            <p>
+              No games finished in this range yet.<br />Try
+              <strong>Lifetime</strong> to see your all-time totals.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         LIVE INTERACTIVE — Direction A wired up (fake fetch)
+         ============================================================ -->
+    <div class="direction-label">
+      Live — Direction A wired up (click the tabs)
+    </div>
+    <p class="direction-note">
+      Clicking a range swaps the caption, toggles the tracking note, and
+      re-renders the list with a short fade (simulating the refetch). "Year to
+      date" here is seeded empty to show the empty-window message. Data is
+      hard-coded; production re-fetches <code>GET /api/stats?window=…</code>.
+    </p>
+    <div class="state-grid" style="grid-template-columns: minmax(300px, 420px)">
+      <div class="state-cell">
+        <div class="stats-card">
+          <h1 class="stats-card__title">Your Stats</h1>
+          <p class="stats-card__caption" id="live-caption">
+            Lifetime totals across all your games.
+          </p>
+          <div class="stats-seg" id="live-seg" data-active="0">
+            <span class="stats-seg__thumb"></span>
+            <button
+              class="stats-seg__btn"
+              data-window="lifetime"
+              aria-selected="true"
+            >
+              Lifetime
+            </button>
+            <button class="stats-seg__btn" data-window="30d">
+              Last 30 days
+            </button>
+            <button class="stats-seg__btn" data-window="ytd">
+              Year to date
+            </button>
+          </div>
+          <p
+            class="stats-range__tracking"
+            id="live-tracking"
+            style="display: none"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            <span id="live-tracking-text"></span>
+          </p>
+          <div id="live-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ---- fake per-window payloads (stand-in for GET /api/stats?window=) ----
+      const DATA = {
+        lifetime: {
+          caption: "Lifetime totals across all your games.",
+          trackingSince: null,
+          games: [
+            {
+              name: "Big 2",
+              winRate: "62%",
+              games: 48,
+              score: "184",
+              won: 30,
+              lost: 18,
+            },
+            {
+              name: "Tonk",
+              winRate: "44%",
+              games: 25,
+              score: "-310",
+              won: 11,
+              lost: 14,
+            },
+          ],
+        },
+        "30d": {
+          caption: "Games you finished in the last 30 days.",
+          trackingSince: "Jun 12, 2026",
+          games: [
+            {
+              name: "Big 2",
+              winRate: "70%",
+              games: 10,
+              score: "41",
+              won: 7,
+              lost: 3,
+            },
+          ],
+        },
+        ytd: {
+          caption: "Games you finished this year.",
+          trackingSince: "Jun 12, 2026",
+          games: [], // empty-window demo
+        },
+      };
+
+      const seg = document.getElementById("live-seg");
+      const caption = document.getElementById("live-caption");
+      const tracking = document.getElementById("live-tracking");
+      const trackingText = document.getElementById("live-tracking-text");
+      const body = document.getElementById("live-body");
+      const btns = [...seg.querySelectorAll(".stats-seg__btn")];
+
+      function entryHtml(g) {
+        return `
+          <div class="stats-entry">
+            <h2 class="stats-entry__name">${g.name}</h2>
+            <dl class="stats-entry__rows">
+              <div class="stats-entry__row"><dt class="stats-entry__label">Win Rate</dt><dd class="stats-entry__value">${g.winRate}</dd></div>
+              <div class="stats-entry__row"><dt class="stats-entry__label">Total Games</dt><dd class="stats-entry__value">${g.games}</dd></div>
+              <div class="stats-entry__row"><dt class="stats-entry__label">Total Score</dt><dd class="stats-entry__value">${g.score}</dd></div>
+              <div class="stats-entry__row"><dt class="stats-entry__label">Won</dt><dd class="stats-entry__value">${g.won}</dd></div>
+              <div class="stats-entry__row"><dt class="stats-entry__label">Lost</dt><dd class="stats-entry__value">${g.lost}</dd></div>
+            </dl>
+          </div>`;
+      }
+
+      function render(win) {
+        const d = DATA[win];
+        caption.textContent = d.caption;
+
+        // tracking note: only for windowed views with a non-null trackingSince
+        if (win !== "lifetime" && d.trackingSince) {
+          tracking.style.display = "flex";
+          trackingText.textContent = "Tracking since " + d.trackingSince;
+        } else {
+          tracking.style.display = "none";
+        }
+
+        if (d.games.length === 0) {
+          // empty-window message (distinct from never-played)
+          body.innerHTML = `
+            <div class="stats-card__message">
+              <p>No games finished in this range yet.<br />Try <strong>Lifetime</strong> to see your all-time totals.</p>
+            </div>`;
+        } else {
+          body.innerHTML =
+            `<div class="stats-list stats-list--swap">` +
+            d.games.map(entryHtml).join("") +
+            `</div>`;
+        }
+      }
+
+      btns.forEach((btn, i) => {
+        btn.addEventListener("click", () => {
+          btns.forEach((b) => b.setAttribute("aria-selected", "false"));
+          btn.setAttribute("aria-selected", "true");
+          seg.setAttribute("data-active", String(i));
+          render(btn.dataset.window);
+        });
+      });
+
+      render("lifetime");
+    </script>
+  </body>
+</html>
