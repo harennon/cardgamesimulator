@@ -147,11 +147,21 @@ The lobby player list, room code, Start button, socket, game state, and turn tim
 all live in `GameView.vue` and its composables (`useGameState`, `useSocket`,
 `useGameActions`), entirely outside `HelpCluster`. The walkthrough modal:
 
-- imports no game state, no socket, no composables (enforced by the existing #122
-  source-scan test — reused, see §7);
+- imports no game state, no socket, no game composables (`useGameState`,
+  `useSocket`, `useGameActions`, `socket-events`);
 - toggling `walkthroughOpen` mutates only a local `ref` in `HelpCluster`;
 - is App-shell-mounted, so opening it neither remounts `GameView` nor re-runs its
   join flow.
+
+The decision-7 isolation is enforced by the existing #122 source-scan test's
+forbidden-import scan. Note that test's `MODULE_FILES` list currently covers only
+the leaf content/nav modules (`walkthroughs.ts`, `walkthroughTypes.ts`,
+`big2Walkthrough.ts`, `tonkWalkthrough.ts`, `stepNav.ts`, `WalkthroughScene.vue`,
+`WalkthroughModal.vue`) — it does **not** yet cover `HelpCluster.vue`. The new
+`clusterPlacement.ts` helper this LLD extracts (§4.2, §9) is added to that
+`MODULE_FILES` list (§7.1) so the placement/toast logic is held to the same
+no-live-state bar; that extracted helper — not `HelpCluster.vue` itself — is what
+the scan enforces.
 
 Therefore opening/closing the modal **cannot** disturb lobby/board/socket state —
 there is no wire between them. The hardening for these criteria is primarily
@@ -175,28 +185,43 @@ not trapped (X / scrim / Esc / "Got it" all still close it) and the transition i
 not blocked (nothing in the modal gates `GameView`).
 
 The one UX gap: a player reading the walkthrough in the lobby would not notice the
-game started. Direction A specifies a **non-blocking ~3s toast**. Implementation
-keeps the shell decoupled from game state:
+game started. Direction A specifies a **non-blocking ~3s toast**. The signal
+`HelpCluster` reacts to is the **existing `useFeedbackContext.gamePhase` enum** —
+no new phase singleton is introduced:
 
-- `useCurrentGameType` (the existing module singleton set by `GameView` from the
-  REST `getGameState`) gains a tiny, enum-only signal for "the game I'm in just
-  started." Concretely: a `phase` ref (`"lobby" | "playing" | null`) or a
-  monotonically-increasing `gameStartedTick` counter, set by `GameView` when
-  `displayPhase` transitions CREATED→IN_PROGRESS, reset on `GameView` unmount. It
-  carries **no hands/board/socket data** — only a phase enum/counter — preserving
-  decision 7 (information hiding).
-- `HelpCluster` watches that signal **only while `walkthroughOpen` is true**; when
-  it fires, it shows a small non-blocking toast ("Game started — you can close this
-  anytime") for ~3s. The toast does **not** auto-close the modal and does **not**
-  block the board (`pointer-events: none` on the toast). The player closes the
-  modal when ready and lands on the already-transitioned board.
+- `useFeedbackContext` already exposes an enum-only `gamePhase`
+  (`"lobby" | "in-progress" | "game-over" | undefined`), a module singleton set by
+  `GameView` from the **same** `watch(displayPhase, …)` that drives the feedback
+  context (`GameView.vue` line 243/258 — `setGamePhase(toFeedbackPhase(phase))`),
+  and `clearGamePhase()` on unmount. It carries **no hands/board/socket data** —
+  only the coarse phase enum — so it already respects decision 7. The
+  CREATED→IN_PROGRESS game start is exactly the `"lobby"` → `"in-progress"` edge on
+  this ref.
+- `HelpCluster` imports `useFeedbackContext`, reads its readonly `gamePhase`, and
+  watches it **only while `walkthroughOpen` is true**; when the `"lobby"` →
+  `"in-progress"` edge fires, it shows a small non-blocking toast ("Game started —
+  close this when you're ready") for ~3s. The toast does **not** auto-close the
+  modal and does **not** block the board (`pointer-events: none` on the toast). The
+  player closes the modal when ready and lands on the already-transitioned board.
 
-**Rationale for signalling via the existing singleton rather than a new store:**
-`useCurrentGameType` is already the one enum-only bridge between `GameView` and the
-App-shell cluster; extending it with a phase enum keeps the wire count at one and
-respects decision 7. Alternative (rejected): have `HelpCluster` read the route or
-`useGameState` — reading `useGameState` would violate decision 7; reading the route
-alone cannot distinguish CREATED from IN_PROGRESS (same `/game/:id` path).
+**Rationale — reuse the existing feedback-phase signal; do NOT add a second one.**
+An earlier draft proposed adding a parallel `gamePhase` enum to `useCurrentGameType`.
+That is rejected for two concrete reasons: (1) `GameView.vue` already destructures
+`{ setGamePhase, clearGamePhase }` from `useFeedbackContext()` (line 243); adding a
+same-named `setGamePhase` from `useCurrentGameType()` would collide in the same
+file. (2) More fundamentally, `useFeedbackContext.gamePhase` is **already** an
+enum-only App-shell bridge fed by the exact `watch(displayPhase)` we need and
+**already** makes the CREATED→IN_PROGRESS (`"lobby"` → `"in-progress"`) distinction.
+Introducing a second phase singleton fed by the same watch would create two parallel
+signals for one fact — pure duplication with no benefit. Reusing the feedback enum
+genuinely keeps the wire count at one and requires **no change** to
+`useCurrentGameType` or `GameView` for the toast.
+
+Alternatives considered and rejected: (a) have `HelpCluster` read `useGameState` —
+violates decision 7 (live game state in the shell); (b) have `HelpCluster` read the
+route alone — cannot distinguish CREATED from IN_PROGRESS (same `/game/:id` path);
+(c) add a new enum to `useCurrentGameType` — duplicates the existing feedback-phase
+signal and collides with GameView's existing `setGamePhase` binding (above).
 
 ### 2.5 Reuse the #122 visual language verbatim
 
@@ -251,46 +276,33 @@ for a repositioning-only change.)
 
 ## 4. Interfaces / Types
 
-### 4.1 `useCurrentGameType` — add an enum-only game-phase signal
+### 4.1 Game-start signal — reuse `useFeedbackContext.gamePhase` (NO composable change)
 
-Extend the existing module singleton (no new store). Carries **only** a phase enum
-— never hands/board/socket data (decision 7 preserved).
+**No new phase signal and no change to `useCurrentGameType` or `GameView`.** The
+game-start edge is read from the **existing** `useFeedbackContext.gamePhase`
+enum, which is already a shell-level, enum-only singleton set by `GameView`:
 
 ```typescript
-// src/frontend/composables/useCurrentGameType.ts  (extend, do not replace)
-import { ref, readonly } from "vue";
-import type { GameType } from "@shared/engine-types";
-
-const currentGameType = ref<GameType>("big2");
-// NEW: coarse phase of the game the local player is currently in.
-// null = not in a game (home/create/stats). Set by GameView.
-const gamePhase = ref<"lobby" | "playing" | null>(null);
-
-export function useCurrentGameType() {
-  return {
-    currentGameType: readonly(currentGameType),
-    setCurrentGameType: (t: GameType) => { currentGameType.value = t; },
-    resetCurrentGameType: () => { currentGameType.value = "big2"; },
-    // NEW
-    gamePhase: readonly(gamePhase),
-    setGamePhase: (p: "lobby" | "playing" | null) => { gamePhase.value = p; },
-  };
-}
+// src/frontend/composables/useFeedbackContext.ts  (EXISTING — reused verbatim, unchanged)
+export type FeedbackGamePhase = "lobby" | "in-progress" | "game-over";
+// gamePhase: DeepReadonly<Ref<FeedbackGamePhase | undefined>>
+// setGamePhase(phase); clearGamePhase();
 ```
 
-`GameView.vue` calls `setGamePhase("lobby")` when `displayPhase` is `CREATED`,
-`setGamePhase("playing")` when it becomes `IN_PROGRESS`, and `setGamePhase(null)`
-in `onUnmounted` (next to the existing `resetCurrentGameType()`), driven by the
-same `watch(displayPhase, …)` that already sets the feedback phase. The
-CREATED→IN_PROGRESS edge (lobby was `"lobby"`, now `"playing"`) is the game-started
-signal `HelpCluster` reacts to.
+`GameView.vue` already drives it (unchanged): `watch(displayPhase, (phase) =>
+setGamePhase(toFeedbackPhase(phase)), { immediate: true })` sets `"lobby"` for
+CREATED and `"in-progress"` for IN_PROGRESS / SHOW_FINAL_PLAY, and
+`clearGamePhase()` fires in `onUnmounted`. The game-started edge `HelpCluster`
+reacts to is therefore `"lobby"` → `"in-progress"` on this existing ref — no new
+`GameView` wiring is added by this LLD.
 
-> Naming note: the shared name to use here is whatever the implementer picks
-> (`gamePhase` vs a `gameStartedTick` counter). A counter is simpler if the watcher
-> only needs the edge; a phase enum is more reusable. Recommendation: `gamePhase`
-> enum, because `HelpCluster` also uses "am I in a game at all" is already derivable
-> and the enum reads clearly. Either satisfies the contract: **enum/scalar only, no
-> live game data.**
+> Collision note (must be honored by the implementer): `GameView.vue` already
+> imports `{ setGamePhase, clearGamePhase }` from `useFeedbackContext()` (line 243).
+> Do **not** add a second, same-named `setGamePhase`/`gamePhase` to
+> `useCurrentGameType` — it would collide with that binding in the same file and
+> duplicate a signal that already exists. `HelpCluster` consumes the feedback-phase
+> enum directly (§4.2); `useCurrentGameType` continues to carry only the `gameType`
+> enum and is untouched.
 
 ### 4.2 `HelpCluster.vue` — surface awareness (additions only)
 
@@ -300,6 +312,7 @@ No prop changes; consumes the route and the media query internally.
 // Additions to <script setup> in HelpCluster.vue
 import { useRoute } from "vue-router";
 import { onMounted, onUnmounted, watch } from "vue";
+import { useFeedbackContext } from "@/composables/useFeedbackContext";
 
 const route = useRoute();
 // The live board is the only route shaped /game/<id> (mirrors App.vue showNav).
@@ -312,13 +325,14 @@ const onNarrowChange = (e: MediaQueryListEvent) => { isNarrow.value = e.matches;
 onMounted(() => mql.addEventListener("change", onNarrowChange));
 onUnmounted(() => mql.removeEventListener("change", onNarrowChange));
 
-const { gamePhase } = useCurrentGameType(); // enum-only signal (§4.1)
+const { gamePhase } = useFeedbackContext(); // EXISTING enum-only signal (§4.1)
 
-// Toast: fire only when the game starts WHILE the walkthrough is open.
+// Toast: fire only when the game starts WHILE the walkthrough is open, i.e. the
+// lobby→board edge on the existing feedback-phase enum ("lobby" -> "in-progress").
 const gameStartToast = ref(false);
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 watch(gamePhase, (now, prev) => {
-  if (walkthroughOpen.value && prev === "lobby" && now === "playing") {
+  if (walkthroughOpen.value && prev === "lobby" && now === "in-progress") {
     gameStartToast.value = true;
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { gameStartToast.value = false; }, 3000);
@@ -367,21 +381,23 @@ architecture principles 1 & 2).
 | `onBoard` | `HelpCluster` (computed from route) | Reactive to route |
 | `isNarrow` | `HelpCluster` (`ref` from `matchMedia`) | Reactive to viewport |
 | `gameStartToast` | `HelpCluster` (`ref`, 3s timer) | Ephemeral, only while game-start fires during open |
-| `gamePhase` | `useCurrentGameType` singleton (**enum only**) | Set by `GameView` on phase change; `null` on unmount |
+| `gamePhase` | `useFeedbackContext` singleton (**existing, enum only**) | Set by `GameView`'s existing `watch(displayPhase)`; cleared on unmount. **Not added by this LLD** |
 | `currentIndex` | `WalkthroughModal` (`ref`) | Per modal open (unchanged) |
 | lobby list / room code / Start / socket / game state / turn timer | `GameView` + composables | **Untouched by this LLD** |
 
 Game-start flow while open:
 
 ```
-GameView watch(displayPhase): CREATED -> IN_PROGRESS  ==> setGamePhase("playing")
-HelpCluster watch(gamePhase): (open && lobby -> playing) ==> gameStartToast = true (3s)
+GameView watch(displayPhase): CREATED -> IN_PROGRESS
+    ==> setGamePhase("in-progress")  [EXISTING feedback-context wiring, unchanged]
+HelpCluster watch(gamePhase): (open && "lobby" -> "in-progress") ==> gameStartToast = true (3s)
 Board renders under the still-open modal (router-view child swap, modal not remounted)
 User closes modal (X / scrim / Esc / "Got it") ==> walkthroughOpen = false ==> full board freed
 ```
 
-No live hand/board/socket data enters `HelpCluster` — only the `gamePhase` enum and
-the route path. Verifiable by the source-scan test (§7.1).
+No live hand/board/socket data enters `HelpCluster` — only the existing
+`useFeedbackContext.gamePhase` enum and the route path. The extracted
+`clusterPlacement.ts` helper is held to this bar by the source-scan test (§7.1).
 
 ---
 
@@ -398,13 +414,13 @@ the route path. Verifiable by the source-scan test (§7.1).
 | E7 | Closing returns the user exactly where they were | The underlying view is never unmounted (App-shell mount), so its scroll/selection/state persist; closing only removes the overlay. |
 | E8 | FAB open, user rotates / resizes across the 767px board breakpoint | `isNarrow` is reactive (`matchMedia` listener); the cluster re-lays out and the bug icon appears/hides live, matching the board's own grid switch (same breakpoint). |
 | E9 | Board offset accidentally applied to the modal scrim | Guarded: modifier classes apply to `.help-cluster` only; the scrim (`WalkthroughModal`) is `inset:0` and unmodified. Asserted structurally (§7.1) so a closed modal frees the whole board and an open modal always covers the full viewport. |
-| E10 | Rematch navigation `/game/<old>` → `/game/<new>` while cluster mounted | `onBoard` stays true across the change (both match `/game/:id`); `GameView` remounts (App.vue `routeViewKey`) and re-sets `gamePhase`. Cluster placement unaffected; no toast unless a new CREATED→IN_PROGRESS edge occurs while open. |
-| E11 | Non-game surface (home/create/stats/game-over) | `onBoard` false → resting corner, both buttons — identical to #122. `gamePhase` is `null` there, so no toast can fire. |
+| E10 | Rematch navigation `/game/<old>` → `/game/<new>` while cluster mounted | `onBoard` stays true across the change (both match `/game/:id`); the old `GameView` unmounts (fires `clearGamePhase()` → `gamePhase` = `undefined`) then the new `GameView` mounts and its `immediate` `watch(displayPhase)` sets `"lobby"`. So the enum transits `"in-progress"` → `undefined` → `"lobby"`. The toast fires **only** on the `"lobby"` → `"in-progress"` edge, so no `undefined`/`"lobby"` intermediate can spuriously fire it. A toast can legitimately re-appear only if a genuine new CREATED→IN_PROGRESS start occurs while the modal is still open (e.g. rematch lands in a fresh lobby that then starts) — which is the intended behavior. Cluster placement unaffected. |
+| E11 | Non-game surface (home/create/stats/game-over) | `onBoard` false → resting corner, both buttons — identical to #122. `gamePhase` is `undefined` there (no `GameView` mounted), so no `"lobby"` → `"in-progress"` edge and no toast can fire. |
 | E12 | Feedback modal open on the board | Existing `feedbackOpen` hides the whole cluster while the feedback modal is open (unchanged #122 behavior); board offset is irrelevant while hidden. |
 | E13 | `env(safe-area-inset-bottom)` unsupported (older browsers) | `env(…, 0px)` fallback → offset degrades to the plain action-row clearance; still clears the action row. |
 | E14 | Reduced motion | Toast fade + FAB transitions disabled under `prefers-reduced-motion: reduce`, matching existing components. |
 | E15 | Game-start toast timer leak on unmount / rapid re-open | `toastTimer` is cleared before re-arming and on the reduced-motion path; `HelpCluster` lives for the session so no unmount leak, but the timer is still guarded. |
-| E16 | Big2 SHOW_FINAL_PLAY reveal (blurred board + reveal layer, z-index 101) | Cluster (z-index 1000) sits above the reveal scrim; acceptable — the (?) remains available. No toast fires (phase already `playing`). Placement unchanged (still `onBoard`). |
+| E16 | Big2 SHOW_FINAL_PLAY reveal (blurred board + reveal layer, z-index 101) | Cluster (z-index 1000) sits above the reveal scrim; acceptable — the (?) remains available. No toast fires (phase is already `"in-progress"`; SHOW_FINAL_PLAY also maps to `"in-progress"`, so no new `"lobby"` → `"in-progress"` edge). Placement unchanged (still `onBoard`). |
 
 ---
 
@@ -424,20 +440,26 @@ than adding new harnesses.
   `onBoard && !collapseBug`; non-board path → `!onBoard && !collapseBug`; rematch
   path `/game/abc` and `/game/xyz` both → `onBoard`.
 - **Game-start toast trigger reducer:** extract the "should the toast fire?"
-  predicate as a pure function of `(walkthroughOpen, prevPhase, nextPhase)` and
-  test: fires only on `open && lobby → playing`; does not fire when closed; does
-  not fire on `null → lobby`, `playing → null`, or `lobby → null`.
-- **Information-hiding source-scan (decision 7):** extend the existing #122
-  `MODULE_FILES` forbidden-import scan to include the extracted placement/toast
-  helper module(s) and assert they import nothing from a live-state source
+  predicate as a pure function of
+  `(walkthroughOpen, prevPhase, nextPhase)` over the existing `FeedbackGamePhase`
+  enum (`"lobby" | "in-progress" | "game-over" | undefined`), and test: fires only
+  on `open && "lobby" → "in-progress"`; does not fire when closed; does **not** fire
+  on `undefined → "lobby"`, `"in-progress" → undefined`, `"lobby" → undefined`, or
+  `"in-progress" → "game-over"`. This directly covers the E10 rematch remount
+  ordering (`"in-progress"` → `undefined` → `"lobby"` produces no fire).
+- **Information-hiding source-scan (decision 7):** add the extracted
+  `clusterPlacement.ts` helper to the existing #122 `MODULE_FILES` forbidden-import
+  scan (which currently lists only the leaf content/nav modules, not
+  `HelpCluster.vue`) and assert it imports nothing from a live-state source
   (`useGameState`, `useSocket`, `socket-events`, `EnrichedPlayerView`,
-  `gameSpecificPublicState`, `useGameActions`). This is the automated security
-  guard for a client-only feature.
-- **`useCurrentGameType` phase signal:** `setGamePhase("playing")` updates the
-  readonly `gamePhase`; `resetCurrentGameType`/`setGamePhase(null)` clears it; the
-  exported `gamePhase` is read-only (mutation attempts do not compile / are
-  rejected) and carries only the enum (type-level assertion that it is not a game
-  view/state object).
+  `gameSpecificPublicState`, `useGameActions`). This is the automated security guard
+  for the client-only placement/toast logic. `useFeedbackContext` is **not** in the
+  forbidden list — it is itself an enum-only shell bridge, so `HelpCluster`
+  consuming it does not weaken decision 7.
+- **No new phase-signal composable to test:** the game-start signal reuses the
+  existing `useFeedbackContext.gamePhase`, which #122 already covers. This LLD adds
+  no `useCurrentGameType` phase field, so no new composable-level test is needed
+  there; `useCurrentGameType` remains gameType-enum-only.
 
 ### 7.2 E2E tests (Playwright) — extend `e2e/howto-walkthrough.spec.ts`
 
@@ -487,10 +509,11 @@ a board-mobile viewport — otherwise unchanged).
 
 All present on this branch (both dependencies merged):
 
-- `src/frontend/component/howto/HelpCluster.vue` — surface awareness + toast added here (#122).
+- `src/frontend/component/howto/HelpCluster.vue` — surface awareness + toast added here; consumes route, `matchMedia`, and the existing `useFeedbackContext.gamePhase` (#122).
 - `src/frontend/component/howto/WalkthroughModal.vue` — reused verbatim; asserted unmodified except that its scrim stays `inset:0` (#122).
-- `src/frontend/composables/useCurrentGameType.ts` — extended with the enum-only `gamePhase` signal (#122).
-- `src/frontend/component/game/GameView.vue` — sets `gamePhase` on phase change / clears on unmount (existing `watch(displayPhase)` + `onUnmounted`).
+- `src/frontend/composables/useFeedbackContext.ts` — **reused verbatim, not modified**; its existing enum-only `gamePhase` is the game-start signal `HelpCluster` reads.
+- `src/frontend/composables/useCurrentGameType.ts` — **not modified**; continues to carry only the `gameType` enum (an earlier draft's `gamePhase` addition was rejected — see §4.1 collision note).
+- `src/frontend/component/game/GameView.vue` — **not modified**; its existing `watch(displayPhase) → setGamePhase(toFeedbackPhase(phase))` and `clearGamePhase()` on unmount already drive the phase enum this LLD consumes.
 - `src/frontend/component/game/GameBoard.vue`, `TonkBoard.vue` — read-only context for the action-row height / breakpoint the offset targets; **not modified**.
 - `src/frontend/component/App.vue` — already mounts `HelpCluster` once after `<router-view>`; **not modified**.
 - `src/frontend/styles/game-variables.css` — `--mobile-actions-height`, `--panel-bg`, `--gold-accent` (reused, not changed).
@@ -508,16 +531,17 @@ NOT modified (reused verbatim — modifying any of these signals a mis-scoped sl
 
 ```
 Modified files:
-  src/frontend/component/howto/HelpCluster.vue      -- onBoard/isNarrow placement classes, mobile bug-icon collapse, game-start toast
-  src/frontend/composables/useCurrentGameType.ts    -- add enum-only gamePhase signal (setGamePhase / readonly gamePhase)
-  src/frontend/component/game/GameView.vue          -- setGamePhase on displayPhase change; clear on unmount
-  tests/frontend/walkthroughs.test.ts               -- placement helper, toast-trigger reducer, extended source-scan, gamePhase signal
+  src/frontend/component/howto/HelpCluster.vue      -- onBoard/isNarrow placement classes, mobile bug-icon collapse, game-start toast (reads existing useFeedbackContext.gamePhase)
+  tests/frontend/walkthroughs.test.ts               -- placement helper, toast-trigger reducer, extended source-scan (add clusterPlacement.ts to MODULE_FILES)
   e2e/howto-walkthrough.spec.ts                      -- board offset, mobile collapse, state-preservation, game-start toast
 
 New files (small extracted pure helpers, node-testable — implementer's discretion):
   src/frontend/component/howto/clusterPlacement.ts   -- pure placement + toast-trigger logic (kept live-state-free for the source-scan)
 
-NOT modified:
+NOT modified (reused verbatim):
+  src/frontend/composables/useCurrentGameType.ts     -- gameType enum only; NO gamePhase added (collision — §4.1)
+  src/frontend/composables/useFeedbackContext.ts     -- existing gamePhase enum is the game-start signal
+  src/frontend/component/game/GameView.vue           -- existing watch(displayPhase)+clearGamePhase already drive the enum
   src/frontend/component/howto/WalkthroughModal.vue, WalkthroughScene.vue,
   walkthroughs.ts, big2Walkthrough.ts, tonkWalkthrough.ts, walkthroughTypes.ts,
   stepNav.ts, GameCard.vue, FeedbackWidget.vue, App.vue,
