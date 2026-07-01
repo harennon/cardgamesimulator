@@ -1,0 +1,1685 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      How to Play — Walkthrough Shell + Big2 + Create-Game Entrypoint
+    </title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===== Tokens lifted from src/frontend/styles/game-variables.css ===== */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --input-border: var(--table-rim-light);
+        --input-border-focus: var(--gold-accent);
+        --input-radius: 6px;
+
+        --btn-primary-bg: var(--gold-accent);
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-radius: 6px;
+        --btn-disabled-opacity: 0.4;
+
+        --page-max-width: 420px;
+        --card-panel-bg: var(--panel-bg);
+        --card-panel-border: var(--table-rim-light);
+        --card-panel-radius: 12px;
+        --error-text: #e05555;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            1200px 800px at 50% -10%,
+            rgba(37, 107, 66, 0.35),
+            transparent 60%
+          ),
+          var(--felt);
+        background-attachment: fixed;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        padding: 32px 16px 120px;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        background-image:
+          repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(-45deg, #000 0 1px, transparent 1px 3px);
+        background-size: 6px 6px;
+        z-index: 0;
+      }
+
+      .doc-head {
+        max-width: 1100px;
+        margin: 0 auto 8px;
+        text-align: center;
+        position: relative;
+        z-index: 1;
+      }
+      .doc-head h1 {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.7rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.02em;
+        margin: 0 0 6px;
+      }
+      .doc-head p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin: 0 auto;
+        max-width: 680px;
+        line-height: 1.55;
+      }
+
+      .section-label {
+        max-width: 1100px;
+        margin: 52px auto 18px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--gold-accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        position: relative;
+        z-index: 1;
+      }
+      .section-label::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          rgba(201, 168, 76, 0.5),
+          transparent
+        );
+      }
+      .section-label .hint {
+        color: var(--text-muted);
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-transform: none;
+        font-size: 0.78rem;
+      }
+
+      .stage {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 32px;
+        justify-content: center;
+        align-items: flex-start;
+        position: relative;
+        z-index: 1;
+      }
+
+      .device {
+        position: relative;
+      }
+      .device-cap {
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        margin: 12px 0 0;
+        line-height: 1.4;
+      }
+      .device-cap b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* Fake phone/desktop framing so screens read as real product surfaces */
+      .frame-phone {
+        width: 375px;
+        height: 720px;
+        border-radius: 34px;
+        border: 10px solid #0a0a0a;
+        box-shadow:
+          0 30px 70px rgba(0, 0, 0, 0.55),
+          inset 0 0 0 2px #1c1c1c;
+        overflow: hidden;
+        position: relative;
+        background: var(--felt);
+      }
+      .frame-desk {
+        width: 640px;
+        max-width: 92vw;
+        border-radius: 12px;
+        border: 1px solid var(--table-rim-light);
+        box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        position: relative;
+        background: var(--felt);
+      }
+      .screen {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+      .frame-desk .screen {
+        position: relative;
+        inset: auto;
+        min-height: 460px;
+      }
+
+      /* felt weave inside device screens */
+      .screen::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        background-image:
+          repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(-45deg, #000 0 1px, transparent 1px 3px);
+        background-size: 6px 6px;
+      }
+
+      /* ====================== SHARED: form-card ====================== */
+      .form-card {
+        background: var(--card-panel-bg);
+        border: 2px solid var(--card-panel-border);
+        border-radius: var(--card-panel-radius);
+        padding: 28px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        backdrop-filter: blur(2px);
+      }
+      .form-card__title {
+        font-family: var(--font-ui);
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-align: center;
+        margin: 0;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .flabel {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .finput {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        padding: 10px 14px;
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: var(--input-radius);
+        color: var(--text-primary);
+        outline: none;
+        width: 100%;
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23c9a84c' stroke-width='1.6' stroke-linecap='round'/></svg>");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+      }
+      .btn-primary {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: var(--btn-radius);
+        border: none;
+        cursor: pointer;
+        background: var(--btn-primary-bg);
+        color: var(--btn-primary-text);
+        width: 100%;
+      }
+
+      /* ====================== ENTRYPOINT: game-type row w/ (?) ====================== */
+      .type-row {
+        display: flex;
+        gap: 8px;
+        align-items: stretch;
+      }
+      .type-row .finput {
+        flex: 1;
+      }
+      /* the (?) affordance sitting beside the game-type selector */
+      .help-inline {
+        flex: 0 0 auto;
+        width: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--input-bg);
+        border: 1.5px solid var(--gold-accent);
+        border-radius: var(--input-radius);
+        color: var(--gold-accent);
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.15rem;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease,
+          transform 0.1s ease;
+      }
+      .help-inline:hover {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .help-inline:active {
+        transform: translateY(1px);
+      }
+      .help-hint {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin: 2px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .help-hint .k {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      /* ====================== PERSISTENT HELP CLUSTER (feedback merge) ====================== */
+      .help-cluster {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 10px;
+        align-items: center;
+        z-index: 40;
+      }
+      .help-fab {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        border: 1px solid var(--gold-accent);
+        background: rgba(20, 12, 8, 0.92);
+        color: var(--gold-accent);
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.25rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+        transition:
+          transform 0.12s ease,
+          background 0.15s ease,
+          color 0.15s ease;
+      }
+      .help-fab svg {
+        width: 20px;
+        height: 20px;
+      }
+      .help-fab:hover {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        transform: translateY(-2px);
+      }
+      .help-fab--bug {
+        border-color: var(--text-muted);
+        color: var(--text-muted);
+        width: 40px;
+        height: 40px;
+      }
+      .help-fab--bug:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+        background: rgba(20, 12, 8, 0.92);
+        transform: translateY(-2px);
+      }
+      .cluster-note {
+        position: absolute;
+        right: 60px;
+        bottom: 22px;
+        background: rgba(10, 6, 3, 0.92);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        z-index: 41;
+      }
+      .cluster-note b {
+        color: var(--gold-accent);
+      }
+
+      /* ====================== CARD (mini, for walkthrough illustration) ====================== */
+      .mini-cards {
+        display: flex;
+        gap: 3px;
+        justify-content: center;
+      }
+      .mcard {
+        width: 40px;
+        height: 56px;
+        border-radius: 5px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.9rem;
+        box-shadow: 1px 2px 5px var(--card-shadow);
+        position: relative;
+        flex-shrink: 0;
+      }
+      .mcard.sel {
+        transform: translateY(-8px);
+        border-color: var(--gold-accent);
+        box-shadow: 0 6px 16px var(--gold-glow);
+      }
+      .mcard .r {
+        line-height: 1;
+      }
+      .mcard .s {
+        line-height: 1;
+        font-size: 1.1em;
+      }
+      .mcard.red {
+        color: var(--red-suit);
+      }
+      .mcard.black {
+        color: var(--black-suit);
+      }
+      .mcard.lo {
+        outline: 2px dashed var(--gold-accent);
+        outline-offset: 2px;
+      }
+
+      /* ====================== WALKTHROUGH SHELL — shared step chrome ====================== */
+      .wt-illus {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 18px;
+      }
+      .wt-illus .tag {
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .shot-placeholder {
+        width: 100%;
+        border: 1px dashed rgba(201, 168, 76, 0.4);
+        border-radius: 8px;
+        background:
+          repeating-linear-gradient(
+            45deg,
+            rgba(201, 168, 76, 0.03) 0 8px,
+            transparent 8px 16px
+          ),
+          rgba(10, 6, 3, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 10px;
+        padding: 20px;
+        text-align: center;
+      }
+      .shot-badge {
+        font-size: 0.6rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 4px;
+        padding: 3px 8px;
+      }
+      .wt-caption {
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+      .wt-caption strong {
+        color: var(--gold-accent);
+      }
+
+      /* Progress dots */
+      .wt-dots {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        justify-content: center;
+      }
+      .wt-dots i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--table-rim-light);
+        display: block;
+        transition: all 0.2s ease;
+      }
+      .wt-dots i.on {
+        background: var(--gold-accent);
+        width: 20px;
+        border-radius: 4px;
+      }
+
+      .wt-nav {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .navbtn {
+        font-family: var(--font-ui);
+        font-size: 0.88rem;
+        font-weight: 600;
+        padding: 10px 18px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: 1px solid var(--text-muted);
+        background: transparent;
+        color: var(--text-primary);
+        min-height: 44px;
+      }
+      .navbtn--primary {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border-color: var(--gold-accent);
+        flex: 1;
+      }
+      .navbtn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      /* =========================================================
+         DIRECTION A — MODAL / LIGHTBOX
+         ========================================================= */
+      .A-scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.66);
+        backdrop-filter: blur(2px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+      }
+      .A-modal {
+        width: 100%;
+        max-width: 340px;
+        background: var(--card-panel-bg);
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 14px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .A-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .A-head .title {
+        font-family: var(--font-card);
+        font-weight: 700;
+        color: var(--gold-accent);
+        font-size: 1rem;
+      }
+      .A-head .title small {
+        display: block;
+        font-family: var(--font-ui);
+        font-weight: 500;
+        color: var(--text-muted);
+        font-size: 0.66rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin-top: 2px;
+      }
+      .A-close {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid var(--table-rim-light);
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1.1rem;
+        line-height: 1;
+      }
+      .A-close:hover {
+        color: var(--gold-accent);
+        border-color: var(--gold-accent);
+      }
+      .A-body {
+        padding: 8px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .A-foot {
+        padding: 12px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        border-top: 1px solid var(--table-rim-light);
+      }
+      .step-count {
+        text-align: center;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        letter-spacing: 0.06em;
+      }
+      .step-count b {
+        color: var(--gold-accent);
+      }
+
+      /* =========================================================
+         DIRECTION B — FULL-PAGE ROUTE (/how-to-play/big2)
+         ========================================================= */
+      .B-topbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--table-rim-light);
+        background: rgba(10, 6, 3, 0.5);
+      }
+      .B-back {
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .B-back:hover {
+        color: var(--gold-accent);
+      }
+      .B-title {
+        font-family: var(--font-card);
+        font-weight: 700;
+        color: var(--gold-accent);
+        font-size: 1rem;
+        margin: 0 auto;
+      }
+      .B-body {
+        padding: 22px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        max-width: 560px;
+        margin: 0 auto;
+      }
+      .B-hero {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .B-hero .step-of {
+        font-size: 0.68rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .B-hero h3 {
+        margin: 0;
+        font-family: var(--font-card);
+        font-size: 1.3rem;
+        color: var(--text-primary);
+      }
+      .B-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 6px;
+      }
+
+      /* =========================================================
+         DIRECTION C — RAIL / STEP-LIST (desktop split)
+         ========================================================= */
+      .C-wrap {
+        display: grid;
+        grid-template-columns: 190px 1fr;
+        min-height: 460px;
+      }
+      .C-rail {
+        border-right: 1px solid var(--table-rim-light);
+        background: rgba(10, 6, 3, 0.45);
+        padding: 18px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .C-rail .rail-title {
+        font-family: var(--font-card);
+        font-weight: 700;
+        color: var(--gold-accent);
+        font-size: 0.95rem;
+        padding: 0 8px 12px;
+      }
+      .rail-step {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 7px;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        border-left: 2px solid transparent;
+      }
+      .rail-step .num {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 1px solid currentColor;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.66rem;
+        flex-shrink: 0;
+      }
+      .rail-step:hover {
+        color: var(--text-primary);
+      }
+      .rail-step.active {
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+        border-left-color: var(--gold-accent);
+      }
+      .rail-step.done {
+        color: var(--text-primary);
+      }
+      .rail-step.done .num {
+        background: rgba(201, 168, 76, 0.15);
+        color: var(--gold-accent);
+        border-color: var(--gold-accent);
+      }
+      .C-main {
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .C-main h3 {
+        margin: 0;
+        font-family: var(--font-card);
+        color: var(--text-primary);
+        font-size: 1.25rem;
+      }
+      .C-close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        border: 1px solid var(--table-rim-light);
+        background: rgba(10, 6, 3, 0.6);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1rem;
+        z-index: 5;
+      }
+      .C-close:hover {
+        color: var(--gold-accent);
+        border-color: var(--gold-accent);
+      }
+      .C-foot {
+        margin-top: auto;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding-top: 10px;
+      }
+
+      /* Anti-rot doc block */
+      .note {
+        max-width: 900px;
+        margin: 0 auto;
+        background: rgba(10, 6, 3, 0.55);
+        border: 1px solid var(--table-rim-light);
+        border-left: 3px solid var(--gold-accent);
+        border-radius: 8px;
+        padding: 18px 22px;
+        position: relative;
+        z-index: 1;
+      }
+      .note h4 {
+        margin: 0 0 8px;
+        color: var(--gold-accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.04em;
+      }
+      .note p,
+      .note li {
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+      .note code {
+        background: rgba(201, 168, 76, 0.12);
+        color: var(--gold-accent);
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+      }
+      .note ul {
+        margin: 6px 0 0;
+        padding-left: 20px;
+      }
+
+      @media (max-width: 767px) {
+        .frame-desk {
+          width: 100%;
+        }
+        .C-wrap {
+          grid-template-columns: 1fr;
+        }
+        .C-rail {
+          flex-direction: row;
+          overflow-x: auto;
+          border-right: none;
+          border-bottom: 1px solid var(--table-rim-light);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc-head">
+      <h1>How to Play — Walkthrough</h1>
+      <p>
+        Shell + Big2 content + Create-Game entrypoint. Three directions for the
+        <b>modal-vs-route</b> decision, the <b>(?) entrypoint</b> beside the
+        game-type selector, and the <b>persistent help + bug cluster</b> from
+        user feedback. Screens are framed as real device surfaces. All chrome
+        reuses the existing felt/gold token system.
+      </p>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- ENTRYPOINT                                                     -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      Entrypoint
+      <span class="hint"
+        >— (?) beside the game-type selector in CreateGameView</span
+      >
+    </div>
+    <div class="stage">
+      <div class="device">
+        <div class="frame-phone">
+          <div class="screen" style="padding: 24px 18px">
+            <div class="form-card">
+              <h2 class="form-card__title">Create a Game</h2>
+              <div class="field">
+                <label class="flabel">Game Type</label>
+                <div class="type-row">
+                  <select class="finput">
+                    <option>Big 2</option>
+                    <option>Tonk</option>
+                  </select>
+                  <button class="help-inline" title="How to play Big 2">
+                    ?
+                  </button>
+                </div>
+                <p class="help-hint">
+                  <span class="k">?</span> New to Big 2? See how it&rsquo;s
+                  played.
+                </p>
+              </div>
+              <div class="field">
+                <label class="flabel">Players</label>
+                <div
+                  class="finput"
+                  style="
+                    background-image: none;
+                    color: var(--gold-accent);
+                    font-weight: 700;
+                  "
+                >
+                  4
+                </div>
+              </div>
+              <div class="field">
+                <label class="flabel">Turn Timer</label>
+                <select class="finput">
+                  <option>60 seconds</option>
+                </select>
+              </div>
+              <button class="btn-primary">Create Game</button>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>Entrypoint (chosen for all directions).</b> The (?) sits inline
+          with the game-type selector and is scoped to the
+          <em>currently selected</em>
+          type — pick Tonk later and the same button opens Tonk&rsquo;s
+          walkthrough. Tapping it launches whichever direction (A/B/C) below is
+          approved.
+        </p>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- DIRECTION A — MODAL                                            -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      Direction A — Modal / Lightbox
+      <span class="hint"
+        >— overlays the current view (like FeedbackWidget); no route
+        change</span
+      >
+    </div>
+    <div class="stage">
+      <!-- A: mid-walkthrough step -->
+      <div class="device">
+        <div class="frame-phone">
+          <div class="screen">
+            <!-- faint create-game behind the scrim -->
+            <div style="padding: 24px 18px; filter: blur(1px); opacity: 0.5">
+              <div class="form-card">
+                <h2 class="form-card__title">Create a Game</h2>
+                <div class="field">
+                  <label class="flabel">Game Type</label>
+                  <div class="finput">Big 2</div>
+                </div>
+                <div class="field">
+                  <label class="flabel">Players</label>
+                  <div class="finput">4</div>
+                </div>
+              </div>
+            </div>
+            <div class="A-scrim">
+              <div class="A-modal">
+                <div class="A-head">
+                  <span class="title">How to Play<small>Big 2</small></span>
+                  <button class="A-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="A-body">
+                  <div class="wt-illus">
+                    <span class="tag">Rank order</span>
+                    <div class="mini-cards">
+                      <span class="mcard lo black"
+                        ><span class="r">3</span
+                        ><span class="s">&clubs;</span></span
+                      >
+                      <span class="mcard black"
+                        ><span class="r">7</span
+                        ><span class="s">&spades;</span></span
+                      >
+                      <span class="mcard red"
+                        ><span class="r">10</span
+                        ><span class="s">&hearts;</span></span
+                      >
+                      <span class="mcard red"
+                        ><span class="r">K</span
+                        ><span class="s">&diams;</span></span
+                      >
+                      <span class="mcard black"
+                        ><span class="r">2</span
+                        ><span class="s">&spades;</span></span
+                      >
+                    </div>
+                    <div class="shot-badge">
+                      screenshot slot · rank-order.png
+                    </div>
+                  </div>
+                  <p class="wt-caption">
+                    Cards rank <strong>3 (lowest) up to 2 (highest)</strong>.
+                    Suit breaks ties: &clubs; &lt; &diams; &lt; &hearts; &lt;
+                    &spades;. The <strong>3&clubs;</strong> is the weakest card
+                    in the deck.
+                  </p>
+                </div>
+                <div class="A-foot">
+                  <div class="wt-dots">
+                    <i class="on"></i><i></i><i></i><i></i><i></i><i></i>
+                  </div>
+                  <div class="step-count">Step <b>1</b> of 6</div>
+                  <div class="wt-nav">
+                    <button class="navbtn" disabled>Back</button>
+                    <button class="navbtn navbtn--primary">Next &rarr;</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>A · Step 1 of 6.</b> Modal over a dimmed Create-Game. Close = X,
+          tap-scrim, or Esc.
+        </p>
+      </div>
+
+      <!-- A: a later step (combinations) -->
+      <div class="device">
+        <div class="frame-phone">
+          <div class="screen">
+            <div style="padding: 24px 18px; filter: blur(1px); opacity: 0.5">
+              <div class="form-card">
+                <h2 class="form-card__title">Create a Game</h2>
+              </div>
+            </div>
+            <div class="A-scrim">
+              <div class="A-modal">
+                <div class="A-head">
+                  <span class="title">How to Play<small>Big 2</small></span>
+                  <button class="A-close">&times;</button>
+                </div>
+                <div class="A-body">
+                  <div class="wt-illus">
+                    <span class="tag">Legal combinations</span>
+                    <div class="mini-cards" style="margin-bottom: 4px">
+                      <span class="mcard red"
+                        ><span class="r">5</span
+                        ><span class="s">&hearts;</span></span
+                      >
+                      <span class="mcard black"
+                        ><span class="r">5</span
+                        ><span class="s">&spades;</span></span
+                      >
+                    </div>
+                    <div class="mini-cards">
+                      <span class="mcard black"
+                        ><span class="r">9</span
+                        ><span class="s">&clubs;</span></span
+                      >
+                      <span class="mcard red"
+                        ><span class="r">9</span
+                        ><span class="s">&hearts;</span></span
+                      >
+                      <span class="mcard red"
+                        ><span class="r">9</span
+                        ><span class="s">&diams;</span></span
+                      >
+                      <span class="mcard red"
+                        ><span class="r">4</span
+                        ><span class="s">&hearts;</span></span
+                      >
+                      <span class="mcard black"
+                        ><span class="r">4</span
+                        ><span class="s">&clubs;</span></span
+                      >
+                    </div>
+                    <div class="shot-badge">screenshot slot · combos.png</div>
+                  </div>
+                  <p class="wt-caption">
+                    Play <strong>singles, pairs, or five-card hands</strong>
+                    (straight, flush, full house, four-of-a-kind, straight
+                    flush). You must match the count of the current play.
+                  </p>
+                </div>
+                <div class="A-foot">
+                  <div class="wt-dots">
+                    <i></i><i></i><i class="on"></i><i></i><i></i><i></i>
+                  </div>
+                  <div class="step-count">Step <b>3</b> of 6</div>
+                  <div class="wt-nav">
+                    <button class="navbtn">Back</button>
+                    <button class="navbtn navbtn--primary">Next &rarr;</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>A · Step 3 of 6.</b> Same chrome, different content step. Dot
+          indicator + count.
+        </p>
+      </div>
+
+      <!-- A: final step -->
+      <div class="device">
+        <div class="frame-phone">
+          <div class="screen">
+            <div style="padding: 24px 18px; filter: blur(1px); opacity: 0.5">
+              <div class="form-card">
+                <h2 class="form-card__title">Create a Game</h2>
+              </div>
+            </div>
+            <div class="A-scrim">
+              <div class="A-modal">
+                <div class="A-head">
+                  <span class="title">How to Play<small>Big 2</small></span>
+                  <button class="A-close">&times;</button>
+                </div>
+                <div class="A-body">
+                  <div class="wt-illus">
+                    <span class="tag">Winning &amp; scoring</span>
+                    <div class="shot-placeholder">
+                      <div style="font-size: 1.8rem">&#127942;</div>
+                      <div
+                        style="font-size: 0.8rem; color: var(--text-primary)"
+                      >
+                        1st = 5 pts · 2nd = 3 · 3rd = 1 · 4th = 0
+                      </div>
+                      <span class="shot-badge"
+                        >screenshot slot · game-over.png</span
+                      >
+                    </div>
+                  </div>
+                  <p class="wt-caption">
+                    First to empty their hand <strong>wins the round</strong>.
+                    Placement decides points — fewer cards left is better.
+                  </p>
+                </div>
+                <div class="A-foot">
+                  <div class="wt-dots">
+                    <i></i><i></i><i></i><i></i><i></i><i class="on"></i>
+                  </div>
+                  <div class="step-count">Step <b>6</b> of 6</div>
+                  <div class="wt-nav">
+                    <button class="navbtn">Back</button>
+                    <button class="navbtn navbtn--primary">
+                      Got it &check;
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>A · Last step.</b> Primary CTA becomes &ldquo;Got it&rdquo; to
+          dismiss.
+        </p>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- DIRECTION B — FULL ROUTE                                       -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      Direction B — Dedicated Route
+      <span class="hint"
+        >— /how-to-play/big2 (like /about); back-button friendly, shareable,
+        deep-linkable</span
+      >
+    </div>
+    <div class="stage">
+      <div class="device">
+        <div class="frame-phone">
+          <div class="screen">
+            <div class="B-topbar">
+              <button class="B-back">&larr; Back</button>
+              <span class="B-title">Big 2</span>
+              <span style="width: 44px"></span>
+            </div>
+            <div class="B-body">
+              <div class="B-hero">
+                <span class="step-of">Step 2 of 6 · Lead with the lowest</span>
+                <h3>The 3&clubs; starts the game</h3>
+              </div>
+              <div class="wt-illus" style="padding: 4px 0 0">
+                <div class="mini-cards">
+                  <span class="mcard lo black"
+                    ><span class="r">3</span
+                    ><span class="s">&clubs;</span></span
+                  >
+                  <span class="mcard black"
+                    ><span class="r">6</span
+                    ><span class="s">&spades;</span></span
+                  >
+                  <span class="mcard red"
+                    ><span class="r">8</span
+                    ><span class="s">&diams;</span></span
+                  >
+                  <span class="mcard red"
+                    ><span class="r">J</span
+                    ><span class="s">&hearts;</span></span
+                  >
+                </div>
+                <div class="shot-placeholder">
+                  <span style="font-size: 0.82rem; color: var(--text-primary)"
+                    >Your hand — 3&clubs; highlighted, must be played</span
+                  >
+                  <span class="shot-badge"
+                    >screenshot slot · first-move.png</span
+                  >
+                </div>
+              </div>
+              <p class="wt-caption">
+                Whoever holds the <strong>3&clubs;</strong> plays first, and
+                that card must be part of the opening move. After that, play
+                passes clockwise.
+              </p>
+              <div class="wt-dots" style="justify-content: flex-start">
+                <i></i><i class="on"></i><i></i><i></i><i></i><i></i>
+              </div>
+              <div class="B-foot">
+                <button class="navbtn">&larr; Back</button>
+                <button
+                  class="navbtn navbtn--primary"
+                  style="flex: 0 0 auto; padding: 10px 28px"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>B · Phone.</b> Full screen, top back-bar, browser back closes it.
+          URL: <code>/how-to-play/big2?step=2</code>
+        </p>
+      </div>
+
+      <div class="device">
+        <div class="frame-desk">
+          <div class="screen">
+            <div class="B-topbar">
+              <button class="B-back">&larr; Back to Create Game</button>
+              <span class="B-title">How to Play — Big 2</span>
+              <span style="width: 160px"></span>
+            </div>
+            <div class="B-body" style="max-width: 100%">
+              <div class="B-hero">
+                <span class="step-of">Step 4 of 6 · Trick flow</span>
+                <h3>Beat it, or pass</h3>
+              </div>
+              <div class="shot-placeholder" style="min-height: 180px">
+                <span style="font-size: 0.9rem; color: var(--text-primary)"
+                  >Board mid-trick — last play + your hand + Play / Pass</span
+                >
+                <span class="shot-badge"
+                  >screenshot slot · trick-flow.png (1280w)</span
+                >
+              </div>
+              <p class="wt-caption">
+                On your turn, play a
+                <strong>higher combination of the same type</strong> or
+                <strong>Pass</strong>. When everyone passes, the last player to
+                play <strong>leads a fresh trick</strong> with anything legal.
+              </p>
+              <div class="B-foot">
+                <div class="wt-dots">
+                  <i></i><i></i><i></i><i class="on"></i><i></i><i></i>
+                </div>
+                <div style="display: flex; gap: 10px">
+                  <button class="navbtn">&larr; Back</button>
+                  <button
+                    class="navbtn navbtn--primary"
+                    style="flex: 0 0 auto; padding: 10px 28px"
+                  >
+                    Next &rarr;
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>B · Desktop.</b> Same route, wider screenshots. Content is the
+          identical data-driven step list.
+        </p>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- DIRECTION C — RAIL / STEP-LIST                                 -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      Direction C — Split Rail (desktop) / stacked (mobile)
+      <span class="hint"
+        >— all steps visible in a rail; jump around freely. Can render as modal
+        or route.</span
+      >
+    </div>
+    <div class="stage">
+      <div class="device">
+        <div class="frame-desk">
+          <div class="screen">
+            <button class="C-close">&times;</button>
+            <div class="C-wrap">
+              <div class="C-rail">
+                <span class="rail-title">Big 2</span>
+                <div class="rail-step done">
+                  <span class="num">&check;</span> Card ranking
+                </div>
+                <div class="rail-step done">
+                  <span class="num">&check;</span> Lead with 3&clubs;
+                </div>
+                <div class="rail-step active">
+                  <span class="num">3</span> Combinations
+                </div>
+                <div class="rail-step">
+                  <span class="num">4</span> Trick flow
+                </div>
+                <div class="rail-step"><span class="num">5</span> Passing</div>
+                <div class="rail-step"><span class="num">6</span> Scoring</div>
+              </div>
+              <div class="C-main">
+                <h3>Combinations you can play</h3>
+                <div class="wt-illus" style="padding: 6px 0">
+                  <div
+                    style="
+                      display: flex;
+                      gap: 20px;
+                      flex-wrap: wrap;
+                      justify-content: center;
+                    "
+                  >
+                    <div style="text-align: center">
+                      <div class="mini-cards">
+                        <span class="mcard red"
+                          ><span class="r">5</span
+                          ><span class="s">&hearts;</span></span
+                        ><span class="mcard black"
+                          ><span class="r">5</span
+                          ><span class="s">&spades;</span></span
+                        >
+                      </div>
+                      <div
+                        style="
+                          font-size: 0.66rem;
+                          color: var(--text-muted);
+                          margin-top: 5px;
+                        "
+                      >
+                        Pair
+                      </div>
+                    </div>
+                    <div style="text-align: center">
+                      <div class="mini-cards">
+                        <span class="mcard black"
+                          ><span class="r">9</span
+                          ><span class="s">&clubs;</span></span
+                        ><span class="mcard red"
+                          ><span class="r">9</span
+                          ><span class="s">&hearts;</span></span
+                        ><span class="mcard red"
+                          ><span class="r">9</span
+                          ><span class="s">&diams;</span></span
+                        ><span class="mcard red"
+                          ><span class="r">4</span
+                          ><span class="s">&hearts;</span></span
+                        ><span class="mcard black"
+                          ><span class="r">4</span
+                          ><span class="s">&clubs;</span></span
+                        >
+                      </div>
+                      <div
+                        style="
+                          font-size: 0.66rem;
+                          color: var(--text-muted);
+                          margin-top: 5px;
+                        "
+                      >
+                        Full House
+                      </div>
+                    </div>
+                  </div>
+                  <div class="shot-placeholder">
+                    <span class="shot-badge">screenshot slot · combos.png</span>
+                  </div>
+                </div>
+                <p class="wt-caption">
+                  Play <strong>singles, pairs, or five-card hands</strong>. A
+                  five-card hand can only be beaten by a stronger five-card hand
+                  of higher category.
+                </p>
+                <div class="C-foot">
+                  <button class="navbtn">&larr; Back</button>
+                  <button
+                    class="navbtn navbtn--primary"
+                    style="flex: 0 0 auto; padding: 10px 28px"
+                  >
+                    Next &rarr;
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>C · Desktop split.</b> Persistent step rail with done/active
+          states; content on the right. Same data model, richer navigation.
+        </p>
+      </div>
+
+      <div class="device">
+        <div class="frame-phone">
+          <div class="screen">
+            <button class="C-close">&times;</button>
+            <div class="C-wrap">
+              <div class="C-rail">
+                <span
+                  class="rail-title"
+                  style="padding-bottom: 0; white-space: nowrap"
+                  >Big 2</span
+                >
+                <div class="rail-step done">
+                  <span class="num">&check;</span>
+                </div>
+                <div class="rail-step done">
+                  <span class="num">&check;</span>
+                </div>
+                <div class="rail-step active"><span class="num">3</span></div>
+                <div class="rail-step"><span class="num">4</span></div>
+                <div class="rail-step"><span class="num">5</span></div>
+                <div class="rail-step"><span class="num">6</span></div>
+              </div>
+              <div class="C-main">
+                <h3 style="font-size: 1.1rem">Combinations</h3>
+                <div class="mini-cards">
+                  <span class="mcard red"
+                    ><span class="r">5</span
+                    ><span class="s">&hearts;</span></span
+                  ><span class="mcard black"
+                    ><span class="r">5</span
+                    ><span class="s">&spades;</span></span
+                  >
+                </div>
+                <div class="shot-placeholder">
+                  <span class="shot-badge">screenshot slot · combos.png</span>
+                </div>
+                <p class="wt-caption">
+                  Singles, pairs, or five-card hands. Match the current
+                  play&rsquo;s count.
+                </p>
+                <div class="C-foot">
+                  <button class="navbtn">&larr;</button>
+                  <button class="navbtn navbtn--primary" style="flex: 1">
+                    Next &rarr;
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>C · Mobile.</b> Rail collapses to a horizontal number strip above
+          the content. More chrome than A on a small screen.
+        </p>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- PERSISTENT HELP + BUG CLUSTER                                  -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      Persistent Help Cluster
+      <span class="hint"
+        >— user feedback: bottom-right (?) that persists in-game, +
+        FeedbackWidget consolidated into a bug icon beside it</span
+      >
+    </div>
+    <div class="stage">
+      <div class="device">
+        <div class="frame-phone">
+          <div class="screen">
+            <!-- fake in-progress board behind -->
+            <div
+              style="
+                position: absolute;
+                inset: 0;
+                display: flex;
+                flex-direction: column;
+              "
+            >
+              <div
+                style="
+                  flex: 1;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  flex-direction: column;
+                  gap: 14px;
+                "
+              >
+                <div
+                  style="
+                    font-size: 0.7rem;
+                    letter-spacing: 0.14em;
+                    color: var(--gold-accent);
+                    text-transform: uppercase;
+                  "
+                >
+                  Last Play — Pair
+                </div>
+                <div class="mini-cards">
+                  <span class="mcard black"
+                    ><span class="r">7</span
+                    ><span class="s">&spades;</span></span
+                  >
+                  <span class="mcard red"
+                    ><span class="r">7</span
+                    ><span class="s">&hearts;</span></span
+                  >
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-muted)">
+                  Your turn · 0:42
+                </div>
+              </div>
+              <div
+                style="
+                  padding: 14px;
+                  display: flex;
+                  gap: 4px;
+                  justify-content: center;
+                  background: rgba(10, 6, 3, 0.35);
+                "
+              >
+                <span class="mcard sel black"
+                  ><span class="r">3</span><span class="s">&clubs;</span></span
+                >
+                <span class="mcard red"
+                  ><span class="r">5</span><span class="s">&diams;</span></span
+                >
+                <span class="mcard black"
+                  ><span class="r">9</span><span class="s">&spades;</span></span
+                >
+                <span class="mcard red"
+                  ><span class="r">J</span><span class="s">&hearts;</span></span
+                >
+                <span class="mcard black"
+                  ><span class="r">K</span><span class="s">&clubs;</span></span
+                >
+              </div>
+            </div>
+            <!-- the cluster -->
+            <div class="cluster-note">persists on <b>every</b> screen</div>
+            <div class="help-cluster">
+              <button class="help-fab" title="How to play">?</button>
+              <button
+                class="help-fab help-fab--bug"
+                title="Report a bug / feedback"
+                aria-label="Report a bug"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path
+                    d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3M5 6l2 2M19 6l-2 2M5 19l2-2M19 19l-2-2"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>In-game.</b> Stacked FABs bottom-right: <b>(?)</b> opens the
+          walkthrough for the <em>current game</em>, bug icon opens the existing
+          feedback modal. Both float above the board (z-index above wood-rim).
+        </p>
+      </div>
+
+      <div class="device">
+        <div class="frame-phone">
+          <div class="screen" style="padding: 24px 18px">
+            <div class="form-card" style="opacity: 0.65">
+              <h2 class="form-card__title">Create a Game</h2>
+              <div class="field">
+                <label class="flabel">Game Type</label>
+                <div class="type-row">
+                  <div class="finput">Big 2</div>
+                  <button class="help-inline">?</button>
+                </div>
+              </div>
+              <div class="field">
+                <label class="flabel">Players</label>
+                <div class="finput">4</div>
+              </div>
+            </div>
+            <div class="cluster-note" style="bottom: 26px">
+              also on lobby &amp; menus
+            </div>
+            <div class="help-cluster">
+              <button class="help-fab" title="How to play">?</button>
+              <button
+                class="help-fab help-fab--bug"
+                title="Report a bug"
+                aria-label="Report a bug"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path
+                    d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3M5 6l2 2M19 6l-2 2M5 19l2-2M19 19l-2-2"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <p class="device-cap">
+          <b>Two entrypoints, one shell.</b> The inline (?) in the form and the
+          persistent (?) FAB both open the <em>same</em> walkthrough. The FAB is
+          global (App-level), so this issue can wire it once the shell exists —
+          though note the lobby FAB is scoped to a follow-up sub-issue.
+        </p>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- DESIGN NOTES / SCREENSHOT ANTI-ROT                             -->
+    <!-- ============================================================= -->
+    <div class="section-label">Screenshot Sourcing &amp; Anti-Rot</div>
+    <div class="note">
+      <h4>The screenshot slots above are NOT bitmap PNGs</h4>
+      <p>
+        There is no <code>public/</code> or image dir today, and committed PNGs
+        rot the instant the board UI changes (LLD 107/108 just reflowed the
+        board). Two options for the LLD to choose between:
+      </p>
+      <ul>
+        <li>
+          <b>Option 1 — Live component thumbnails (recommended).</b> Each step
+          renders <em>real</em> <code>&lt;GameCard&gt;</code> / mini-board
+          markup from static fixture data (the mini-cards above are exactly
+          this). No binary assets; illustrations track the real card renderer
+          automatically. Anti-rot is structural — if
+          <code>GameCard</code> changes, the walkthrough changes with it.
+        </li>
+        <li>
+          <b
+            >Option 2 — Committed PNGs under
+            <code>src/frontend/assets/howto/</code>.</b
+          >
+          Simpler authoring, but rots silently. If chosen, the LLD must add a
+          checklist item to <code>DEVELOPMENT.md</code> ("re-shoot howto images
+          when board UI changes") — an explicit, documented anti-rot process,
+          not a silent one.
+        </li>
+      </ul>
+      <p>
+        Either way the content stays
+        <b>declarative &amp; <code>gameType</code>-keyed</b>:
+        <code>WALKTHROUGHS[gameType] = Step[]</code> where each
+        <code>Step = { illustration, caption }</code>. Adding Tonk later is a
+        data entry, not a code change — mirroring how
+        <code>GameView.vue</code> dispatches <code>&lt;TonkBoard&gt;</code> vs
+        <code>&lt;GameBoard&gt;</code>.
+      </p>
+    </div>
+
+    <div class="note" style="margin-top: 20px">
+      <h4>Recommendation</h4>
+      <p>
+        <b
+          >Direction A (modal) + inline (?) entrypoint + persistent FAB cluster,
+          with Option 1 (live component thumbnails).</b
+        >
+        Rationale: the modal matches the zero-friction, no-dead-end CX principle
+        (never leaves the create-game flow), reuses the FeedbackWidget overlay
+        pattern already in the codebase, and the FAB cluster directly implements
+        the user&rsquo;s feedback. Direction B is best if deep-linking / sharing
+        a rules page matters; Direction C is heavier chrome that pays off only
+        with many steps. Please confirm which you want.
+      </p>
+    </div>
+  </body>
+</html>
