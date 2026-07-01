@@ -38,6 +38,9 @@ function makeTrickPileLogic(
     currentTrick.value.filter((e) => e.action === "play"),
   );
   const badgeCount = computed<number>(() => playEntries.value.length);
+  const latestPlay = computed<Big2HistoryEntry | undefined>(
+    () => playEntries.value[playEntries.value.length - 1],
+  );
   const stackLayers = computed<Big2HistoryEntry[]>(() => {
     const plays = playEntries.value;
     return plays.slice(Math.max(0, plays.length - MAX_LAYERS));
@@ -62,6 +65,7 @@ function makeTrickPileLogic(
     currentTrick,
     playEntries,
     badgeCount,
+    latestPlay,
     stackLayers,
     expanded,
     toggle,
@@ -181,6 +185,61 @@ describe("TrickPile — currentTrick derivation", () => {
     expect(t.currentTrick.value[0]!.playerId).toBe("p3");
     // None of trick 1's entries leak in.
     expect(t.currentTrick.value.some((e) => e.action === "pass")).toBe(false);
+  });
+});
+
+describe("TrickPile — latestPlay derivation (mobile static layer)", () => {
+  it("single play → latestPlay is that play", () => {
+    const hist = [play("p1", [card("3", "clubs")])];
+    const t = makeTrickPileLogic(
+      ref<readonly Big2HistoryEntry[]>(hist),
+      ref(0),
+    );
+    expect(t.latestPlay.value?.playerId).toBe("p1");
+    expect(t.latestPlay.value).toBe(
+      t.playEntries.value[t.playEntries.value.length - 1],
+    );
+  });
+
+  it("three plays → latestPlay is the last (most recent) play", () => {
+    const hist = [
+      play("p1", [card("3", "clubs")]),
+      play("p2", [card("5", "hearts")]),
+      play("p3", [card("9", "spades")]),
+    ];
+    const t = makeTrickPileLogic(
+      ref<readonly Big2HistoryEntry[]>(hist),
+      ref(0),
+    );
+    expect(t.latestPlay.value?.playerId).toBe("p3");
+    expect(t.latestPlay.value?.cards![0]).toEqual(card("9", "spades"));
+  });
+
+  it("six plays → latestPlay is the sixth play (unaffected by MAX_LAYERS cap)", () => {
+    const hist = [
+      play("p1", [card("3", "clubs")]),
+      play("p2", [card("4", "clubs")]),
+      play("p3", [card("5", "clubs")]),
+      play("p4", [card("6", "clubs")]),
+      play("p1", [card("7", "clubs")]),
+      play("p2", [card("8", "clubs")]),
+    ];
+    const t = makeTrickPileLogic(
+      ref<readonly Big2HistoryEntry[]>(hist),
+      ref(0),
+    );
+    expect(t.latestPlay.value?.playerId).toBe("p2");
+    expect(t.latestPlay.value?.cards![0]).toEqual(card("8", "clubs"));
+  });
+
+  it("current trick with only passes → latestPlay is undefined (guards the v-if)", () => {
+    const hist = [pass("p1"), pass("p2")];
+    const t = makeTrickPileLogic(
+      ref<readonly Big2HistoryEntry[]>(hist),
+      ref(0),
+    );
+    expect(t.playEntries.value).toHaveLength(0);
+    expect(t.latestPlay.value).toBeUndefined();
   });
 });
 

@@ -89,6 +89,10 @@
     --card-select-duration: 120ms;
     --card-select-easing: ease;
 
+    /* Big2 played-row cap (LLD 108): bounds the current-play row so a 5-card
+       combo shrinks to fit the clipped mobile table instead of going off-screen. */
+    --play-row-max-width: 260px;
+
     /* Flow screen overrides */
     --card-panel-padding: 28px 20px;
     --page-max-width: 100%;
