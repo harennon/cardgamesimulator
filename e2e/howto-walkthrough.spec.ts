@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import {
   readStoredAuth,
   createGameViaApi,
@@ -12,6 +12,94 @@ import {
 
 const BIG2_STEP_COUNT = 6;
 const TONK_STEP_COUNT = 6;
+
+/** True iff two DOMRect-like boxes do not overlap (share no interior area). */
+function boxesDisjoint(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean {
+  return (
+    a.x + a.width <= b.x ||
+    b.x + b.width <= a.x ||
+    a.y + a.height <= b.y ||
+    b.y + b.height <= a.y
+  );
+}
+
+/**
+ * Seed a 2-player Big2 game to IN_PROGRESS with the host (player1) on turn and a
+ * playable first hand, then land the host on the live board. Mirrors the LLD 111
+ * board-persistence seed but keeps the host's turn so Play/Pass render.
+ */
+async function seedBig2Board(
+  browser: Parameters<Parameters<typeof test>[1]>[0]["browser"],
+  request: Parameters<Parameters<typeof test>[1]>[0]["request"],
+  viewport?: { width: number; height: number },
+): Promise<{ context: BrowserContext; page: Page }> {
+  const host = readStoredAuth("player1.json");
+  const player2 = readStoredAuth("player2.json");
+
+  const gameId = await createGameViaApi(request, host.accessToken, {
+    maxPlayers: 2,
+  });
+  await joinGameViaApi(request, gameId, player2.accessToken);
+  await seedGameState(request, {
+    gameId,
+    state: {
+      status: "IN_PROGRESS",
+      gameType: "big2",
+      version: 1,
+      turnNumber: 1,
+      randomSeed: "howto-board-offset-seed",
+      currentPlayerIndex: 0,
+      winner: null,
+      scores: null,
+      players: [
+        { playerId: host.userId, displayName: "Player1" },
+        { playerId: player2.userId, displayName: "Player2" },
+      ],
+      gameSpecificState: {
+        hands: [
+          [
+            { suit: "clubs", rank: "3" },
+            { suit: "diamonds", rank: "4" },
+          ],
+          [
+            { suit: "hearts", rank: "5" },
+            { suit: "spades", rank: "6" },
+          ],
+        ],
+        lastPlay: null,
+        lastPlayPlayerIndex: null,
+        consecutivePasses: 0,
+        isFreePlay: false,
+        isFirstPlayOfGame: true,
+        playHistory: [],
+        finishedPlayerIndices: [],
+      },
+    },
+    dbFields: {
+      status: "IN_PROGRESS",
+      playerIds: [host.userId, player2.userId],
+      playerDisplayNames: {
+        [host.userId]: "Player1",
+        [player2.userId]: "Player2",
+      },
+      turnTimerSeconds: null,
+    },
+  });
+
+  const context = await browser.newContext({
+    storageState: "e2e/.auth/player1.json",
+    ...(viewport ? { viewport } : {}),
+  });
+  const page = await context.newPage();
+  await page.goto(`/game/${gameId}`);
+  await expect(page.locator('[data-testid="game-board"]')).toBeVisible({
+    timeout: 10_000,
+  });
+  return { context, page };
+}
 
 async function openHome(
   browser: Parameters<Parameters<typeof test>[1]>[0]["browser"],
@@ -403,5 +491,319 @@ test.describe("How-to-play walkthrough — Tonk resolution (LLD 115)", () => {
     ).toBeVisible();
 
     await context.close();
+  });
+});
+
+test.describe("How-to-play walkthrough — FAB hardening (LLD 117)", () => {
+  test("board (Big2, desktop): the (?) FAB does not overlap the Play/Pass action row", async ({
+    browser,
+    request,
+  }) => {
+    const { context, page } = await seedBig2Board(browser, request);
+
+    // Action row (Play/Pass) is present on the host's turn.
+    const actionPanel = page.locator(".action-panel");
+    await expect(actionPanel).toBeVisible();
+
+    const fab = page.locator('[data-testid="howto-fab"]');
+    await expect(fab).toBeVisible();
+
+    const fabBox = await fab.boundingBox();
+    const panelBox = await actionPanel.boundingBox();
+    expect(boxesDisjoint(fabBox!, panelBox!)).toBe(true);
+
+    await context.close();
+  });
+
+  test("board (Big2, desktop): opening the walkthrough leaves the action row visible; the FAB is lifted off it", async ({
+    browser,
+    request,
+  }) => {
+    const { context, page } = await seedBig2Board(browser, request);
+
+    await page.click('[data-testid="howto-fab"]');
+    await expect(page.locator('[data-testid="howto-modal"]')).toBeVisible();
+
+    await context.close();
+  });
+
+  test("board (Tonk, desktop): the (?) FAB does not overlap the Tonk action panel", async ({
+    browser,
+    request,
+  }) => {
+    // Reuse the Tonk-board seeding via a minimal inline flow.
+    const auths = ["player1.json", "player2.json", "player3.json"].map((f) => ({
+      ...readStoredAuth(f),
+    }));
+    const gameId = await createGameViaApi(request, auths[0]!.accessToken, {
+      gameType: "tonk",
+      maxPlayers: 3,
+      deckRoundsTarget: 6,
+    });
+    for (let i = 1; i < auths.length; i++) {
+      await joinGameViaApi(request, gameId, auths[i]!.accessToken);
+    }
+    const players = auths.map((a, i) => ({
+      playerId: a.userId,
+      displayName: `Player${i + 1}`,
+    }));
+    await seedGameState(request, {
+      gameId,
+      state: {
+        status: "IN_PROGRESS",
+        gameType: "tonk",
+        version: 1,
+        turnNumber: 1,
+        randomSeed: "howto-tonk-offset-seed",
+        currentPlayerIndex: 0,
+        winner: null,
+        scores: null,
+        players,
+        gameSpecificState: buildTonkSeedState(3, [
+          [
+            tonkCard("K", "spades"),
+            tonkCard("4", "clubs"),
+            tonkCard("7", "hearts"),
+          ],
+          [tonkCard("9", "diamonds"), tonkCard("2", "spades")],
+          [tonkCard("6", "clubs"), tonkCard("8", "hearts")],
+        ]),
+      },
+      dbFields: {
+        status: "IN_PROGRESS",
+        playerIds: players.map((p) => p.playerId),
+        playerDisplayNames: Object.fromEntries(
+          players.map((p) => [p.playerId, p.displayName]),
+        ),
+        turnTimerSeconds: null,
+      },
+    });
+
+    const context = await browser.newContext({
+      storageState: "e2e/.auth/player1.json",
+    });
+    const page = await context.newPage();
+    await page.goto(`/game/${gameId}`);
+    await expect(page.locator('[data-testid="tonk-board"]')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const actionPanel = page.locator('[data-testid="tonk-action-panel"]');
+    await expect(actionPanel).toBeVisible();
+    const fab = page.locator('[data-testid="howto-fab"]');
+    await expect(fab).toBeVisible();
+
+    const fabBox = await fab.boundingBox();
+    const panelBox = await actionPanel.boundingBox();
+    expect(boxesDisjoint(fabBox!, panelBox!)).toBe(true);
+
+    await context.close();
+  });
+
+  test("mobile board: the cluster collapses to a single (?) FAB (bug icon hidden)", async ({
+    browser,
+    request,
+  }) => {
+    const { context, page } = await seedBig2Board(browser, request, {
+      width: 375,
+      height: 667,
+    });
+
+    await expect(page.locator('[data-testid="howto-fab"]')).toBeVisible();
+    // The bug icon is collapsed away on the mobile board (single-FAB) so the
+    // hand keeps full width — Direction A (LLD 117 §3.1 mobile row, E2).
+    await expect(
+      page.locator('[data-testid="feedback-trigger"]'),
+    ).not.toBeVisible();
+
+    // The single (?) FAB is lifted above the action row so it never obstructs
+    // Play/Pass (E1 headline) — the authoritative offset from §4.3.
+    const fab = page.locator('[data-testid="howto-fab"]');
+    const fabBox = await fab.boundingBox();
+    const panelBox = await page.locator(".action-panel").boundingBox();
+    expect(boxesDisjoint(fabBox!, panelBox!)).toBe(true);
+
+    // It also does not obscure the player's own cards (the hand renders its
+    // cards on the left; the corner FAB clears them).
+    const cardBoxes = await page
+      .locator(".player-hand__card")
+      .evaluateAll((els) =>
+        els
+          .map((el) => el.getBoundingClientRect())
+          .map((r) => ({
+            x: r.x,
+            y: r.y,
+            width: r.width,
+            height: r.height,
+          })),
+      );
+    for (const card of cardBoxes) {
+      expect(boxesDisjoint(fabBox!, card)).toBe(true);
+    }
+
+    await context.close();
+  });
+
+  test("non-board surfaces show both the (?) FAB and the bug icon (resting corner)", async ({
+    browser,
+  }) => {
+    const { context, page } = await openHome(browser);
+    await expect(page.locator('[data-testid="howto-fab"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="feedback-trigger"]'),
+    ).toBeVisible();
+    await context.close();
+  });
+
+  test("non-board surfaces keep both buttons at mobile width", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      storageState: "e2e/.auth/player1.json",
+      viewport: { width: 375, height: 667 },
+    });
+    const page = await context.newPage();
+    await page.goto("/");
+    await expect(page.locator('[data-testid="howto-fab"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="feedback-trigger"]'),
+    ).toBeVisible();
+    await context.close();
+  });
+
+  test("open/close on the board preserves board state and interactivity (E6)", async ({
+    browser,
+    request,
+  }) => {
+    const { context, page } = await seedBig2Board(browser, request);
+
+    // Player's own hand is present before opening.
+    const hand = page.locator(".player-hand");
+    await expect(hand).toBeVisible();
+
+    await page.click('[data-testid="howto-fab"]');
+    await expect(page.locator('[data-testid="howto-modal"]')).toBeVisible();
+    await page.click('[data-testid="howto-close"]');
+    await expect(page.locator('[data-testid="howto-modal"]')).not.toBeVisible();
+
+    // Board is intact and interactive after close: the hand is still there and
+    // a card can be selected (interactive) on the host's turn.
+    await expect(hand).toBeVisible();
+    await expect(page.locator(".action-panel")).toBeVisible();
+    await page.locator(".player-hand__card").first().click();
+
+    await context.close();
+  });
+
+  test("open/close in the lobby preserves lobby state (E5)", async ({
+    browser,
+    request,
+  }) => {
+    const host = readStoredAuth("player1.json");
+    const player2 = readStoredAuth("player2.json");
+    const gameId = await createGameViaApi(request, host.accessToken, {
+      maxPlayers: 2,
+    });
+    await joinGameViaApi(request, gameId, player2.accessToken);
+
+    const context = await browser.newContext({
+      storageState: "e2e/.auth/player1.json",
+    });
+    const page = await context.newPage();
+    await page.goto(`/game/${gameId}`);
+    await expect(page.locator('[data-testid="game-lobby"]')).toBeVisible();
+
+    const codeBefore = await page
+      .locator('[data-testid="join-code-chip"]')
+      .textContent();
+    const countBefore = await page
+      .locator('[data-testid="lobby-count"]')
+      .textContent();
+
+    await page.click('[data-testid="howto-fab"]');
+    await expect(page.locator('[data-testid="howto-modal"]')).toBeVisible();
+    await page.click('[data-testid="howto-close"]');
+    await expect(page.locator('[data-testid="howto-modal"]')).not.toBeVisible();
+
+    // Lobby untouched: room code, count, and Start button are still there.
+    await expect(page.locator('[data-testid="join-code-chip"]')).toHaveText(
+      codeBefore ?? "",
+    );
+    await expect(page.locator('[data-testid="lobby-count"]')).toHaveText(
+      countBefore ?? "",
+    );
+    await expect(
+      page.locator('[data-testid="start-game-button"]'),
+    ).toBeVisible();
+
+    await context.close();
+  });
+
+  test("game-starts-while-open: toast appears, modal stays open, board is underneath (E4)", async ({
+    browser,
+    request,
+  }) => {
+    // Two real contexts: the host starts the game while the OTHER player is
+    // reading the walkthrough. The observing player's full-viewport modal scrim
+    // must not block the host's Start (each has their own page), and the phase
+    // edge lands on the observer's still-open modal — the E4 scenario.
+    const host = readStoredAuth("player1.json");
+    const player2 = readStoredAuth("player2.json");
+    const gameId = await createGameViaApi(request, host.accessToken, {
+      maxPlayers: 2,
+    });
+    await joinGameViaApi(request, gameId, player2.accessToken);
+
+    const hostContext = await browser.newContext({
+      storageState: "e2e/.auth/player1.json",
+    });
+    const hostPage = await hostContext.newPage();
+    await hostPage.goto(`/game/${gameId}`);
+    await expect(hostPage.locator('[data-testid="game-lobby"]')).toBeVisible();
+
+    const observerContext = await browser.newContext({
+      storageState: "e2e/.auth/player2.json",
+    });
+    const observerPage = await observerContext.newPage();
+    await observerPage.goto(`/game/${gameId}`);
+    await expect(
+      observerPage.locator('[data-testid="game-lobby"]'),
+    ).toBeVisible();
+
+    // Observer opens the walkthrough in the lobby.
+    await observerPage.click('[data-testid="howto-fab"]');
+    await expect(
+      observerPage.locator('[data-testid="howto-modal"]'),
+    ).toBeVisible();
+
+    // Host starts the game (their own page — not behind the observer's scrim).
+    await hostPage.click('[data-testid="start-game-button"]');
+    await expect(hostPage.locator('[data-testid="game-board"]')).toBeVisible();
+
+    // (a) the non-blocking toast appears on the observer's screen.
+    await expect(
+      observerPage.locator('[data-testid="howto-gamestart-toast"]'),
+    ).toBeVisible();
+    // (b) the observer's modal is not auto-closed (user not trapped).
+    await expect(
+      observerPage.locator('[data-testid="howto-modal"]'),
+    ).toBeVisible();
+    // (c) the board rendered underneath the observer's still-open modal.
+    await expect(
+      observerPage.locator('[data-testid="game-board"]'),
+    ).toBeVisible();
+
+    // (d) after closing the modal, the observer's board is fully interactive.
+    await observerPage.click('[data-testid="howto-close"]');
+    await expect(
+      observerPage.locator('[data-testid="howto-modal"]'),
+    ).not.toBeVisible();
+    await expect(
+      observerPage.locator('[data-testid="game-board"]'),
+    ).toBeVisible();
+    await expect(observerPage.locator(".player-hand")).toBeVisible();
+
+    await observerContext.close();
+    await hostContext.close();
   });
 });

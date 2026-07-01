@@ -1,8 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, useTemplateRef } from "vue";
+import {
+  ref,
+  computed,
+  useTemplateRef,
+  onMounted,
+  onUnmounted,
+  watch,
+} from "vue";
+import { useRoute } from "vue-router";
 import WalkthroughModal from "./WalkthroughModal.vue";
 import { getWalkthrough, GAME_LABEL } from "./walkthroughs";
+import { clusterPlacement, shouldFireGameStartToast } from "./clusterPlacement";
 import { useCurrentGameType } from "@/composables/useCurrentGameType";
+import { useFeedbackContext } from "@/composables/useFeedbackContext";
 import FeedbackWidget from "@/component/FeedbackWidget.vue";
 
 // The single bottom-right cluster: a (?) help FAB + a bug icon. Owns the
@@ -14,6 +24,41 @@ const { currentGameType } = useCurrentGameType();
 const walkthroughOpen = ref(false);
 const steps = computed(() => getWalkthrough(currentGameType.value));
 const gameLabel = computed(() => GAME_LABEL[currentGameType.value]);
+
+// Surface awareness (LLD 117): lift the cluster above the board action row and,
+// on the narrow board, collapse to the single (?) FAB. Placement reads only the
+// route path and the board's own mobile breakpoint — never live game state.
+const route = useRoute();
+const mql = window.matchMedia("(max-width: 767px)");
+const isNarrow = ref(mql.matches);
+const onNarrowChange = (e: MediaQueryListEvent): void => {
+  isNarrow.value = e.matches;
+};
+onMounted(() => mql.addEventListener("change", onNarrowChange));
+onUnmounted(() => {
+  mql.removeEventListener("change", onNarrowChange);
+  if (toastTimer) clearTimeout(toastTimer);
+});
+
+const placement = computed(() => clusterPlacement(route.path, isNarrow.value));
+const onBoard = computed(() => placement.value.onBoard);
+const collapseBug = computed(() => placement.value.collapseBug);
+
+// Game-starts-while-open (E4): watch the EXISTING feedback-phase enum only while
+// the walkthrough is open; on the lobby->in-progress edge show a non-blocking
+// ~3s toast. Reads the coarse enum, never hands/board/socket (decision 7).
+const { gamePhase } = useFeedbackContext();
+const gameStartToast = ref(false);
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+watch(gamePhase, (now, prev) => {
+  if (shouldFireGameStartToast(walkthroughOpen.value, prev, now)) {
+    gameStartToast.value = true;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      gameStartToast.value = false;
+    }, 3000);
+  }
+});
 
 const feedback =
   useTemplateRef<InstanceType<typeof FeedbackWidget>>("feedback");
@@ -37,7 +82,22 @@ function openFeedback(): void {
 </script>
 
 <template>
-  <div v-if="!feedbackOpen" class="help-cluster">
+  <div
+    v-if="!feedbackOpen"
+    class="help-cluster"
+    :class="{
+      'help-cluster--board': onBoard,
+      'help-cluster--board-mobile': collapseBug,
+    }"
+  >
+    <div
+      v-if="gameStartToast"
+      class="help-toast"
+      role="status"
+      data-testid="howto-gamestart-toast"
+    >
+      Game started — close this when you're ready
+    </div>
     <button
       class="help-fab"
       type="button"
@@ -49,6 +109,7 @@ function openFeedback(): void {
       ?
     </button>
     <button
+      v-if="!collapseBug"
       class="help-fab help-fab--bug"
       type="button"
       aria-label="Report a bug"
@@ -100,6 +161,50 @@ function openFeedback(): void {
   align-items: center;
 }
 
+/* Live board (desktop): lift above the 64px action row so the (?) FAB never
+   overlaps Play/Pass (Big2) or Discard/Draw/TONK (Tonk). */
+.help-cluster--board {
+  bottom: calc(64px + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Live board (mobile ≤767px): clear the mobile action row; the bug icon is
+   hidden via v-if so only the single (?) FAB shows (hand keeps full width). */
+.help-cluster--board-mobile {
+  bottom: calc(
+    var(--mobile-actions-height) + 12px + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+/* Non-blocking game-start toast (E4). Column-reverse stacks the FAB(s) from the
+   bottom up; order:1 keeps this pill above them. Never intercepts pointer
+   events, so the board underneath stays interactive. */
+.help-toast {
+  order: 1;
+  align-self: flex-end;
+  max-width: 220px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--gold-accent);
+  background: var(--panel-bg);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: right;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: help-toast-fade 0.2s ease;
+}
+
+@keyframes help-toast-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .help-fab {
   width: 46px;
   height: 46px;
@@ -149,6 +254,9 @@ function openFeedback(): void {
 @media (prefers-reduced-motion: reduce) {
   .help-fab {
     transition: none;
+  }
+  .help-toast {
+    animation: none;
   }
 }
 </style>
