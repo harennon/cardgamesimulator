@@ -1,0 +1,1483 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>How to Play — Walkthrough Shell &amp; Big2 Content Mockups</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===== Tokens lifted from src/frontend/styles/game-variables.css ===== */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --input-border: var(--table-rim-light);
+        --input-border-focus: var(--gold-accent);
+        --input-radius: 6px;
+
+        --btn-primary-bg: var(--gold-accent);
+        --btn-primary-text: #1a0f06;
+        --btn-primary-hover: #d4b45a;
+        --btn-radius: 6px;
+
+        --page-max-width: 420px;
+        --card-panel-bg: var(--panel-bg);
+        --card-panel-border: var(--table-rim-light);
+        --card-panel-radius: 12px;
+        --error-text: #e05555;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            1200px 800px at 50% -10%,
+            rgba(37, 107, 66, 0.35),
+            transparent 60%
+          ),
+          var(--felt);
+        background-attachment: fixed;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        padding: 32px 16px 120px;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        background-image:
+          repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(-45deg, #000 0 1px, transparent 1px 3px);
+        background-size: 6px 6px;
+        z-index: 0;
+      }
+
+      .doc-head {
+        max-width: 1100px;
+        margin: 0 auto 10px;
+        text-align: center;
+        position: relative;
+        z-index: 1;
+      }
+      .doc-head h1 {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.7rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.02em;
+        margin: 0 0 6px;
+      }
+      .doc-head p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin: 0 auto;
+        max-width: 680px;
+        line-height: 1.55;
+      }
+
+      .section-label {
+        max-width: 1100px;
+        margin: 46px auto 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--gold-accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        position: relative;
+        z-index: 1;
+      }
+      .section-label::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, var(--table-rim-light), transparent);
+      }
+      .section-label .num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 1px solid var(--gold-accent);
+        font-size: 0.7rem;
+      }
+      .section-note {
+        max-width: 1100px;
+        margin: -6px auto 20px;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        line-height: 1.5;
+        position: relative;
+        z-index: 1;
+      }
+      .section-note b {
+        color: var(--text-primary);
+      }
+      .tag {
+        display: inline-block;
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--table-rim-light);
+        color: var(--gold-accent);
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+      .tag--rec {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border-color: var(--gold-accent);
+      }
+
+      /* ===== Device frame to preview the two directions ===== */
+      .stage {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        gap: 28px;
+        position: relative;
+        z-index: 1;
+      }
+      @media (min-width: 900px) {
+        .stage--two {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      .device {
+        background: var(--bg-dark);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 18px;
+        padding: 10px;
+        box-shadow:
+          0 24px 60px rgba(0, 0, 0, 0.5),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      }
+      .device__label {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-align: center;
+        padding: 6px 0 10px;
+        letter-spacing: 0.06em;
+      }
+      .device__screen {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        height: 620px;
+        background:
+          radial-gradient(
+            900px 600px at 50% -10%,
+            rgba(37, 107, 66, 0.4),
+            transparent 60%
+          ),
+          var(--felt);
+      }
+      .device__screen::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        background-image:
+          repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(-45deg, #000 0 1px, transparent 1px 3px);
+        background-size: 6px 6px;
+      }
+
+      /* Faux app chrome for the route direction */
+      .appbar {
+        height: 46px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--table-rim-light);
+        background: rgba(13, 13, 13, 0.55);
+        backdrop-filter: blur(4px);
+        position: relative;
+        z-index: 2;
+      }
+      .appbar__brand {
+        font-family: var(--font-card);
+        color: var(--gold-accent);
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+      .appbar__back {
+        appearance: none;
+        background: transparent;
+        border: 1px solid var(--table-rim-light);
+        color: var(--text-primary);
+        border-radius: 6px;
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+      .appbar__back:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+      .appbar__spacer {
+        flex: 1;
+      }
+      .appbar__url {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ===== Shared walkthrough shell (used by BOTH directions) ===== */
+      /* The .wt-shell markup is IDENTICAL in modal & route; only the frame differs.
+         This is the core point: one content-rendering shell, two hosts. */
+      .wt-shell {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: var(--panel-bg);
+      }
+      .wt-shell--in-modal {
+        height: auto;
+        max-height: 100%;
+      }
+
+      .wt-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 18px 12px;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .wt-head__crest {
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(160deg, #2a1a0d, #16305f);
+        border: 1px solid var(--table-rim-light);
+        font-family: var(--font-card);
+        font-weight: 700;
+        color: var(--gold-accent);
+        font-size: 0.95rem;
+        flex-shrink: 0;
+      }
+      .wt-head__titles {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+        min-width: 0;
+      }
+      .wt-head__eyebrow {
+        font-size: 0.62rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .wt-head__title {
+        font-family: var(--font-card);
+        font-size: 1.05rem;
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+      .wt-head__spacer {
+        flex: 1;
+      }
+      .wt-close {
+        appearance: none;
+        border: 1px solid var(--table-rim-light);
+        background: transparent;
+        color: var(--text-muted);
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition:
+          color 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .wt-close:hover {
+        color: var(--gold-accent);
+        border-color: var(--gold-accent);
+      }
+
+      /* Screenshot stage — this is where the committed UI capture goes */
+      .wt-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        min-height: 0;
+      }
+      .wt-shot {
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid var(--table-rim-light);
+        background:
+          radial-gradient(
+            600px 300px at 50% 0%,
+            rgba(37, 107, 66, 0.5),
+            transparent 70%
+          ),
+          #123a24;
+        aspect-ratio: 16 / 10;
+        display: grid;
+        place-items: center;
+      }
+      /* The faux "screenshot" content — a simplified Big2 board rendered in CSS
+         purely so the mockup shows how a real capture reads in the frame. */
+      .shot-scene {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        font-size: 0.6rem;
+      }
+      .shot-opponents {
+        position: absolute;
+        top: 8px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-around;
+        color: var(--text-primary);
+      }
+      .shot-opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        opacity: 0.85;
+      }
+      .shot-backs {
+        display: flex;
+      }
+      .mini-back {
+        width: 12px;
+        height: 17px;
+        border-radius: 2px;
+        margin-left: -6px;
+        background: repeating-linear-gradient(
+          45deg,
+          #6b2020 0 2px,
+          #4a1616 2px 4px
+        );
+        border: 0.5px solid #2a0e0e;
+      }
+      .shot-center {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        gap: 4px;
+      }
+      .shot-hand {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+      }
+      .shot-hand .mini-face {
+        margin-left: -10px;
+      }
+      .mini-face {
+        width: 22px;
+        height: 31px;
+        border-radius: 3px;
+        background: var(--card-face);
+        border: 0.5px solid rgba(0, 0, 0, 0.4);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 2px 0 0 2px;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.62rem;
+        position: relative;
+      }
+      .mini-face.red {
+        color: var(--red-suit);
+      }
+      .mini-face.black {
+        color: var(--black-suit);
+      }
+      .mini-face.sel {
+        transform: translateY(-8px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+        outline: 1.5px solid var(--gold-accent);
+      }
+      /* callout ring/arrow that a real screenshot would have baked-in or overlaid */
+      .shot-ring {
+        position: absolute;
+        border: 2px solid var(--gold-accent);
+        border-radius: 8px;
+        box-shadow: 0 0 0 4px var(--gold-glow);
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          box-shadow: 0 0 0 3px var(--gold-glow);
+        }
+        50% {
+          box-shadow: 0 0 0 7px rgba(201, 168, 76, 0.12);
+        }
+      }
+      .wt-caption {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .wt-caption__step {
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+      }
+      .wt-caption__title {
+        font-family: var(--font-card);
+        font-size: 1.02rem;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .wt-caption__body {
+        font-size: 0.86rem;
+        line-height: 1.55;
+        color: var(--text-muted);
+        margin: 0;
+      }
+      .wt-caption__body b {
+        color: var(--text-primary);
+      }
+
+      /* Footer nav: prev / dots / next */
+      .wt-foot {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+        border-top: 1px solid var(--table-rim-light);
+        background: rgba(13, 13, 13, 0.4);
+      }
+      .wt-nav {
+        appearance: none;
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 10px 16px;
+        cursor: pointer;
+        min-height: 42px;
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease,
+          transform 0.08s ease;
+      }
+      .wt-nav:active {
+        transform: translateY(1px);
+      }
+      .wt-nav--prev {
+        background: transparent;
+        border: 1px solid var(--table-rim-light);
+        color: var(--text-primary);
+      }
+      .wt-nav--prev:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+      .wt-nav--prev:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .wt-nav--next {
+        background: var(--gold-accent);
+        border: 1px solid var(--gold-accent);
+        color: #1a0f06;
+        flex: 1;
+      }
+      .wt-nav--next:hover {
+        background: var(--btn-primary-hover);
+      }
+      .wt-dots {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .wt-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--table-rim-light);
+        transition:
+          background 0.2s ease,
+          transform 0.2s ease;
+      }
+      .wt-dot.active {
+        background: var(--gold-accent);
+        transform: scale(1.35);
+      }
+      .wt-count {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+        min-width: 34px;
+        text-align: center;
+      }
+
+      /* ===== Modal host ===== */
+      .overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        background: rgba(0, 0, 0, 0.62);
+        backdrop-filter: blur(2px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .modal-card {
+        width: 100%;
+        max-width: 440px;
+        max-height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-card, #1a1008);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+      }
+
+      /* Route host: shell fills the screen below the appbar */
+      .route-host {
+        position: absolute;
+        inset: 46px 0 0 0;
+      }
+
+      /* ===== Faux Create-Game form behind the modal (entrypoint demo) ===== */
+      .flow-page {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 40px 18px;
+        overflow-y: auto;
+      }
+      .form-card {
+        width: 100%;
+        max-width: 360px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 26px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .form-card__title {
+        font-family: var(--font-card);
+        color: var(--gold-accent);
+        margin: 0;
+        font-size: 1.25rem;
+      }
+      .form-card__field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .form-card__label {
+        font-size: 0.8rem;
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      /* the entrypoint row: label + info affordance sit together */
+      .label-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .info-btn {
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: transparent;
+        border: 1px solid var(--table-rim-light);
+        color: var(--gold-accent);
+        border-radius: 20px;
+        padding: 3px 10px 3px 8px;
+        font-family: var(--font-ui);
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease,
+          color 0.15s ease;
+      }
+      .info-btn:hover {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .info-btn__glyph {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        border: 1.5px solid currentColor;
+        display: inline-grid;
+        place-items: center;
+        font-size: 0.62rem;
+        font-weight: 800;
+        font-style: italic;
+        font-family: var(--font-card);
+      }
+      .form-card__input {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: var(--input-radius);
+        color: var(--text-primary);
+        padding: 10px 12px;
+      }
+      .range-mock {
+        height: 4px;
+        border-radius: 4px;
+        background: var(--table-rim-light);
+        position: relative;
+      }
+      .range-mock::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 60%;
+        height: 4px;
+        border-radius: 4px;
+        background: var(--gold-accent);
+      }
+      .range-mock::before {
+        content: "";
+        position: absolute;
+        left: 60%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+      }
+      .btn-primary {
+        margin-top: 4px;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border: none;
+        border-radius: 6px;
+        padding: 12px;
+        font-family: var(--font-ui);
+        font-weight: 700;
+        font-size: 0.92rem;
+        cursor: pointer;
+      }
+
+      /* variant B — inline text-link affordance (alternative for the entrypoint) */
+      .info-link {
+        appearance: none;
+        background: transparent;
+        border: none;
+        color: var(--gold-accent);
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        padding: 0;
+        align-self: flex-start;
+      }
+
+      .callout {
+        max-width: 1100px;
+        margin: 18px auto 0;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-left: 3px solid var(--gold-accent);
+        border-radius: 10px;
+        padding: 16px 18px;
+        position: relative;
+        z-index: 1;
+      }
+      .callout h3 {
+        margin: 0 0 8px;
+        color: var(--gold-accent);
+        font-size: 0.9rem;
+        font-family: var(--font-ui);
+        letter-spacing: 0.04em;
+      }
+      .callout ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+      .callout li b {
+        color: var(--text-primary);
+      }
+      .callout table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+        margin-top: 6px;
+      }
+      .callout th,
+      .callout td {
+        text-align: left;
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--table-rim-light);
+        color: var(--text-muted);
+        vertical-align: top;
+      }
+      .callout th {
+        color: var(--gold-accent);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+      .callout td b {
+        color: var(--text-primary);
+      }
+
+      .controls {
+        max-width: 1100px;
+        margin: 12px auto 0;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 1;
+      }
+      .ctl {
+        appearance: none;
+        background: transparent;
+        border: 1px solid var(--table-rim-light);
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        border-radius: 6px;
+        padding: 7px 12px;
+        cursor: pointer;
+      }
+      .ctl:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+      .hint {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        align-self: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc-head">
+      <h1>How to Play — Walkthrough</h1>
+      <p>
+        One reusable, <b>gameType-keyed</b> content shell (steps of screenshot +
+        caption) rendered inside two candidate hosts. The Big2 content below is
+        the real proposed step sequence. Pick the host (A vs B) and the
+        entrypoint affordance, then the LLD is written to match. Resize to a
+        phone width to check mobile.
+      </p>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- ENTRYPOINT: the Create-Game info affordance                    -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      <span class="num">1</span> Entrypoint — Create-Game game-type selector
+    </div>
+    <p class="section-note">
+      Where a player first meets a game. Clicking the affordance opens the
+      walkthrough for the <b>currently selected</b> game type. Two affordance
+      styles shown: a <b>pill button</b> next to the label (recommended — it is
+      a clear, tappable target on mobile) and a subtler <b>inline text link</b>.
+    </p>
+
+    <div class="stage stage--two">
+      <div class="device">
+        <div class="device__label">
+          Affordance A — pill button beside the label
+          <span class="tag tag--rec">recommended</span>
+        </div>
+        <div class="device__screen">
+          <div class="flow-page">
+            <div class="form-card">
+              <div class="form-card__title">Create a Game</div>
+              <div class="form-card__field">
+                <div class="label-row">
+                  <span class="form-card__label">Game Type</span>
+                  <button
+                    class="info-btn"
+                    onclick="openHost('modal')"
+                    aria-label="How to play Big 2"
+                  >
+                    <span class="info-btn__glyph">i</span> How to play
+                  </button>
+                </div>
+                <select class="form-card__input">
+                  <option>Big 2</option>
+                  <option>Tonk</option>
+                </select>
+              </div>
+              <div class="form-card__field">
+                <span class="form-card__label">Players</span>
+                <div class="range-mock"></div>
+              </div>
+              <div class="form-card__field">
+                <span class="form-card__label">Turn Timer</span>
+                <select class="form-card__input">
+                  <option>60 seconds</option>
+                </select>
+              </div>
+              <button class="btn-primary">Create Game</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="device">
+        <div class="device__label">
+          Affordance B — inline text link under the selector
+        </div>
+        <div class="device__screen">
+          <div class="flow-page">
+            <div class="form-card">
+              <div class="form-card__title">Create a Game</div>
+              <div class="form-card__field">
+                <span class="form-card__label">Game Type</span>
+                <select class="form-card__input">
+                  <option>Big 2</option>
+                  <option>Tonk</option>
+                </select>
+                <button class="info-link" onclick="openHost('modal')">
+                  New to Big 2? How to play &rsaquo;
+                </button>
+              </div>
+              <div class="form-card__field">
+                <span class="form-card__label">Players</span>
+                <div class="range-mock"></div>
+              </div>
+              <div class="form-card__field">
+                <span class="form-card__label">Turn Timer</span>
+                <select class="form-card__input">
+                  <option>60 seconds</option>
+                </select>
+              </div>
+              <button class="btn-primary">Create Game</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- DIRECTION A: MODAL OVERLAY                                     -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      <span class="num">2</span> Direction A — Modal overlay
+      <span class="tag tag--rec">recommended</span>
+    </div>
+    <p class="section-note">
+      The walkthrough opens <b>in place</b> over the Create-Game form
+      (precedent: <b>FeedbackWidget</b>). No navigation, no URL change — close
+      returns you to exactly where you were, mid-form, without losing
+      selections. Best for a "quick reference while deciding" moment. The
+      <b>same shell markup</b> is used in Direction B; only the host differs.
+    </p>
+
+    <div class="stage">
+      <div class="device">
+        <div class="device__label">Modal — Big2 walkthrough, step 2 of 6</div>
+        <div class="device__screen">
+          <!-- form dimmed behind -->
+          <div class="flow-page" style="filter: brightness(0.5)">
+            <div class="form-card">
+              <div class="form-card__title">Create a Game</div>
+              <div class="form-card__field">
+                <span class="form-card__label">Game Type</span>
+                <select class="form-card__input">
+                  <option>Big 2</option>
+                </select>
+              </div>
+              <div class="form-card__field">
+                <span class="form-card__label">Players</span>
+                <div class="range-mock"></div>
+              </div>
+            </div>
+          </div>
+          <div class="overlay">
+            <div class="modal-card">
+              <div class="wt-shell wt-shell--in-modal">
+                <div class="wt-head">
+                  <div class="wt-head__crest">2</div>
+                  <div class="wt-head__titles">
+                    <span class="wt-head__eyebrow">How to play</span>
+                    <span class="wt-head__title">Big 2</span>
+                  </div>
+                  <div class="wt-head__spacer"></div>
+                  <button class="wt-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="wt-body">
+                  <div class="wt-shot">
+                    <div class="shot-scene">
+                      <div class="shot-center">
+                        <span class="mini-face red">7</span>
+                        <span class="mini-face black">7</span>
+                      </div>
+                      <div class="shot-hand">
+                        <span class="mini-face black">3</span>
+                        <span class="mini-face red">4</span>
+                        <span class="mini-face red">5</span>
+                        <span class="mini-face sel red">5</span>
+                        <span class="mini-face black">9</span>
+                        <span class="mini-face black">J</span>
+                        <span class="mini-face red">2</span>
+                      </div>
+                      <div
+                        class="shot-ring"
+                        style="left: 30%; right: 28%; top: 40%; bottom: 34%"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="wt-caption">
+                    <span class="wt-caption__step">Step 2 · Combinations</span>
+                    <h3 class="wt-caption__title">
+                      Play singles, pairs & five-card hands
+                    </h3>
+                    <p class="wt-caption__body">
+                      Beat the last play with the <b>same shape</b> but higher
+                      rank — a pair beats a pair, a straight beats a straight.
+                      Five-card hands rank straight &lt; flush &lt; full house
+                      &lt; four-of-a-kind &lt; straight flush.
+                    </p>
+                  </div>
+                </div>
+                <div class="wt-foot">
+                  <button class="wt-nav wt-nav--prev">Back</button>
+                  <div class="wt-dots">
+                    <span class="wt-dot"></span>
+                    <span class="wt-dot active"></span>
+                    <span class="wt-dot"></span>
+                    <span class="wt-dot"></span>
+                    <span class="wt-dot"></span>
+                    <span class="wt-dot"></span>
+                  </div>
+                  <button class="wt-nav wt-nav--next">Next</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- DIRECTION B: DEDICATED ROUTE                                  -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      <span class="num">3</span> Direction B — Dedicated route
+      (/how-to-play/big2)
+    </div>
+    <p class="section-note">
+      The walkthrough is a full page at its own URL (precedent:
+      <b>AboutView</b> at <code>/about</code>). Shareable & bookmarkable ("send
+      your friend the rules"), gets a browser Back button for free, and has room
+      to breathe. Cost: it navigates <b>away</b> from the Create-Game form, so
+      returning requires a back-nav and the form state must survive it. Same
+      shell, hosted full-bleed.
+    </p>
+
+    <div class="stage">
+      <div class="device">
+        <div class="device__label">Route — Big2 walkthrough, step 1 of 6</div>
+        <div class="device__screen">
+          <div class="appbar">
+            <span class="appbar__brand">Card Game Simulator</span>
+            <div class="appbar__spacer"></div>
+            <span class="appbar__url">/how-to-play/big2</span>
+            <button class="appbar__back">&lsaquo; Back</button>
+          </div>
+          <div class="route-host">
+            <div class="wt-shell">
+              <div class="wt-head">
+                <div class="wt-head__crest">1</div>
+                <div class="wt-head__titles">
+                  <span class="wt-head__eyebrow">How to play</span>
+                  <span class="wt-head__title">Big 2</span>
+                </div>
+                <div class="wt-head__spacer"></div>
+                <button class="wt-close" aria-label="Close">&times;</button>
+              </div>
+              <div class="wt-body">
+                <div class="wt-shot">
+                  <div class="shot-scene">
+                    <div class="shot-hand">
+                      <span class="mini-face sel black">3</span>
+                      <span class="mini-face red">4</span>
+                      <span class="mini-face red">5</span>
+                      <span class="mini-face black">8</span>
+                      <span class="mini-face black">9</span>
+                      <span class="mini-face red">J</span>
+                      <span class="mini-face black">Q</span>
+                      <span class="mini-face red">2</span>
+                    </div>
+                    <div
+                      class="shot-ring"
+                      style="left: 22%; width: 26px; height: 40px; bottom: 6px"
+                    ></div>
+                  </div>
+                </div>
+                <div class="wt-caption">
+                  <span class="wt-caption__step">Step 1 · The goal</span>
+                  <h3 class="wt-caption__title">Empty your hand first</h3>
+                  <p class="wt-caption__body">
+                    Everyone is dealt cards; be the first to play them all.
+                    Ranks run <b>3 (low)</b> up to <b>2 (high)</b>. Whoever
+                    holds the <b>3&clubs;</b> leads the very first trick and
+                    must include it.
+                  </p>
+                </div>
+              </div>
+              <div class="wt-foot">
+                <button class="wt-nav wt-nav--prev" disabled>Back</button>
+                <div class="wt-dots">
+                  <span class="wt-dot active"></span>
+                  <span class="wt-dot"></span>
+                  <span class="wt-dot"></span>
+                  <span class="wt-dot"></span>
+                  <span class="wt-dot"></span>
+                  <span class="wt-dot"></span>
+                </div>
+                <button class="wt-nav wt-nav--next">Next</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- INTERACTIVE: live modal you can step through                  -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      <span class="num">4</span> Interactive — full Big2 step sequence
+    </div>
+    <p class="section-note">
+      Click <b>How to play</b> to open the (recommended) modal host and step
+      through the <b>real proposed Big2 content</b> with working next / prev /
+      dots / close. This is the end-to-end flow the LLD will spec.
+    </p>
+    <div class="controls">
+      <button class="ctl" onclick="openHost('modal')">
+        ▶ Open walkthrough (modal)
+      </button>
+      <span class="hint" id="liveStepHint">closed</span>
+    </div>
+
+    <!-- live host container -->
+    <div id="liveOverlay" class="overlay" style="display: none">
+      <div class="modal-card">
+        <div class="wt-shell wt-shell--in-modal">
+          <div class="wt-head">
+            <div class="wt-head__crest" id="liveCrest">1</div>
+            <div class="wt-head__titles">
+              <span class="wt-head__eyebrow">How to play</span>
+              <span class="wt-head__title">Big 2</span>
+            </div>
+            <div class="wt-head__spacer"></div>
+            <button class="wt-close" aria-label="Close" onclick="closeHost()">
+              &times;
+            </button>
+          </div>
+          <div class="wt-body">
+            <div class="wt-shot">
+              <div class="shot-scene" id="liveScene"></div>
+            </div>
+            <div class="wt-caption">
+              <span class="wt-caption__step" id="liveStep"></span>
+              <h3 class="wt-caption__title" id="liveTitle"></h3>
+              <p class="wt-caption__body" id="liveBody"></p>
+            </div>
+          </div>
+          <div class="wt-foot">
+            <button
+              class="wt-nav wt-nav--prev"
+              id="livePrev"
+              onclick="step(-1)"
+            >
+              Back
+            </button>
+            <div class="wt-dots" id="liveDots"></div>
+            <button class="wt-nav wt-nav--next" id="liveNext" onclick="step(1)">
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- SCREENSHOT SOURCING / ANTI-ROT approach                       -->
+    <!-- ============================================================= -->
+    <div class="section-label">
+      <span class="num">5</span> Screenshot sourcing &amp; anti-rot approach
+    </div>
+    <div class="callout">
+      <h3>The problem</h3>
+      <ul>
+        <li>
+          <code>src/frontend</code> has <b>no</b> <code>public/</code>,
+          <code>assets/</code>, or committed images today — this is greenfield.
+        </li>
+        <li>
+          Hand-captured PNGs <b>rot silently</b>: the board UI changes, the
+          screenshots don't, and nobody notices until a player is confused.
+        </li>
+      </ul>
+    </div>
+    <div class="callout">
+      <h3>
+        Recommended: render "illustrations" from live components, not captured
+        PNGs
+      </h3>
+      <ul>
+        <li>
+          Each Big2 step points at a small, <b>deterministic scene</b> built
+          from the <b>real card components</b> (e.g. <code>GameCard.vue</code>)
+          with hard-coded props — exactly the CSS-drawn mini-cards you see in
+          the frames above, but using production components instead of mockup
+          markup.
+        </li>
+        <li>
+          <b>Anti-rot by construction:</b> if <code>GameCard</code> or the felt
+          tokens change, the walkthrough visuals change with them — they can't
+          drift out of sync because they <b>are</b> the same components.
+        </li>
+        <li>
+          Zero binary assets, zero image pipeline, zero capture step. Adding a
+          game later is a <b>data entry</b> (its scenes reference that game's
+          card components) — no rendering-code change, satisfying the acceptance
+          criteria.
+        </li>
+      </ul>
+      <table>
+        <tr>
+          <th>Option</th>
+          <th>Sync / anti-rot</th>
+          <th>Cost</th>
+        </tr>
+        <tr>
+          <td>
+            <b>Component-rendered scenes</b>
+            <span class="tag tag--rec">pick</span>
+          </td>
+          <td><b>Cannot rot</b> — reuses live GameCard + tokens</td>
+          <td>Author a tiny scene descriptor per step</td>
+        </tr>
+        <tr>
+          <td>Committed PNG screenshots</td>
+          <td>Rots silently; needs a manual re-capture discipline</td>
+          <td>Image dir + capture step + review burden</td>
+        </tr>
+        <tr>
+          <td>Playwright auto-captured PNGs in CI</td>
+          <td>Stays fresh, but heavy</td>
+          <td>New CI job, storage, flakiness — over-built for this slice</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="callout">
+      <h3>Content model shape (gameType-keyed, declarative)</h3>
+      <ul>
+        <li>
+          Mirrors <code>GameView.vue</code>'s
+          <code>gameState.gameType === 'tonk' ? TonkBoard : GameBoard</code>
+          dispatch: <code>WALKTHROUGHS[gameType]</code> &rarr; ordered
+          <code>steps[]</code>, each <code>{ scene, title, caption }</code>.
+        </li>
+        <li>
+          The <b>shell</b> takes a <code>gameType</code>, looks up the entry,
+          and renders steps. Adding Tonk later (next sub-issue) is one new key —
+          no shell change.
+        </li>
+      </ul>
+    </div>
+
+    <script>
+      // Real proposed Big2 content — 6 steps. Scene builders draw simple
+      // CSS card scenes to stand in for the component-rendered illustrations.
+      function face(rank, red, sel) {
+        return (
+          '<span class="mini-face ' +
+          (red ? "red" : "black") +
+          (sel ? " sel" : "") +
+          '">' +
+          rank +
+          "</span>"
+        );
+      }
+      function handScene(cards, ring) {
+        var h = cards
+          .map(function (c) {
+            return face(c.r, c.red, c.sel);
+          })
+          .join("");
+        return (
+          '<div class="shot-hand">' +
+          h +
+          "</div>" +
+          (ring ? '<div class="shot-ring" style="' + ring + '"></div>' : "")
+        );
+      }
+      function centerScene(cards, ring, extraHand) {
+        var c = cards
+          .map(function (x) {
+            return face(x.r, x.red, x.sel);
+          })
+          .join("");
+        return (
+          '<div class="shot-center">' +
+          c +
+          "</div>" +
+          (extraHand || "") +
+          (ring ? '<div class="shot-ring" style="' + ring + '"></div>' : "")
+        );
+      }
+      function tableScene() {
+        var opp =
+          '<div class="shot-opponents">' +
+          [3, 5, 8]
+            .map(function (n) {
+              var backs = "";
+              for (var i = 0; i < Math.min(n, 6); i++)
+                backs += '<span class="mini-back"></span>';
+              return (
+                '<div class="shot-opp"><div class="shot-backs">' +
+                backs +
+                "</div><span>" +
+                n +
+                "</span></div>"
+              );
+            })
+            .join("") +
+          "</div>";
+        var hand = handScene([
+          { r: "4", red: true },
+          { r: "6" },
+          { r: "8", red: true },
+          { r: "9" },
+          { r: "10" },
+          { r: "K", red: true },
+        ]);
+        return opp + hand;
+      }
+
+      var BIG2_STEPS = [
+        {
+          step: "Step 1 · The goal",
+          title: "Empty your hand first",
+          body: "Everyone is dealt cards; be the first to play them all. Ranks run <b>3 (low)</b> up to <b>2 (high)</b>. Whoever holds the <b>3&clubs;</b> leads the first trick and must include it.",
+          scene: function () {
+            return handScene(
+              [
+                { r: "3", sel: true },
+                { r: "4", red: true },
+                { r: "5", red: true },
+                { r: "8" },
+                { r: "9" },
+                { r: "J", red: true },
+                { r: "Q" },
+                { r: "2", red: true },
+              ],
+              "left:22%;width:26px;height:40px;bottom:4px",
+            );
+          },
+        },
+        {
+          step: "Step 2 · Combinations",
+          title: "Singles, pairs & five-card hands",
+          body: "Beat the last play with the <b>same shape</b> but higher rank — a pair beats a pair, a straight beats a straight. Five-card hands rank straight &lt; flush &lt; full house &lt; four-of-a-kind &lt; straight flush.",
+          scene: function () {
+            return centerScene(
+              [{ r: "7", red: true }, { r: "7" }],
+              "left:30%;right:28%;top:38%;bottom:36%",
+              handScene([
+                { r: "3" },
+                { r: "5", red: true },
+                { r: "5", red: true, sel: true },
+                { r: "9" },
+                { r: "J", red: true },
+              ]),
+            );
+          },
+        },
+        {
+          step: "Step 3 · Lead low",
+          title: "A new trick can be any valid combo",
+          body: "When everyone else passes, you <b>win the trick</b> and lead the next one with any legal single or combination. There is no suit to follow — only shape and rank.",
+          scene: function () {
+            return centerScene(
+              [{ r: "9" }, { r: "9", red: true }],
+              "left:34%;right:34%;top:36%;bottom:38%",
+            );
+          },
+        },
+        {
+          step: "Step 4 · Your turn",
+          title: "Select cards, then Play or Pass",
+          body: "Tap cards to <b>lift</b> them into your selection, then <b>Play</b>. Can't or don't want to beat it? <b>Pass</b> — you can rejoin the next trick. Passing does not remove you from the round.",
+          scene: function () {
+            return handScene(
+              [
+                { r: "4", red: true },
+                { r: "6" },
+                { r: "8", red: true, sel: true },
+                { r: "8", sel: true },
+                { r: "10" },
+                { r: "K", red: true },
+              ],
+              "left:34%;width:52px;height:40px;bottom:4px",
+            );
+          },
+        },
+        {
+          step: "Step 5 · Reading the table",
+          title: "Everything you need is on screen",
+          body: "Opponents show their <b>card counts</b>, the center shows the <b>last play</b>, and the active seat is highlighted. Watch counts drop — someone near zero is about to win.",
+          scene: tableScene,
+        },
+        {
+          step: "Step 6 · Winning",
+          title: "First to empty their hand wins",
+          body: "The round ends the moment a player is out. Scoring is <b>placement-based</b>: 1st = 5, 2nd = 3, 3rd = 1, 4th = 0. Fewer cards left is better — so dump high cards early.",
+          scene: function () {
+            return centerScene(
+              [{ r: "2" }, { r: "2", red: true }],
+              "left:30%;right:30%;top:34%;bottom:40%",
+            );
+          },
+        },
+      ];
+
+      var idx = 0;
+
+      function renderDots() {
+        var dots = "";
+        for (var i = 0; i < BIG2_STEPS.length; i++) {
+          dots +=
+            '<span class="wt-dot' + (i === idx ? " active" : "") + '"></span>';
+        }
+        document.getElementById("liveDots").innerHTML = dots;
+      }
+
+      function render() {
+        var s = BIG2_STEPS[idx];
+        document.getElementById("liveScene").innerHTML = s.scene();
+        document.getElementById("liveStep").innerHTML = s.step;
+        document.getElementById("liveTitle").innerHTML = s.title;
+        document.getElementById("liveBody").innerHTML = s.body;
+        document.getElementById("liveCrest").textContent = String(idx + 1);
+        document.getElementById("livePrev").disabled = idx === 0;
+        document.getElementById("liveNext").textContent =
+          idx === BIG2_STEPS.length - 1 ? "Done" : "Next";
+        document.getElementById("liveStepHint").textContent =
+          "step " + (idx + 1) + " of " + BIG2_STEPS.length;
+        renderDots();
+      }
+
+      function step(delta) {
+        if (idx === BIG2_STEPS.length - 1 && delta === 1) {
+          closeHost();
+          return;
+        }
+        idx = Math.max(0, Math.min(BIG2_STEPS.length - 1, idx + delta));
+        render();
+      }
+
+      function openHost() {
+        idx = 0;
+        render();
+        document.getElementById("liveOverlay").style.display = "flex";
+      }
+      function closeHost() {
+        document.getElementById("liveOverlay").style.display = "none";
+        document.getElementById("liveStepHint").textContent = "closed";
+      }
+
+      // click-outside + Esc to close (matches FeedbackWidget @click.self behavior)
+      document
+        .getElementById("liveOverlay")
+        .addEventListener("click", function (e) {
+          if (e.target === this) closeHost();
+        });
+      document.addEventListener("keydown", function (e) {
+        if (document.getElementById("liveOverlay").style.display === "none")
+          return;
+        if (e.key === "Escape") closeHost();
+        if (e.key === "ArrowRight") step(1);
+        if (e.key === "ArrowLeft") step(-1);
+      });
+
+      render();
+    </script>
+  </body>
+</html>
