@@ -5,7 +5,11 @@ export const meta = {
   whenToUse:
     "When you want to autonomously triage the backlog and ship a batch of issues end-to-end.",
   phases: [
-    { title: "Triage", detail: "Assess all untriaged open issues in parallel" },
+    {
+      title: "Triage",
+      detail: "Assess all untriaged open issues in parallel",
+      model: "claude-sonnet-4-6",
+    },
     {
       title: "Label",
       detail: "Apply triage labels and post comments on close/needs-info",
@@ -564,6 +568,7 @@ The Restart comment IS the new information. This issue is real and actionable â€
 Be honest and critical. Not every issue is worth fixing. Consider whether the issue is still relevant given current project state.`,
           {
             label: `triage-${issue.number}`,
+            model: "claude-sonnet-4-6",
             schema: TRIAGE_SCHEMA,
           },
         ),
