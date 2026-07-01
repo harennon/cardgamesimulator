@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How-to-play walkthrough — Tonk content entry (#123)</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---- Tokens transcribed from src/frontend/styles/game-variables.css ----
+         The mockup reuses the SAME variables the production shell uses, so the
+         rendered modal is pixel-faithful to WalkthroughModal.vue. */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: #17110b;
+        --card-panel-bg: var(--panel-bg);
+        --card-shadow: rgba(0, 0, 0, 0.4);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --card-selected-lift: -14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        background: radial-gradient(
+            ellipse 90% 70% at 50% 30%,
+            var(--felt-light) 0%,
+            var(--felt) 45%,
+            #0f2e1c 100%
+          )
+          fixed;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 26px;
+        padding: 40px 18px 90px;
+      }
+
+      /* ---- Doc chrome (NOT part of the shipped UI) ---- */
+      .doc-head {
+        max-width: 880px;
+        text-align: center;
+      }
+      .doc-head h1 {
+        font-family: var(--font-card);
+        font-size: 1.5rem;
+        color: var(--gold-accent);
+        margin: 0 0 6px;
+        letter-spacing: 0.01em;
+      }
+      .doc-head p {
+        font-size: 0.9rem;
+        line-height: 1.55;
+        color: var(--text-primary);
+        opacity: 0.88;
+        margin: 4px auto;
+        max-width: 760px;
+      }
+      .doc-head code {
+        font-family: ui-monospace, monospace;
+        background: rgba(201, 168, 76, 0.12);
+        color: var(--gold-accent);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 0.82em;
+      }
+      .constraint {
+        display: inline-block;
+        margin-top: 14px;
+        padding: 10px 16px;
+        border: 1px solid var(--gold-accent);
+        border-radius: 8px;
+        font-size: 0.8rem;
+        letter-spacing: 0.01em;
+        line-height: 1.5;
+        background: rgba(201, 168, 76, 0.08);
+        max-width: 700px;
+      }
+      .constraint b {
+        color: var(--gold-accent);
+      }
+
+      .section-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        color: var(--gold-accent);
+        font-weight: 700;
+        margin: 22px 0 -6px;
+        text-align: center;
+      }
+      .section-sub {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-align: center;
+        margin: 2px 0 6px;
+        max-width: 640px;
+      }
+
+      /* ---- Option cards: two distinct authoring directions ---- */
+      .options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 22px;
+        justify-content: center;
+        width: 100%;
+        max-width: 980px;
+      }
+      .opt {
+        flex: 1 1 420px;
+        max-width: 460px;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 14px;
+        background: rgba(23, 17, 11, 0.72);
+        padding: 20px 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .opt--recommended {
+        border-color: var(--gold-accent);
+        box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.25);
+      }
+      .opt__tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--text-muted);
+        font-weight: 700;
+      }
+      .opt__pill {
+        font-size: 0.6rem;
+        letter-spacing: 0.08em;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--gold-accent);
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.1);
+      }
+      .opt h2 {
+        font-family: var(--font-card);
+        font-size: 1.12rem;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .opt h2 em {
+        color: var(--gold-accent);
+        font-style: normal;
+      }
+      .opt__cost {
+        font-size: 0.82rem;
+        line-height: 1.55;
+        color: var(--text-primary);
+        opacity: 0.9;
+        margin: 0;
+      }
+      .opt__cost code {
+        font-family: ui-monospace, monospace;
+        background: rgba(201, 168, 76, 0.12);
+        color: var(--gold-accent);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 0.85em;
+      }
+      .opt__ledger {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 0.78rem;
+      }
+      .opt__ledger div {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .opt__ledger .ok {
+        color: #6fbf7f;
+        font-weight: 700;
+      }
+      .opt__ledger .edit {
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .opt__ledger .file {
+        font-family: ui-monospace, monospace;
+        font-size: 0.8em;
+        color: var(--text-primary);
+        opacity: 0.85;
+      }
+
+      /* A live shell instance embedded inside each option card. */
+      .opt__preview {
+        margin-top: 4px;
+        border-radius: 12px;
+        padding: 16px 10px;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 40%,
+          rgba(37, 107, 66, 0.32) 0%,
+          rgba(0, 0, 0, 0.55) 72%
+        );
+        display: flex;
+        justify-content: center;
+      }
+
+      /* ---- Device frames for the responsive proof ---- */
+      .stage {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 46px;
+        align-items: flex-start;
+        justify-content: center;
+      }
+      .device {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .device__cap {
+        font-size: 0.66rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .phone {
+        width: 360px;
+        border: 8px solid #0b0805;
+        border-radius: 34px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+        overflow: hidden;
+      }
+      .phone .wt-scrim {
+        position: relative;
+        inset: auto;
+        min-height: 640px;
+        padding: 22px 12px;
+      }
+
+      /* =================================================================
+         BELOW: verbatim styles from WalkthroughModal.vue + WalkthroughScene.vue
+         + GameCard.vue. NOTHING here is new markup — this is exactly what the
+         shipped shell already renders. That is the whole point of the issue.
+         ================================================================= */
+
+      .wt-scrim {
+        position: relative;
+        z-index: 1;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 40%,
+          rgba(37, 107, 66, 0.3) 0%,
+          rgba(0, 0, 0, 0.55) 72%
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px;
+        border-radius: 14px;
+      }
+
+      .wt-modal {
+        width: 100%;
+        max-width: 340px;
+        background: var(--card-panel-bg);
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 14px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .wt-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--table-rim-light);
+        flex-shrink: 0;
+      }
+      .wt-head__title {
+        font-family: var(--font-card);
+        font-weight: 700;
+        color: var(--gold-accent);
+        font-size: 1rem;
+      }
+      .wt-head__title small {
+        display: block;
+        font-family: var(--font-ui);
+        font-weight: 500;
+        color: var(--text-muted);
+        font-size: 0.66rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin-top: 2px;
+      }
+      .wt-close {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid var(--table-rim-light);
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1.1rem;
+        line-height: 1;
+      }
+      .wt-close:hover {
+        color: var(--gold-accent);
+        border-color: var(--gold-accent);
+      }
+
+      .wt-body {
+        padding: 8px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        overflow-y: auto;
+      }
+      .wt-illus {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 18px;
+        min-height: 128px;
+      }
+      .wt-illus__tag {
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .wt-caption {
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin: 0;
+      }
+      .wt-caption strong {
+        color: var(--gold-accent);
+      }
+
+      .wt-foot {
+        padding: 12px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        border-top: 1px solid var(--table-rim-light);
+        flex-shrink: 0;
+      }
+      .wt-dots {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        justify-content: center;
+      }
+      .wt-dots i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--table-rim-light);
+        display: block;
+        transition: all 0.2s ease;
+      }
+      .wt-dots i.on {
+        background: var(--gold-accent);
+        width: 20px;
+        border-radius: 4px;
+      }
+      .wt-step-count {
+        text-align: center;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        letter-spacing: 0.06em;
+      }
+      .wt-step-count b {
+        color: var(--gold-accent);
+      }
+      .wt-nav {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .wt-navbtn {
+        font-family: var(--font-ui);
+        font-size: 0.88rem;
+        font-weight: 600;
+        padding: 10px 18px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: 1px solid var(--text-muted);
+        background: transparent;
+        color: var(--text-primary);
+        min-height: 44px;
+      }
+      .wt-navbtn--primary {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border-color: var(--gold-accent);
+        flex: 1;
+      }
+      .wt-navbtn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      /* --- WalkthroughScene.vue: the two existing scene kinds --- */
+      .wt-scene {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .wt-scene__cards {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+        flex-wrap: wrap;
+        padding-top: 16px;
+      }
+      .wt-scene__card {
+        display: inline-flex;
+        border-radius: 6px;
+      }
+      .wt-scene__card--highlight {
+        outline: 2px dashed var(--gold-accent);
+        outline-offset: 2px;
+      }
+      .wt-scene__callout {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 18px;
+        text-align: center;
+      }
+      .wt-scene__callout-icon {
+        font-size: 2rem;
+        line-height: 1;
+        filter: drop-shadow(0 0 12px var(--gold-glow));
+      }
+      .wt-scene__callout-line {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--text-primary);
+      }
+
+      /* --- GameCard.vue (size="small") verbatim, incl. shipped joker face --- */
+      .card {
+        position: relative;
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        transition:
+          transform 0.18s ease,
+          box-shadow 0.18s ease,
+          border-color 0.18s ease;
+        flex-shrink: 0;
+        width: 30px;
+        height: 42px;
+        font-size: 0.72rem;
+      }
+      .card__rank {
+        line-height: 1;
+      }
+      .card__suit {
+        line-height: 1;
+        font-size: 1.2em;
+      }
+      .card.red .card__rank,
+      .card.red .card__suit {
+        color: var(--red-suit);
+      }
+      .card.black .card__rank,
+      .card.black .card__suit {
+        color: var(--black-suit);
+      }
+      .card--selected {
+        transform: translateY(var(--card-selected-lift));
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+      /* Joker face — GameCard.vue .card--joker (already ships, LLD 88) */
+      .card--joker {
+        background: linear-gradient(135deg, #faf3e8 0%, #efe2cb 100%);
+      }
+      .card__joker-icon {
+        color: var(--gold-accent);
+        font-size: 1.2em;
+        line-height: 1;
+        text-shadow: 0 0 6px var(--gold-glow);
+      }
+
+      /* ---- Storyboard grid ---- */
+      .board {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+        max-width: 940px;
+        width: 100%;
+      }
+      .mini {
+        background: var(--card-panel-bg);
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .mini__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .mini__step {
+        font-size: 0.62rem;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+      }
+      .mini__step b {
+        color: var(--gold-accent);
+      }
+      .mini__body {
+        padding: 6px 12px 14px;
+      }
+      .mini .wt-illus {
+        padding: 10px;
+        min-height: 96px;
+      }
+      .mini .wt-caption {
+        font-size: 0.78rem;
+      }
+
+      .note {
+        max-width: 820px;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 16px 22px;
+        background: rgba(23, 17, 11, 0.7);
+        font-size: 0.84rem;
+        line-height: 1.62;
+      }
+      .note h3 {
+        margin: 0 0 8px;
+        font-family: var(--font-card);
+        color: var(--gold-accent);
+        font-size: 0.95rem;
+      }
+      .note code {
+        font-family: ui-monospace, monospace;
+        background: rgba(201, 168, 76, 0.12);
+        color: var(--gold-accent);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 0.82em;
+      }
+      .note ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      .note li {
+        margin: 5px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc-head">
+      <h1>How to Play — Tonk walkthrough (content-only, #123)</h1>
+      <p>
+        The Tonk walkthrough is a <b>declarative content entry</b> rendered
+        through the <em>exact same shell</em> the Big2 walkthrough uses (<code
+          >WalkthroughModal.vue</code
+        >
+        + <code>WalkthroughScene.vue</code> + <code>GameCard.vue</code>). Every
+        modal below is that <b>real production shell</b>, driven only by a new
+        <code>TONK_WALKTHROUGH</code> step array registered in
+        <code>walkthroughs.ts</code>.
+      </p>
+      <div class="constraint">
+        <b>The test of the design:</b> adding Tonk must require
+        <b>zero new rendering components</b>. Both options below satisfy that.
+        They differ only in whether the joker step draws a real card face —
+        which costs <b>one type edit in the content layer</b> (not a renderer).
+      </div>
+    </div>
+
+    <div class="section-label">Two authoring options</div>
+    <p class="section-sub">
+      Same shell, same 6 steps, same captions. The only difference is how the
+      <b>Jokers</b> step renders. Both are pure content changes.
+    </p>
+
+    <div class="options">
+      <!-- OPTION A -->
+      <div class="opt opt--recommended">
+        <div class="opt__tag">
+          Option A · Strict reuse
+          <span class="opt__pill">recommended</span>
+        </div>
+        <h2>Zero code edits — <em>content array only</em></h2>
+        <p class="opt__cost">
+          The Jokers concept lives in <b>caption text</b> and a
+          <code>callout</code> scene. No <code>cards</code> scene ever holds a
+          joker, so nothing in the shell, the scene mapper, or the types is
+          touched. The literal cleanest reading of "declarative, no new UI."
+        </p>
+        <div class="opt__ledger">
+          <div>
+            <span class="ok">✔ no change</span>
+            <span class="file"
+              >WalkthroughModal.vue / WalkthroughScene.vue</span
+            >
+          </div>
+          <div>
+            <span class="ok">✔ no change</span>
+            <span class="file">walkthroughTypes.ts (no type widening)</span>
+          </div>
+          <div>
+            <span class="edit">＋ add</span>
+            <span class="file">tonkWalkthrough.ts (new content array)</span>
+          </div>
+          <div>
+            <span class="edit">＋ 1 line</span>
+            <span class="file">walkthroughs.ts (register tonk)</span>
+          </div>
+        </div>
+        <div class="opt__preview">
+          <div class="wt-modal" id="optA"></div>
+        </div>
+      </div>
+
+      <!-- OPTION B -->
+      <div class="opt">
+        <div class="opt__tag">
+          Option B · Joker fixture card
+          <span class="opt__pill">richer visual</span>
+        </div>
+        <h2>One type widening — <em>real joker card</em></h2>
+        <p class="opt__cost">
+          The Jokers step shows an actual <code>GameCard</code> joker face (★,
+          already shipped for the Tonk board, LLD 88). To pass a joker through a
+          <code>cards</code> scene, widen the fixture type in
+          <code>walkthroughTypes.ts</code> from <code>readonly Card[]</code> to
+          <code>readonly (Card | TonkCard)[]</code>. Still
+          <b>no new renderer</b> — <code>GameCard</code> and
+          <code>WalkthroughScene</code> already accept and forward it.
+        </p>
+        <div class="opt__ledger">
+          <div>
+            <span class="ok">✔ no change</span>
+            <span class="file"
+              >WalkthroughModal.vue / WalkthroughScene.vue</span
+            >
+          </div>
+          <div>
+            <span class="edit">＋ 1 type</span>
+            <span class="file"
+              >walkthroughTypes.ts (Card → Card | TonkCard)</span
+            >
+          </div>
+          <div>
+            <span class="edit">＋ add</span>
+            <span class="file">tonkWalkthrough.ts (new content array)</span>
+          </div>
+          <div>
+            <span class="edit">＋ 1 line</span>
+            <span class="file">walkthroughs.ts (register tonk)</span>
+          </div>
+        </div>
+        <div class="opt__preview">
+          <div class="wt-modal" id="optB"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">
+      The live shell — interactive (click Next / Back)
+    </div>
+    <p class="section-sub">
+      Desktop and mobile render identically. This shows the
+      <b>Option A</b> content end-to-end on both viewports.
+    </p>
+    <div class="stage">
+      <div class="device">
+        <div class="device__cap">
+          Desktop / centered modal · max-width 340px
+        </div>
+        <div class="wt-scrim">
+          <div class="wt-modal" id="shell-desktop"></div>
+        </div>
+      </div>
+
+      <div class="device">
+        <div class="device__cap">Mobile viewport · 360px</div>
+        <div class="phone">
+          <div class="wt-scrim">
+            <div class="wt-modal" id="shell-mobile"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">All six Tonk steps (Option A storyboard)</div>
+    <div class="board" id="board"></div>
+
+    <div class="note">
+      <h3>Why this proves "declarative, no new UI"</h3>
+      <ul>
+        <li>
+          Every step is one of the two scene kinds the shell already renders:
+          the <code>cards</code> scene (a row of real <code>GameCard</code>s
+          from static fixtures, with <code>selectedIndices</code> /
+          <code>highlightIndices</code>) or the <code>callout</code> scene (icon
+          + text lines). No new <code>WalkthroughScene</code> branch.
+        </li>
+        <li>
+          Fixtures are <b>static literals</b>, mirroring
+          <code>big2Walkthrough.ts</code> — never live game state (LLD 111
+          decision 7). This is the live-component-thumbnail approach: real
+          components + hard-coded props, no committed PNGs.
+        </li>
+        <li>
+          The (?) FAB is unchanged. <code>HelpCluster.vue</code> already
+          resolves <code>getWalkthrough(currentGameType)</code>; registering
+          <code>WALKTHROUGHS.tonk</code> makes the FAB open the Tonk walkthrough
+          automatically whenever the current game type is Tonk. No entrypoint /
+          FAB code change.
+        </li>
+        <li>
+          <b>Option A vs B is the only decision.</b> A keeps the joker in text
+          (zero type edits). B widens the scene fixture type by one union so a
+          real joker card renders — a content-layer type edit, still not a new
+          rendering component. If either option needed a new
+          <code>WalkthroughScene</code> branch, the foundation shell would be
+          wrong; neither does.
+        </li>
+      </ul>
+    </div>
+
+    <script>
+      // ---- Fixtures: static literals (never live state), mirroring the
+      // big2Walkthrough.ts pattern. `joker(id)` marks a Tonk joker fixture. ----
+      const S = { c: "clubs", d: "diamonds", h: "hearts", s: "spades" };
+      const card = (rank, suit) => ({ rank, suit });
+      const joker = (id) => ({ joker: true, id });
+
+      // Steps 1,2,3,5,6 are identical across both options. Only step 4 (Jokers)
+      // differs: Option A uses a callout (no joker card), Option B uses a cards
+      // scene containing a real joker fixture (requires the type widening).
+      const stepIntro = {
+        tag: "Aim of the game",
+        scene: {
+          kind: "cards",
+          cards: [
+            card("A", S.s),
+            card("4", S.d),
+            card("7", S.c),
+            card("2", S.h),
+          ],
+        },
+        caption: [
+          { text: "Unlike Big 2, you " },
+          { strong: "never empty your hand" },
+          { text: ". You hold " },
+          { strong: "5 cards" },
+          { text: " and race for the " },
+          { strong: "lowest hand value" },
+          { text: ": A = 1, 2–10 = face, J/Q/K = 10." },
+        ],
+      };
+
+      const stepDiscard = {
+        tag: "Discard first",
+        scene: {
+          kind: "cards",
+          cards: [card("Q", S.h), card("Q", S.s), card("Q", S.c)],
+          selectedIndices: [0, 1, 2],
+        },
+        caption: [
+          { text: "Each turn you " },
+          { strong: "discard first" },
+          {
+            text: " — one card, or several of the same rank at once (here, three Queens to dump 30 points).",
+          },
+        ],
+      };
+
+      const stepDraw = {
+        tag: "…then draw one",
+        scene: {
+          kind: "cards",
+          cards: [card("2", S.d), card("6", S.c), card("9", S.h)],
+          highlightIndices: [0],
+        },
+        caption: [
+          { text: "Then " },
+          { strong: "draw exactly one" },
+          { text: " — from the face-down " },
+          { strong: "stock" },
+          { text: ", or take the highlighted " },
+          { strong: "face-up card" },
+          {
+            text: " the previous player left. You can never draw back your own discard.",
+          },
+        ],
+      };
+
+      // --- Step 4: JOKERS — the ONLY step that differs between options ---
+      const stepJokerA = {
+        tag: "Jokers are gold",
+        scene: {
+          kind: "callout",
+          icon: "★", // ★ — the shipped joker glyph, in the existing callout scene
+          lines: ["Joker = 0 points", "Your single best card to hold"],
+        },
+        caption: [
+          { text: "The deck includes " },
+          { strong: "Jokers, worth 0" },
+          {
+            text: ". Since low is good, a Joker is the best card you can hold — keep it and dump your high cards.",
+          },
+        ],
+      };
+      const stepJokerB = {
+        tag: "Jokers are gold",
+        scene: {
+          kind: "cards",
+          // Requires walkthroughTypes.ts widening: readonly (Card | TonkCard)[]
+          cards: [card("K", S.s), joker(0), card("Q", S.d)],
+          highlightIndices: [1],
+        },
+        caption: [
+          { text: "The deck includes " },
+          { strong: "Jokers, worth 0" },
+          {
+            text: ". Since low is good, a Joker is the best card you can hold — keep it and dump your high cards.",
+          },
+        ],
+      };
+
+      const stepTonk = {
+        tag: "Call TONK",
+        scene: {
+          kind: "cards",
+          cards: [card("A", S.d), card("2", S.c), card("3", S.h)],
+          highlightIndices: [0, 1, 2],
+        },
+        caption: [
+          { text: "Think your hand is lowest? At the start of your turn, " },
+          { strong: "call TONK" },
+          {
+            text: " instead of discarding. All hands reveal. Beat everyone and you add ",
+          },
+          { strong: "0" },
+          { text: " while they take their hand value — " },
+          { strong: "but a failed call costs you 30." },
+        ],
+      };
+
+      const stepScoring = {
+        tag: "Scoring — low is safe",
+        scene: {
+          kind: "callout",
+          icon: "\u{1F4C9}",
+          lines: [
+            "Points ADD UP each trick — lower is better",
+            "Hit 150 and you're in the running to lose",
+          ],
+        },
+        caption: [
+          { text: "Tonk is " },
+          { strong: "loss-centric" },
+          {
+            text: ": points pile up over many tricks and once someone hits ",
+          },
+          { strong: "150" },
+          {
+            text: ", the game ends with exactly one true loser. Everyone else wins — so keep your tally low.",
+          },
+        ],
+      };
+
+      const TONK_A = [
+        stepIntro,
+        stepDiscard,
+        stepDraw,
+        stepJokerA,
+        stepTonk,
+        stepScoring,
+      ];
+      const TONK_B = [
+        stepIntro,
+        stepDiscard,
+        stepDraw,
+        stepJokerB,
+        stepTonk,
+        stepScoring,
+      ];
+
+      const GAME_LABEL = "Tonk";
+
+      // ---- Renderers: mirror WalkthroughScene.vue / WalkthroughModal.vue 1:1
+      // so what you see is exactly what the shell produces. ----
+      function suitSym(s) {
+        return { clubs: "♣", diamonds: "♦", hearts: "♥", spades: "♠" }[s] || "";
+      }
+      function isRed(s) {
+        return s === "hearts" || s === "diamonds";
+      }
+      function cardEl(c, opts = {}) {
+        const wrap = document.createElement("span");
+        wrap.className = "wt-scene__card";
+        if (opts.highlight) wrap.classList.add("wt-scene__card--highlight");
+        const el = document.createElement("div");
+        if (c.joker) {
+          el.className =
+            "card card--joker" + (opts.selected ? " card--selected" : "");
+          const ic = document.createElement("span");
+          ic.className = "card__joker-icon";
+          ic.textContent = "★"; // ★
+          el.appendChild(ic);
+        } else {
+          el.className =
+            "card " +
+            (isRed(c.suit) ? "red" : "black") +
+            (opts.selected ? " card--selected" : "");
+          const r = document.createElement("span");
+          r.className = "card__rank";
+          r.textContent = c.rank;
+          const su = document.createElement("span");
+          su.className = "card__suit";
+          su.textContent = suitSym(c.suit);
+          el.append(r, su);
+        }
+        wrap.appendChild(el);
+        return wrap;
+      }
+
+      function sceneEl(scene) {
+        const root = document.createElement("div");
+        root.className = "wt-scene";
+
+        if (scene.kind === "callout") {
+          const c = document.createElement("div");
+          c.className = "wt-scene__callout";
+          const ic = document.createElement("div");
+          ic.className = "wt-scene__callout-icon";
+          ic.textContent = scene.icon;
+          c.appendChild(ic);
+          scene.lines.forEach((line) => {
+            const l = document.createElement("div");
+            l.className = "wt-scene__callout-line";
+            l.textContent = line;
+            c.appendChild(l);
+          });
+          root.appendChild(c);
+          return root;
+        }
+
+        // kind: "cards"
+        const cards = document.createElement("div");
+        cards.className = "wt-scene__cards";
+        const sel = new Set(scene.selectedIndices || []);
+        const hi = new Set(scene.highlightIndices || []);
+        scene.cards.forEach((c, i) => {
+          cards.appendChild(
+            cardEl(c, { selected: sel.has(i), highlight: hi.has(i) }),
+          );
+        });
+        root.appendChild(cards);
+        return root;
+      }
+
+      function captionEl(segments) {
+        const p = document.createElement("p");
+        p.className = "wt-caption";
+        segments.forEach((seg) => {
+          if ("strong" in seg) {
+            const s = document.createElement("strong");
+            s.textContent = seg.strong;
+            p.appendChild(s);
+          } else {
+            p.appendChild(document.createTextNode(seg.text));
+          }
+        });
+        return p;
+      }
+
+      // Build a full interactive shell instance bound to its own step list + index.
+      function mountShell(rootId, steps) {
+        const root = document.getElementById(rootId);
+        let idx = 0;
+        const count = steps.length;
+
+        function render() {
+          const step = steps[idx];
+          root.innerHTML = "";
+
+          const head = document.createElement("div");
+          head.className = "wt-head";
+          head.innerHTML =
+            '<span class="wt-head__title">How to Play<small>' +
+            GAME_LABEL +
+            '</small></span><button class="wt-close" title="Close">&times;</button>';
+
+          const body = document.createElement("div");
+          body.className = "wt-body";
+          const illus = document.createElement("div");
+          illus.className = "wt-illus";
+          const tag = document.createElement("span");
+          tag.className = "wt-illus__tag";
+          tag.textContent = step.tag;
+          illus.append(tag, sceneEl(step.scene));
+          body.append(illus, captionEl(step.caption));
+
+          const foot = document.createElement("div");
+          foot.className = "wt-foot";
+          const dots = document.createElement("div");
+          dots.className = "wt-dots";
+          steps.forEach((_, i) => {
+            const d = document.createElement("i");
+            if (i === idx) d.classList.add("on");
+            dots.appendChild(d);
+          });
+          const sc = document.createElement("div");
+          sc.className = "wt-step-count";
+          sc.innerHTML = "Step <b>" + (idx + 1) + "</b> of " + count;
+          const nav = document.createElement("div");
+          nav.className = "wt-nav";
+          const back = document.createElement("button");
+          back.className = "wt-navbtn";
+          back.textContent = "Back";
+          back.disabled = idx === 0;
+          back.onclick = () => {
+            if (idx > 0) {
+              idx--;
+              render();
+            }
+          };
+          const primary = document.createElement("button");
+          primary.className = "wt-navbtn wt-navbtn--primary";
+          const last = idx >= count - 1;
+          primary.textContent = last ? "Got it ✓" : "Next →";
+          primary.onclick = () => {
+            idx = last ? 0 : idx + 1;
+            render();
+          };
+          nav.append(back, primary);
+          foot.append(dots, sc, nav);
+
+          root.append(head, body, foot);
+        }
+        render();
+      }
+
+      // Option previews: each starts on the differing step (4, index 3) so the
+      // joker distinction is visible immediately.
+      mountShell("optA", TONK_A);
+      mountShell("optB", TONK_B);
+
+      // Full interactive shells (Option A content).
+      mountShell("shell-desktop", TONK_A);
+      mountShell("shell-mobile", TONK_A);
+
+      // Storyboard: render every Option A step as a static mini-shell body.
+      const board = document.getElementById("board");
+      TONK_A.forEach((step, i) => {
+        const mini = document.createElement("div");
+        mini.className = "mini";
+        const mh = document.createElement("div");
+        mh.className = "mini__head";
+        const tag = document.createElement("span");
+        tag.className = "wt-illus__tag";
+        tag.textContent = step.tag;
+        const st = document.createElement("span");
+        st.className = "mini__step";
+        st.innerHTML = "Step <b>" + (i + 1) + "</b>/" + TONK_A.length;
+        mh.append(tag, st);
+        const mb = document.createElement("div");
+        mb.className = "mini__body";
+        const illus = document.createElement("div");
+        illus.className = "wt-illus";
+        illus.appendChild(sceneEl(step.scene));
+        mb.append(illus, captionEl(step.caption));
+        mini.append(mh, mb);
+        board.appendChild(mini);
+      });
+    </script>
+  </body>
+</html>
