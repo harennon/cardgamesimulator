@@ -101,6 +101,13 @@ async function seedInProgressGame(
         [host.userId]: "Player1",
         [player2.userId]: "Player2",
       },
+      // createGameViaApi requests turnTimerSeconds:30, but this seed never arms a
+      // timer. On player join the timer-recovery branch (socketHandler.ts) would
+      // see a non-null timer with no deadline/active timer, treat the seeded turn
+      // as expired, and auto-pass — ending the 2-player trick, nulling lastPlay,
+      // and rendering "New Trick" so .play-area__card-row never appears. Disable
+      // the timer for these deterministic seeds so the seeded play stays on-table.
+      turnTimerSeconds: null,
     },
   });
 }
