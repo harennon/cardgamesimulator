@@ -1,0 +1,1411 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Help FAB — cross-surface hardening (LLD 113)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ── Tokens mirrored from src/frontend/styles/game-variables.css ── */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --card-panel-bg: var(--panel-bg);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --error-text: #e05555;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #060606;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        line-height: 1.5;
+        padding: 0 0 80px;
+      }
+
+      /* ── Page chrome ── */
+      .doc-head {
+        padding: 40px 32px 28px;
+        border-bottom: 1px solid #1c1c1c;
+        background:
+          radial-gradient(
+            ellipse 60% 120% at 85% 0%,
+            rgba(201, 168, 76, 0.06),
+            transparent 60%
+          ),
+          #0a0a0a;
+      }
+      .doc-head h1 {
+        font-family: var(--font-card);
+        font-size: 1.7rem;
+        margin: 0 0 6px;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .doc-head p {
+        margin: 4px 0;
+        max-width: 760px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+      }
+      .doc-head .tag {
+        display: inline-block;
+        font-size: 0.66rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        border-radius: 999px;
+        padding: 3px 12px;
+        margin-bottom: 14px;
+      }
+
+      .section {
+        padding: 44px 32px 8px;
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .section > h2 {
+        font-family: var(--font-card);
+        font-size: 1.15rem;
+        color: var(--text-primary);
+        border-left: 3px solid var(--gold-accent);
+        padding-left: 12px;
+        margin: 0 0 4px;
+      }
+      .section > .lead {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin: 0 0 22px;
+        max-width: 800px;
+      }
+      .section > .lead code,
+      .callout code {
+        color: var(--gold-accent);
+        font-family: "Courier New", monospace;
+        font-size: 0.85em;
+      }
+
+      .callout {
+        margin: 18px 0 4px;
+        padding: 12px 16px;
+        border: 1px solid var(--table-rim-light);
+        border-left: 3px solid var(--gold-accent);
+        border-radius: 6px;
+        background: rgba(20, 12, 8, 0.6);
+        font-size: 0.85rem;
+        color: var(--text-primary);
+      }
+      .callout b {
+        color: var(--gold-accent);
+      }
+
+      /* ── Device frames ── */
+      .frames {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 32px;
+        align-items: flex-start;
+      }
+      .frame-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .frame-label {
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .frame-label b {
+        color: var(--text-primary);
+      }
+
+      .device {
+        position: relative;
+        overflow: hidden;
+        border-radius: 14px;
+        border: 1px solid #2a2a2a;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+        background: var(--felt);
+      }
+      .device.desktop {
+        width: 720px;
+        height: 452px;
+      }
+      .device.mobile {
+        width: 300px;
+        height: 600px;
+      }
+
+      /* Board felt background reused by all "surface" panels */
+      .felt-bg {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+      }
+      .wood-rim {
+        position: absolute;
+        inset: 0;
+        border: 10px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        pointer-events: none;
+        z-index: 100;
+      }
+      .device.mobile .wood-rim {
+        border-width: 4px;
+      }
+
+      /* ── Board layout mimic (Big2) ── */
+      .board {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        z-index: 1;
+      }
+      .device.desktop .board {
+        grid-template-rows: 52px 1fr 120px 52px;
+        grid-template-columns: 1fr 180px;
+        grid-template-areas:
+          "opp  opp"
+          "tbl  log"
+          "hand log"
+          "act  act";
+      }
+      .device.mobile .board {
+        grid-template-rows: 40px 1fr 128px 54px;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "opp"
+          "tbl"
+          "hand"
+          "act";
+      }
+      .b-opp {
+        grid-area: opp;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+      }
+      .b-tbl {
+        grid-area: tbl;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .b-log {
+        grid-area: log;
+        border-left: 1px solid var(--table-rim-light);
+        padding: 10px;
+        font-size: 0.62rem;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .b-log .lg-t {
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.56rem;
+      }
+      .b-hand {
+        grid-area: hand;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--ov, 2px);
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 0 10px;
+      }
+      .b-act {
+        grid-area: act;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        border-top: 1px solid var(--table-rim-light);
+        background: rgba(15, 46, 28, 0.85);
+      }
+
+      .seat {
+        font-size: 0.6rem;
+        padding: 3px 8px;
+        border-radius: 5px;
+        border: 1px solid var(--table-rim-light);
+        background: rgba(20, 12, 8, 0.5);
+        color: var(--text-primary);
+        white-space: nowrap;
+      }
+      .seat.on {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+        box-shadow: 0 0 10px var(--gold-glow);
+      }
+      .roomchip {
+        margin-left: auto;
+        font-family: "Courier New", monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.15em;
+        color: var(--gold-accent);
+        border: 1px solid rgba(201, 168, 76, 0.5);
+        border-radius: 5px;
+        padding: 2px 8px;
+      }
+
+      .turn-pill {
+        font-size: 0.66rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        border-radius: 999px;
+        padding: 3px 12px;
+      }
+
+      /* Mini cards */
+      .mc {
+        width: 30px;
+        height: 42px;
+        border-radius: 4px;
+        background: var(--card-face);
+        color: var(--black-suit);
+        font-family: var(--font-card);
+        font-size: 0.62rem;
+        font-weight: 700;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 2px 3px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+        flex: 0 0 auto;
+      }
+      .device.mobile .mc {
+        width: 24px;
+        height: 34px;
+        font-size: 0.54rem;
+      }
+      .mc.r {
+        color: var(--red-suit);
+      }
+      .mc.back {
+        background: linear-gradient(135deg, #6b2020, #3a1010);
+        border: 1px solid rgba(201, 168, 76, 0.3);
+      }
+      .b-hand .mc {
+        margin-left: var(--ov, -8px);
+      }
+      .b-hand .mc:first-child {
+        margin-left: 0;
+      }
+      .b-hand .mc.sel {
+        transform: translateY(-10px);
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+        outline: 1px solid var(--gold-accent);
+      }
+
+      .btn {
+        font-family: var(--font-ui);
+        font-weight: 600;
+        font-size: 0.72rem;
+        border-radius: 6px;
+        padding: 7px 20px;
+        cursor: pointer;
+        border: 1px solid var(--text-muted);
+        background: transparent;
+        color: var(--text-primary);
+      }
+      .device.mobile .btn {
+        min-height: 40px;
+        flex: 1;
+      }
+      .btn--play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border-color: var(--gold-accent);
+      }
+
+      /* Mobile log toggle (existing component, right:8px top:60px scaled) */
+      .log-toggle {
+        position: absolute;
+        top: 48px;
+        right: 6px;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--text-muted);
+        color: var(--text-primary);
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 200;
+      }
+
+      /* ── THE HELP CLUSTER (the thing we're hardening) ── */
+      .cluster {
+        position: absolute;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 8px;
+        align-items: center;
+        /* placement set per-variant via modifier classes */
+        right: 12px;
+        bottom: 12px;
+      }
+      .fab {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid var(--gold-accent);
+        background: rgba(20, 12, 8, 0.92);
+        color: var(--gold-accent);
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.05rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+        transition:
+          transform 0.12s ease,
+          background 0.15s ease,
+          color 0.15s ease;
+      }
+      .fab:hover {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        transform: translateY(-2px);
+      }
+      .fab--bug {
+        width: 32px;
+        height: 32px;
+        border-color: var(--text-muted);
+        color: var(--text-muted);
+      }
+      .fab--bug svg {
+        width: 16px;
+        height: 16px;
+      }
+      .fab--bug:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+        background: rgba(20, 12, 8, 0.92);
+      }
+
+      /* Danger highlight to show the overlap problem */
+      .overlap-warn .b-act {
+        outline: 2px dashed var(--error-text);
+        outline-offset: -2px;
+      }
+      .overlap-warn .cluster {
+        box-shadow: 0 0 0 3px rgba(224, 85, 85, 0.5);
+        border-radius: 30px;
+      }
+      .collide-note {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        z-index: 1001;
+        font-size: 0.6rem;
+        color: var(--error-text);
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid var(--error-text);
+        border-radius: 5px;
+        padding: 4px 8px;
+        max-width: 150px;
+      }
+      .safe-note {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        z-index: 1001;
+        font-size: 0.6rem;
+        color: var(--gold-accent);
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid rgba(201, 168, 76, 0.5);
+        border-radius: 5px;
+        padding: 4px 8px;
+        max-width: 160px;
+      }
+
+      /* ── Create-game / lobby surface panels ── */
+      .flow-surface {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1;
+      }
+      .flow-panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 22px 26px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+        min-width: 240px;
+      }
+      .flow-panel h3 {
+        font-family: var(--font-ui);
+        color: var(--gold-accent);
+        margin: 0;
+        font-size: 1.05rem;
+      }
+      .flow-field {
+        width: 100%;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .flow-field .box {
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        padding: 8px 10px;
+        color: var(--text-primary);
+        background: rgba(45, 24, 16, 0.5);
+        font-size: 0.8rem;
+      }
+      .lobby-code {
+        font-family: "Courier New", monospace;
+        font-size: 1.5rem;
+        letter-spacing: 0.28em;
+        color: var(--gold-accent);
+        border: 3px solid var(--gold-accent);
+        border-radius: 10px;
+        padding: 8px 18px;
+      }
+      .lobby-players {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .lobby-player {
+        font-size: 0.78rem;
+        padding: 7px 12px;
+        border-radius: 5px;
+        border: 1px solid var(--table-rim-light);
+        background: rgba(45, 24, 16, 0.6);
+      }
+      .lobby-player.empty {
+        color: var(--text-muted);
+        font-style: italic;
+      }
+      .flow-btn {
+        width: 100%;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border: none;
+        border-radius: 6px;
+        padding: 9px;
+        font-weight: 600;
+        font-size: 0.82rem;
+        cursor: pointer;
+      }
+
+      /* ── Walkthrough modal replica ── */
+      .wt-scrim {
+        position: absolute;
+        inset: 0;
+        z-index: 1100;
+        background: rgba(0, 0, 0, 0.66);
+        backdrop-filter: blur(2px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+      }
+      .wt-modal {
+        width: 100%;
+        max-width: 250px;
+        background: var(--card-panel-bg);
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 12px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .wt-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 13px;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .wt-title {
+        font-family: var(--font-card);
+        font-weight: 700;
+        color: var(--gold-accent);
+        font-size: 0.85rem;
+      }
+      .wt-title small {
+        display: block;
+        font-family: var(--font-ui);
+        font-weight: 500;
+        color: var(--text-muted);
+        font-size: 0.56rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .wt-close {
+        width: 26px;
+        height: 26px;
+        border-radius: 6px;
+        border: 1px solid var(--table-rim-light);
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+      .wt-body {
+        padding: 12px 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .wt-illus {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 14px;
+        border-radius: 8px;
+        background: rgba(26, 74, 46, 0.4);
+      }
+      .wt-cap {
+        font-size: 0.74rem;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .wt-cap b {
+        color: var(--gold-accent);
+      }
+      .wt-foot {
+        padding: 10px 13px;
+        border-top: 1px solid var(--table-rim-light);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .wt-dots {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+      }
+      .wt-dots i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--table-rim-light);
+      }
+      .wt-dots i.on {
+        background: var(--gold-accent);
+        width: 16px;
+        border-radius: 3px;
+      }
+      .wt-nav {
+        display: flex;
+        gap: 8px;
+      }
+      .wt-nav .btn {
+        flex: 1;
+        justify-content: center;
+      }
+
+      /* transient toast for the game-starts-while-open path */
+      .transition-toast {
+        position: absolute;
+        left: 50%;
+        bottom: 70px;
+        transform: translateX(-50%);
+        z-index: 1101;
+        background: var(--table-rim);
+        border: 1px solid var(--gold-accent);
+        color: var(--gold-accent);
+        border-radius: 6px;
+        padding: 7px 14px;
+        font-size: 0.66rem;
+        white-space: nowrap;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+      }
+
+      /* interactive controls */
+      .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 10px 0 20px;
+      }
+      .ctl {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        border-radius: 6px;
+        padding: 8px 16px;
+        cursor: pointer;
+        border: 1px solid var(--table-rim-light);
+        background: rgba(20, 12, 8, 0.6);
+        color: var(--text-primary);
+      }
+      .ctl.active {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+
+      .legend {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin: 6px 0 18px;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="doc-head">
+      <span class="tag">LLD 113 · Frontend Mockup · Hardening</span>
+      <h1>Persistent Help FAB — cross-surface edge-case hardening</h1>
+      <p>
+        The single bottom-right cluster (a <code>?</code> help FAB + a bug icon,
+        delivered by #122) lives in the app shell and is present on every
+        surface. This mockup does <b>not</b> introduce a new aesthetic — it
+        demonstrates the placement + behavior changes needed so the cluster
+        never collides with board controls and behaves sensibly across the
+        lobby, live board, and the game-starts-while-open transition.
+      </p>
+      <p>
+        Two placement directions are shown side-by-side (A and B). Use the
+        toggle in each section to compare. Everything is a static replica of the
+        real components (same tokens, same z-index stack).
+      </p>
+    </header>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <section class="section">
+      <h2>1 · The problem: cluster vs. bottom action row</h2>
+      <p class="lead">
+        The cluster sits at <code>right:16px; bottom:16px</code>. On the board
+        the play/pass <code>ActionPanel</code> occupies a
+        <code>--mobile-actions-height: 56px</code> bar pinned to the bottom
+        edge. At narrow widths the cluster overlaps the <b>Pass</b> /
+        <b>Play</b>
+        buttons and can sit on top of the player's own hand. This is the primary
+        AC to resolve.
+      </p>
+
+      <div class="legend">
+        <span
+          ><span class="swatch" style="background: var(--error-text)"></span
+          >Collision zone</span
+        >
+        <span
+          ><span class="swatch" style="background: var(--gold-accent)"></span
+          >Cluster (z-1000)</span
+        >
+        <span
+          ><span class="swatch" style="background: var(--felt-light)"></span
+          >Player hand</span
+        >
+      </div>
+
+      <div class="frames">
+        <div class="frame-wrap">
+          <span class="frame-label"
+            ><b>BEFORE</b> — mobile, cluster overlaps Play/Pass</span
+          >
+          <div class="device mobile overlap-warn">
+            <div class="felt-bg"></div>
+            <div class="board">
+              <div class="b-opp">
+                <div class="seat">Bob 9</div>
+                <div class="seat">Cy 11</div>
+                <div class="roomchip">7QRT</div>
+              </div>
+              <div class="b-tbl">
+                <span class="turn-pill">Your turn · 0:42</span>
+                <div style="display: flex; gap: 3px">
+                  <div class="mc r">7♥</div>
+                  <div class="mc">7♠</div>
+                </div>
+              </div>
+              <div class="b-hand" style="--ov: -6px">
+                <div class="mc">3♣</div>
+                <div class="mc r">5♦</div>
+                <div class="mc sel">9♣</div>
+                <div class="mc sel">9♠</div>
+                <div class="mc r">J♥</div>
+                <div class="mc">K♠</div>
+                <div class="mc r">2♦</div>
+              </div>
+              <div class="b-act">
+                <button class="btn">Pass</button>
+                <button class="btn btn--play">Play</button>
+              </div>
+            </div>
+            <div class="wood-rim"></div>
+            <div class="cluster">
+              <button class="fab">?</button>
+              <button class="fab fab--bug">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path
+                    d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3M5 6l2 2M19 6l-2 2M5 19l2-2M19 19l-2-2"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="collide-note">
+              FAB covers the Play button — untappable
+            </div>
+          </div>
+        </div>
+
+        <div class="frame-wrap">
+          <span class="frame-label"
+            ><b>BEFORE</b> — desktop, overlaps action row corner</span
+          >
+          <div class="device desktop overlap-warn">
+            <div class="felt-bg"></div>
+            <div class="board">
+              <div class="b-opp">
+                <div class="seat">Bob 9</div>
+                <div class="seat on">Charlie 11</div>
+                <div class="seat">Dave 8</div>
+                <div class="roomchip">7QRT</div>
+              </div>
+              <div class="b-tbl">
+                <span class="turn-pill">Charlie's turn · 0:42</span>
+                <div style="display: flex; gap: 4px">
+                  <div class="mc r">7♥</div>
+                  <div class="mc">7♠</div>
+                </div>
+              </div>
+              <div class="b-log">
+                <span class="lg-t">Game Log</span>
+                <span>Bob: Pair 7♠ 7♥</span>
+                <span>Charlie: Pass</span>
+              </div>
+              <div class="b-hand" style="--ov: -8px">
+                <div class="mc">3♣</div>
+                <div class="mc r">5♦</div>
+                <div class="mc">9♣</div>
+                <div class="mc r">J♥</div>
+                <div class="mc">Q♠</div>
+                <div class="mc">K♠</div>
+                <div class="mc r">2♦</div>
+              </div>
+              <div class="b-act">
+                <button class="btn">Pass</button>
+                <button class="btn btn--play">Play</button>
+              </div>
+            </div>
+            <div class="wood-rim"></div>
+            <div class="cluster">
+              <button class="fab">?</button>
+              <button class="fab fab--bug">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path
+                    d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3M5 6l2 2M19 6l-2 2M5 19l2-2M19 19l-2-2"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="collide-note">
+              Cluster sits over the action row's right edge
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <section class="section">
+      <h2>2 · Two solution directions on the live board</h2>
+      <p class="lead">
+        Both keep the cluster in the app shell (never unmounts → socket, timers,
+        and board state are untouched). They differ only in how the cluster
+        yields to the bottom action row.
+      </p>
+
+      <div class="controls" id="dirControls">
+        <button class="ctl active" data-dir="A">
+          Direction A — Lift above action bar
+        </button>
+        <button class="ctl" data-dir="B">
+          Direction B — Dock into opponent row (top-right)
+        </button>
+      </div>
+
+      <div class="callout" id="dirDesc">
+        <b>Direction A — Lift above the action bar.</b> On the board only, the
+        shell reads a CSS custom property <code>--board-safe-bottom</code> (set
+        to the action-row height + gap) so the cluster rises to sit
+        <i>above</i> the Play/Pass row instead of on top of it. On mobile the
+        cluster also collapses to a single <code>?</code> FAB (the bug icon
+        moves into an expand-on-tap) to reclaim horizontal room next to the
+        hand. Zero layout change on non-board surfaces.
+      </div>
+
+      <div class="frames">
+        <div class="frame-wrap">
+          <span class="frame-label"><b>DESKTOP</b> · 1280px+ board</span>
+          <div class="device desktop" id="boardDesktop">
+            <div class="felt-bg"></div>
+            <div class="board">
+              <div class="b-opp">
+                <div class="seat">Bob 9</div>
+                <div class="seat on">Charlie 11</div>
+                <div class="seat">Dave 8</div>
+                <div class="roomchip">7QRT</div>
+              </div>
+              <div class="b-tbl">
+                <span class="turn-pill">Your turn · 0:42</span>
+                <div style="display: flex; gap: 4px">
+                  <div class="mc r">7♥</div>
+                  <div class="mc">7♠</div>
+                </div>
+              </div>
+              <div class="b-log">
+                <span class="lg-t">Game Log</span>
+                <span>Bob: Pair 7♠ 7♥</span>
+                <span>Charlie: Pass</span>
+                <span>Dave: Pass</span>
+              </div>
+              <div class="b-hand" style="--ov: -8px">
+                <div class="mc">3♣</div>
+                <div class="mc r">5♦</div>
+                <div class="mc sel">9♣</div>
+                <div class="mc sel">9♠</div>
+                <div class="mc r">J♥</div>
+                <div class="mc">K♠</div>
+                <div class="mc r">2♦</div>
+              </div>
+              <div class="b-act">
+                <button class="btn">Pass</button>
+                <button class="btn btn--play">Play</button>
+              </div>
+            </div>
+            <div class="wood-rim"></div>
+            <div class="cluster" id="clusterD">
+              <button class="fab">?</button>
+              <button class="fab fab--bug" id="bugD">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path
+                    d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3M5 6l2 2M19 6l-2 2M5 19l2-2M19 19l-2-2"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="safe-note" id="noteD">
+              Cluster lifted above the action bar — Play/Pass fully tappable
+            </div>
+          </div>
+        </div>
+
+        <div class="frame-wrap">
+          <span class="frame-label"><b>MOBILE</b> · 375px board</span>
+          <div class="device mobile" id="boardMobile">
+            <div class="felt-bg"></div>
+            <div class="board">
+              <div class="b-opp">
+                <div class="seat">Bob 9</div>
+                <div class="seat">Cy 11</div>
+                <div class="roomchip">7QRT</div>
+              </div>
+              <div class="b-tbl">
+                <span class="turn-pill">Your turn · 0:42</span>
+                <div style="display: flex; gap: 3px">
+                  <div class="mc r">7♥</div>
+                  <div class="mc">7♠</div>
+                </div>
+              </div>
+              <div class="b-hand" style="--ov: -6px">
+                <div class="mc">3♣</div>
+                <div class="mc r">5♦</div>
+                <div class="mc sel">9♣</div>
+                <div class="mc sel">9♠</div>
+                <div class="mc r">J♥</div>
+                <div class="mc">K♠</div>
+                <div class="mc r">2♦</div>
+              </div>
+              <div class="b-act">
+                <button class="btn">Pass</button>
+                <button class="btn btn--play">Play</button>
+              </div>
+            </div>
+            <div class="wood-rim"></div>
+            <div class="log-toggle">☰</div>
+            <div class="cluster" id="clusterM">
+              <button class="fab">?</button>
+              <button class="fab fab--bug" id="bugM">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path
+                    d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3M5 6l2 2M19 6l-2 2M5 19l2-2M19 19l-2-2"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="safe-note" id="noteM">
+              Single ? FAB, lifted above action bar; bug moves into feedback
+              modal
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <section class="section">
+      <h2>3 · Consistent styling across surfaces</h2>
+      <p class="lead">
+        The identical cluster on create-game and the lobby waiting screen. Here
+        there is no bottom action row, so the cluster stays at its resting
+        <code>bottom:16px</code> anchor — the placement only shifts on the
+        board. Opening the walkthrough from the lobby must not disturb the
+        player list, room code, or Start button (they live in
+        <code>GameView</code>, a sibling of the shell → untouched).
+      </p>
+
+      <div class="frames">
+        <div class="frame-wrap">
+          <span class="frame-label"><b>CREATE GAME</b></span>
+          <div class="device desktop" style="height: 360px">
+            <div class="felt-bg"></div>
+            <div class="flow-surface">
+              <div class="flow-panel">
+                <h3>Create a Game</h3>
+                <div class="flow-field">
+                  Game Type
+                  <div class="box">Big 2 ▾</div>
+                </div>
+                <div class="flow-field">
+                  Players
+                  <div class="box">4 ▾</div>
+                </div>
+                <div class="flow-field">
+                  Turn Timer
+                  <div class="box">60 seconds ▾</div>
+                </div>
+                <button class="flow-btn">Create Game</button>
+              </div>
+            </div>
+            <div class="cluster">
+              <button class="fab">?</button>
+              <button class="fab fab--bug">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path
+                    d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3M5 6l2 2M19 6l-2 2M5 19l2-2M19 19l-2-2"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="frame-wrap">
+          <span class="frame-label"><b>LOBBY</b> — waiting for players</span>
+          <div class="device desktop" style="height: 360px">
+            <div class="felt-bg"></div>
+            <div class="flow-surface">
+              <div class="flow-panel">
+                <h3>Game Lobby</h3>
+                <div class="lobby-code">7QRT</div>
+                <div class="lobby-players">
+                  <div class="lobby-player">Alice (host)</div>
+                  <div class="lobby-player">Bob</div>
+                  <div class="lobby-player empty">Waiting for player…</div>
+                </div>
+                <button class="flow-btn">Start Game</button>
+              </div>
+            </div>
+            <div class="cluster">
+              <button class="fab">?</button>
+              <button class="fab fab--bug">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path
+                    d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3M5 6l2 2M19 6l-2 2M5 19l2-2M19 19l-2-2"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <section class="section">
+      <h2>4 · Edge case: game starts while walkthrough is open</h2>
+      <p class="lead">
+        A player opens the walkthrough from the lobby, then the host presses
+        Start. Because the walkthrough content is static (no live state), the
+        board renders <b>behind</b> the scrim and nothing is trapped. The
+        proposed behavior: the modal stays open (the user chose to read it) but
+        a non-blocking toast announces the transition, and closing returns them
+        straight onto the now-live board. <b>Play the sequence:</b>
+      </p>
+
+      <div class="controls">
+        <button class="ctl" id="btnStep0">1 · Lobby, walkthrough open</button>
+        <button class="ctl" id="btnStep1">2 · Host starts → toast</button>
+        <button class="ctl" id="btnStep2">3 · Close → land on board</button>
+      </div>
+
+      <div class="frames">
+        <div class="frame-wrap">
+          <span class="frame-label"><b>TRANSITION</b> · mobile</span>
+          <div class="device mobile" id="transStage">
+            <div class="felt-bg"></div>
+
+            <!-- lobby layer (step 0) -->
+            <div class="flow-surface" id="tLobby">
+              <div class="flow-panel">
+                <h3>Game Lobby</h3>
+                <div class="lobby-code">7QRT</div>
+                <div class="lobby-players">
+                  <div class="lobby-player">Alice (host)</div>
+                  <div class="lobby-player">You</div>
+                </div>
+                <button class="flow-btn">Waiting for host…</button>
+              </div>
+            </div>
+
+            <!-- board layer (steps 1-2), behind the scrim -->
+            <div class="board" id="tBoard" style="display: none">
+              <div class="b-opp">
+                <div class="seat on">Alice 13</div>
+                <div class="seat">You 13</div>
+                <div class="roomchip">7QRT</div>
+              </div>
+              <div class="b-tbl">
+                <span class="turn-pill">Alice's turn · 1:00</span>
+              </div>
+              <div class="b-hand" style="--ov: -6px">
+                <div class="mc">3♣</div>
+                <div class="mc r">5♦</div>
+                <div class="mc">9♣</div>
+                <div class="mc r">J♥</div>
+                <div class="mc">K♠</div>
+                <div class="mc r">2♦</div>
+              </div>
+              <div class="b-act">
+                <button class="btn">Pass</button>
+                <button class="btn btn--play">Play</button>
+              </div>
+            </div>
+
+            <div class="wood-rim"></div>
+
+            <!-- cluster hidden while modal is open (matches feedbackOpen behavior) -->
+            <div class="cluster" id="tCluster">
+              <button class="fab">?</button>
+            </div>
+
+            <!-- walkthrough modal (steps 0-1) -->
+            <div class="wt-scrim" id="tModal">
+              <div class="wt-modal">
+                <div class="wt-head">
+                  <span class="wt-title">How to Play<small>Big 2</small></span>
+                  <button class="wt-close" id="tClose">×</button>
+                </div>
+                <div class="wt-body">
+                  <div class="wt-illus">
+                    <div class="mc">3♣</div>
+                    <div class="mc r">4♦</div>
+                    <div class="mc r">5♥</div>
+                    <div class="mc">6♠</div>
+                    <div class="mc r">7♦</div>
+                  </div>
+                  <p class="wt-cap">
+                    Play <b>singles, pairs, or five-card hands</b> that beat the
+                    last play — or <b>pass</b> to wait for the next trick.
+                  </p>
+                </div>
+                <div class="wt-foot">
+                  <div class="wt-dots">
+                    <i></i><i class="on"></i><i></i><i></i>
+                  </div>
+                  <div class="wt-nav">
+                    <button class="btn">Back</button>
+                    <button class="btn btn--play">Next →</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- transient toast (step 1) -->
+            <div class="transition-toast" id="tToast" style="display: none">
+              Game started — close to jump in ↓
+            </div>
+          </div>
+        </div>
+
+        <div class="frame-wrap" style="max-width: 360px">
+          <span class="frame-label"><b>WHY THIS IS SAFE</b></span>
+          <div class="callout" style="margin-top: 0">
+            <p style="margin: 0 0 10px">
+              <b>Socket &amp; state untouched.</b> The FAB and modal live in the
+              app shell, a sibling of <code>GameView</code>. Opening the modal
+              never remounts <code>GameView</code>, so the Socket.IO connection,
+              <code>useGameState</code>, and the turn timer keep running.
+            </p>
+            <p style="margin: 0 0 10px">
+              <b>Nothing is trapped.</b> The lobby→board transition happens in
+              <code>GameView</code> underneath the scrim. The modal is a pure
+              overlay; the user closes it (× / Esc / scrim tap) and is on the
+              live board exactly where the game now is.
+            </p>
+            <p style="margin: 0">
+              <b>Sensible nudge.</b> A 3s auto-dismissing toast signals the
+              transition without stealing focus or forcing a close — the user
+              decides when to return.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>5 · Interaction &amp; behavior summary</h2>
+      <div class="callout">
+        <p style="margin: 0 0 8px">
+          <b>Resting placement</b> (home, create-game, lobby, game-over):
+          cluster at <code>right:16px; bottom:16px</code> — unchanged from #122.
+        </p>
+        <p style="margin: 0 0 8px">
+          <b>Board placement</b> (IN_PROGRESS / SHOW_FINAL_PLAY): cluster lifts
+          by the action-row height so it never overlaps Play/Pass or the hand.
+          Direction A lifts; Direction B docks top-right into the opponent row.
+        </p>
+        <p style="margin: 0 0 8px">
+          <b>Mobile</b>: collapse to a single <code>?</code> FAB near the safe
+          corner; bug/feedback reachable inside the walkthrough footer or the
+          existing feedback path, so the hand keeps full width.
+        </p>
+        <p style="margin: 0 0 8px">
+          <b>Open/close</b>: no navigation, no socket churn; Esc and scrim-tap
+          close; focus returns to the FAB.
+        </p>
+        <p style="margin: 0">
+          <b>Game-starts-while-open</b>: modal persists, non-blocking toast
+          appears, closing lands the user on the live board.
+        </p>
+      </div>
+    </section>
+
+    <script>
+      // ── Section 2: A/B direction toggle ──
+      const descA =
+        "<b>Direction A — Lift above the action bar.</b> On the board only, the shell reads a CSS custom property <code>--board-safe-bottom</code> (set to the action-row height + gap) so the cluster rises to sit <i>above</i> the Play/Pass row instead of on top of it. On mobile the cluster also collapses to a single <code>?</code> FAB (the bug icon moves into an expand-on-tap) to reclaim horizontal room next to the hand. Zero layout change on non-board surfaces.";
+      const descB =
+        "<b>Direction B — Dock into the opponent row (top-right).</b> On the board only, the cluster relocates to the top-right corner inside the opponent row band, well clear of the bottom action row and hand at every width. Trade-off: it sits near the mobile log-toggle (☰) so the two must be spaced/stacked; it also moves the FAB away from its resting corner, so its position is less predictable across surfaces.";
+
+      const dirControls = document.getElementById("dirControls");
+      const dirDesc = document.getElementById("dirDesc");
+      const clusterD = document.getElementById("clusterD");
+      const clusterM = document.getElementById("clusterM");
+      const bugD = document.getElementById("bugD");
+      const bugM = document.getElementById("bugM");
+      const noteD = document.getElementById("noteD");
+      const noteM = document.getElementById("noteM");
+      const logToggle = document.querySelector("#boardMobile .log-toggle");
+
+      function applyDir(dir) {
+        [...dirControls.children].forEach((b) =>
+          b.classList.toggle("active", b.dataset.dir === dir),
+        );
+        if (dir === "A") {
+          dirDesc.innerHTML = descA;
+          // Desktop: lift above 52px action bar
+          clusterD.style.bottom = "70px";
+          clusterD.style.right = "16px";
+          clusterD.style.top = "";
+          bugD.style.display = "";
+          noteD.textContent =
+            "Cluster lifted above the action bar — Play/Pass fully tappable";
+          // Mobile: lift + collapse to single FAB
+          clusterM.style.bottom = "70px";
+          clusterM.style.right = "10px";
+          clusterM.style.top = "";
+          bugM.style.display = "none";
+          noteM.textContent =
+            "Single ? FAB, lifted above action bar; bug reachable via feedback path";
+        } else {
+          dirDesc.innerHTML = descB;
+          // Desktop: dock top-right
+          clusterD.style.top = "12px";
+          clusterD.style.right = "16px";
+          clusterD.style.bottom = "";
+          bugD.style.display = "";
+          noteD.textContent =
+            "Cluster docked into opponent row — clear of hand + actions";
+          // Mobile: dock top-right, offset from log-toggle
+          clusterM.style.top = "84px";
+          clusterM.style.right = "8px";
+          clusterM.style.bottom = "";
+          bugM.style.display = "none";
+          noteM.textContent =
+            "Docked below the ☰ log-toggle; two floating buttons stacked at top-right";
+        }
+      }
+
+      dirControls.addEventListener("click", (e) => {
+        const btn = e.target.closest(".ctl");
+        if (btn) applyDir(btn.dataset.dir);
+      });
+      applyDir("A");
+
+      // ── Section 4: transition sequence ──
+      const tLobby = document.getElementById("tLobby");
+      const tBoard = document.getElementById("tBoard");
+      const tModal = document.getElementById("tModal");
+      const tToast = document.getElementById("tToast");
+      const tCluster = document.getElementById("tCluster");
+
+      function step(n) {
+        [
+          ["btnStep0", 0],
+          ["btnStep1", 1],
+          ["btnStep2", 2],
+        ].forEach(([id, k]) =>
+          document.getElementById(id).classList.toggle("active", k === n),
+        );
+        if (n === 0) {
+          tLobby.style.display = "flex";
+          tBoard.style.display = "none";
+          tModal.style.display = "flex";
+          tToast.style.display = "none";
+          tCluster.style.display = "none";
+        } else if (n === 1) {
+          tLobby.style.display = "none";
+          tBoard.style.display = "grid";
+          tModal.style.display = "flex";
+          tToast.style.display = "block";
+          tCluster.style.display = "none";
+        } else {
+          tLobby.style.display = "none";
+          tBoard.style.display = "grid";
+          tModal.style.display = "none";
+          tToast.style.display = "none";
+          tCluster.style.display = "flex";
+          tCluster.style.bottom = "70px";
+          tCluster.style.right = "10px";
+        }
+      }
+      document.getElementById("btnStep0").onclick = () => step(0);
+      document.getElementById("btnStep1").onclick = () => step(1);
+      document.getElementById("btnStep2").onclick = () => step(2);
+      document.getElementById("tClose").onclick = () => step(2);
+      step(0);
+    </script>
+  </body>
+</html>
