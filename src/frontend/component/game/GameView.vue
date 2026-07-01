@@ -140,6 +140,7 @@ import { useGameActions } from "@/composables/useGameActions";
 import { useCardSelection } from "@/composables/useCardSelection";
 import { useFeedbackContext } from "@/composables/useFeedbackContext";
 import type { FeedbackGamePhase } from "@/composables/useFeedbackContext";
+import { useCurrentGameType } from "@/composables/useCurrentGameType";
 import { getSession } from "@/service/authService";
 import { restoreGuestSession } from "@/service/guestService";
 import GameLobbyView from "@/component/game/GameLobbyView.vue";
@@ -240,6 +241,7 @@ watch(effectiveStatus, (newStatus, oldStatus) => {
 });
 
 const { setGamePhase, clearGamePhase } = useFeedbackContext();
+const { setCurrentGameType, resetCurrentGameType } = useCurrentGameType();
 
 function toFeedbackPhase(phase: DisplayPhase): FeedbackGamePhase {
   switch (phase) {
@@ -337,6 +339,7 @@ onMounted(async () => {
     const game = response.data.gameState;
     maxPlayers.value = game.maxPlayers;
     gameType.value = game.gameType;
+    setCurrentGameType(game.gameType);
     turnTimerSeconds.value = game.turnTimerSeconds;
     roomCode.value = game.joinCode ?? "";
     initialPlayerIds = game.playerIds;
@@ -417,6 +420,7 @@ onUnmounted(() => {
   unbindActions();
   disconnect();
   clearGamePhase();
+  resetCurrentGameType();
 });
 
 async function onStartGame(): Promise<void> {

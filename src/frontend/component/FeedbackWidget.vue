@@ -72,20 +72,15 @@ async function submit() {
     submitting.value = false;
   }
 }
+
+// The floating trigger now lives in HelpCluster (LLD 111 §3.5 Option A). This
+// component owns only the modal + submit + toast; the parent opens it and reads
+// `isOpen` so it can hide its bug-icon trigger while the modal is up.
+defineExpose({ open: openModal, isOpen });
 </script>
 
 <template>
   <div class="feedback-widget">
-    <button
-      v-if="!isOpen"
-      class="feedback-widget__trigger"
-      aria-label="Send feedback"
-      data-testid="feedback-trigger"
-      @click="openModal"
-    >
-      Feedback
-    </button>
-
     <div
       v-if="isOpen"
       class="feedback-widget__overlay"
@@ -158,33 +153,10 @@ async function submit() {
 </template>
 
 <style scoped>
-.feedback-widget__trigger {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1000;
-  font-family: var(--font-ui);
-  font-size: 0.85rem;
-  background: var(--table-rim);
-  color: var(--gold-accent);
-  border: 1px solid var(--gold-accent);
-  border-radius: 6px;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
-
-.feedback-widget__trigger:hover {
-  background: var(--gold-accent);
-  color: var(--bg-dark);
-}
-
 .feedback-widget__overlay {
   position: fixed;
   inset: 0;
-  z-index: 1001;
+  z-index: 1101;
   background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
@@ -281,7 +253,7 @@ async function submit() {
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 1002;
+  z-index: 1102;
   background: var(--table-rim);
   color: var(--gold-accent);
   border: 1px solid var(--gold-accent);

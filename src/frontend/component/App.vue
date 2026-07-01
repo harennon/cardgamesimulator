@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { type Session } from "@supabase/supabase-js";
 import { getSession, signOut, supabase } from "@/service/authService";
-import FeedbackWidget from "@/component/FeedbackWidget.vue";
+import HelpCluster from "@/component/howto/HelpCluster.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -66,7 +66,7 @@ async function logout() {
       </div>
     </nav>
     <router-view :key="routeViewKey" />
-    <FeedbackWidget />
+    <HelpCluster />
   </div>
 </template>
 
