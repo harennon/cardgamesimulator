@@ -7,14 +7,24 @@
       data-testid="trick-pile-toggle"
       @click="toggle"
     >
+      <!-- Mobile: one static layer, constant footprint -->
       <span
-        v-for="(entry, i) in stackLayers"
-        :key="`layer-${i}`"
-        class="trick-pile__layer"
-        :style="layerStyle(i)"
+        v-if="isMobile && latestPlay"
+        class="trick-pile__layer trick-pile__layer--static"
       >
-        <GameCard :card="topCardOf(entry)" size="small" />
+        <GameCard :card="topCardOf(latestPlay)" size="small" />
       </span>
+      <!-- Desktop: existing layered stack, unchanged -->
+      <template v-else>
+        <span
+          v-for="(entry, i) in stackLayers"
+          :key="`layer-${i}`"
+          class="trick-pile__layer"
+          :style="layerStyle(i)"
+        >
+          <GameCard :card="topCardOf(entry)" size="small" />
+        </span>
+      </template>
       <span class="trick-pile__badge" data-testid="trick-pile-badge">{{
         badgeCount
       }}</span>
@@ -76,7 +86,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, watch, onUnmounted } from "vue";
+import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import type { Big2HistoryEntry } from "@shared/big2-types";
 import type { Card } from "@shared/engine-types";
 import GameCard from "./GameCard.vue";
@@ -108,6 +118,12 @@ const playEntries = computed<Big2HistoryEntry[]>(() =>
 
 const badgeCount = computed<number>(() => playEntries.value.length);
 
+// Most-recent play; drives the mobile static layer only. May be undefined for a
+// degenerate all-pass current trick (guarded by v-if in the template).
+const latestPlay = computed<Big2HistoryEntry | undefined>(
+  () => playEntries.value[playEntries.value.length - 1],
+);
+
 // Collapsed stack: only plays are cards. Top of the pile = most recent play.
 // We render up to MAX_LAYERS, ordered so the last (most recent) sits on top.
 const stackLayers = computed<Big2HistoryEntry[]>(() => {
@@ -127,6 +143,20 @@ function layerStyle(i: number): Record<string, string> {
     zIndex: String(i + 1),
   };
 }
+
+// Mobile renders a single static layer; desktop renders the layered stack.
+// A CSS media query cannot switch template structure, so branch on this flag
+// (same pattern as GameBoard.vue).
+const isMobile = ref(false);
+const mql = window.matchMedia("(max-width: 767px)");
+function handleMediaChange(e: MediaQueryListEvent): void {
+  isMobile.value = e.matches;
+}
+
+onMounted(() => {
+  isMobile.value = mql.matches;
+  mql.addEventListener("change", handleMediaChange);
+});
 
 const expanded = ref(false);
 
@@ -160,6 +190,7 @@ watch(
 
 onUnmounted(() => {
   document.removeEventListener("keydown", onKeydown);
+  mql.removeEventListener("change", handleMediaChange);
 });
 </script>
 
@@ -314,9 +345,18 @@ onUnmounted(() => {
 }
 
 @media (max-width: 767px) {
+  /* Constant, unscaled footprint: exactly one small card + badge. The
+     scale(0.85) that used to blur the pile's real footprint is removed so the
+     fixed-corner placement (LLD 108 Decision 1) is deterministic. */
   .trick-pile__stack {
-    transform: scale(0.85);
-    transform-origin: top left;
+    width: 30px;
+    height: 42px;
+  }
+
+  .trick-pile__layer--static {
+    position: absolute;
+    top: 0;
+    left: 0;
   }
 
   .trick-overlay__panel {

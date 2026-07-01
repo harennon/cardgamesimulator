@@ -152,8 +152,36 @@ const lastPlayDisplayName = computed(() => {
 }
 
 @media (max-width: 767px) {
+  /* (a) Make .play-area the containing block for the pile. */
+  .play-area {
+    position: relative;
+  }
+  /* (b) Demote the centered box so it is no longer the nearest positioned
+         ancestor — otherwise the pile still anchors to the shrink-wrapped
+         centered play, not the felt corner. */
+  .play-area__center {
+    position: static;
+  }
+  /* Pin the pile to the felt's bottom-left corner, decoupled from the play. */
   .play-area__trick-pile {
-    left: -64px;
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    top: auto;
+    transform: none; /* cancel desktop translateY(-50%) */
+  }
+
+  /* Width-cap the played row and let cards flex-shrink to share the width. */
+  .play-area__card-row {
+    max-width: var(--play-row-max-width);
+    width: 100%;
+    justify-content: center;
+  }
+  .play-area__card-row .card--medium {
+    flex: 0 1 var(--card-hand-width); /* shrink allowed, never grow past natural */
+    min-width: 0; /* allow shrink below content size */
+    height: auto; /* preserve aspect via ratio */
+    aspect-ratio: var(--card-hand-width) / var(--card-hand-height);
   }
 }
 </style>
