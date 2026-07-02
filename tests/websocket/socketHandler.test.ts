@@ -306,6 +306,7 @@ describe("socketHandler handleGameJoin — CREATED branch", () => {
       getSpectatorView: vi.fn().mockResolvedValue(null),
       applyAction: vi.fn(),
       startGame: vi.fn(),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set()),
     } as unknown as GameService;
   });
 
@@ -475,6 +476,7 @@ describe("socketHandler handleGameJoin — timer recovery on wake", () => {
       getSpectatorView: vi.fn().mockResolvedValue(null),
       applyAction: vi.fn().mockResolvedValue(undefined),
       startGame: vi.fn(),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set()),
     } as unknown as GameService;
   });
 
@@ -624,6 +626,7 @@ describe("socketHandler handleGameJoin — join-time game:state joinCode", () =>
       getSpectatorView: vi.fn().mockResolvedValue(null),
       applyAction: vi.fn(),
       startGame: vi.fn(),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set()),
     } as unknown as GameService;
   });
 
@@ -792,6 +795,7 @@ describe("socketHandler — AI-seat: shouldAutoPlay and handleGameStart", () => 
         .mockImplementation(
           async (_gameId: string, playerId: string) => playerId === aiId,
         ),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set([aiId])),
     } as unknown as GameService;
 
     const { socket } = makeSocket(humanId, "Host");
@@ -862,6 +866,7 @@ describe("socketHandler — AI-seat: shouldAutoPlay and handleGameStart", () => 
         .mockImplementation(
           async (_gameId: string, playerId: string) => playerId === aiId,
         ),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set([aiId])),
     } as unknown as GameService;
 
     const { socket } = makeSocket(humanId, "Host");
@@ -927,6 +932,7 @@ describe("socketHandler — AI-seat: shouldAutoPlay and handleGameStart", () => 
       getSpectatorView: vi.fn().mockResolvedValue(null),
       applyAction: vi.fn(),
       isAiSeat: vi.fn().mockResolvedValue(false), // human seat
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set()),
     } as unknown as GameService;
 
     const { socket } = makeSocket(humanId, "Host");

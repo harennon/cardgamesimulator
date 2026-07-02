@@ -35,6 +35,7 @@ export type PlayerId = string;
 export interface PlayerInfo {
   readonly playerId: PlayerId;
   readonly displayName: string;
+  readonly isAi?: boolean; // true iff this seat is a server-driven AI seat
 }
 
 // Base type for all game actions. Each game engine defines its own
@@ -86,6 +87,7 @@ export interface PlayerPublicInfo {
   readonly displayName: string;
   readonly cardCount: number;
   readonly isConnected: boolean;
+  readonly isAi?: boolean; // derived server-side from gameConfig.aiPlayerIds
 }
 
 // What you can see about yourself (includes your hand)

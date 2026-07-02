@@ -110,11 +110,20 @@ export async function createTestServer(
     app.use(path, authMiddleware, handler.router);
   });
 
+  const gameCache = new GameCache();
+  const statsService = new StatsService(SupabaseDB.INSTANCE, guestSessionStore);
+  const gameService = new GameService(
+    gameCache,
+    engineFactory,
+    SupabaseDB.INSTANCE,
+    statsService,
+  );
+
   app.use(
     "/createGame",
     authMiddleware,
     registeredOnlyMiddleware,
-    CreateGameHandler.INSTANCE.router,
+    CreateGameHandler.create(gameService).router,
   );
 
   // Stats route (auth required, guests allowed)
@@ -126,15 +135,6 @@ export async function createTestServer(
   const httpServer = http.createServer(app);
   const io = createSocketServer(httpServer);
   io.use(createSocketAuthMiddleware(guestSessionStore));
-
-  const gameCache = new GameCache();
-  const statsService = new StatsService(SupabaseDB.INSTANCE, guestSessionStore);
-  const gameService = new GameService(
-    gameCache,
-    engineFactory,
-    SupabaseDB.INSTANCE,
-    statsService,
-  );
 
   // Seed endpoint (test-only) — registered after gameCache/gameService are created
   app.use(

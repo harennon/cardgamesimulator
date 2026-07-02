@@ -156,6 +156,75 @@ function assertBig2CompletedInvariant(state: InternalGameState): void {
 }
 
 // ---------------------------------------------------------------------------
+// getAiSeatIds — cache-backed set retrieval
+// ---------------------------------------------------------------------------
+
+describe("GameService.getAiSeatIds", () => {
+  it("returns the AI ids from gameConfig.aiPlayerIds (IN_PROGRESS game, cached)", async () => {
+    const statsRepo = makeStatsRepo();
+    const { service: svc, repo: r } = makeRealService(statsRepo);
+    const aiId = `ai:${crypto.randomUUID()}`;
+    const humanId = "player-human";
+
+    const g = new Game();
+    g.gameId = "g-ai-ids";
+    g.gameType = "big2";
+    g.playerIds = [humanId, aiId];
+    g.playerDisplayNames = { [humanId]: "Human", [aiId]: "CPU 1" };
+    g.maxPlayers = 4;
+    g.status = "IN_PROGRESS";
+    g.state = {};
+    g.turnTimerSeconds = null;
+    g.joinCode = null;
+    g.gameConfig = { practice: true, aiPlayerIds: [aiId] };
+    g.version = 1;
+
+    (r.getGame as ReturnType<typeof vi.fn>).mockImplementation(async () => g);
+
+    const ids = await svc.getAiSeatIds("g-ai-ids");
+    expect(ids.has(aiId)).toBe(true);
+    expect(ids.has(humanId)).toBe(false);
+
+    // Second call hits the cache — getGame called only once
+    await svc.getAiSeatIds("g-ai-ids");
+    expect((r.getGame as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+  });
+
+  it("returns empty set when gameConfig has no aiPlayerIds", async () => {
+    const statsRepo = makeStatsRepo();
+    const { service: svc, repo: r } = makeRealService(statsRepo);
+
+    const g = new Game();
+    g.gameId = "g-no-ai";
+    g.gameType = "big2";
+    g.playerIds = ["user-1", "user-2"];
+    g.playerDisplayNames = { "user-1": "Alice", "user-2": "Bob" };
+    g.maxPlayers = 4;
+    g.status = "IN_PROGRESS";
+    g.state = {};
+    g.turnTimerSeconds = null;
+    g.joinCode = null;
+    g.gameConfig = {};
+    g.version = 1;
+
+    (r.getGame as ReturnType<typeof vi.fn>).mockImplementation(async () => g);
+
+    const ids = await svc.getAiSeatIds("g-no-ai");
+    expect(ids.size).toBe(0);
+  });
+
+  it("returns empty set when game does not exist", async () => {
+    const statsRepo = makeStatsRepo();
+    const { service: svc, repo: r } = makeRealService(statsRepo);
+
+    (r.getGame as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+    const ids = await svc.getAiSeatIds("nonexistent");
+    expect(ids.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Full-game simulation — Big2, 1 human + 1 AI
 // ---------------------------------------------------------------------------
 

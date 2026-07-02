@@ -125,4 +125,47 @@ describe("Game CRUD integration", () => {
     expect(gameState.playerIds).toContain(userB.id);
     expect(gameState.status).toBe("CREATED");
   });
+
+  it("numAiSeats=2 creates a practice game with 2 AI seats in gameConfig.aiPlayerIds", async () => {
+    const host = await createTestUser("PracticeHost");
+
+    const createRes = await request(ctx.app)
+      .post("/createGame")
+      .set("Authorization", `Bearer ${host.accessToken}`)
+      .send({
+        gameType: "big2",
+        maxPlayers: 4,
+        turnTimerSeconds: 30,
+        numAiSeats: 2,
+      });
+
+    expect(createRes.status).toBe(200);
+    const gameId = createRes.body.gameId as string;
+
+    const stateRes = await request(ctx.app)
+      .get(`/getGameState?gameId=${gameId}`)
+      .set("Authorization", `Bearer ${host.accessToken}`);
+
+    expect(stateRes.status).toBe(200);
+    const gameState = stateRes.body.gameState as {
+      playerIds: string[];
+      gameConfig: { practice?: boolean; aiPlayerIds?: string[] };
+    };
+
+    // 1 human host + 2 AI seats
+    expect(gameState.playerIds).toHaveLength(3);
+    expect(gameState.playerIds).toContain(host.id);
+
+    // gameConfig must carry practice flag and the 2 AI ids
+    expect(gameState.gameConfig.practice).toBe(true);
+    expect(Array.isArray(gameState.gameConfig.aiPlayerIds)).toBe(true);
+    expect(gameState.gameConfig.aiPlayerIds).toHaveLength(2);
+
+    // AI ids must be in playerIds and must not include the human host
+    const aiIds = gameState.gameConfig.aiPlayerIds!;
+    aiIds.forEach((aiId) => {
+      expect(gameState.playerIds).toContain(aiId);
+      expect(aiId).not.toBe(host.id);
+    });
+  });
 });

@@ -143,6 +143,7 @@ import type { FeedbackGamePhase } from "@/composables/useFeedbackContext";
 import { useCurrentGameType } from "@/composables/useCurrentGameType";
 import { getSession } from "@/service/authService";
 import { restoreGuestSession } from "@/service/guestService";
+import { buildRestLobbyPlayers } from "@/component/game/lobbyUtils";
 import GameLobbyView from "@/component/game/GameLobbyView.vue";
 import GameBoard from "@/component/game/GameBoard.vue";
 import TonkBoard from "@/component/game/TonkBoard.vue";
@@ -344,10 +345,11 @@ onMounted(async () => {
     roomCode.value = game.joinCode ?? "";
     initialPlayerIds = game.playerIds;
 
-    lobbyPlayers.value = initialPlayerIds.map((id) => ({
-      playerId: id,
-      displayName: game.playerDisplayNames[id] ?? id,
-    }));
+    lobbyPlayers.value = buildRestLobbyPlayers(
+      initialPlayerIds,
+      game.playerDisplayNames,
+      game.gameConfig?.aiPlayerIds,
+    );
 
     restStatus.value = game.status;
   } catch (err: unknown) {

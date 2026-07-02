@@ -10,6 +10,7 @@ import { BadRequestError } from "@/util/errors";
 import { generateJoinCode } from "@/service/joinCodeService";
 import { Game } from "@/database/entities/Game";
 import type { GameType } from "@shared/engine-types";
+import type { GameService } from "@/service/gameService";
 
 const VALID_TIMER_VALUES: ReadonlySet<number> = new Set([30, 60, 90]);
 
@@ -36,8 +37,47 @@ function resolveDeckRoundsTargetOrThrow(raw: number | undefined): number {
   return raw;
 }
 
+/**
+ * Validate and resolve numAiSeats from the request body.
+ * Returns 0 when absent/0 (human-only game; no addAiSeats call needed).
+ * Throws BadRequestError for:
+ *   - non-integer or negative value
+ *   - value exceeding maxPlayers - 1 (at least one human seat required)
+ *   - value >= 1 from a guest (registered-host-only capability)
+ */
+export function validateNumAiSeatsOrThrow(
+  raw: unknown,
+  maxPlayers: number,
+  isRegisteredHost: boolean,
+): number {
+  if (raw == null || raw === 0) return 0;
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 0) {
+    throw new BadRequestError();
+  }
+  if (raw > maxPlayers - 1) {
+    throw new BadRequestError();
+  }
+  if (!isRegisteredHost) {
+    throw new BadRequestError();
+  }
+  return raw;
+}
+
 export class CreateGameHandler extends Handler {
-  public static INSTANCE: CreateGameHandler = new CreateGameHandler();
+  public static INSTANCE: CreateGameHandler = new CreateGameHandler(null);
+
+  private constructor(private readonly gameService: GameService | null) {
+    super();
+  }
+
+  /**
+   * Create a new instance wired to a GameService (used in server.ts).
+   * The INSTANCE singleton remains null-wired for legacy imports; the
+   * server.ts wired instance is used at runtime.
+   */
+  public static create(gameService: GameService): CreateGameHandler {
+    return new CreateGameHandler(gameService);
+  }
 
   public override async post(
     request: Request<CreateGameRequest>,
@@ -55,6 +95,14 @@ export class CreateGameHandler extends Handler {
     );
     const gameConfig: GameConfig =
       request.body.gameType === "tonk" ? { deckRoundsTarget } : {};
+
+    const isRegisteredHost = request.isGuest !== true;
+    const numAiSeats = validateNumAiSeatsOrThrow(
+      request.body.numAiSeats,
+      request.body.maxPlayers,
+      isRegisteredHost,
+    );
+
     const gameId = crypto.randomUUID();
     const game = await this.createGameWithCode(
       gameId,
@@ -65,6 +113,14 @@ export class CreateGameHandler extends Handler {
       turnTimerSeconds,
       gameConfig,
     );
+
+    if (numAiSeats >= 1) {
+      if (this.gameService == null) {
+        throw new Error("INTERNAL_ERROR: gameService not wired");
+      }
+      await this.gameService.addAiSeats(game.gameId, numAiSeats);
+    }
+
     const createGameResponse: CreateGameResponse = {
       gameId: game.gameId,
       gameType: request.body.gameType,
