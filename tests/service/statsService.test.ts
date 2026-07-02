@@ -644,4 +644,73 @@ describe("StatsService.recordGameCompletion", () => {
 
     expect(repo.recordGameHistory).not.toHaveBeenCalled();
   });
+
+  // -------------------------------------------------------------------------
+  // LLD 118: practice game exclusion
+  // -------------------------------------------------------------------------
+
+  it("practice=true skips BOTH incrementStats and recordGameHistory for all seats (Big2 score shape)", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await service.recordGameCompletion(makeCompletedState(), true);
+
+    expect(repo.incrementStats).not.toHaveBeenCalled();
+    expect(repo.recordGameHistory).not.toHaveBeenCalled();
+  });
+
+  it("practice=true skips BOTH writes for Tonk loss-centric score shape", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    const tonkState = makeCompletedState({
+      gameType: "tonk",
+      winner: "player-b",
+      players: [
+        { playerId: "player-a", displayName: "Alice" },
+        { playerId: "player-b", displayName: "Bob" },
+      ],
+      scores: [
+        {
+          playerId: "player-a",
+          score: 160,
+          breakdown: { lost: 1, trueLoser: 1, finalTally: 160 },
+        },
+        {
+          playerId: "player-b",
+          score: 35,
+          breakdown: { lost: 0, trueLoser: 0, finalTally: 35 },
+        },
+      ],
+    });
+
+    await service.recordGameCompletion(tonkState, true);
+
+    expect(repo.incrementStats).not.toHaveBeenCalled();
+    expect(repo.recordGameHistory).not.toHaveBeenCalled();
+  });
+
+  it("practice=false (default) with registered players → both writes called per player (regression)", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await service.recordGameCompletion(makeCompletedState(), false);
+
+    expect(repo.incrementStats).toHaveBeenCalledTimes(2);
+    expect(repo.recordGameHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it("omitting the practice argument (default false) behaves identically to passing false", async () => {
+    const repo = makeStatsRepo();
+    const guestStore = makeGuestSessionStore();
+    const service = new StatsService(repo, guestStore);
+
+    await service.recordGameCompletion(makeCompletedState());
+
+    expect(repo.incrementStats).toHaveBeenCalledTimes(2);
+    expect(repo.recordGameHistory).toHaveBeenCalledTimes(2);
+  });
 });

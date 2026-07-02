@@ -12,12 +12,19 @@ export class StatsService {
    * Record stats for all registered (non-guest) players in a completed game.
    * Called once when game status transitions to COMPLETED.
    *
+   * When `practice` is true, skips ALL writes (both incrementStats and
+   * recordGameHistory) for every seat. Practice games are never recorded.
    * Silently skips guest players. Errors on individual player upserts are
    * logged but do not block other players' stat recording.
    */
-  async recordGameCompletion(state: InternalGameState): Promise<void> {
+  async recordGameCompletion(
+    state: InternalGameState,
+    practice: boolean = false,
+  ): Promise<void> {
     if (state.status !== "COMPLETED") return;
     if (!state.scores || state.scores.length === 0) return;
+
+    if (practice) return;
 
     const gameType = state.gameType; // already on InternalGameState — no new dependency
     const winnerId = state.winner;

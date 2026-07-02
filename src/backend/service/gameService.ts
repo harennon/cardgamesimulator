@@ -12,12 +12,23 @@ import type { Game } from "@/database/entities/Game";
 import { SeededPRNG } from "@/engine/prng";
 import type { StatsService } from "@/service/statsService";
 
+// Per-engine minimum player counts. Centralised here so startGame can guard
+// correctly without hardcoding 2 everywhere (Tonk requires 3).
+const ENGINE_MIN_PLAYERS: Record<string, number> = {
+  big2: 2,
+  tonk: 3,
+};
+
 export class GameService {
   // Read-through cache of the immutable join code per game. The join code is set
   // once at creation (LLD 28) and never changes, so it is safe to memoize. This
   // avoids an uncached DB read on the per-broadcast hot path (getGame is not
   // cache-backed, unlike getGameState) when surfacing the code on game:state.
   private readonly joinCodeCache: Map<string, string | null> = new Map();
+
+  // Memoised set of AI player ids per game, populated only once a game is
+  // IN_PROGRESS. Immutable post-start; safe to cache indefinitely.
+  private readonly aiSeatCache: Map<string, ReadonlySet<string>> = new Map();
 
   constructor(
     private readonly cache: GameCache,
@@ -88,8 +99,17 @@ export class GameService {
     }
 
     const engine = this.engineFactory.getEngine(game.gameType);
-    const minPlayers = 2; // engines validate their own min, but we guard here too
-    if (game.playerIds.length < minPlayers) {
+    const engineMin = ENGINE_MIN_PLAYERS[game.gameType] ?? 2;
+
+    // Guard: at least one human must be present (no all-AI games).
+    const aiIds = new Set(game.gameConfig.aiPlayerIds ?? []);
+    const humanCount = game.playerIds.filter((id) => !aiIds.has(id)).length;
+    if (humanCount < 1) {
+      throw new Error("NO_HUMAN_PLAYERS");
+    }
+
+    // Guard: total seats (humans + AI) must satisfy the engine minimum.
+    if (game.playerIds.length < engineMin) {
       throw new Error("NOT_ENOUGH_PLAYERS");
     }
 
@@ -101,7 +121,7 @@ export class GameService {
     const prng = new SeededPRNG();
     const config = {
       maxPlayers: game.maxPlayers,
-      minPlayers,
+      minPlayers: engineMin,
       options: { deckRoundsTarget: game.gameConfig.deckRoundsTarget ?? 8 },
     };
 
@@ -173,6 +193,18 @@ export class GameService {
 
     const hostDisplayName =
       oldGame.playerDisplayNames?.[requesterId] ?? requesterId;
+
+    // Strip practice/AI markers: a rematch is always a fresh human-only game.
+    // AI seats never hold a socket, so the connection-roster rebuild already
+    // dropped them; carrying the marker would silently exclude stats.
+    const {
+      practice: _p,
+      aiPlayerIds: _ai,
+      ...rematchConfig
+    } = oldGame.gameConfig;
+    void _p;
+    void _ai;
+
     const newGame = await this.gameRepo.createGame(
       newGameId,
       oldGame.gameType,
@@ -181,7 +213,7 @@ export class GameService {
       hostDisplayName,
       oldGame.turnTimerSeconds,
       transferCode,
-      oldGame.gameConfig,
+      rematchConfig,
     );
 
     // Attach the remaining carried-over players (createGame only seeds the host).
@@ -199,6 +231,64 @@ export class GameService {
     const state = await this.startGame(newGameId, requesterId);
 
     return { newGameId, state };
+  }
+
+  /**
+   * Seat `count` AI players onto a CREATED game and mark it as practice.
+   * Throws GAME_NOT_FOUND, GAME_ALREADY_STARTED, GAME_FULL, INVALID_AI_COUNT.
+   */
+  async addAiSeats(gameId: string, count: number): Promise<Game> {
+    if (count < 1) {
+      throw new Error("INVALID_AI_COUNT");
+    }
+
+    const game = await this.gameRepo.getGame(gameId);
+    if (!game) {
+      throw new Error("GAME_NOT_FOUND");
+    }
+    if (game.status !== "CREATED") {
+      throw new Error("GAME_ALREADY_STARTED");
+    }
+    if (game.playerIds.length + count > game.maxPlayers) {
+      throw new Error("GAME_FULL");
+    }
+
+    const existingAiCount = (game.gameConfig.aiPlayerIds ?? []).length;
+    for (let i = 0; i < count; i++) {
+      const aiId = `ai:${crypto.randomUUID()}`;
+      const displayName = `CPU ${existingAiCount + i + 1}`;
+      game.playerIds.push(aiId);
+      game.playerDisplayNames[aiId] = displayName;
+      game.gameConfig = {
+        ...game.gameConfig,
+        practice: true,
+        aiPlayerIds: [...(game.gameConfig.aiPlayerIds ?? []), aiId],
+      };
+    }
+
+    await this.gameRepo.saveGame(game);
+    return game;
+  }
+
+  /**
+   * Returns true if playerId is an AI seat in gameId.
+   * Memoised after first read once the game is IN_PROGRESS; reads through
+   * without caching while the game is still CREATED (seats may still be added).
+   */
+  async isAiSeat(gameId: string, playerId: PlayerId): Promise<boolean> {
+    const cached = this.aiSeatCache.get(gameId);
+    if (cached !== undefined) return cached.has(playerId);
+
+    const game = await this.gameRepo.getGame(gameId);
+    if (!game) return false;
+
+    const aiIds = new Set(game.gameConfig.aiPlayerIds ?? []);
+    // Only memoize once the game has left CREATED so we never cache an
+    // incomplete set from an in-progress lobby.
+    if (game.status !== "CREATED") {
+      this.aiSeatCache.set(gameId, aiIds);
+    }
+    return aiIds.has(playerId);
   }
 
   /**
@@ -228,9 +318,10 @@ export class GameService {
       game.state = result.newState as unknown as Record<string, unknown>;
       if (result.newState.status === "COMPLETED") {
         game.status = "COMPLETED";
+        const practice = game.gameConfig.practice === true;
         // Fire-and-forget: don't block game state persistence on stats
         this.statsService
-          .recordGameCompletion(result.newState)
+          .recordGameCompletion(result.newState, practice)
           .catch((err: unknown) =>
             console.error("Stats recording failed:", err),
           );
