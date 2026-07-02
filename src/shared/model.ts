@@ -8,6 +8,10 @@ export interface GameConfig {
   // Tonk only: target deck length in rounds, integer [5,12], default 8.
   // Absent for Big2 and for Tonk games created before this field existed.
   deckRoundsTarget?: number;
+  // true iff the game contains AI seats; excludes from stats/history writes.
+  practice?: boolean;
+  // Synthetic playerIds seated as AI; subset of Game.playerIds.
+  aiPlayerIds?: string[];
 }
 
 export interface CreateGameRequest {

@@ -395,9 +395,10 @@ describe("GameService", () => {
         .mockReturnValue(makeState("game-1", { status: "IN_PROGRESS" }));
       const engine = makeEngine({ initialize });
       const factory = makeEngineFactory(engine);
+      // Tonk requires ≥3 players; use 3 to satisfy the engine-min guard.
       const game = makeGame({
         gameType: "tonk",
-        playerIds: ["player-a", "player-b"],
+        playerIds: ["player-a", "player-b", "player-c"],
         gameConfig: { deckRoundsTarget: 6 },
       });
       const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
@@ -725,8 +726,15 @@ describe("GameService", () => {
 
     it("carries the old game's gameConfig into the new createGame call (preserves deck length)", async () => {
       const cache = new GameCache();
+      // Tonk requires ≥3 players; use 3 to satisfy the engine-min guard.
       const oldGame = makeCompletedGame({
         gameType: "tonk",
+        playerIds: ["player-a", "player-b", "player-c"],
+        playerDisplayNames: {
+          "player-a": "Alice",
+          "player-b": "Bob",
+          "player-c": "Carol",
+        },
         gameConfig: { deckRoundsTarget: 6 },
       });
       const repo = makeInMemoryRepo([oldGame]);
@@ -736,10 +744,10 @@ describe("GameService", () => {
       const { newGameId } = await service.createRematch(
         "old-game",
         "player-a",
-        ["player-a", "player-b"],
+        ["player-a", "player-b", "player-c"],
       );
 
-      // The 8th createGame arg is the carried-over gameConfig.
+      // The 8th createGame arg is the carried-over gameConfig (practice/aiPlayerIds stripped).
       const createArgs = (repo.createGame as ReturnType<typeof vi.fn>).mock
         .calls[0]!;
       expect(createArgs[7]).toEqual({ deckRoundsTarget: 6 });
@@ -842,6 +850,7 @@ describe("GameService", () => {
 
       expect(statsService.recordGameCompletion).toHaveBeenCalledWith(
         completedState,
+        false,
       );
     });
 
@@ -926,6 +935,442 @@ describe("GameService", () => {
       for (const p of result!.players) {
         expect((p as Record<string, unknown>).hand).toBeUndefined();
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // LLD 118: startGame — relaxed start gate
+  // ---------------------------------------------------------------------------
+
+  describe("startGame — AI-seat / human-count guards", () => {
+    it("1 human + 1 AI for Big2 (total 2) → starts; AI seat has a hand", async () => {
+      const cache = new GameCache();
+      const aiId = "ai:00000000-0000-0000-0000-000000000001";
+      const initialState = makeState("game-1", {
+        status: "IN_PROGRESS",
+        players: [
+          { playerId: "player-a", displayName: "Alice" },
+          { playerId: aiId, displayName: "CPU 1" },
+        ],
+      });
+      const engine = makeEngine({
+        initialize: vi.fn().mockReturnValue(initialState),
+      });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({
+        gameType: "big2",
+        playerIds: ["player-a", aiId],
+        gameConfig: { practice: true, aiPlayerIds: [aiId] },
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const result = await service.startGame("game-1", "player-a");
+
+      expect(result.status).toBe("IN_PROGRESS");
+      expect(result.players).toHaveLength(2);
+      expect(result.players.some((p) => p.playerId === aiId)).toBe(true);
+    });
+
+    it("0 humans + N AI → throws NO_HUMAN_PLAYERS", async () => {
+      const cache = new GameCache();
+      const aiId1 = "ai:00000000-0000-0000-0000-000000000001";
+      const aiId2 = "ai:00000000-0000-0000-0000-000000000002";
+      const game = makeGame({
+        gameType: "big2",
+        playerIds: [aiId1, aiId2],
+        gameConfig: { practice: true, aiPlayerIds: [aiId1, aiId2] },
+      });
+      // Host check uses playerIds[0]; we pass that as requesterId
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(service.startGame("game-1", aiId1)).rejects.toThrow(
+        "NO_HUMAN_PLAYERS",
+      );
+    });
+
+    it("1 human + 1 AI for Tonk (total 2) → throws NOT_ENOUGH_PLAYERS", async () => {
+      const cache = new GameCache();
+      const aiId = "ai:00000000-0000-0000-0000-000000000001";
+      const game = makeGame({
+        gameType: "tonk",
+        playerIds: ["player-a", aiId],
+        gameConfig: { practice: true, aiPlayerIds: [aiId] },
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(service.startGame("game-1", "player-a")).rejects.toThrow(
+        "NOT_ENOUGH_PLAYERS",
+      );
+    });
+
+    it("1 human + 2 AI for Tonk (total 3) → starts", async () => {
+      const cache = new GameCache();
+      const aiId1 = "ai:00000000-0000-0000-0000-000000000001";
+      const aiId2 = "ai:00000000-0000-0000-0000-000000000002";
+      const initialState = makeState("game-1", {
+        status: "IN_PROGRESS",
+        players: [
+          { playerId: "player-a", displayName: "Alice" },
+          { playerId: aiId1, displayName: "CPU 1" },
+          { playerId: aiId2, displayName: "CPU 2" },
+        ],
+      });
+      const engine = makeEngine({
+        initialize: vi.fn().mockReturnValue(initialState),
+      });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({
+        gameType: "tonk",
+        playerIds: ["player-a", aiId1, aiId2],
+        gameConfig: { practice: true, aiPlayerIds: [aiId1, aiId2] },
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const result = await service.startGame("game-1", "player-a");
+
+      expect(result.status).toBe("IN_PROGRESS");
+      expect(result.players).toHaveLength(3);
+    });
+
+    it("regression: 2 humans, no AI, Big2 → starts exactly as before", async () => {
+      const cache = new GameCache();
+      const initialState = makeState("game-1", { status: "IN_PROGRESS" });
+      const engine = makeEngine({
+        initialize: vi.fn().mockReturnValue(initialState),
+      });
+      const factory = makeEngineFactory(engine);
+      const game = makeGame({
+        gameType: "big2",
+        playerIds: ["player-a", "player-b"],
+        gameConfig: {},
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const result = await service.startGame("game-1", "player-a");
+
+      expect(result.status).toBe("IN_PROGRESS");
+    });
+
+    it("regression: 1 human, no AI, Big2 → still throws NOT_ENOUGH_PLAYERS", async () => {
+      const cache = new GameCache();
+      const game = makeGame({
+        gameType: "big2",
+        playerIds: ["player-a"],
+        gameConfig: {},
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(service.startGame("game-1", "player-a")).rejects.toThrow(
+        "NOT_ENOUGH_PLAYERS",
+      );
+    });
+
+    it("regression: 2 humans, no AI, Tonk → still throws NOT_ENOUGH_PLAYERS (Tonk min 3)", async () => {
+      const cache = new GameCache();
+      const game = makeGame({
+        gameType: "tonk",
+        playerIds: ["player-a", "player-b"],
+        gameConfig: {},
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(service.startGame("game-1", "player-a")).rejects.toThrow(
+        "NOT_ENOUGH_PLAYERS",
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // LLD 118: addAiSeats
+  // ---------------------------------------------------------------------------
+
+  describe("addAiSeats", () => {
+    it("seats count AI ids (prefix ai:), sets practice=true, populates aiPlayerIds, adds display names, persists", async () => {
+      const cache = new GameCache();
+      const game = makeGame({
+        playerIds: ["player-a"],
+        playerDisplayNames: { "player-a": "Alice" },
+        maxPlayers: 4,
+        gameConfig: {},
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const result = await service.addAiSeats("game-1", 2);
+
+      expect(result.playerIds).toHaveLength(3);
+      const aiIds = result.gameConfig.aiPlayerIds!;
+      expect(aiIds).toHaveLength(2);
+      for (const aiId of aiIds) {
+        expect(aiId).toMatch(/^ai:/);
+        expect(result.playerIds).toContain(aiId);
+        expect(result.playerDisplayNames[aiId]).toMatch(/^CPU \d+$/);
+      }
+      expect(result.gameConfig.practice).toBe(true);
+      expect(repo.saveGame).toHaveBeenCalled();
+    });
+
+    it("count exceeding maxPlayers - current → throws GAME_FULL", async () => {
+      const cache = new GameCache();
+      const game = makeGame({
+        playerIds: ["player-a", "player-b"],
+        maxPlayers: 3,
+        gameConfig: {},
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(service.addAiSeats("game-1", 2)).rejects.toThrow(
+        "GAME_FULL",
+      );
+    });
+
+    it("called on non-CREATED game → throws GAME_ALREADY_STARTED", async () => {
+      const cache = new GameCache();
+      const game = makeGame({ status: "IN_PROGRESS", gameConfig: {} });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(service.addAiSeats("game-1", 1)).rejects.toThrow(
+        "GAME_ALREADY_STARTED",
+      );
+    });
+
+    it("count < 1 → throws INVALID_AI_COUNT", async () => {
+      const cache = new GameCache();
+      const game = makeGame({ gameConfig: {} });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(service.addAiSeats("game-1", 0)).rejects.toThrow(
+        "INVALID_AI_COUNT",
+      );
+    });
+
+    it("game not found → throws GAME_NOT_FOUND", async () => {
+      const cache = new GameCache();
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(null) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(service.addAiSeats("missing", 1)).rejects.toThrow(
+        "GAME_NOT_FOUND",
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // LLD 118: isAiSeat — memoization invariant
+  // ---------------------------------------------------------------------------
+
+  describe("isAiSeat", () => {
+    it("returns true for a seated AI id and false for a human id (after IN_PROGRESS)", async () => {
+      const cache = new GameCache();
+      const aiId = "ai:00000000-0000-0000-0000-000000000001";
+      const game = makeGame({
+        status: "IN_PROGRESS",
+        playerIds: ["player-a", aiId],
+        gameConfig: { practice: true, aiPlayerIds: [aiId] },
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      expect(await service.isAiSeat("game-1", aiId)).toBe(true);
+      expect(await service.isAiSeat("game-1", "player-a")).toBe(false);
+    });
+
+    it("returns false for an unknown id", async () => {
+      const cache = new GameCache();
+      const aiId = "ai:00000000-0000-0000-0000-000000000001";
+      const game = makeGame({
+        status: "IN_PROGRESS",
+        playerIds: ["player-a", aiId],
+        gameConfig: { practice: true, aiPlayerIds: [aiId] },
+      });
+      const repo = makeGameRepo({ getGame: vi.fn().mockResolvedValue(game) });
+      const factory = makeEngineFactory(makeEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      expect(await service.isAiSeat("game-1", "unknown-player")).toBe(false);
+    });
+
+    it("memoization invariant: isAiSeat called during CREATED does not cache; all AI ids visible after game transitions to IN_PROGRESS", async () => {
+      const cache = new GameCache();
+      const factory = makeEngineFactory(makeEngine());
+
+      // Simulate: game starts with 1 AI (CREATED), then a second AI is added,
+      // then game transitions to IN_PROGRESS. The repo is a mutable reference.
+      let currentGame = makeGame({
+        gameType: "big2",
+        status: "CREATED",
+        playerIds: ["player-a", "ai:first"],
+        playerDisplayNames: {
+          "player-a": "Alice",
+          "ai:first": "CPU 1",
+        },
+        gameConfig: { practice: true, aiPlayerIds: ["ai:first"] },
+      });
+      const repo = makeGameRepo({
+        getGame: vi.fn().mockImplementation(async () => currentGame),
+        saveGame: vi.fn().mockImplementation(async (g: Game) => {
+          currentGame = g;
+          return g;
+        }),
+      });
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      // Read during CREATED — should return true but must NOT cache (status=CREATED).
+      expect(await service.isAiSeat("game-1", "ai:first")).toBe(true);
+
+      // Simulate addAiSeats: add a second AI while still CREATED.
+      currentGame = Object.assign(
+        Object.create(Object.getPrototypeOf(currentGame)) as Game,
+        currentGame,
+        {
+          playerIds: [...currentGame.playerIds, "ai:second"],
+          playerDisplayNames: {
+            ...currentGame.playerDisplayNames,
+            "ai:second": "CPU 2",
+          },
+          gameConfig: {
+            ...currentGame.gameConfig,
+            aiPlayerIds: ["ai:first", "ai:second"],
+          },
+        },
+      );
+
+      // Transition to IN_PROGRESS (as startGame would do).
+      currentGame = Object.assign(
+        Object.create(Object.getPrototypeOf(currentGame)) as Game,
+        currentGame,
+        {
+          status: "IN_PROGRESS",
+        },
+      );
+
+      // Both AI ids must now be visible — proving the CREATED read did not
+      // cache an incomplete set that would miss "ai:second".
+      expect(await service.isAiSeat("game-1", "ai:first")).toBe(true);
+      expect(await service.isAiSeat("game-1", "ai:second")).toBe(true);
+      expect(await service.isAiSeat("game-1", "player-a")).toBe(false);
+
+      // After IN_PROGRESS, subsequent reads are served from the memo (no extra DB read).
+      const callsBefore = (repo.getGame as ReturnType<typeof vi.fn>).mock.calls
+        .length;
+      expect(await service.isAiSeat("game-1", "ai:first")).toBe(true);
+      expect((repo.getGame as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
+        callsBefore,
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // LLD 118: createRematch strips practice/AI
+  // ---------------------------------------------------------------------------
+
+  describe("createRematch — practice/AI stripping", () => {
+    function makeRematchEngine(): GameEngine {
+      return makeEngine({
+        initialize: vi
+          .fn()
+          .mockImplementation((gameId: string) =>
+            makeState(gameId, { status: "IN_PROGRESS" }),
+          ),
+      });
+    }
+
+    it("rematch of a practice game strips practice and aiPlayerIds; roster is humans only", async () => {
+      const cache = new GameCache();
+      const aiId = "ai:00000000-0000-0000-0000-000000000001";
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", "player-b", aiId],
+        playerDisplayNames: {
+          "player-a": "Alice",
+          "player-b": "Bob",
+          [aiId]: "CPU 1",
+        },
+        gameConfig: { practice: true, aiPlayerIds: [aiId] },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      // Only the 2 humans are connected
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "player-b"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.gameConfig.practice).toBeUndefined();
+      expect(newGame?.gameConfig.aiPlayerIds).toBeUndefined();
+      expect(newGame?.playerIds).not.toContain(aiId);
+      expect(newGame?.playerIds).toEqual(
+        expect.arrayContaining(["player-a", "player-b"]),
+      );
+    });
+
+    it("rematch of a practice game with only 1 human connected → throws NOT_ENOUGH_PLAYERS", async () => {
+      const cache = new GameCache();
+      const aiId = "ai:00000000-0000-0000-0000-000000000001";
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", aiId],
+        playerDisplayNames: { "player-a": "Alice", [aiId]: "CPU 1" },
+        joinCode: "H7K3",
+        gameConfig: { practice: true, aiPlayerIds: [aiId] },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a"]),
+      ).rejects.toThrow("NOT_ENOUGH_PLAYERS");
+    });
+
+    it("regression: rematch of a human-vs-human Tonk game preserves deckRoundsTarget, no practice added", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({
+        gameType: "tonk",
+        playerIds: ["player-a", "player-b", "player-c"],
+        playerDisplayNames: {
+          "player-a": "Alice",
+          "player-b": "Bob",
+          "player-c": "Carol",
+        },
+        gameConfig: { deckRoundsTarget: 7 },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "player-b", "player-c"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.gameConfig.deckRoundsTarget).toBe(7);
+      expect(newGame?.gameConfig.practice).toBeUndefined();
+      expect(newGame?.gameConfig.aiPlayerIds).toBeUndefined();
     });
   });
 });

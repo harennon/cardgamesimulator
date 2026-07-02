@@ -2,7 +2,11 @@ import type { TypedServer, TypedSocket } from "./socketServer.js";
 import type { ConnectionManager } from "./connectionManager.js";
 import type { GameService } from "@/service/gameService";
 import { engineFactory } from "@/engine/game-engine-factory";
-import type { PlayerPublicInfo, PlayerInfo } from "@shared/engine-types";
+import type {
+  PlayerPublicInfo,
+  PlayerInfo,
+  PlayerId,
+} from "@shared/engine-types";
 import type {
   GameJoinPayload,
   GameJoinResponse,
@@ -82,8 +86,23 @@ async function broadcastGameState(
 }
 
 /**
- * After a state change, if the new current player is abandoned, auto-play them immediately.
- * Loops until a non-abandoned player's turn or game completion.
+ * Returns true if the player's turn should be driven automatically:
+ * either it is an AI seat or it is an abandoned human.
+ */
+async function shouldAutoPlay(
+  gameId: string,
+  playerId: PlayerId,
+  gameService: GameService,
+  connectionManager: ConnectionManager,
+): Promise<boolean> {
+  if (connectionManager.isAbandoned(gameId, playerId)) return true;
+  return gameService.isAiSeat(gameId, playerId);
+}
+
+/**
+ * After a state change, if the new current player should be auto-driven
+ * (AI seat or abandoned), play them immediately.
+ * Loops until a non-driven player's turn or game completion.
  */
 async function autoPlayAbandoned(
   io: TypedServer,
@@ -106,9 +125,14 @@ async function autoPlayAbandoned(
     const currentPlayer = currentState.players[currentState.currentPlayerIndex];
     if (
       !currentPlayer ||
-      !connectionManager.isAbandoned(gameId, currentPlayer.playerId)
+      !(await shouldAutoPlay(
+        gameId,
+        currentPlayer.playerId,
+        gameService,
+        connectionManager,
+      ))
     ) {
-      // Connected player reached — start their turn timer only if we actually auto-played
+      // Non-driven player reached — start their turn timer only if we actually auto-played
       if (i > 0) {
         turnTimerService.startTurn(gameId, false);
       }
@@ -326,15 +350,24 @@ async function handleGameStart(
   }
 
   try {
-    await gameService.startGame(gameId, userId);
+    const initialState = await gameService.startGame(gameId, userId);
 
-    // Register and start timer after game starts
+    // Register timer for later human turns. Start it immediately only if the
+    // first seat is human; if the first seat is AI, defer arming until
+    // autoPlayAbandoned stops at a human (so no redundant timer is armed).
     const game = await gameService.getGame(gameId);
     if (game?.turnTimerSeconds != null) {
       turnTimerService.registerGame(gameId, {
         turnTimerSeconds: game.turnTimerSeconds,
       });
-      turnTimerService.startTurn(gameId, true);
+      const firstSeatId =
+        initialState.players[initialState.currentPlayerIndex]?.playerId;
+      const firstIsAi =
+        firstSeatId != null &&
+        (await gameService.isAiSeat(gameId, firstSeatId));
+      if (!firstIsAi) {
+        turnTimerService.startTurn(gameId, true);
+      }
     }
 
     // Broadcast game:started to all players in the room
@@ -342,6 +375,15 @@ async function handleGameStart(
 
     // Then broadcast each player's individual state
     await broadcastGameState(
+      io,
+      gameId,
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    // If the first seat to act is AI (or abandoned), drive turns now.
+    await autoPlayAbandoned(
       io,
       gameId,
       gameService,
@@ -448,12 +490,17 @@ async function handleGameAction(
       return;
     }
 
-    // Check if the next current player is abandoned — if so, skip turn timer and auto-play
+    // Check if the next current player should be auto-driven (AI or abandoned).
     if (newState) {
       const nextPlayer = newState.players[newState.currentPlayerIndex];
       if (
         nextPlayer &&
-        connectionManager.isAbandoned(gameId, nextPlayer.playerId)
+        (await shouldAutoPlay(
+          gameId,
+          nextPlayer.playerId,
+          gameService,
+          connectionManager,
+        ))
       ) {
         await broadcastGameState(
           io,
@@ -639,7 +686,12 @@ export async function handleTimerExpired(
     const nextPlayer = newState.players[newState.currentPlayerIndex];
     if (
       nextPlayer &&
-      connectionManager.isAbandoned(gameId, nextPlayer.playerId)
+      (await shouldAutoPlay(
+        gameId,
+        nextPlayer.playerId,
+        gameService,
+        connectionManager,
+      ))
     ) {
       // Skip timer — autoPlayAbandoned will handle this player and start timer for the next connected one
     } else {
