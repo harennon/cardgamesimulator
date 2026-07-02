@@ -43,6 +43,7 @@
           class="lobby__player"
         >
           {{ player.displayName }}
+          <AiBadge v-if="player.isAi" data-testid="ai-badge" />
         </div>
         <div
           v-for="n in emptySlots"
@@ -97,6 +98,7 @@
 import { ref, computed } from "vue";
 import type { PlayerInfo, GameType } from "@shared/engine-types";
 import { gameTypeLabel } from "@/component/statsView";
+import AiBadge from "@/component/game-ui/AiBadge.vue";
 
 const props = defineProps<{
   gameId: string;
@@ -330,6 +332,9 @@ async function copyInviteLink(): Promise<void> {
   background: rgba(45, 24, 16, 0.6);
   border: 1px solid var(--table-rim-light);
   border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .lobby__player--empty {

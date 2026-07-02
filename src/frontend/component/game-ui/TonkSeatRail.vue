@@ -21,6 +21,7 @@
 
       <div class="tonk-seat__info">
         <span class="tonk-seat__name">{{ seat.displayName }}</span>
+        <AiBadge v-if="seat.isAi" data-testid="ai-badge" />
         <div class="tonk-seat__meta">
           <span class="tonk-seat__count">{{ seat.cardCount }}</span>
           <span class="tonk-seat__tally" data-testid="tonk-seat-tally">{{
@@ -59,6 +60,7 @@ import { computed } from "vue";
 import type { PlayerPublicInfo } from "@shared/engine-types";
 import type { TonkTurnPhase } from "@shared/tonk-types";
 import OpponentTimer from "./OpponentTimer.vue";
+import AiBadge from "./AiBadge.vue";
 import {
   isCompactRail,
   isWrappingRail,

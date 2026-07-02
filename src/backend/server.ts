@@ -69,6 +69,16 @@ export class Server {
     this.guestSessionStore = new GuestSessionStore();
     const authMiddleware = createAuthMiddleware(this.guestSessionStore);
 
+    // Build GameService early so it can be injected into the createGame route.
+    const gameCache = new GameCache();
+    const statsService = new StatsService(statsRepo, this.guestSessionStore);
+    const gameService = new GameService(
+      gameCache,
+      engineFactory,
+      gameRepo,
+      statsService,
+    );
+
     // Health endpoint — no auth, used by Railway + monitoring
     this.app.get("/health", (_req, res) => {
       const connections = getConnectionMetrics(this.io);
@@ -109,12 +119,13 @@ export class Server {
       this.app.use(path, authMiddleware, handler.router);
     });
 
-    // createGame requires a registered (non-guest) user
+    // createGame requires a registered (non-guest) user; wired with GameService
+    // so the handler can call addAiSeats after creation when numAiSeats >= 1.
     this.app.use(
       "/createGame",
       authMiddleware,
       registeredOnlyMiddleware,
-      CreateGameHandler.INSTANCE.router,
+      CreateGameHandler.create(gameService).router,
     );
 
     // Stats route (auth required, guests allowed — returns zeroed stats)
@@ -136,14 +147,6 @@ export class Server {
     this.io = createSocketServer(this.server);
     this.io.use(createSocketAuthMiddleware(this.guestSessionStore));
 
-    const gameCache = new GameCache();
-    const statsService = new StatsService(statsRepo, this.guestSessionStore);
-    const gameService = new GameService(
-      gameCache,
-      engineFactory,
-      gameRepo,
-      statsService,
-    );
     const connectionManager = new ConnectionManager();
     this.timerProvider = new RealTimerProvider();
     const turnTimerService = new TurnTimerService(

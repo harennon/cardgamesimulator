@@ -111,6 +111,7 @@ export interface SeatRow {
   readonly displayName: string;
   readonly cardCount: number;
   readonly isConnected: boolean;
+  readonly isAi?: boolean;
   readonly seatIndex: number;
   readonly tally: number;
 }
@@ -131,6 +132,7 @@ export function railSeats(
       displayName: p.displayName,
       cardCount: p.cardCount,
       isConnected: p.isConnected,
+      isAi: p.isAi,
       seatIndex,
       tally: tallies[seatIndex] ?? 0,
     }))

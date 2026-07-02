@@ -2,8 +2,9 @@
 import { axiosInstance } from "@/service/http";
 import { CreateGameRequest, CreateGameResponse, GameType } from "@shared/model";
 import { GAME_TYPE_UI_BOUNDS } from "@/component/statsView";
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { getSession } from "@/service/authService";
 
 const DECK_ROUNDS_VALUES = [5, 6, 7, 8, 9, 10, 11, 12] as const;
 
@@ -12,10 +13,19 @@ const maxPlayers = ref(2);
 const turnTimerSeconds = ref<30 | 60 | 90>(60);
 // Tonk only; integer 5..12, default 8. Carried across type toggles (E3).
 const deckRoundsTarget = ref<number>(8);
+// AI opponents stepper; integer 0..(maxPlayers-1), default 0.
+const numAiSeats = ref<number>(0);
 const loading = ref(false);
 const errorMessage = ref("");
+// true once the session check resolves; AI field rendered only for registered hosts.
+const isRegisteredHost = ref(false);
 
 const router = useRouter();
+
+onMounted(async () => {
+  const session = await getSession();
+  isRegisteredHost.value = session != null;
+});
 
 function clamp(value: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, value));
@@ -31,6 +41,16 @@ const maxPlayersBound = computed(() => bounds.value?.maxPlayers ?? 4);
 const showDeckLength = computed(
   () => bounds.value?.hasDeckRoundsTarget ?? false,
 );
+const showAiSeats = computed(
+  () => isRegisteredHost.value && bounds.value != null,
+);
+
+// Max AI seats = maxPlayers - 1 (at least one human must stay).
+const maxAiSeats = computed(() => maxPlayers.value - 1);
+
+const ctaLabel = computed(() =>
+  numAiSeats.value >= 1 ? "Create Practice Game" : "Create Game",
+);
 
 // On game-type change: seed the count to the new type's min when coming from
 // the unselected state, otherwise re-clamp the current count into the new range.
@@ -42,7 +62,22 @@ watch(gameType, (next, prev) => {
   } else {
     maxPlayers.value = clamp(maxPlayers.value, b.minPlayers, b.maxPlayers);
   }
+  // Re-clamp numAiSeats into the new bounds.
+  numAiSeats.value = clamp(numAiSeats.value, 0, maxPlayers.value - 1);
 });
+
+// When maxPlayers is lowered below numAiSeats + 1, clamp numAiSeats down.
+watch(maxPlayers, (next) => {
+  numAiSeats.value = clamp(numAiSeats.value, 0, next - 1);
+});
+
+function decrementAiSeats() {
+  numAiSeats.value = clamp(numAiSeats.value - 1, 0, maxAiSeats.value);
+}
+
+function incrementAiSeats() {
+  numAiSeats.value = clamp(numAiSeats.value + 1, 0, maxAiSeats.value);
+}
 
 async function createGame() {
   loading.value = true;
@@ -55,6 +90,7 @@ async function createGame() {
       ...(gameType.value === "tonk"
         ? { deckRoundsTarget: deckRoundsTarget.value }
         : {}),
+      ...(numAiSeats.value > 0 ? { numAiSeats: numAiSeats.value } : {}),
     };
     const createGameResponse = await axiosInstance.post<CreateGameResponse>(
       "/api/createGame",
@@ -148,6 +184,40 @@ async function createGame() {
         </p>
       </div>
 
+      <div
+        v-if="showAiSeats"
+        class="form-card__field"
+        data-testid="ai-seats-field"
+      >
+        <label class="form-card__label">AI Opponents</label>
+        <div class="stepper">
+          <button
+            type="button"
+            class="stepper__btn"
+            :disabled="numAiSeats === 0"
+            data-testid="ai-seats-decrement"
+            @click="decrementAiSeats"
+          >
+            −
+          </button>
+          <span class="stepper__value" data-testid="ai-seats-value">{{
+            numAiSeats
+          }}</span>
+          <button
+            type="button"
+            class="stepper__btn"
+            :disabled="numAiSeats >= maxAiSeats"
+            data-testid="ai-seats-increment"
+            @click="incrementAiSeats"
+          >
+            +
+          </button>
+        </div>
+        <p v-if="numAiSeats >= 1" class="help-text" data-testid="practice-note">
+          Practice games don't count toward stats.
+        </p>
+      </div>
+
       <div class="form-card__field">
         <label class="form-card__label" for="turn-timer">Turn Timer</label>
         <select
@@ -176,7 +246,7 @@ async function createGame() {
         :disabled="!gameType || loading"
         data-testid="submit-create-game"
       >
-        {{ loading ? "Creating..." : "Create Game" }}
+        {{ loading ? "Creating..." : ctaLabel }}
       </button>
     </form>
   </div>
@@ -287,5 +357,58 @@ async function createGame() {
   color: var(--text-muted);
   line-height: 1.45;
   margin: 2px 0 0;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--input-bg);
+  border: 1.5px solid var(--input-border);
+  border-radius: var(--input-radius);
+  padding: 6px 12px;
+  width: fit-content;
+}
+
+.stepper__btn {
+  font-family: var(--font-ui);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--input-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    opacity 0.12s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepper__btn:not(:disabled):hover {
+  background: rgba(127, 178, 255, 0.15);
+  border-color: var(--ai-accent);
+  color: var(--ai-accent);
+}
+
+.stepper__btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.stepper__value {
+  font-family: var(--font-ui);
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ai-accent);
+  min-width: 24px;
+  text-align: center;
 }
 </style>

@@ -10,6 +10,20 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 120: Create-game + lobby/board UI — AI seats and human/AI labels**
+  - `src/shared/engine-types.ts` — added `isAi?: boolean` to `PlayerPublicInfo` and `PlayerInfo`; derived server-side only, never trusted from client.
+  - `src/shared/model.ts` — extended `CreateGameRequest` with `numAiSeats?: number` (0..maxPlayers-1; omitted/0 → human-only game unchanged).
+  - `src/backend/api/game/createGame.ts` — new `validateNumAiSeatsOrThrow` helper (rejects non-integer, negative, over-fill, guest); `CreateGameHandler.create(gameService)` factory wires the `GameService` dependency; after game creation, calls `gameService.addAiSeats(gameId, numAiSeats)` when `numAiSeats >= 1`. `server.ts` creates `GameService` before route registration so it can be injected.
+  - `src/backend/websocket/socketHandler.ts` — `injectConnectionStatus` extended with optional `aiIds` set to stamp `isAi` on every `PlayerPublicInfo` at the serialization boundary (board broadcast, spectator join, reconnect). Lobby `PlayerInfo[]` builder also tags AI seats from `game.gameConfig.aiPlayerIds`.
+  - `src/frontend/styles/game-variables.css` — new `--ai-accent: #7fb2ff` token (steel/cool blue; never collides with `--gold-accent` turn glow).
+  - `src/frontend/component/game-ui/AiBadge.vue` — new static atom: squared-off (2px) steel-blue dot + "CPU" text; `flex-shrink: 0`; no emoji; used verbatim in the three surfaces below.
+  - `src/frontend/component/game/GameLobbyView.vue` — renders `<AiBadge v-if="player.isAi" />` next to the display name; player row is now flex so the badge sits inline.
+  - `src/frontend/component/game-ui/OpponentRow.vue` — renders `<AiBadge v-if="player.isAi" />` inside `.opponent__info`; existing gold turn-border untouched.
+  - `src/frontend/component/game-ui/TonkSeatRail.vue` — renders `<AiBadge v-if="seat.isAi" />` next to the seat name; existing phase-tag and turn-indicator untouched.
+  - `src/frontend/component/game-ui/tonkDisplay.ts` — `SeatRow` interface gains `isAi?: boolean`; `railSeats()` propagates it from `PlayerPublicInfo`.
+  - `src/frontend/component/CreateGameView.vue` — AI Opponents stepper (`[ − ] N [ + ]`, 0..maxPlayers-1, default 0); shown only for a registered host after game type is selected; `numAiSeats` re-clamped when `maxPlayers` is lowered; CTA switches to "Create Practice Game" + help note at `numAiSeats >= 1`; `numAiSeats` omitted from request body when 0 so human-only requests are byte-for-byte unchanged.
+  - Tests: 65 new unit tests across `createGameAiSeats.test.ts` (validation logic + `addAiSeats` call path), `aiSeatsInjection.test.ts` (server-side `isAi` derivation from config, not prefix), `aiBadge.test.ts` (structural badge contract), `createGameViewAiSeats.test.ts` (stepper clamp, CTA label, request body, visibility), `aiBadgeRendering.test.ts` (lobby, board, TonkSeatRail `railSeats`, REST-seeded derivation).
+
 - **LLD 118: Backend — AI-seat foundation (1-human start, auto-driven AI turns, stats/history exclusion)**
   - `src/shared/model.ts` — extended `GameConfig` with `practice?: boolean` and `aiPlayerIds?: string[]`; backward-compatible (absent for all existing games).
   - `src/backend/service/gameService.ts` — added `addAiSeats(gameId, count)` (seats synthetic `ai:<uuid>` players, marks game practice, persists); `isAiSeat(gameId, playerId)` (memoised once IN_PROGRESS, read-through during CREATED); relaxed `startGame` to a human-count guard (`NO_HUMAN_PLAYERS`) + per-engine minimum map (`NOT_ENOUGH_PLAYERS`; Big2=2, Tonk=3) replacing the hardcoded `minPlayers=2`; `applyAction` passes `game.gameConfig.practice` into `statsService.recordGameCompletion`; `createRematch` strips `practice`/`aiPlayerIds` from the forwarded config so rematches are always clean human-only games.

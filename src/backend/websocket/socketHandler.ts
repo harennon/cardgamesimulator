@@ -41,10 +41,16 @@ function emitSpectatorCount(
 
 function injectConnectionStatus<
   T extends { players: readonly PlayerPublicInfo[] },
->(view: T, gameId: string, connectionManager: ConnectionManager): T {
+>(
+  view: T,
+  gameId: string,
+  connectionManager: ConnectionManager,
+  aiIds?: ReadonlySet<string>,
+): T {
   const players = view.players.map((p) => ({
     ...p,
     isConnected: connectionManager.isPlayerConnected(gameId, p.playerId),
+    ...(aiIds != null && aiIds.size > 0 ? { isAi: aiIds.has(p.playerId) } : {}),
   }));
   return { ...view, players };
 }
@@ -64,6 +70,12 @@ async function broadcastGameState(
   // the per-player view carries it on every broadcast without an uncached DB read.
   const joinCode = await gameService.getJoinCode(gameId);
 
+  // Build the AI-seat set once per broadcast; derived from persisted config, never
+  // from client input. The engine stays pure (no AI knowledge) — isAi is injected
+  // here at the serialization boundary alongside isConnected.
+  const game = await gameService.getGame(gameId);
+  const aiIds = new Set(game?.gameConfig?.aiPlayerIds ?? []);
+
   const engine = engineFactory.getEngine(state.gameType);
   const playerSockets = connectionManager.getPlayerSockets(gameId);
   const spectatorCount = connectionManager.getSpectatorCount(gameId);
@@ -72,7 +84,7 @@ async function broadcastGameState(
   for (const { playerId, socket } of playerSockets) {
     const view = engine.getPlayerView(state, playerId);
     socket.emit("game:state", {
-      ...injectConnectionStatus(view, gameId, connectionManager),
+      ...injectConnectionStatus(view, gameId, connectionManager, aiIds),
       turnDeadline,
       joinCode,
     });
@@ -80,7 +92,7 @@ async function broadcastGameState(
 
   const spectatorView = engine.getSpectatorView(state, spectatorCount);
   io.to(`spectators:${gameId}`).emit("game:spectatorState", {
-    ...injectConnectionStatus(spectatorView, gameId, connectionManager),
+    ...injectConnectionStatus(spectatorView, gameId, connectionManager, aiIds),
     turnDeadline,
   });
 }
@@ -222,10 +234,13 @@ async function handleGameJoin(
     await socket.join(`game:${gameId}`);
 
     if (game.status === "CREATED") {
-      // Send full lobby state to the joining socket for reconciliation
+      // Send full lobby state to the joining socket for reconciliation.
+      // Tag AI seats from persisted config — never trusted from client.
+      const aiIds = new Set(game.gameConfig?.aiPlayerIds ?? []);
       const players: PlayerInfo[] = game.playerIds.map((id) => ({
         playerId: id,
         displayName: game.playerDisplayNames[id] ?? id,
+        ...(aiIds.size > 0 ? { isAi: aiIds.has(id) } : {}),
       }));
       socket.emit("lobby:state", {
         players,
@@ -265,8 +280,14 @@ async function handleGameJoin(
       const view = await gameService.getPlayerView(gameId, userId);
       if (view) {
         const turnDeadline = turnTimerService.getDeadline(gameId);
+        const reconnectAiIds = new Set(game.gameConfig?.aiPlayerIds ?? []);
         socket.emit("game:state", {
-          ...injectConnectionStatus(view, gameId, connectionManager),
+          ...injectConnectionStatus(
+            view,
+            gameId,
+            connectionManager,
+            reconnectAiIds,
+          ),
           turnDeadline,
           joinCode: game.joinCode ?? null,
         });
@@ -315,8 +336,14 @@ async function handleGameJoin(
     );
     if (spectatorView) {
       const turnDeadline = turnTimerService.getDeadline(gameId);
+      const spectatorAiIds = new Set(game.gameConfig?.aiPlayerIds ?? []);
       socket.emit("game:spectatorState", {
-        ...injectConnectionStatus(spectatorView, gameId, connectionManager),
+        ...injectConnectionStatus(
+          spectatorView,
+          gameId,
+          connectionManager,
+          spectatorAiIds,
+        ),
         turnDeadline,
       });
     }

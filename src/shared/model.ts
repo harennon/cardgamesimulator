@@ -20,6 +20,7 @@ export interface CreateGameRequest {
   gameOptions?: { [key: string]: string }; // dead/unread by the backend; optional so callers can omit it
   turnTimerSeconds: 30 | 60 | 90;
   deckRoundsTarget?: number; // optional, integer [5,12]; omitted -> default 8
+  numAiSeats?: number; // 0..(maxPlayers-1); omitted/0 => human-only game
 }
 
 export interface CreateGameResponse {
