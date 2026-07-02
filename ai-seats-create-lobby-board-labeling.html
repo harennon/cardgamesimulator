@@ -1,0 +1,1246 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Seats — Create / Lobby / Board mockups</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Libre+Baskerville:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---- Production tokens (mirrored from game-variables.css) ---- */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --input-border: var(--table-rim-light);
+        --input-radius: 6px;
+        --error-text: #e05555;
+        --tonk-cyan: #3fd0d8;
+
+        /* NEW: AI-seat identity tokens (proposed additions to game-variables.css) */
+        --ai-accent: #7fb2ff; /* cool steel-blue — reads clearly as "not human", never clashes with gold/turn-glow */
+        --ai-accent-dim: rgba(127, 178, 255, 0.16);
+        --ai-accent-border: rgba(127, 178, 255, 0.55);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg-dark);
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ---- Mockup scaffold chrome (NOT part of the app) ---- */
+      .doc {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px 24px 120px;
+      }
+      .doc__head {
+        border-bottom: 1px solid var(--table-rim-light);
+        padding-bottom: 24px;
+        margin-bottom: 8px;
+      }
+      .doc__kicker {
+        font-size: 0.72rem;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--ai-accent);
+        font-weight: 700;
+        margin: 0 0 10px;
+      }
+      .doc h1 {
+        font-family: var(--font-card);
+        font-weight: 400;
+        font-size: 2.1rem;
+        margin: 0 0 12px;
+        color: var(--card-face);
+        letter-spacing: -0.01em;
+      }
+      .doc__lede {
+        max-width: 720px;
+        color: var(--text-muted);
+        line-height: 1.6;
+        margin: 0;
+        font-size: 0.95rem;
+      }
+      .doc__lede b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .variant-switch {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 14px 0;
+        margin-bottom: 8px;
+        background: linear-gradient(
+          to bottom,
+          var(--bg-dark) 70%,
+          rgba(13, 13, 13, 0)
+        );
+      }
+      .variant-switch__label {
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+      .variant-switch button {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: 999px;
+        padding: 8px 18px;
+        cursor: pointer;
+        transition:
+          color 0.15s ease,
+          border-color 0.15s ease,
+          background 0.15s ease;
+      }
+      .variant-switch button:hover {
+        color: var(--text-primary);
+      }
+      .variant-switch button.is-on {
+        color: var(--card-face);
+        border-color: var(--ai-accent-border);
+        background: var(--ai-accent-dim);
+      }
+
+      section.stage {
+        margin-top: 56px;
+      }
+      .stage__title {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin: 0 0 6px;
+      }
+      .stage__title h2 {
+        font-family: var(--font-card);
+        font-weight: 400;
+        font-size: 1.4rem;
+        margin: 0;
+        color: var(--card-face);
+      }
+      .stage__num {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        color: var(--ai-accent);
+        text-transform: uppercase;
+      }
+      .stage__note {
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        line-height: 1.55;
+        max-width: 760px;
+        margin: 0 0 22px;
+      }
+      .stage__note code {
+        font-family: "Courier New", monospace;
+        color: var(--tonk-cyan);
+        font-size: 0.85em;
+      }
+
+      .felt-frame {
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        border: 10px solid var(--table-rim);
+        border-radius: 14px;
+        overflow: hidden;
+        position: relative;
+      }
+      .flow-frame {
+        background: var(--bg-dark);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 14px;
+        padding: 40px 20px;
+        display: flex;
+        justify-content: center;
+      }
+
+      /* =================================================================
+         CREATE GAME FORM  (mirrors CreateGameView.vue + flows.css)
+         ================================================================= */
+      .form-card {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 40px 48px;
+        width: 100%;
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .form-card__title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-align: center;
+        margin: 0;
+      }
+      .form-card__field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .form-card__label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .form-card__input {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        padding: 10px 14px;
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: var(--input-radius);
+        color: var(--text-primary);
+        outline: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238a7e6e' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+      }
+      .range-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .range-value {
+        font-weight: 700;
+        color: var(--gold-accent);
+        font-size: 0.95rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .form-card__range {
+        width: 100%;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: var(--input-bg);
+        border: 1px solid var(--input-border);
+        border-radius: 3px;
+        outline: none;
+        cursor: pointer;
+      }
+      .form-card__range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        cursor: pointer;
+      }
+      .range-scale {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 4px;
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .btn-primary {
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 12px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        width: 100%;
+      }
+
+      /* ---- NEW: AI-opponents field on the create form ---- */
+      .ai-field {
+        border-left: 2px solid var(--ai-accent-border);
+        padding-left: 14px;
+        margin-left: -2px;
+      }
+      .ai-field__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .ai-field__value {
+        font-weight: 700;
+        color: var(--ai-accent);
+        font-size: 0.95rem;
+        font-variant-numeric: tabular-nums;
+      }
+      /* stepper: [ − ]  N  [ + ]  with live seat-composition preview */
+      .stepper {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: var(--input-radius);
+        padding: 4px;
+      }
+      .stepper__btn {
+        width: 40px;
+        height: 36px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--text-primary);
+        font-size: 1.25rem;
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+        transition: background 0.12s ease;
+      }
+      .stepper__btn:hover:not(:disabled) {
+        background: var(--ai-accent-dim);
+        color: var(--ai-accent);
+      }
+      .stepper__btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+      .stepper__count {
+        flex: 1;
+        text-align: center;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+      .ai-help {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+        margin: 6px 0 0;
+      }
+      .ai-help b {
+        color: var(--ai-accent);
+        font-weight: 700;
+      }
+      /* Live seat-composition strip: 1 human + N CPU, dims when it can't start */
+      .seat-preview {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .seat-pip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 4px 9px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        line-height: 1;
+      }
+      .seat-pip--you {
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.12);
+        border-color: rgba(201, 168, 76, 0.5);
+      }
+      .seat-pip--ai {
+        color: var(--ai-accent);
+        background: var(--ai-accent-dim);
+        border-color: var(--ai-accent-border);
+      }
+      .seat-pip--empty {
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.03);
+        border-color: var(--table-rim-light);
+        border-style: dashed;
+        font-style: italic;
+      }
+      .seat-warn {
+        font-size: 0.72rem;
+        color: var(--error-text);
+        margin: 8px 0 0;
+        min-height: 1em;
+      }
+
+      /* =================================================================
+         SHARED AI BADGE — the reusable atom (AiBadge.vue)
+         Rendered in lobby rows AND board opponent seats.
+         Two variants toggled by [data-variant] on <body>.
+         ================================================================= */
+      .ai-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-family: var(--font-ui);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        line-height: 1;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .ai-badge__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 1.5px; /* squared-off = machine, not a round human dot */
+      }
+
+      /* Variant A — "gold system chip": tucks into the existing gold language,
+         lowest-contrast, treats CPU as just another kind of seat. */
+      body[data-variant="A"] .ai-badge {
+        font-size: 0.58rem;
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.14);
+        border: 1px solid rgba(201, 168, 76, 0.45);
+        border-radius: 4px;
+        padding: 2px 6px;
+      }
+      body[data-variant="A"] .ai-badge__dot {
+        background: var(--gold-accent);
+      }
+
+      /* Variant B — "steel-blue identity": a dedicated cool accent that makes
+         bots instantly scannable across a mixed roster; strongest human/AI split. */
+      body[data-variant="B"] .ai-badge {
+        font-size: 0.58rem;
+        color: var(--ai-accent);
+        background: var(--ai-accent-dim);
+        border: 1px solid var(--ai-accent-border);
+        border-radius: 4px;
+        padding: 2px 6px;
+      }
+      body[data-variant="B"] .ai-badge__dot {
+        background: var(--ai-accent);
+        box-shadow: 0 0 5px rgba(127, 178, 255, 0.7);
+      }
+
+      /* =================================================================
+         LOBBY  (mirrors GameLobbyView.vue)
+         ================================================================= */
+      .lobby-wrap {
+        display: flex;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+      .lobby__panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 32px 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        max-width: 440px;
+        width: 100%;
+      }
+      .lobby__title {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0;
+      }
+      .lobby__type-badge {
+        font-size: 0.74rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.1);
+        border: 1px solid rgba(201, 168, 76, 0.5);
+        border-radius: 999px;
+        padding: 4px 12px;
+      }
+      .lobby__count {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        align-self: flex-start;
+      }
+      .lobby__count b {
+        color: var(--text-primary);
+      }
+      .lobby__players {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .lobby__player {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        padding: 10px 16px;
+        background: rgba(45, 24, 16, 0.6);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+      }
+      /* AI rows carry a faint left accent so the roster reads at a glance */
+      body[data-variant="B"] .lobby__player--ai {
+        border-left: 3px solid var(--ai-accent-border);
+      }
+      .lobby__player--empty {
+        color: var(--text-muted);
+        font-weight: 400;
+        font-style: italic;
+      }
+      .lobby__player .host-tag {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        border: 1px solid rgba(201, 168, 76, 0.5);
+        border-radius: 4px;
+        padding: 2px 6px;
+        line-height: 1;
+      }
+      .lobby__player .spacer {
+        flex: 1;
+      }
+      .lobby__btn--start {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        width: 100%;
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 10px 28px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+      }
+
+      /* =================================================================
+         BOARD OPPONENT ROW  (mirrors OpponentRow.vue / TonkSeatRail.vue)
+         ================================================================= */
+      .board-strip {
+        padding: 14px 16px 26px;
+      }
+      .board-label {
+        font-size: 0.62rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        text-align: center;
+        margin: 0 0 12px;
+      }
+      .opponent-row {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 10px 16px;
+        background: var(--table-rim);
+        border-radius: 8px;
+        border-bottom: 2px solid var(--table-rim-light);
+      }
+      .opponent {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        position: relative;
+      }
+      .opponent--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .opponent__cards {
+        display: flex;
+      }
+      .opponent__cards .card-back {
+        width: 28px;
+        height: 40px;
+        margin-left: -10px;
+        border-radius: 4px;
+        border: 1px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        position: relative;
+        overflow: hidden;
+      }
+      .opponent__cards .card-back:first-child {
+        margin-left: 0;
+      }
+      .opponent__cards .card-back::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 2px;
+      }
+      .opponent__info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+      }
+      /* name row now holds an inline badge next to the name for AI seats */
+      .opponent__nameline {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .opponent__name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .opponent__count {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      .opponent__turn-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-accent);
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.3);
+        }
+      }
+      /* small "thinking" ellipsis shown under an AI seat while it auto-plays */
+      .opponent__thinking {
+        font-size: 0.62rem;
+        color: var(--ai-accent);
+        font-style: italic;
+        letter-spacing: 0.04em;
+      }
+      body[data-variant="A"] .opponent__thinking {
+        color: var(--gold-accent);
+      }
+      .opponent__thinking::after {
+        content: "";
+        animation: dots 1.4s steps(4, end) infinite;
+      }
+      @keyframes dots {
+        0% {
+          content: "";
+        }
+        25% {
+          content: ".";
+        }
+        50% {
+          content: "..";
+        }
+        75% {
+          content: "...";
+        }
+      }
+
+      .stack-two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      @media (max-width: 780px) {
+        .stack-two {
+          grid-template-columns: 1fr;
+        }
+      }
+      .mini-caption {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-align: center;
+        margin: 10px 0 0;
+        font-style: italic;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-top: 18px;
+        padding: 16px 20px;
+        background: var(--input-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+      }
+      .legend__item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .legend__item b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body data-variant="B">
+    <div class="doc">
+      <header class="doc__head">
+        <p class="doc__kicker">Frontend Mockup · Issue #135 · Parent #127</p>
+        <h1>AI seats: create-game, lobby &amp; board labeling</h1>
+        <p class="doc__lede">
+          A registered host adds <b>N AI opponents</b> at create time; the game
+          starts with <b>1 human + N CPU seats</b> (backend LLD 118). Everywhere
+          a bot appears — the lobby roster and the in-game opponent seats — it
+          is <b>labeled distinctly from humans</b> via one shared badge atom.
+          Toggle the two labeling directions below; every surface updates
+          together so you can judge them as a system, not in isolation.
+        </p>
+      </header>
+
+      <div class="variant-switch">
+        <span class="variant-switch__label">Labeling direction</span>
+        <button data-set="A" onclick="setVariant('A')">
+          A · Gold system chip
+        </button>
+        <button data-set="B" class="is-on" onclick="setVariant('B')">
+          B · Steel-blue bot identity
+        </button>
+      </div>
+
+      <div class="legend">
+        <div class="legend__item">
+          <span class="ai-badge"><span class="ai-badge__dot"></span>CPU</span>
+          <b>&nbsp;AI seat</b> — server-driven, excluded from stats
+        </div>
+        <div class="legend__item">
+          <span class="seat-pip seat-pip--you">You (host)</span>
+          <b>&nbsp;the human</b> — always ≥ 1, enforced by the backend
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- STAGE 1 — CREATE GAME                                        -->
+      <!-- ============================================================ -->
+      <section class="stage">
+        <div class="stage__title">
+          <span class="stage__num">Surface 1 / 3</span>
+          <h2>Create a game — add AI opponents</h2>
+        </div>
+        <p class="stage__note">
+          A new <b>AI opponents</b> stepper sits directly under Players. It is
+          bounded by the remaining seats (<code>maxPlayers − 1 human</code>) so
+          the host can never over-fill the table. A live seat-composition strip
+          shows exactly who will be dealt in. The field only renders for a
+          registered host (guests can't create games). When AI count is 0, the
+          form is byte-for-byte the current form —
+          <b>human-only flows are visually unchanged</b>.
+        </p>
+
+        <div class="flow-frame">
+          <form class="form-card" onsubmit="return false;">
+            <h2 class="form-card__title">Create a Game</h2>
+
+            <div class="form-card__field">
+              <label class="form-card__label">Game Type</label>
+              <select
+                class="form-card__input"
+                id="mk-type"
+                onchange="recompute()"
+              >
+                <option value="big2">Big 2</option>
+                <option value="tonk">Tonk</option>
+              </select>
+            </div>
+
+            <div class="form-card__field">
+              <div class="range-head">
+                <label class="form-card__label">Players (table size)</label>
+                <span class="range-value" id="mk-maxplayers">4</span>
+              </div>
+              <input
+                class="form-card__range"
+                type="range"
+                id="mk-range"
+                min="2"
+                max="4"
+                step="1"
+                value="4"
+                oninput="onRange()"
+              />
+              <div class="range-scale">
+                <span id="mk-min">2</span><span id="mk-max">4</span>
+              </div>
+            </div>
+
+            <!-- NEW field -->
+            <div class="form-card__field ai-field">
+              <div class="ai-field__head">
+                <label class="form-card__label">AI Opponents</label>
+                <span class="ai-field__value" id="mk-aival">2 CPU</span>
+              </div>
+              <div class="stepper">
+                <button
+                  type="button"
+                  class="stepper__btn"
+                  id="mk-minus"
+                  onclick="stepAi(-1)"
+                  aria-label="Remove an AI opponent"
+                >
+                  &minus;
+                </button>
+                <span class="stepper__count" id="mk-aicount">2</span>
+                <button
+                  type="button"
+                  class="stepper__btn"
+                  id="mk-plus"
+                  onclick="stepAi(1)"
+                  aria-label="Add an AI opponent"
+                >
+                  +
+                </button>
+              </div>
+              <div class="seat-preview" id="mk-preview"></div>
+              <p class="seat-warn" id="mk-warn"></p>
+              <p class="ai-help">
+                Fill empty seats with <b>CPU players</b> to start without
+                waiting for friends. Games with AI are <b>practice</b> — they
+                don't count toward your stats.
+              </p>
+            </div>
+
+            <div class="form-card__field">
+              <label class="form-card__label">Turn Timer</label>
+              <select class="form-card__input">
+                <option>30 seconds</option>
+                <option selected>60 seconds</option>
+                <option>90 seconds</option>
+              </select>
+            </div>
+
+            <button class="btn-primary" id="mk-submit">Create Game</button>
+          </form>
+        </div>
+        <p class="mini-caption">
+          Try the stepper and switch game type — the strip re-clamps to the
+          engine's bounds (Big2 2–4, Tonk 3–8) and warns when the roster can't
+          start.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- STAGE 2 — LOBBY                                              -->
+      <!-- ============================================================ -->
+      <section class="stage">
+        <div class="stage__title">
+          <span class="stage__num">Surface 2 / 3</span>
+          <h2>Lobby — bots labeled in the roster</h2>
+        </div>
+        <p class="stage__note">
+          Each seat that came from an AI slot renders the shared badge inline
+          after the name. The host reads the roster top-to-bottom and instantly
+          tells who's a person waiting to be joined vs. a bot that's already
+          locked in. Requires surfacing an <code>isAi</code> flag on
+          <code>PlayerPublicInfo</code> (derived server-side from
+          <code>gameConfig.aiPlayerIds</code>).
+        </p>
+
+        <div class="lobby-wrap">
+          <div class="lobby__panel">
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
+              "
+            >
+              <h2 class="lobby__title">Game Lobby</h2>
+              <span class="lobby__type-badge">Big 2 · up to 4</span>
+            </div>
+            <div class="lobby__count">Players <b>4</b> / 4</div>
+            <div class="lobby__players">
+              <div class="lobby__player">
+                Alice
+                <span class="host-tag">Host</span>
+              </div>
+              <div class="lobby__player lobby__player--ai">
+                CPU 1
+                <span class="spacer"></span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <div class="lobby__player lobby__player--ai">
+                CPU 2
+                <span class="spacer"></span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <div class="lobby__player lobby__player--ai">
+                CPU 3
+                <span class="spacer"></span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+            </div>
+            <button class="lobby__btn--start">Start Game</button>
+          </div>
+        </div>
+        <p class="mini-caption">
+          Mixed roster below — 1 human joins later, 2 CPU seats already filled.
+        </p>
+        <div class="lobby-wrap">
+          <div class="lobby__panel">
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
+              "
+            >
+              <h2 class="lobby__title">Game Lobby</h2>
+              <span class="lobby__type-badge">Big 2 · up to 4</span>
+            </div>
+            <div class="lobby__count">Players <b>3</b> / 4</div>
+            <div class="lobby__players">
+              <div class="lobby__player">
+                Alice <span class="host-tag">Host</span>
+              </div>
+              <div class="lobby__player lobby__player--ai">
+                CPU 1
+                <span class="spacer"></span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <div class="lobby__player lobby__player--ai">
+                CPU 2
+                <span class="spacer"></span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <div class="lobby__player lobby__player--empty">
+                Waiting for player...
+              </div>
+            </div>
+            <button class="lobby__btn--start">Start Game</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- STAGE 3 — BOARD                                             -->
+      <!-- ============================================================ -->
+      <section class="stage">
+        <div class="stage__title">
+          <span class="stage__num">Surface 3 / 3</span>
+          <h2>Board — bots labeled during play</h2>
+        </div>
+        <p class="stage__note">
+          The same badge atom rides in the opponent seat, next to the name — one
+          treatment, three surfaces. When it's a bot's turn the existing gold
+          turn-glow still applies (turn state stays gold everywhere), and an
+          optional <i>thinking…</i> line under the seat explains why the board
+          is auto-advancing without a human clicking. Human opponents are
+          untouched.
+        </p>
+
+        <div class="stack-two">
+          <div>
+            <p class="board-label">Big 2 — opponent row (OpponentRow.vue)</p>
+            <div class="felt-frame board-strip">
+              <div class="opponent-row">
+                <div class="opponent opponent--active">
+                  <div class="opponent__cards">
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                  </div>
+                  <div class="opponent__info">
+                    <div class="opponent__nameline">
+                      <span class="opponent__name">CPU 1</span>
+                      <span class="ai-badge"
+                        ><span class="ai-badge__dot"></span>CPU</span
+                      >
+                    </div>
+                    <span class="opponent__count">8 cards</span>
+                    <span class="opponent__thinking">thinking</span>
+                  </div>
+                  <div class="opponent__turn-indicator"></div>
+                </div>
+
+                <div class="opponent">
+                  <div class="opponent__cards">
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                  </div>
+                  <div class="opponent__info">
+                    <div class="opponent__nameline">
+                      <span class="opponent__name">CPU 2</span>
+                      <span class="ai-badge"
+                        ><span class="ai-badge__dot"></span>CPU</span
+                      >
+                    </div>
+                    <span class="opponent__count">11 cards</span>
+                  </div>
+                </div>
+
+                <div class="opponent">
+                  <div class="opponent__cards">
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                    <div class="card-back"></div>
+                  </div>
+                  <div class="opponent__info">
+                    <div class="opponent__nameline">
+                      <span class="opponent__name">Dave</span>
+                    </div>
+                    <span class="opponent__count">7 cards</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="mini-caption">
+              CPU 1 is mid-turn (gold glow + <i>thinking…</i>); Dave is a human
+              opponent, unlabeled.
+            </p>
+          </div>
+
+          <div>
+            <p class="board-label">Tonk — seat rail (TonkSeatRail.vue)</p>
+            <div class="felt-frame board-strip">
+              <div class="opponent-row">
+                <div class="opponent">
+                  <div class="opponent__info">
+                    <div class="opponent__nameline">
+                      <span class="opponent__name">Bea</span>
+                    </div>
+                    <div style="display: flex; gap: 6px; align-items: center">
+                      <span class="opponent__count">5</span>
+                      <span
+                        style="
+                          font-size: 0.7rem;
+                          font-weight: 700;
+                          color: var(--text-primary);
+                          background: rgba(0, 0, 0, 0.3);
+                          padding: 1px 7px;
+                          border-radius: 8px;
+                        "
+                        >42</span
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <div class="opponent opponent--active">
+                  <div class="opponent__info">
+                    <div class="opponent__nameline">
+                      <span class="opponent__name">CPU 1</span>
+                      <span class="ai-badge"
+                        ><span class="ai-badge__dot"></span>CPU</span
+                      >
+                    </div>
+                    <div style="display: flex; gap: 6px; align-items: center">
+                      <span class="opponent__count">6</span>
+                      <span
+                        style="
+                          font-size: 0.7rem;
+                          font-weight: 700;
+                          color: var(--text-primary);
+                          background: rgba(0, 0, 0, 0.3);
+                          padding: 1px 7px;
+                          border-radius: 8px;
+                        "
+                        >77</span
+                      >
+                    </div>
+                    <span class="opponent__thinking">thinking</span>
+                  </div>
+                  <div class="opponent__turn-indicator"></div>
+                </div>
+
+                <div class="opponent">
+                  <div class="opponent__info">
+                    <div class="opponent__nameline">
+                      <span class="opponent__name">CPU 2</span>
+                      <span class="ai-badge"
+                        ><span class="ai-badge__dot"></span>CPU</span
+                      >
+                    </div>
+                    <div style="display: flex; gap: 6px; align-items: center">
+                      <span class="opponent__count">4</span>
+                      <span
+                        style="
+                          font-size: 0.7rem;
+                          font-weight: 700;
+                          color: var(--text-primary);
+                          background: rgba(0, 0, 0, 0.3);
+                          padding: 1px 7px;
+                          border-radius: 8px;
+                        "
+                        >61</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="mini-caption">
+              Same badge in the Tonk rail; sits alongside the card count and
+              running tally, before the phase tag.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      // ---- Variant toggle ----
+      function setVariant(v) {
+        document.body.setAttribute("data-variant", v);
+        document
+          .querySelectorAll(".variant-switch button")
+          .forEach((b) =>
+            b.classList.toggle("is-on", b.getAttribute("data-set") === v),
+          );
+      }
+
+      // ---- Create-form live logic (bounds + seat preview mirror LLD 118) ----
+      const BOUNDS = {
+        big2: { min: 2, max: 4 },
+        tonk: { min: 3, max: 8 },
+      };
+      let aiCount = 2;
+
+      function el(id) {
+        return document.getElementById(id);
+      }
+
+      function onRange() {
+        recompute();
+      }
+
+      function stepAi(delta) {
+        aiCount = Math.max(0, aiCount + delta);
+        recompute();
+      }
+
+      function recompute() {
+        const type = el("mk-type").value;
+        const b = BOUNDS[type];
+        const range = el("mk-range");
+
+        // Re-point the players slider at the engine bounds for the type.
+        range.min = b.min;
+        range.max = b.max;
+        el("mk-min").textContent = b.min;
+        el("mk-max").textContent = b.max;
+        let maxPlayers = Math.min(Math.max(+range.value, b.min), b.max);
+        range.value = maxPlayers;
+        el("mk-maxplayers").textContent = maxPlayers;
+
+        // AI seats are bounded by the remaining seats after the 1 human host.
+        const aiCap = maxPlayers - 1;
+        if (aiCount > aiCap) aiCount = aiCap;
+        el("mk-aicount").textContent = aiCount;
+        el("mk-aival").textContent =
+          aiCount === 0 ? "none" : aiCount + (aiCount === 1 ? " CPU" : " CPU");
+        el("mk-minus").disabled = aiCount <= 0;
+        el("mk-plus").disabled = aiCount >= aiCap;
+
+        // Seat-composition strip: 1 human + N CPU + empty (human-join) slots.
+        const total = 1 + aiCount;
+        const pips = [`<span class="seat-pip seat-pip--you">You (host)</span>`];
+        for (let i = 1; i <= aiCount; i++) {
+          pips.push(
+            `<span class="seat-pip seat-pip--ai"><span class="ai-badge__dot" style="width:6px;height:6px;border-radius:1.5px;background:currentColor;display:inline-block"></span>CPU ${i}</span>`,
+          );
+        }
+        for (let i = total; i < maxPlayers; i++) {
+          pips.push(
+            `<span class="seat-pip seat-pip--empty">open · human</span>`,
+          );
+        }
+        el("mk-preview").innerHTML = pips.join("");
+
+        // Advisory warning (backend start-gate is authoritative). Big2 can start
+        // 1v1 vs a bot; Tonk needs 3 total, so 1 human needs >= 2 CPU if no
+        // humans will join.
+        const warn = el("mk-warn");
+        if (total < b.min) {
+          const needed = b.min - total;
+          warn.textContent = `Needs ${needed} more seat${needed > 1 ? "s" : ""} to start (add AI or wait for players).`;
+        } else if (aiCount === 0) {
+          warn.textContent = "";
+        } else {
+          warn.textContent = "";
+        }
+
+        el("mk-submit").textContent =
+          aiCount > 0 ? "Create Practice Game" : "Create Game";
+      }
+
+      recompute();
+    </script>
+  </body>
+</html>
