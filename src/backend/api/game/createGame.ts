@@ -114,7 +114,10 @@ export class CreateGameHandler extends Handler {
       gameConfig,
     );
 
-    if (numAiSeats >= 1 && this.gameService != null) {
+    if (numAiSeats >= 1) {
+      if (this.gameService == null) {
+        throw new Error("INTERNAL_ERROR: gameService not wired");
+      }
       await this.gameService.addAiSeats(game.gameId, numAiSeats);
     }
 

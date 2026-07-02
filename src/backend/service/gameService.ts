@@ -292,6 +292,26 @@ export class GameService {
   }
 
   /**
+   * Returns the set of AI player ids for a game.
+   * Uses the same aiSeatCache as isAiSeat — a single DB read per game, memoised
+   * once the game is IN_PROGRESS. Safe to call on every broadcast without
+   * incurring an uncached DB round-trip (unlike getGame which is never cached).
+   */
+  async getAiSeatIds(gameId: string): Promise<ReadonlySet<string>> {
+    const cached = this.aiSeatCache.get(gameId);
+    if (cached !== undefined) return cached;
+
+    const game = await this.gameRepo.getGame(gameId);
+    if (!game) return new Set();
+
+    const aiIds = new Set(game.gameConfig.aiPlayerIds ?? []);
+    if (game.status !== "CREATED") {
+      this.aiSeatCache.set(gameId, aiIds);
+    }
+    return aiIds;
+  }
+
+  /**
    * Apply a game action. Returns the new state on success.
    * Throws on invalid action or game not found.
    */

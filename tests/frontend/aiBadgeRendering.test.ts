@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { PlayerInfo, PlayerPublicInfo } from "@shared/engine-types";
 import { railSeats } from "@/component/game-ui/tonkDisplay";
+import { buildRestLobbyPlayers } from "@/component/game/lobbyUtils";
 
 // ---------------------------------------------------------------------------
 // Tests for isAi badge rendering logic across GameLobbyView, OpponentRow,
@@ -17,14 +18,6 @@ function lobbyShowsBadge(player: PlayerInfo): boolean {
 // Mirrors OpponentRow/TonkSeatRail: render badge iff player/seat.isAi is truthy.
 function boardShowsBadge(player: PlayerPublicInfo): boolean {
   return player.isAi === true;
-}
-
-// Mirrors the REST-seeded lobby derivation: isAi comes from gameConfig.aiPlayerIds.
-function deriveIsAiFromConfig(
-  playerId: string,
-  aiPlayerIds: string[] | undefined,
-): boolean {
-  return (aiPlayerIds ?? []).includes(playerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -55,20 +48,35 @@ describe("GameLobbyView — AI badge rendering", () => {
     expect(lobbyShowsBadge(human)).toBe(false);
   });
 
-  it("REST-seeded lobby derives isAi from gameConfig.aiPlayerIds, not from id prefix", () => {
+  it("REST-seeded lobby: buildRestLobbyPlayers derives isAi from gameConfig.aiPlayerIds, not from id prefix", () => {
     const aiId = "ai:uuid-1";
     const humanId = "user-human-1";
-    const aiPlayerIds = [aiId];
+    const displayNames = { [aiId]: "CPU 1", [humanId]: "Alice" };
 
-    expect(deriveIsAiFromConfig(aiId, aiPlayerIds)).toBe(true);
-    expect(deriveIsAiFromConfig(humanId, aiPlayerIds)).toBe(false);
+    const players = buildRestLobbyPlayers([humanId, aiId], displayNames, [
+      aiId,
+    ]);
+    expect(players.find((p) => p.playerId === aiId)?.isAi).toBe(true);
+    expect(players.find((p) => p.playerId === humanId)?.isAi).toBeFalsy();
   });
 
-  it("REST-seeded lobby: absent aiPlayerIds → all seats have isAi=false", () => {
+  it("REST-seeded lobby: buildRestLobbyPlayers with absent aiPlayerIds → all seats isAi absent", () => {
     const ids = ["user-1", "user-2", "ai:not-configured"];
-    ids.forEach((id) => {
-      expect(deriveIsAiFromConfig(id, undefined)).toBe(false);
+    const displayNames = Object.fromEntries(ids.map((id) => [id, id]));
+    const players = buildRestLobbyPlayers(ids, displayNames, undefined);
+    players.forEach((p) => {
+      expect("isAi" in p).toBe(false);
     });
+  });
+
+  it("REST-seeded lobby: id starting with 'ai:' but absent from aiPlayerIds gets no badge", () => {
+    const impersonatorId = "ai:not-in-config";
+    const players = buildRestLobbyPlayers(
+      [impersonatorId],
+      { [impersonatorId]: "Trickster" },
+      [], // empty aiPlayerIds
+    );
+    expect(players[0]?.isAi).toBeFalsy();
   });
 });
 

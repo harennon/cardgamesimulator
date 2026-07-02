@@ -73,8 +73,9 @@ async function broadcastGameState(
   // Build the AI-seat set once per broadcast; derived from persisted config, never
   // from client input. The engine stays pure (no AI knowledge) — isAi is injected
   // here at the serialization boundary alongside isConnected.
-  const game = await gameService.getGame(gameId);
-  const aiIds = new Set(game?.gameConfig?.aiPlayerIds ?? []);
+  // Use the cache-backed getAiSeatIds (same aiSeatCache as isAiSeat) to avoid an
+  // uncached DB read on every broadcast. getGame is not cache-backed; this is.
+  const aiIds = await gameService.getAiSeatIds(gameId);
 
   const engine = engineFactory.getEngine(state.gameType);
   const playerSockets = connectionManager.getPlayerSockets(gameId);
