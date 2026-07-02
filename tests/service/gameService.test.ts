@@ -1096,7 +1096,7 @@ describe("GameService", () => {
   // ---------------------------------------------------------------------------
 
   describe("addAiSeats", () => {
-    it("seats count AI ids (prefix ai:), sets practice=true, populates aiPlayerIds, adds display names, persists", async () => {
+    it("seats count AI ids (plain UUID), sets practice=true, populates aiPlayerIds, adds display names, persists", async () => {
       const cache = new GameCache();
       const game = makeGame({
         playerIds: ["player-a"],
@@ -1113,8 +1113,12 @@ describe("GameService", () => {
       expect(result.playerIds).toHaveLength(3);
       const aiIds = result.gameConfig.aiPlayerIds!;
       expect(aiIds).toHaveLength(2);
+      // AI seat ids are plain UUIDs (no prefix) — compatible with the UUID[] column.
+      // Identity is signalled by membership in gameConfig.aiPlayerIds, not by id format.
+      const uuidPattern =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       for (const aiId of aiIds) {
-        expect(aiId).toMatch(/^ai:/);
+        expect(aiId).toMatch(uuidPattern);
         expect(result.playerIds).toContain(aiId);
         expect(result.playerDisplayNames[aiId]).toMatch(/^CPU \d+$/);
       }

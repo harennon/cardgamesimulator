@@ -20,6 +20,7 @@ import type {
   TimerExpiredPayload,
 } from "@shared/socket-events";
 import type { TurnTimerService } from "@/timer/turnTimerService";
+import { injectBoardAi, buildLobbyPlayers } from "@/websocket/socketAiUtils";
 
 /**
  * Upper bound on auto-timeout actions any engine takes to advance one seat to
@@ -47,11 +48,14 @@ function injectConnectionStatus<
   connectionManager: ConnectionManager,
   aiIds?: ReadonlySet<string>,
 ): T {
-  const players = view.players.map((p) => ({
+  const withConnection = view.players.map((p) => ({
     ...p,
     isConnected: connectionManager.isPlayerConnected(gameId, p.playerId),
-    ...(aiIds != null && aiIds.size > 0 ? { isAi: aiIds.has(p.playerId) } : {}),
   }));
+  const players =
+    aiIds != null && aiIds.size > 0
+      ? injectBoardAi(withConnection, aiIds)
+      : withConnection;
   return { ...view, players };
 }
 
@@ -238,11 +242,11 @@ async function handleGameJoin(
       // Send full lobby state to the joining socket for reconciliation.
       // Tag AI seats from persisted config — never trusted from client.
       const aiIds = new Set(game.gameConfig?.aiPlayerIds ?? []);
-      const players: PlayerInfo[] = game.playerIds.map((id) => ({
-        playerId: id,
-        displayName: game.playerDisplayNames[id] ?? id,
-        ...(aiIds.size > 0 ? { isAi: aiIds.has(id) } : {}),
-      }));
+      const players: PlayerInfo[] = buildLobbyPlayers(
+        game.playerIds,
+        game.playerDisplayNames,
+        aiIds,
+      );
       socket.emit("lobby:state", {
         players,
         maxPlayers: game.maxPlayers,

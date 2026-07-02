@@ -255,7 +255,7 @@ export class GameService {
 
     const existingAiCount = (game.gameConfig.aiPlayerIds ?? []).length;
     for (let i = 0; i < count; i++) {
-      const aiId = `ai:${crypto.randomUUID()}`;
+      const aiId = crypto.randomUUID();
       const displayName = `CPU ${existingAiCount + i + 1}`;
       game.playerIds.push(aiId);
       game.playerDisplayNames[aiId] = displayName;
