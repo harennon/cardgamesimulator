@@ -1,0 +1,1868 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Opponent Naming &amp; Avatars — Mockups (#136)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===== Tokens lifted verbatim from src/frontend/styles/game-variables.css ===== */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --input-border: var(--table-rim-light);
+        --input-radius: 6px;
+
+        --tonk-cyan: #3fd0d8;
+        --tonk-phase-discard: #c97b3f;
+        --tonk-phase-draw: #3f9dc9;
+
+        /* AI identity token (LLD 120) — steel/cool blue; never collides with gold turn glow */
+        --ai-accent: #7fb2ff;
+        --ai-accent-dim: rgba(127, 178, 255, 0.16);
+        --ai-accent-line: rgba(127, 178, 255, 0.5);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            1200px 800px at 50% -10%,
+            rgba(37, 107, 66, 0.35),
+            transparent 60%
+          ),
+          var(--felt);
+        background-attachment: fixed;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        padding: 32px 16px 120px;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        background-image:
+          repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(-45deg, #000 0 1px, transparent 1px 3px);
+        background-size: 6px 6px;
+      }
+
+      .doc-head {
+        max-width: 1120px;
+        margin: 0 auto 8px;
+        text-align: center;
+      }
+      .doc-head h1 {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.7rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.02em;
+        margin: 0 0 6px;
+      }
+      .doc-head p {
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        margin: 0 auto;
+        max-width: 720px;
+        line-height: 1.55;
+      }
+      .doc-head .tag {
+        display: inline-block;
+        margin-top: 12px;
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ai-accent);
+        border: 1px solid var(--ai-accent-line);
+        background: var(--ai-accent-dim);
+        border-radius: 999px;
+        padding: 4px 14px;
+      }
+
+      /* jump nav */
+      .nav {
+        max-width: 1120px;
+        margin: 20px auto 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+      }
+      .nav a {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: var(--text-primary);
+        text-decoration: none;
+        border: 1px solid var(--table-rim-light);
+        background: var(--panel-bg);
+        border-radius: 999px;
+        padding: 6px 14px;
+        transition:
+          border-color 0.15s ease,
+          color 0.15s ease;
+      }
+      .nav a:hover {
+        border-color: var(--ai-accent-line);
+        color: var(--ai-accent);
+      }
+
+      .section-label {
+        max-width: 1120px;
+        margin: 52px auto 6px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--gold-accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .section-label::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          rgba(201, 168, 76, 0.5),
+          transparent
+        );
+      }
+      .section-note {
+        max-width: 1120px;
+        margin: 0 auto 18px;
+        color: var(--text-muted);
+        font-size: 0.86rem;
+        line-height: 1.5;
+      }
+      .section-note b {
+        color: var(--text-primary);
+      }
+      .section-note code {
+        font-family: "Courier New", monospace;
+        background: rgba(127, 178, 255, 0.12);
+        color: var(--ai-accent);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 0.82em;
+      }
+
+      /* card grid holding the surface demos */
+      .grid {
+        max-width: 1120px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 22px;
+      }
+      .grid--wide {
+        grid-template-columns: 1fr;
+      }
+
+      .demo {
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 18px 18px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .demo__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .demo__title {
+        font-family: var(--font-card);
+        font-size: 1.05rem;
+        color: var(--text-primary);
+        margin: 0;
+      }
+      .demo__where {
+        font-size: 0.68rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .demo__desc {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+        margin: -4px 0 0;
+      }
+      .demo__stage {
+        background:
+          radial-gradient(
+            600px 300px at 50% -30%,
+            rgba(37, 107, 66, 0.4),
+            transparent 70%
+          ),
+          var(--felt);
+        border: 1px solid var(--table-rim);
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .demo__stage--dark {
+        background: var(--bg-dark);
+      }
+      .stage-caption {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        letter-spacing: 0.04em;
+        text-align: center;
+      }
+
+      /* ============================================================= */
+      /* AVATAR PRIMITIVES — three directions                          */
+      /* ============================================================= */
+
+      /* -- Direction A: monogram tile (initials on a steel-blue chip) -- */
+      .av-mono {
+        width: 34px;
+        height: 34px;
+        flex-shrink: 0;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-family: var(--font-ui);
+        font-weight: 700;
+        font-size: 0.82rem;
+        letter-spacing: 0.02em;
+        color: #0b1b33;
+        background: linear-gradient(150deg, #a9ccff 0%, var(--ai-accent) 70%);
+        border: 1px solid rgba(127, 178, 255, 0.7);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+        position: relative;
+      }
+      .av-mono--sm {
+        width: 26px;
+        height: 26px;
+        font-size: 0.66rem;
+        border-radius: 6px;
+      }
+      /* the tiny CPU corner-tick that keeps the "this is a bot" signal */
+      .av-mono::after {
+        content: "";
+        position: absolute;
+        right: -2px;
+        bottom: -2px;
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+        background: var(--ai-accent);
+        border: 1.5px solid var(--panel-bg);
+      }
+
+      /* -- Direction B: geometric bot glyph (procedural "face" in a ring) -- */
+      .av-glyph {
+        width: 34px;
+        height: 34px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 35% 30%, #12305c, #0a1a33);
+        border: 1.5px solid var(--ai-accent);
+        box-shadow: 0 0 0 2px rgba(127, 178, 255, 0.12);
+        position: relative;
+      }
+      .av-glyph--sm {
+        width: 26px;
+        height: 26px;
+        border-width: 1.25px;
+      }
+      .av-glyph svg {
+        width: 60%;
+        height: 60%;
+        display: block;
+      }
+
+      /* -- Direction C: named suit-token (a pip badge, ties bots to the deck) -- */
+      .av-suit {
+        width: 34px;
+        height: 34px;
+        flex-shrink: 0;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-family: var(--font-card);
+        font-size: 1.15rem;
+        line-height: 1;
+        background: #101c30;
+        border: 1.5px solid var(--ai-accent-line);
+        color: var(--ai-accent);
+        position: relative;
+      }
+      .av-suit--sm {
+        width: 26px;
+        height: 26px;
+        font-size: 0.9rem;
+        border-radius: 6px;
+      }
+      .av-suit__tick {
+        position: absolute;
+        right: -3px;
+        bottom: -3px;
+        font-family: var(--font-ui);
+        font-size: 0.42rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        background: var(--ai-accent);
+        color: #0b1b33;
+        border-radius: 3px;
+        padding: 0 3px;
+        line-height: 1.35;
+        border: 1px solid var(--panel-bg);
+      }
+
+      /* the tiny CPU pill (existing AiBadge — reused verbatim beside the name) */
+      .ai-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-family: var(--font-ui);
+        font-size: 0.6rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ai-accent);
+        flex-shrink: 0;
+      }
+      .ai-badge__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 2px;
+        background: var(--ai-accent);
+        flex-shrink: 0;
+      }
+
+      /* ============================================================= */
+      /* SURFACE: LOBBY ROW                                            */
+      /* ============================================================= */
+      .lobby {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+        max-width: 380px;
+        margin: 0 auto;
+      }
+      .lobby__row {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        padding: 9px 14px;
+        background: rgba(45, 24, 16, 0.6);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .lobby__row--ai {
+        border-color: var(--ai-accent-line);
+        background: rgba(127, 178, 255, 0.06);
+      }
+      .lobby__row--empty {
+        color: var(--text-muted);
+        font-weight: 400;
+        font-style: italic;
+      }
+      .lobby__name {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+      }
+      .lobby__name > span:first-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .host-tag {
+        font-size: 0.62rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        border: 1px solid rgba(201, 168, 76, 0.5);
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-weight: 700;
+      }
+      .kick {
+        margin-left: auto;
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        background: transparent;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 5px;
+        padding: 3px 9px;
+        cursor: pointer;
+        transition:
+          color 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .kick:hover {
+        color: #e05555;
+        border-color: rgba(224, 85, 85, 0.6);
+      }
+
+      /* ============================================================= */
+      /* SURFACE: BIG2 OPPONENT ROW                                    */
+      /* ============================================================= */
+      .opprow {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        padding: 8px 12px 10px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        position: relative;
+        min-width: 110px;
+      }
+      .opp--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .opp__cards {
+        display: flex;
+      }
+      .opp__cards .cb {
+        width: 26px;
+        height: 37px;
+        margin-left: -10px;
+        border-radius: 4px;
+        border: 1px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        position: relative;
+        overflow: hidden;
+      }
+      .opp__cards .cb:first-child {
+        margin-left: 0;
+      }
+      .opp__cards .cb::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 2px;
+      }
+      .opp__info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+      }
+      .opp__id {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .opp__name {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .opp__count {
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      .opp__thinking {
+        font-family: var(--font-ui);
+        font-size: 0.64rem;
+        letter-spacing: 0.05em;
+        color: var(--ai-accent);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .opp__thinking .dots span {
+        animation: blink 1.2s infinite both;
+        font-weight: 700;
+      }
+      .opp__thinking .dots span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .opp__thinking .dots span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes blink {
+        0%,
+        60%,
+        100% {
+          opacity: 0.25;
+        }
+        30% {
+          opacity: 1;
+        }
+      }
+      .opp__turn {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-accent);
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.3);
+        }
+      }
+
+      /* ============================================================= */
+      /* SURFACE: TONK SEAT RAIL                                       */
+      /* ============================================================= */
+      .rail {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .seat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 7px 10px 9px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        position: relative;
+        min-width: 96px;
+      }
+      .seat--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .seat__id {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .seat__name {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        max-width: 84px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .seat__meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .seat__count {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      .seat__tally {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        background: rgba(0, 0, 0, 0.3);
+        padding: 1px 7px;
+        border-radius: 8px;
+      }
+      .seat__turn {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-accent);
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      /* ============================================================= */
+      /* CREATE-GAME CONVENIENCE                                       */
+      /* ============================================================= */
+      .cg {
+        max-width: 380px;
+        margin: 0 auto;
+        width: 100%;
+      }
+      .cg__label {
+        display: block;
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+      }
+      .stepper-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .stepper {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--input-bg);
+        border: 1.5px solid var(--input-border);
+        border-radius: var(--input-radius);
+        padding: 6px 12px;
+        width: fit-content;
+      }
+      .stepper__btn {
+        font-family: var(--font-ui);
+        font-size: 1.1rem;
+        font-weight: 700;
+        line-height: 1;
+        width: 28px;
+        height: 28px;
+        border: 1.5px solid var(--input-border);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+      }
+      .stepper__btn:hover {
+        border-color: var(--ai-accent);
+        color: var(--ai-accent);
+        background: rgba(127, 178, 255, 0.12);
+      }
+      .stepper__value {
+        font-family: var(--font-ui);
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--ai-accent);
+        min-width: 20px;
+        text-align: center;
+      }
+      .fill-btn {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--ai-accent);
+        background: rgba(127, 178, 255, 0.1);
+        border: 1.5px solid var(--ai-accent-line);
+        border-radius: 6px;
+        padding: 7px 12px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.15s ease;
+      }
+      .fill-btn:hover {
+        background: rgba(127, 178, 255, 0.2);
+      }
+      .fill-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .cg__help {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+        margin: 10px 0 0;
+      }
+      .cg__preview {
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .cg__preview-title {
+        font-size: 0.68rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .cg__chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        background: rgba(127, 178, 255, 0.06);
+        border: 1px solid var(--ai-accent-line);
+        border-radius: 999px;
+        padding: 4px 12px 4px 4px;
+        width: fit-content;
+      }
+
+      /* callout box for the recommendation */
+      .callout {
+        max-width: 1120px;
+        margin: 26px auto 0;
+        background: linear-gradient(
+          120deg,
+          rgba(127, 178, 255, 0.08),
+          rgba(20, 12, 8, 0.85)
+        );
+        border: 1px solid var(--ai-accent-line);
+        border-radius: 12px;
+        padding: 20px 24px;
+      }
+      .callout h3 {
+        margin: 0 0 8px;
+        font-family: var(--font-card);
+        color: var(--ai-accent);
+        font-size: 1.05rem;
+      }
+      .callout p {
+        margin: 0 0 8px;
+        font-size: 0.88rem;
+        line-height: 1.55;
+        color: var(--text-primary);
+      }
+      .callout ul {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        font-size: 0.85rem;
+        line-height: 1.6;
+        color: var(--text-muted);
+      }
+      .callout b {
+        color: var(--text-primary);
+      }
+
+      .namepool {
+        max-width: 1120px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .namepool span {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        background: rgba(45, 24, 16, 0.6);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        padding: 5px 12px;
+      }
+      .namepool span b {
+        color: var(--ai-accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc-head">
+      <h1>AI Opponent Naming &amp; Avatars</h1>
+      <p>
+        Polish layer for practice-game bots (#136, sub-issue 3 of #127). Turns
+        the placeholder
+        <code style="color: var(--ai-accent)">CPU&nbsp;1 / CPU&nbsp;2</code>
+        seats into recognizable characters — friendly stable names plus an
+        optional avatar — across every surface a bot appears on. All game logic,
+        turn-driving, and stats exclusion are locked by sub-issues 1 &amp; 2 and
+        untouched here. The blue
+        <span class="ai-badge"><span class="ai-badge__dot"></span>CPU</span>
+        badge and the <b style="color: var(--gold-accent)">gold turn glow</b>
+        established in LLD 120 both remain; this adds identity on top.
+      </p>
+      <span class="tag"
+        >3 avatar directions · 1 naming scheme · create-game convenience</span
+      >
+    </div>
+
+    <nav class="nav">
+      <a href="#naming">Naming scheme</a>
+      <a href="#dirA">Dir A · Monogram</a>
+      <a href="#dirB">Dir B · Bot glyph</a>
+      <a href="#dirC">Dir C · Suit token</a>
+      <a href="#states">Key states</a>
+      <a href="#creategame">Create-game convenience</a>
+      <a href="#reco">Recommendation</a>
+    </nav>
+
+    <!-- ============================================================ -->
+    <!-- NAMING SCHEME -->
+    <!-- ============================================================ -->
+    <div class="section-label" id="naming">
+      Naming scheme (shared by all directions)
+    </div>
+    <p class="section-note">
+      A small, curated, <b>alphabetically-ordered</b> name pool replaces
+      <code>CPU 1</code>, <code>CPU 2</code>. Names are assigned by AI-seat
+      ordinal so they are <b>stable and deterministic</b> — the first bot is
+      always the first pool entry, matching how <code>addAiSeats</code> already
+      numbers seats. Card-adjacent, unmistakably non-human, short enough to fit
+      the ellipsized seat labels (≤ 8 chars). The
+      <span class="ai-badge"><span class="ai-badge__dot"></span>CPU</span> badge
+      still rides alongside so the "this is a bot" signal never depends on
+      recognizing a name.
+    </p>
+    <div class="namepool">
+      <span><b>1.</b> Ace</span>
+      <span><b>2.</b> Bishop</span>
+      <span><b>3.</b> Cortex</span>
+      <span><b>4.</b> Domino</span>
+      <span><b>5.</b> Echo</span>
+      <span><b>6.</b> Fable</span>
+      <span><b>7.</b> Gambit</span>
+    </div>
+    <p class="section-note" style="margin-top: 12px">
+      Pool is sized for the largest table (Tonk, 8 seats → up to 7 bots). Names
+      collide-safe against humans: a human literally named "Ace" still shows
+      <b>no</b> badge/avatar because identity keys off the server-side
+      <code>isAi</code> flag, not the string (LLD 120 Edge Case 10). Only the
+      backend <code>displayName</code> assignment in <code>addAiSeats</code>
+      changes — no new type, no new socket field.
+    </p>
+
+    <!-- ============================================================ -->
+    <!-- DIRECTION A -->
+    <!-- ============================================================ -->
+    <div class="section-label" id="dirA">Direction A — Monogram tile</div>
+    <p class="section-note">
+      A rounded <b>steel-blue chip with the name's initial</b>, gradient-filled,
+      with a tiny squared corner-tick echoing the CPU badge's squared dot.
+      Cheapest to build (pure CSS, first letter of the name), reads instantly at
+      any size, and never needs an asset. The chip color <em>is</em> the bot
+      signal — warm gold is reserved for turns, so the two never compete.
+    </p>
+    <div class="grid">
+      <!-- Lobby -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Lobby</h3>
+          <span class="demo__where">GameLobbyView</span>
+        </div>
+        <p class="demo__desc">
+          Host has filled a 4-player Big2 table with 2 bots.
+        </p>
+        <div class="demo__stage">
+          <div class="lobby">
+            <div class="lobby__row">
+              <div class="lobby__name">
+                <span>Priya</span><span class="host-tag">Host</span>
+              </div>
+            </div>
+            <div class="lobby__row lobby__row--ai">
+              <span class="av-mono av-mono--sm">A</span>
+              <div class="lobby__name">
+                <span>Ace</span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <button class="kick">Remove</button>
+            </div>
+            <div class="lobby__row lobby__row--ai">
+              <span class="av-mono av-mono--sm">B</span>
+              <div class="lobby__name">
+                <span>Bishop</span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <button class="kick">Remove</button>
+            </div>
+            <div class="lobby__row lobby__row--empty">
+              Waiting for player...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Big2 board -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Big2 board</h3>
+          <span class="demo__where">OpponentRow</span>
+        </div>
+        <p class="demo__desc">
+          Bishop is taking its turn (gold glow + blue identity).
+        </p>
+        <div class="demo__stage">
+          <div class="opprow">
+            <div class="opp">
+              <div class="opp__cards">
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+              </div>
+              <div class="opp__info">
+                <div class="opp__id">
+                  <span class="av-mono av-mono--sm">A</span>
+                  <span class="opp__name">Ace</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                </div>
+                <span class="opp__count">7 cards</span>
+              </div>
+            </div>
+            <div class="opp opp--active">
+              <div class="opp__turn"></div>
+              <div class="opp__cards">
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+              </div>
+              <div class="opp__info">
+                <div class="opp__id">
+                  <span class="av-mono av-mono--sm">B</span>
+                  <span class="opp__name">Bishop</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                </div>
+                <span class="opp__thinking"
+                  >thinking<span class="dots"
+                    ><span>.</span><span>.</span><span>.</span></span
+                  ></span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tonk rail -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Tonk seat rail</h3>
+          <span class="demo__where">TonkSeatRail</span>
+        </div>
+        <p class="demo__desc">1 human + 3 bots; Cortex is active.</p>
+        <div class="demo__stage">
+          <div class="rail">
+            <div class="seat">
+              <div class="seat__id">
+                <span class="av-mono av-mono--sm">A</span>
+                <span class="seat__name">Ace</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta">
+                <span class="seat__count">6</span>
+                <span class="seat__tally">42</span>
+              </div>
+            </div>
+            <div class="seat">
+              <div class="seat__id">
+                <span class="av-mono av-mono--sm">B</span>
+                <span class="seat__name">Bishop</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta">
+                <span class="seat__count">5</span>
+                <span class="seat__tally">88</span>
+              </div>
+            </div>
+            <div class="seat seat--active">
+              <div class="seat__turn"></div>
+              <div class="seat__id">
+                <span class="av-mono av-mono--sm">C</span>
+                <span class="seat__name">Cortex</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta">
+                <span class="seat__count">7</span>
+                <span class="seat__tally">31</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DIRECTION B -->
+    <!-- ============================================================ -->
+    <div class="section-label" id="dirB">Direction B — Geometric bot glyph</div>
+    <p class="section-note">
+      A single inline-SVG <b>procedural "face"</b> in a dark disc ringed in
+      steel-blue. One shared glyph (not per-name) — the <em>name</em> gives
+      individuality, the glyph gives a consistent species. More characterful and
+      obviously robotic than a monogram; slightly more markup but still
+      asset-free and CSS/SVG-only (no icon font, per the LLD 120 constraint of
+      "no icon fonts / no emoji").
+    </p>
+    <div class="grid">
+      <!-- Lobby -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Lobby</h3>
+          <span class="demo__where">GameLobbyView</span>
+        </div>
+        <p class="demo__desc">Same 4-player Big2 table, glyph avatars.</p>
+        <div class="demo__stage">
+          <div class="lobby">
+            <div class="lobby__row">
+              <div class="lobby__name">
+                <span>Priya</span><span class="host-tag">Host</span>
+              </div>
+            </div>
+            <div class="lobby__row lobby__row--ai">
+              <span class="av-glyph av-glyph--sm">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#7fb2ff"
+                  stroke-width="1.6"
+                >
+                  <rect x="5" y="7" width="14" height="11" rx="3" />
+                  <circle
+                    cx="9.5"
+                    cy="12.5"
+                    r="1.4"
+                    fill="#7fb2ff"
+                    stroke="none"
+                  />
+                  <circle
+                    cx="14.5"
+                    cy="12.5"
+                    r="1.4"
+                    fill="#7fb2ff"
+                    stroke="none"
+                  />
+                  <line x1="12" y1="4" x2="12" y2="7" />
+                  <circle cx="12" cy="3.5" r="1" fill="#7fb2ff" stroke="none" />
+                </svg>
+              </span>
+              <div class="lobby__name">
+                <span>Ace</span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <button class="kick">Remove</button>
+            </div>
+            <div class="lobby__row lobby__row--ai">
+              <span class="av-glyph av-glyph--sm">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#7fb2ff"
+                  stroke-width="1.6"
+                >
+                  <rect x="5" y="7" width="14" height="11" rx="3" />
+                  <circle
+                    cx="9.5"
+                    cy="12.5"
+                    r="1.4"
+                    fill="#7fb2ff"
+                    stroke="none"
+                  />
+                  <circle
+                    cx="14.5"
+                    cy="12.5"
+                    r="1.4"
+                    fill="#7fb2ff"
+                    stroke="none"
+                  />
+                  <line x1="12" y1="4" x2="12" y2="7" />
+                  <circle cx="12" cy="3.5" r="1" fill="#7fb2ff" stroke="none" />
+                </svg>
+              </span>
+              <div class="lobby__name">
+                <span>Bishop</span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <button class="kick">Remove</button>
+            </div>
+            <div class="lobby__row lobby__row--empty">
+              Waiting for player...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Big2 -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Big2 board</h3>
+          <span class="demo__where">OpponentRow</span>
+        </div>
+        <p class="demo__desc">Bishop active. Glyph sits left of the name.</p>
+        <div class="demo__stage">
+          <div class="opprow">
+            <div class="opp">
+              <div class="opp__cards">
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+              </div>
+              <div class="opp__info">
+                <div class="opp__id">
+                  <span class="av-glyph av-glyph--sm">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#7fb2ff"
+                      stroke-width="1.6"
+                    >
+                      <rect x="5" y="7" width="14" height="11" rx="3" />
+                      <circle
+                        cx="9.5"
+                        cy="12.5"
+                        r="1.4"
+                        fill="#7fb2ff"
+                        stroke="none"
+                      />
+                      <circle
+                        cx="14.5"
+                        cy="12.5"
+                        r="1.4"
+                        fill="#7fb2ff"
+                        stroke="none"
+                      />
+                      <line x1="12" y1="4" x2="12" y2="7" />
+                      <circle
+                        cx="12"
+                        cy="3.5"
+                        r="1"
+                        fill="#7fb2ff"
+                        stroke="none"
+                      />
+                    </svg>
+                  </span>
+                  <span class="opp__name">Ace</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                </div>
+                <span class="opp__count">7 cards</span>
+              </div>
+            </div>
+            <div class="opp opp--active">
+              <div class="opp__turn"></div>
+              <div class="opp__cards">
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+              </div>
+              <div class="opp__info">
+                <div class="opp__id">
+                  <span class="av-glyph av-glyph--sm">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#7fb2ff"
+                      stroke-width="1.6"
+                    >
+                      <rect x="5" y="7" width="14" height="11" rx="3" />
+                      <circle
+                        cx="9.5"
+                        cy="12.5"
+                        r="1.4"
+                        fill="#7fb2ff"
+                        stroke="none"
+                      />
+                      <circle
+                        cx="14.5"
+                        cy="12.5"
+                        r="1.4"
+                        fill="#7fb2ff"
+                        stroke="none"
+                      />
+                      <line x1="12" y1="4" x2="12" y2="7" />
+                      <circle
+                        cx="12"
+                        cy="3.5"
+                        r="1"
+                        fill="#7fb2ff"
+                        stroke="none"
+                      />
+                    </svg>
+                  </span>
+                  <span class="opp__name">Bishop</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                </div>
+                <span class="opp__thinking"
+                  >thinking<span class="dots"
+                    ><span>.</span><span>.</span><span>.</span></span
+                  ></span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tonk -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Tonk seat rail</h3>
+          <span class="demo__where">TonkSeatRail</span>
+        </div>
+        <p class="demo__desc">Cortex active. Glyph above the name.</p>
+        <div class="demo__stage">
+          <div class="rail">
+            <div class="seat">
+              <div class="seat__id">
+                <span class="av-glyph av-glyph--sm">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#7fb2ff"
+                    stroke-width="1.6"
+                  >
+                    <rect x="5" y="7" width="14" height="11" rx="3" />
+                    <circle
+                      cx="9.5"
+                      cy="12.5"
+                      r="1.4"
+                      fill="#7fb2ff"
+                      stroke="none"
+                    />
+                    <circle
+                      cx="14.5"
+                      cy="12.5"
+                      r="1.4"
+                      fill="#7fb2ff"
+                      stroke="none"
+                    />
+                    <line x1="12" y1="4" x2="12" y2="7" />
+                    <circle
+                      cx="12"
+                      cy="3.5"
+                      r="1"
+                      fill="#7fb2ff"
+                      stroke="none"
+                    />
+                  </svg>
+                </span>
+                <span class="seat__name">Ace</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta">
+                <span class="seat__count">6</span>
+                <span class="seat__tally">42</span>
+              </div>
+            </div>
+            <div class="seat seat--active">
+              <div class="seat__turn"></div>
+              <div class="seat__id">
+                <span class="av-glyph av-glyph--sm">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#7fb2ff"
+                    stroke-width="1.6"
+                  >
+                    <rect x="5" y="7" width="14" height="11" rx="3" />
+                    <circle
+                      cx="9.5"
+                      cy="12.5"
+                      r="1.4"
+                      fill="#7fb2ff"
+                      stroke="none"
+                    />
+                    <circle
+                      cx="14.5"
+                      cy="12.5"
+                      r="1.4"
+                      fill="#7fb2ff"
+                      stroke="none"
+                    />
+                    <line x1="12" y1="4" x2="12" y2="7" />
+                    <circle
+                      cx="12"
+                      cy="3.5"
+                      r="1"
+                      fill="#7fb2ff"
+                      stroke="none"
+                    />
+                  </svg>
+                </span>
+                <span class="seat__name">Cortex</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta">
+                <span class="seat__count">7</span>
+                <span class="seat__tally">31</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DIRECTION C -->
+    <!-- ============================================================ -->
+    <div class="section-label" id="dirC">Direction C — Named suit token</div>
+    <p class="section-note">
+      A <b>card-suit pip</b> (♠ ♥ ♦ ♣) in a dark square with a tiny "CPU" tick,
+      tying the bots visually to the deck itself. Most on-theme for a card game
+      and the pip cycles per seat, giving each bot a distinct mark. Trade-off:
+      suit pips carry meaning inside Big2/Tonk, so a bot marked "♥" beside real
+      hearts <em>could</em> read as game state on a busy board. Included for
+      completeness; the LLD flags this as the collision risk to weigh.
+    </p>
+    <div class="grid">
+      <!-- Lobby -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Lobby</h3>
+          <span class="demo__where">GameLobbyView</span>
+        </div>
+        <p class="demo__desc">Suit pips cycle ♠ ♥ ♦ ♣ by seat ordinal.</p>
+        <div class="demo__stage">
+          <div class="lobby">
+            <div class="lobby__row">
+              <div class="lobby__name">
+                <span>Priya</span><span class="host-tag">Host</span>
+              </div>
+            </div>
+            <div class="lobby__row lobby__row--ai">
+              <span class="av-suit av-suit--sm" style="color: var(--ai-accent)"
+                >♠<span class="av-suit__tick">AI</span></span
+              >
+              <div class="lobby__name">
+                <span>Ace</span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <button class="kick">Remove</button>
+            </div>
+            <div class="lobby__row lobby__row--ai">
+              <span class="av-suit av-suit--sm" style="color: var(--ai-accent)"
+                >♥<span class="av-suit__tick">AI</span></span
+              >
+              <div class="lobby__name">
+                <span>Bishop</span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <button class="kick">Remove</button>
+            </div>
+            <div class="lobby__row lobby__row--empty">
+              Waiting for player...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Big2 -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Big2 board</h3>
+          <span class="demo__where">OpponentRow</span>
+        </div>
+        <p class="demo__desc">
+          Note the pip near red suits — possible read ambiguity.
+        </p>
+        <div class="demo__stage">
+          <div class="opprow">
+            <div class="opp">
+              <div class="opp__cards">
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+              </div>
+              <div class="opp__info">
+                <div class="opp__id">
+                  <span class="av-suit av-suit--sm"
+                    >♠<span class="av-suit__tick">AI</span></span
+                  >
+                  <span class="opp__name">Ace</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                </div>
+                <span class="opp__count">7 cards</span>
+              </div>
+            </div>
+            <div class="opp opp--active">
+              <div class="opp__turn"></div>
+              <div class="opp__cards">
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+              </div>
+              <div class="opp__info">
+                <div class="opp__id">
+                  <span class="av-suit av-suit--sm"
+                    >♥<span class="av-suit__tick">AI</span></span
+                  >
+                  <span class="opp__name">Bishop</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                </div>
+                <span class="opp__thinking"
+                  >thinking<span class="dots"
+                    ><span>.</span><span>.</span><span>.</span></span
+                  ></span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tonk -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Tonk seat rail</h3>
+          <span class="demo__where">TonkSeatRail</span>
+        </div>
+        <p class="demo__desc">Cortex active.</p>
+        <div class="demo__stage">
+          <div class="rail">
+            <div class="seat">
+              <div class="seat__id">
+                <span class="av-suit av-suit--sm"
+                  >♠<span class="av-suit__tick">AI</span></span
+                >
+                <span class="seat__name">Ace</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta">
+                <span class="seat__count">6</span>
+                <span class="seat__tally">42</span>
+              </div>
+            </div>
+            <div class="seat seat--active">
+              <div class="seat__turn"></div>
+              <div class="seat__id">
+                <span class="av-suit av-suit--sm"
+                  >♦<span class="av-suit__tick">AI</span></span
+                >
+                <span class="seat__name">Cortex</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta">
+                <span class="seat__count">7</span>
+                <span class="seat__tally">31</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- KEY STATES -->
+    <!-- ============================================================ -->
+    <div class="section-label" id="states">Key states (using Direction A)</div>
+    <p class="section-note">
+      The states that matter for correctness, shown with the recommended
+      Direction&nbsp;A avatar. These verify the identity treatment never fights
+      the existing turn/disconnect/mobile behavior.
+    </p>
+    <div class="grid">
+      <!-- Collision: gold turn + blue identity -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Turn + identity together</h3>
+          <span class="demo__where">Edge Case 6</span>
+        </div>
+        <p class="demo__desc">
+          Active bot shows the
+          <b style="color: var(--gold-accent)">gold</b> border/pulse (turn)
+          <em>and</em> the
+          <span style="color: var(--ai-accent)">blue</span> avatar + CPU badge
+          (identity). Warm vs cool — no collision.
+        </p>
+        <div class="demo__stage">
+          <div class="opprow">
+            <div class="opp opp--active">
+              <div class="opp__turn"></div>
+              <div class="opp__cards">
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+              </div>
+              <div class="opp__info">
+                <div class="opp__id">
+                  <span class="av-mono av-mono--sm">D</span>
+                  <span class="opp__name">Domino</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                </div>
+                <span class="opp__thinking"
+                  >thinking<span class="dots"
+                    ><span>.</span><span>.</span><span>.</span></span
+                  ></span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Human vs bot side by side -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Human vs bot, side by side</h3>
+          <span class="demo__where">Regression</span>
+        </div>
+        <p class="demo__desc">
+          Humans get <b>no avatar, no badge</b> — byte-for-byte the current
+          look. Only the bot carries the treatment.
+        </p>
+        <div class="demo__stage">
+          <div class="opprow">
+            <div class="opp">
+              <div class="opp__cards">
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+              </div>
+              <div class="opp__info">
+                <div class="opp__id"><span class="opp__name">Marcus</span></div>
+                <span class="opp__count">3 cards</span>
+              </div>
+            </div>
+            <div class="opp">
+              <div class="opp__cards">
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+                <div class="cb"></div>
+              </div>
+              <div class="opp__info">
+                <div class="opp__id">
+                  <span class="av-mono av-mono--sm">E</span>
+                  <span class="opp__name">Echo</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                </div>
+                <span class="opp__count">5 cards</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile lobby -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Mobile lobby row</h3>
+          <span class="demo__where">≤ 767px</span>
+        </div>
+        <p class="demo__desc">
+          Avatar is <code>flex-shrink: 0</code>; the name ellipsizes, badge and
+          avatar never clip. Remove button stays reachable.
+        </p>
+        <div class="demo__stage">
+          <div class="lobby" style="max-width: 260px">
+            <div class="lobby__row lobby__row--ai" style="font-size: 0.85rem">
+              <span class="av-mono av-mono--sm">G</span>
+              <div class="lobby__name">
+                <span>Gambit</span>
+                <span class="ai-badge"
+                  ><span class="ai-badge__dot"></span>CPU</span
+                >
+              </div>
+              <button class="kick">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Full 8-seat Tonk rail -->
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Max table — 1 human + 7 bots</h3>
+          <span class="demo__where">Tonk 8 seats</span>
+        </div>
+        <p class="demo__desc">
+          Whole pool in play. Compact rail drops the card fan; avatars keep
+          seats readable at density.
+        </p>
+        <div class="demo__stage">
+          <div class="rail" style="gap: 8px">
+            <div class="seat" style="min-width: 78px">
+              <div class="seat__id">
+                <span class="av-mono av-mono--sm">A</span
+                ><span class="seat__name">Ace</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta"><span class="seat__tally">40</span></div>
+            </div>
+            <div class="seat" style="min-width: 78px">
+              <div class="seat__id">
+                <span class="av-mono av-mono--sm">B</span
+                ><span class="seat__name">Bishop</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta"><span class="seat__tally">72</span></div>
+            </div>
+            <div class="seat seat--active" style="min-width: 78px">
+              <div class="seat__turn"></div>
+              <div class="seat__id">
+                <span class="av-mono av-mono--sm">C</span
+                ><span class="seat__name">Cortex</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta"><span class="seat__tally">33</span></div>
+            </div>
+            <div class="seat" style="min-width: 78px">
+              <div class="seat__id">
+                <span class="av-mono av-mono--sm">D</span
+                ><span class="seat__name">Domino</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta"><span class="seat__tally">51</span></div>
+            </div>
+            <div class="seat" style="min-width: 78px">
+              <div class="seat__id">
+                <span class="av-mono av-mono--sm">E</span
+                ><span class="seat__name">Echo</span>
+              </div>
+              <span class="ai-badge"
+                ><span class="ai-badge__dot"></span>CPU</span
+              >
+              <div class="seat__meta"><span class="seat__tally">64</span></div>
+            </div>
+          </div>
+          <div class="stage-caption">(2 of 7 bots elided for width)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- CREATE-GAME CONVENIENCE -->
+    <!-- ============================================================ -->
+    <div class="section-label" id="creategame">
+      Create-game convenience — "Fill with AI"
+    </div>
+    <p class="section-note">
+      The existing stepper (LLD 120) stays. This adds one optional
+      <b>"Fill remaining seats"</b> shortcut that sets
+      <code>numAiSeats</code> to <code>maxPlayers − 1</code> in a single tap —
+      the common "I just want to practice solo against a full table" case — plus
+      a small <b>live preview</b> of the bots that will be seated so the host
+      sees the names before creating. Purely a convenience over the stepper; no
+      new request field.
+      <b
+        >This is the only create-game visual change and is why the mockup step
+        is required by the acceptance criteria.</b
+      >
+    </p>
+    <div class="grid">
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">Stepper + Fill shortcut</h3>
+          <span class="demo__where">CreateGameView</span>
+        </div>
+        <p class="demo__desc">Big2, 4 players. One tap fills 3 bots.</p>
+        <div class="demo__stage demo__stage--dark">
+          <div class="cg">
+            <label class="cg__label">AI Opponents</label>
+            <div class="stepper-row">
+              <div class="stepper">
+                <button class="stepper__btn">−</button>
+                <span class="stepper__value">3</span>
+                <button class="stepper__btn">+</button>
+              </div>
+              <button class="fill-btn">
+                <span class="ai-badge" style="color: inherit"
+                  ><span
+                    class="ai-badge__dot"
+                    style="background: currentColor"
+                  ></span
+                ></span>
+                Fill remaining seats
+              </button>
+            </div>
+            <p class="cg__help">
+              Practice games don't count toward stats. Fills to
+              <b style="color: var(--text-primary)">3</b> bots (one seat kept
+              for you).
+            </p>
+            <div class="cg__preview">
+              <span class="cg__preview-title">Table preview</span>
+              <span class="cg__chip"
+                ><span class="av-mono av-mono--sm">A</span>Ace</span
+              >
+              <span class="cg__chip"
+                ><span class="av-mono av-mono--sm">B</span>Bishop</span
+              >
+              <span class="cg__chip"
+                ><span class="av-mono av-mono--sm">C</span>Cortex</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo">
+        <div class="demo__head">
+          <h3 class="demo__title">At 0 — unchanged</h3>
+          <span class="demo__where">Regression</span>
+        </div>
+        <p class="demo__desc">
+          Human-only path: stepper at 0, Fill available but no preview, CTA
+          reads "Create Game". Byte-for-byte the current form.
+        </p>
+        <div class="demo__stage demo__stage--dark">
+          <div class="cg">
+            <label class="cg__label">AI Opponents</label>
+            <div class="stepper-row">
+              <div class="stepper">
+                <button
+                  class="stepper__btn"
+                  style="opacity: 0.3; cursor: not-allowed"
+                >
+                  −
+                </button>
+                <span class="stepper__value">0</span>
+                <button class="stepper__btn">+</button>
+              </div>
+              <button class="fill-btn">Fill remaining seats</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- RECOMMENDATION -->
+    <!-- ============================================================ -->
+    <div class="callout" id="reco">
+      <h3>Recommendation</h3>
+      <p>
+        <b>Naming scheme + Direction A (monogram tile)</b>, avatar rendered as a
+        small optional variant slot on the existing <code>AiBadge</code> surface
+        (or a sibling <code>AiAvatar</code> atom). Rationale:
+      </p>
+      <ul>
+        <li>
+          <b>Cheapest, most robust:</b> pure CSS + the name's first letter. No
+          assets, no icon font (respects the LLD 120 "no emoji / no icon font"
+          rule), scales cleanly board ↔ lobby with a <code>--sm</code> modifier.
+        </li>
+        <li>
+          <b>No game-state ambiguity:</b> unlike Direction C's suit pips, a
+          monogram can never be mistaken for a card on a busy board.
+        </li>
+        <li>
+          <b>Clear identity without stealing the turn signal:</b> steel-blue
+          chip vs gold glow stay in separate lanes (Edge Case 6 verified above).
+        </li>
+      </ul>
+      <p style="margin-top: 12px">
+        <b>Scope of change if approved:</b> (1) backend
+        <code>addAiSeats</code> name pool instead of <code>"CPU N"</code>; (2)
+        new <code>AiAvatar.vue</code> atom (or a <code>variant</code> prop on
+        <code>AiBadge</code>) rendered beside the name in the three surfaces
+        that already gate on <code>isAi</code>; (3) the <b>optional</b> "Fill
+        remaining seats" button + table preview in <code>CreateGameView</code>.
+        No new shared types, no socket-payload change, no game-logic change. The
+        "thinking…" line under an active bot is the pre-existing LLD 120
+        nice-to-have and can ride along or stay deferred.
+      </p>
+    </div>
+  </body>
+</html>
