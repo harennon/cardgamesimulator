@@ -59,6 +59,8 @@ Behavior:
 
 This keeps the entity mutation in one tested place and mirrors how `joinGame` appends human seats. The `count`/naming/`maxPlayers` interaction with the eventual UI is sub-issue 2's problem; this method is the seam it will call.
 
+**Where the "enough seats for the engine" check lives.** `addAiSeats` deliberately does **not** validate that the resulting total seat count can reach the engine minimum (e.g. it does not reject a single AI seat for Tonk). It validates only lobby-level invariants (`maxPlayers`, `count >= 1`, `CREATED` status). The engine-minimum check is owned **solely by the relaxed start gate** (Approach B: `game.playerIds.length < engineMin` → `NOT_ENOUGH_PLAYERS`), which is the authoritative guard and the last checkpoint before `engine.initialize`. Rationale: seats are added incrementally (host + human joins + AI seats can arrive in any order during the `CREATED` lobby), so a total-count check at each `addAiSeats` call would be premature and could reject valid interim states. Centralizing the minimum-seat check at the start gate avoids a duplicated/omitted validation and keeps a single source of truth. The sub-issue-2 UI may surface a friendlier pre-check, but it is advisory; the start gate remains the enforcement point.
+
 ### B. Relaxed start gate (`GameService.startGame`, ~line 91)
 
 Replace the flat `minPlayers = 2` / `playerIds.length < 2` rejection with a human-count guard:
@@ -85,6 +87,10 @@ shouldAutoPlay(gameId, playerId) := isAiSeat(gameId, playerId) || connectionMana
 ```
 
 - `isAiSeat` is resolved from the game's `gameConfig.aiPlayerIds`. The socket layer already has the `Game` (via `gameService.getGame`) and the state; expose AI-seat membership through a cheap lookup. Recommended: `GameService.isAiSeat(gameId, playerId)` backed by the same read-through pattern as `getJoinCode` (memoize the `aiPlayerIds` set per game, since it is immutable once the game starts). This avoids a DB read on the hot auto-play path and keeps the socket layer thin.
+- **Memoization invariant (load-bearing).** `addAiSeats` mutates `aiPlayerIds` while the game is still `CREATED`. If the memo were populated during `CREATED` — before the last `addAiSeats` call — it could cache an incomplete set that is never refreshed. Therefore the invariant is: **the `aiPlayerIds` memo must not be populated until the game has left `CREATED` (i.e. only on/after `startGame` sets `IN_PROGRESS`).** Two mechanisms satisfy this; the implementer picks one:
+  - **(preferred) `isAiSeat` only memoizes when `game.status !== "CREATED"`.** During `CREATED` it may read through without caching (there is no hot-path caller during `CREATED` — the only consumer is the `IN_PROGRESS` auto-play loop), and it caches the immutable set on the first read once the game is running. This keeps `addAiSeats` free of memo concerns.
+  - **(alternative) `addAiSeats` invalidates the memo entry** (`aiSeatCache.delete(gameId)`) after each mutation.
+  This is stated as a correctness-by-invariant requirement, not an incidental note: the only current consumer is the `IN_PROGRESS` auto-play path, and the memo must never observe a partially-seated `CREATED` game. `isAiSeat` must never be relied on to gate behavior *during* `CREATED`.
 - Replace the three `connectionManager.isAbandoned(...)` call sites that gate auto-play with `shouldAutoPlay(...)`:
   - `autoPlayAbandoned` loop condition (~line 109).
   - `handleGameAction`'s post-action "next player abandoned?" check (~line 456).
@@ -94,6 +100,8 @@ shouldAutoPlay(gameId, playerId) := isAiSeat(gameId, playerId) || connectionMana
 **Kicking off AI turns after the human acts and at game start.** `handleGameAction` already calls `autoPlayAbandoned` after a human move when the *next* seat is driven. With `shouldAutoPlay`, this now fires for AI seats too — no new call site needed there. **However**, two gaps must be closed:
 
 1. **Game start.** After `handleGameStart` → `startGame`, if the **first** seat to act is an AI seat, nothing currently drives it. Add a call to `autoPlayAbandoned` at the end of `handleGameStart` (after the initial broadcast), mirroring the post-action pattern. For human-first games this is a no-op (the first seat is not driven), so human-vs-human is unaffected.
+
+   **Timer ordering when the first seat is AI.** `handleGameStart` currently calls `turnTimerService.startTurn(gameId, true)` unconditionally (~line 337) before the broadcast. When the first actor is an AI seat, this would arm a real turn timer *on the AI seat* for the brief window before `autoPlayAbandoned` runs. This is benign (a timer expiry would just call `getAutoTimeoutAction` for the same AI seat), but the timer is redundant/confusing and should not be left armed. Required handling: **the initial `startTurn(gameId, true)` must be skipped when the first seat is an AI seat**, deferring turn-timer arming to `autoPlayAbandoned` (which arms the timer via `startTurn(gameId, false)` only when it stops at a human, `i > 0`). Concretely, gate the initial `startTurn(true)` on `!(await gameService.isAiSeat(gameId, firstSeatId))` where `firstSeatId` is the seat at `state.currentPlayerIndex` returned from `startGame`. `registerGame` still happens unconditionally so the timer service is configured for later human turns. For human-first games this is unchanged (the initial `startTurn(true)` still fires). Note: per the memoization invariant, `isAiSeat` is consulted here only *after* `startGame` has set `IN_PROGRESS`, so the memo is safe to populate at this point.
 2. **Human turn timer path.** Unchanged — humans still get a timer. When a human's action advances to an AI seat, the existing `handleGameAction` branch skips the timer and calls `autoPlayAbandoned` (now true for AI). Good.
 
 **Why not a separate AI driver loop?** A parallel driver would duplicate the exit-condition and completion-broadcast logic already hardened in `autoPlayAbandoned` (timer unregister, `clearGameAbandoned`, completion broadcast). Reusing one loop is the minimal, lowest-blast-radius change and satisfies the acceptance criterion "reuse the existing loop."
@@ -126,6 +134,19 @@ Because the guard is above the loop, it skips **both** writes for **all** seats 
 
 The default `practice = false` keeps every other caller (there is exactly one: `applyAction`) and all existing tests behaving identically unless they opt in.
 
+### E. Rematch strips the practice/AI marker (`GameService.createRematch`, ~line 131)
+
+`createRematch` carries `oldGame.gameConfig` forward verbatim into the new game (line 184) and rebuilds the roster from `connectedPlayerIds` (lines 154–157). AI seats are **server-driven and never hold a socket**, so `connectionManager.getConnectedPlayerIds` never returns an `ai:` id, and the rematch roster is therefore **always human-only**. This creates two problems if the config is copied blindly:
+
+- A rematch would keep `practice: true` and a stale `aiPlayerIds` referencing ids that are no longer in `playerIds`. A now-all-human rematch would then be silently excluded from stats/history — a data-loss bug.
+- A 1-human + 1-AI Big2 practice game could never be rematched: the lone connected human fails the `rematchPlayerIds.length < 2` guard (line 163) and throws `NOT_ENOUGH_PLAYERS`.
+
+**Decision: a rematch of a practice game becomes a normal human-only game.** The AI seats do not carry over. Rationale: (a) re-seating AI on rematch is a UX/product decision that belongs to sub-issue 2's create-game flow, not to the backend foundation; (b) the connection-roster rebuild already drops AI seats, so the *only* correct config for the rematched roster is one with the AI marker removed. Re-seating AI would additionally require regenerating `aiPlayerIds` to match new synthetic ids and is explicitly out of scope here.
+
+Mechanism: when building the rematch config, **strip** `practice` and `aiPlayerIds`, preserving only game-mechanic config (e.g. `deckRoundsTarget`). Concretely, derive a `rematchConfig` from `oldGame.gameConfig` with `practice`/`aiPlayerIds` omitted and pass **that** to `createGame` instead of `oldGame.gameConfig`.
+
+The existing `rematchPlayerIds.length < 2` guard is **kept unchanged**: a rematch always requires ≥2 connected humans (a solo human cannot rematch a practice game into a valid game, and this LLD does not add AI re-seating that would make a solo rematch viable). The resulting error is the existing `NOT_ENOUGH_PLAYERS`, which is the correct signal for the sub-issue-2 UI to interpret (i.e. "rematch needs another human, or re-create as practice"). No new error code, and human-vs-human rematch is unaffected because those configs never carry `practice`/`aiPlayerIds`.
+
 ## Interfaces / Types
 
 **`src/shared/model.ts` — extend `GameConfig`:**
@@ -147,6 +168,8 @@ async addAiSeats(gameId: string, count: number): Promise<Game>;
 isAiSeat(gameId: string, playerId: PlayerId): Promise<boolean>;
 // startGame: internal change only (human-count guard); signature unchanged.
 // applyAction: passes game.gameConfig.practice into recordGameCompletion.
+// createRematch: internal change only (strip practice/aiPlayerIds from the
+//   config passed to createGame); signature unchanged.
 ```
 
 **`src/backend/service/statsService.ts`:**
@@ -177,7 +200,7 @@ New error codes (thrown as `Error(message)`, surfaced by the socket ack like exi
 
 - **Persisted (Supabase `games` row):** `player_ids` includes AI ids; `player_display_names` includes AI names; `game_config` JSONB now may carry `{ practice: true, aiPlayerIds: [...] , deckRoundsTarget? }`. Written by `addAiSeats` via `saveGame` (already persists `game_config`). No schema change — `game_config` column and its `mapGame`/`saveGame` round-trip already exist.
 - **In-memory (engine `InternalGameState`):** unchanged. AI seats appear as ordinary `PlayerInfo` entries in `players[]`; the engine has no notion of "AI" (keeps the engine pure — architecture principle 4). `randomSeed`, hands, turn order all identical to a human game.
-- **In-memory (GameService memo):** `aiPlayerIds` set per game, populated on first `isAiSeat`/`getGame` read, mirroring the existing `joinCodeCache` pattern. Safe to memoize because AI seats are fixed once the game leaves `CREATED`.
+- **In-memory (GameService memo):** `aiPlayerIds` set per game, mirroring the existing `joinCodeCache` pattern, but populated **only once the game has left `CREATED`** (see Approach C, "Memoization invariant"). AI seats are still mutable during `CREATED` (via `addAiSeats`); memoizing then could cache an incomplete set. Safe to memoize once `IN_PROGRESS` because AI seats are fixed thereafter.
 - **In-memory (ConnectionManager):** unchanged. AI seats are never registered; `abandonedPlayers` never contains an AI id. AI-driven-ness comes entirely from `game_config`, orthogonal to abandonment.
 - **Stats/history writes:** for a practice game, **zero** rows written to `player_stats` and **zero** rows to `game_history` for any seat (human or AI). For a normal game, unchanged (guests skipped per-seat; registered humans get both writes).
 
@@ -195,6 +218,7 @@ New error codes (thrown as `Error(message)`, surfaced by the socket ack like exi
 10. **Practice flag present but `aiPlayerIds` empty/absent.** Defensive: `practice === true` still forces the stats/history skip (the flag is authoritative). `humanCount` would equal total seats, so the game would start as if all-human — but stats are still excluded. `addAiSeats` always sets both together, so this only arises from hand-crafted data; the skip erring toward "exclude" is the safe direction (never leaks a practice game into stats).
 11. **Guest + AI in the same game.** Not a target configuration (a guest is a human seat). If it occurs, `practice=true` skips *everyone* (both guest and registered), which is correct — a practice game records nothing.
 12. **Optimistic-lock conflict while adding AI seats.** `addAiSeats` uses `saveGame`; on `OptimisticLockError` the caller (tests / future route) retries by reloading — same contract as `joinGame`. This LLD does not add retry logic inside `addAiSeats` (single-writer during CREATED lobby setup); document that the caller owns retry if it races with human joins.
+13. **Rematch of a practice game.** `createRematch` strips `practice`/`aiPlayerIds` from the config it forwards, so the rematched game is a normal human-only game (see Approach E). Because AI seats never hold a socket, the connection-roster rebuild already drops them; if ≥2 humans were connected, the rematch starts as a clean non-practice game (stats/history recorded normally). If only 1 human was connected (e.g. 1-human + 1-AI Big2), the existing `rematchPlayerIds.length < 2` guard throws `NOT_ENOUGH_PLAYERS` — solo rematch of a practice game is not supported in this increment (no AI re-seating). Human-vs-human rematch is unchanged (those configs carry no practice/AI fields, so the strip is a no-op).
 
 ## Dependencies
 
@@ -220,7 +244,13 @@ Follow testing-principles: pure/seeded, self-contained, invariant checks, full-g
 - Called on non-`CREATED` game → `GAME_ALREADY_STARTED`. `count < 1` → `INVALID_AI_COUNT`.
 
 ### Unit — `isAiSeat`
-- Returns true for a seated AI id, false for a human id and for an unknown id. Memoization returns a consistent result without re-reading after first load.
+- Returns true for a seated AI id, false for a human id and for an unknown id (queried after the game is `IN_PROGRESS`).
+- **Memoization invariant:** memo is not populated (or is invalidated) while the game is `CREATED`. Test: `addAiSeats` twice on a `CREATED` game (or interleave an `isAiSeat` read between two `addAiSeats` calls), then `startGame`, then assert `isAiSeat` returns true for **every** seated AI id — proving no stale/incomplete set was cached from the `CREATED` phase. After `IN_PROGRESS`, memoization returns a consistent result without re-reading.
+
+### Unit — `createRematch` strips practice/AI
+- Rematch of a completed 2-human + 1-AI Big2 practice game with 2 connected humans → new game starts with `practice`/`aiPlayerIds` **absent** from its `gameConfig`, roster is the 2 humans only, and a subsequent completion records stats (not skipped).
+- Rematch of a completed 1-human + 1-AI Big2 practice game with only the 1 human connected → throws `NOT_ENOUGH_PLAYERS` (existing guard).
+- **Regression:** rematch of a human-vs-human game is unchanged — config forwarded intact (e.g. `deckRoundsTarget` preserved for Tonk), no `practice`/`aiPlayerIds` introduced.
 
 ### Unit — stats/history exclusion (`statsService.recordGameCompletion`)
 - **Practice game, both engines' score shapes:** call with `practice=true` and a completed state carrying registered (non-guest) players → assert `incrementStats` **not called** AND `recordGameHistory` **not called** (spy/fake repo, assert zero invocations of *each*). This is the criterion that a spec checking only the aggregate would miss.
@@ -238,5 +268,6 @@ Follow testing-principles: pure/seeded, self-contained, invariant checks, full-g
 
 ### Socket-layer (targeted, if socket tests exist in repo)
 - After `handleGameStart` where the first actor is an AI seat, the loop advances to the human's turn (or completion) without a client acting.
+- **AI-first timer skip:** when the first seat is an AI seat, the initial `turnTimerService.startTurn(gameId, true)` is **not** called on the AI seat; the timer is armed (via `autoPlayAbandoned` → `startTurn(gameId, false)`) only when the loop stops at the human. When the first seat is human, the initial `startTurn(true)` still fires (regression).
 - `shouldAutoPlay` returns true for an AI id and for an abandoned human, false for a connected human — verifying the three gates behave for both cases (no regression to abandoned-human auto-play).
 - Confirm no socket is ever registered for an `ai:` id (the join gate is never exercised by AI): assert `connectionManager.getPlayerSockets(gameId)` contains no AI id after a full driven game.
