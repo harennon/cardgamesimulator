@@ -25,7 +25,7 @@ export const meta = {
     {
       title: "Implement",
       detail: "Build code and tests from the approved LLD",
-      model: "claude-sonnet-4-6",
+      model: "global.anthropic.claude-sonnet-4-6[1m]",
     },
     {
       title: "Code Review",
@@ -542,7 +542,7 @@ Process:
 You are already on branch ${context.branchName}. Do NOT create or switch branches.`,
   {
     label: "implementer",
-    model: "claude-sonnet-4-6",
+    model: "global.anthropic.claude-sonnet-4-6[1m]",
     agentType: "implementer",
   },
 );
@@ -622,7 +622,7 @@ After fixing:
 - git -C ${wtPath} commit -m "Address code review feedback (round ${codeAttempts})"`,
         {
           label: `implementer-fix-${codeAttempts}`,
-          model: "claude-sonnet-4-6",
+          model: "global.anthropic.claude-sonnet-4-6[1m]",
           agentType: "implementer",
         },
       );
@@ -701,7 +701,7 @@ After fixing:
 - git -C ${wtPath} commit -m "Address QA feedback (round ${qaAttempts})"`,
         {
           label: `implementer-qa-fix-${qaAttempts}`,
-          model: "claude-sonnet-4-6",
+          model: "global.anthropic.claude-sonnet-4-6[1m]",
           agentType: "implementer",
         },
       );

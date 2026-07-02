@@ -8,7 +8,7 @@ export const meta = {
     {
       title: "Triage",
       detail: "Assess all untriaged open issues in parallel",
-      model: "claude-sonnet-4-6",
+      model: "global.anthropic.claude-sonnet-4-6[1m]",
     },
     {
       title: "Label",
@@ -22,6 +22,14 @@ export const meta = {
     { title: "Ship", detail: "Execute ship-issue sequentially for each pick" },
   ],
 };
+
+// Headless permission matching is prefix-based and cannot decompose shell
+// constructs: a `for n in ...; do gh issue view $n; done` loop does NOT start
+// with "gh", so it fails to match the `Bash(gh *)` allow rule and gets denied
+// mid-run. Individual `gh issue view <number>` calls match cleanly. Append this
+// to any prompt that tells an agent to inspect multiple issues one-by-one.
+const GH_NO_LOOP =
+  "IMPORTANT: issue these gh commands as SEPARATE, individual calls — one `gh issue view <number> ...` invocation per issue. Do NOT wrap them in a `for` loop or chain them with `&&`/`;`; loop-wrapped commands are denied by the headless permission gate and will fail.";
 
 // --- Schemas ---
 
@@ -432,6 +440,7 @@ Step 2 — Fetch open PRs to exclude in-progress issues:
 
 Step 3 — For each issue, check for "Restart:" comments:
   gh issue view <number> --json comments --jq '.comments[-1].body'
+  ${GH_NO_LOOP}
   A "Restart:" comment is ACTIVE only if it is the LAST comment on the issue (i.e., nothing has happened after it — no triage, no bot comment, no frontend decision). If any comment exists after the Restart comment, it has been consumed and is no longer active.
 
 Step 4 — Classify each issue:
@@ -568,7 +577,7 @@ The Restart comment IS the new information. This issue is real and actionable �
 Be honest and critical. Not every issue is worth fixing. Consider whether the issue is still relevant given current project state.`,
           {
             label: `triage-${issue.number}`,
-            model: "claude-sonnet-4-6",
+            model: "global.anthropic.claude-sonnet-4-6[1m]",
             schema: TRIAGE_SCHEMA,
           },
         ),
@@ -662,6 +671,8 @@ For each issue return:
     gh issue view <N> --json state --jq '.state'
   Include #N in openDependencies ONLY if its state is OPEN. Omit closed/merged dependencies. Empty array if the issue has no open dependencies.
 
+${GH_NO_LOOP}
+
 Return the issues with their summaries, labels, and openDependencies.`,
   { label: "fetch-fix-pool", schema: ISSUE_POOL_SCHEMA },
 );
@@ -686,6 +697,7 @@ Exclude any issue that also has ANY label starting with "blocked:" (e.g. "blocke
 
 For each remaining issue, also get a brief summary:
   gh issue view <number> --json title,body --jq '.body[:200]'
+${GH_NO_LOOP}
 
 Return the issues found. If no deferred issues exist (or all are blocked), return an empty issues array.`,
     { label: "fetch-deferred-pool", schema: ISSUE_POOL_SCHEMA },
@@ -714,6 +726,7 @@ ${deferredPool.map((i) => `- #${i.number}: ${i.title} — ${i.summary || "(read 
 
 Read docs/execution-plan.md and docs/project-hld.md for current strategic context.
 For any issue where the summary above is insufficient, read it: gh issue view <number>
+${GH_NO_LOOP}
 
 ## Consider
 - Has the project state changed such that a previously-deferred item is now unblocked?
@@ -981,6 +994,7 @@ ${priorPoolContext || "(None — all pool issues were triaged this run)"}
 
 For any prior pool issue where the summary above is insufficient, read it with:
   gh issue view <number>
+${GH_NO_LOOP}
 
 ## Selection principles
 - **Priority first** — priority:high issues should be shipped before medium/low unless effort makes them infeasible in this batch
