@@ -145,6 +145,24 @@ const SHIP_SCHEMA = {
 
 // --- Helpers ---
 
+// Model for pure-mechanical "glue" agents that only run a fixed sequence of
+// gh/git/npm commands and make no design/review judgment (worktree setup &
+// cleanup, restart reset, gh-pages publish/ship, restart-ack comment). These
+// inherit the session model (Opus) by default, paying full reasoning-model
+// overhead to run one-line commands; Haiku does them just as reliably and much
+// faster/cheaper. Must be a fully-qualified Bedrock id — the engine forwards
+// opts.model verbatim (a bare alias 400s). NOTE: Haiku uses the "-v1:0" suffix,
+// NOT "[1m]" — only the -v1:0 id is authorized on the BYOA account (the [1m]
+// 1M-context variant is not provisioned). Validated end-to-end on the cron path.
+const MECH_MODEL = "global.anthropic.claude-haiku-4-5-20251001-v1:0";
+
+// Model for near-mechanical agents that follow a scripted sequence but also do
+// a small conditional FILE EDIT (read index.html, find the right section,
+// insert/move an entry without duplicating). Not pure command-runners, so they
+// get Sonnet rather than Haiku for a bit more editing reliability on the public
+// mockup index. Used only by the gh-pages publish/ship steps (frontend issues).
+const MECH_EDIT_MODEL = "global.anthropic.claude-sonnet-4-6[1m]";
+
 const issueIsNumber = (input) =>
   typeof input === "number" ||
   (typeof input === "string" && /^\d+$/.test(input));
@@ -261,7 +279,7 @@ Run these commands in order from ${repoRoot}:
    npm --prefix ${wtPath} install --silent
 
 Return status "ready" with the branch name, or "failed" with the error.`,
-  { label: "setup-worktree", schema: SETUP_SCHEMA },
+  { label: "setup-worktree", model: MECH_MODEL, schema: SETUP_SCHEMA },
 );
 
 if (!setupResult || setupResult.status !== "ready") {
@@ -287,7 +305,7 @@ Run these commands:
 3. git -C ${wtPath} log --oneline -1 (verify it matches origin/main)
 
 Reason for restart: ${context.restart}`,
-    { label: "restart-reset-branch" },
+    { label: "restart-reset-branch", model: MECH_MODEL },
   );
   log("Branch reset to main — starting fresh");
 }
@@ -386,7 +404,7 @@ MOCKUPEOF
 
 5. Clean up (ignore error if already removed):
    git -C ${repoRoot} worktree remove /tmp/gh-pages-publish --force`,
-      { label: "publish-gh-pages" },
+      { label: "publish-gh-pages", model: MECH_EDIT_MODEL },
     );
 
     log(
@@ -395,7 +413,7 @@ MOCKUPEOF
     // Clean up worktree — branch is pushed, re-run will re-create from remote
     await agent(
       `Remove the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
-      { label: "cleanup-worktree" },
+      { label: "cleanup-worktree", model: MECH_MODEL },
     );
     return {
       status: "awaiting-frontend-decision",
@@ -511,7 +529,7 @@ if (!designApproved) {
   log(`Design review failed after ${MAX_DESIGN_ATTEMPTS} attempts. Stopping.`);
   await agent(
     `Clean up the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
-    { label: "cleanup-worktree" },
+    { label: "cleanup-worktree", model: MECH_MODEL },
   );
   return { status: "failed", phase: "design-review", lldPath };
 }
@@ -529,10 +547,9 @@ Process:
 3. Run npm --prefix ${wtPath} run build — fix any errors
 4. Run npm --prefix ${wtPath} test — fix any failures
 5. Run npm --prefix ${wtPath} run test:integration — fix any failures (these test the full server with DB)
-6. Run npm --prefix ${wtPath} run test:e2e — fix any failures (these run Playwright headless against the full stack)
-7. Run npm --prefix ${wtPath} run lint:fix
-8. Update CHANGELOG.md under [Unreleased] with what was implemented
-9. Stage and commit:
+6. Run npm --prefix ${wtPath} run lint:fix
+7. Update CHANGELOG.md under [Unreleased] with what was implemented
+8. Stage and commit:
    - Run git -C ${wtPath} status to see what changed
    - Stage ONLY source files you created/modified (src/**, tests/**, CHANGELOG.md, package.json, etc.)
    - Do NOT stage .env, .env.*, credentials, secrets, node_modules, build/, or dist/
@@ -568,7 +585,8 @@ Run these commands first:
 - npm --prefix ${wtPath} run build (verify it compiles)
 - npm --prefix ${wtPath} test (verify unit tests pass)
 - npm --prefix ${wtPath} run test:integration (verify integration tests pass)
-- npm --prefix ${wtPath} run test:e2e (verify e2e tests pass)
+
+(End-to-end Playwright tests are run in the QA phase, not here — this keeps the review loop fast while QA remains the definitive behavioral gate.)
 
 ${codeAttempts > 1 ? "This is a re-review after the implementer addressed prior feedback. Verify fixes are correct." : ""}
 
@@ -634,7 +652,7 @@ if (!codeApproved) {
   log(`Code review failed after ${MAX_CODE_ATTEMPTS} attempts. Stopping.`);
   await agent(
     `Clean up the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
-    { label: "cleanup-worktree" },
+    { label: "cleanup-worktree", model: MECH_MODEL },
   );
   return { status: "failed", phase: "code-review", lldPath };
 }
@@ -656,7 +674,11 @@ Validate the implementation of the LLD at ${wtPath}/${lldPath}.
 Check the changed files (run: git -C ${wtPath} diff main --stat, then read relevant ones).
 Cross-reference with ${wtPath}/docs/customer-experience.md for expected user flows.
 
-${qaAttempts > 1 ? "This is a re-check after the implementer addressed prior QA feedback. Verify the fixes." : ""}
+Run the end-to-end Playwright suite — this is QA's definitive behavioral gate and MUST pass:
+- npm --prefix ${wtPath} run test:e2e
+If any e2e test fails, that is a CHANGES_REQUESTED verdict: report the failing spec(s) and the failure output in your issues so the implementer can fix them.
+
+${qaAttempts > 1 ? "This is a re-check after the implementer addressed prior QA feedback. Verify the fixes — re-run the e2e suite to confirm the failures are resolved." : ""}
 
 Return your verdict.`,
     {
@@ -713,7 +735,7 @@ if (!qaApproved) {
   log(`QA failed after ${MAX_QA_ATTEMPTS} attempts. Stopping.`);
   await agent(
     `Clean up the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
-    { label: "cleanup-worktree" },
+    { label: "cleanup-worktree", model: MECH_MODEL },
   );
   return { status: "failed", phase: "qa", lldPath };
 }
@@ -781,7 +803,7 @@ if (!shipResult) {
   log("Ship agent failed. Branch is pushed but PR may not exist.");
   await agent(
     `Clean up the worktree (ignore error if already removed): git -C ${repoRoot} worktree remove ${wtPath} --force`,
-    { label: "cleanup-worktree" },
+    { label: "cleanup-worktree", model: MECH_MODEL },
   );
   return { status: "failed", phase: "ship", branchName: context.branchName };
 }
@@ -804,7 +826,7 @@ if (context.restart && issueNum) {
     `Post a comment on issue #${issueNum} acknowledging the restart was handled, so the Restart comment is no longer the most recent comment:
 
 gh issue comment ${issueNum} --body "Restart handled — re-shipped from a fresh branch. PR: ${shipResult.prUrl}"`,
-    { label: "consume-restart" },
+    { label: "consume-restart", model: MECH_MODEL },
   );
   log(`Restart consumed for #${issueNum} via acknowledgement comment`);
 }
@@ -835,7 +857,7 @@ if (context.hasFrontend && issueNum) {
 
 4. Clean up (ignore error if already removed):
    git -C ${repoRoot} worktree remove /tmp/gh-pages-ship --force`,
-    { label: "gh-pages-ship" },
+    { label: "gh-pages-ship", model: MECH_EDIT_MODEL },
   );
 }
 
@@ -843,7 +865,7 @@ if (context.hasFrontend && issueNum) {
 await agent(
   `Remove the worktree now that the PR is up (ignore error if already removed):
 git -C ${repoRoot} worktree remove ${wtPath} --force`,
-  { label: "cleanup-worktree" },
+  { label: "cleanup-worktree", model: MECH_MODEL },
 );
 
 return {

@@ -318,6 +318,16 @@ const ISSUE_STATE_SCHEMA = {
 const MAX_PARALLEL_TRIAGE = 15;
 const DEFER_STALENESS_DAYS = 7;
 
+// Model for pure-mechanical "glue" agents that only run a fixed gh command
+// (label add/remove, promote/demote, open-state check, sub-issue create) and
+// make no triage/selection judgment. These inherit the session model (Opus) by
+// default, paying full reasoning-model overhead to run a one-line command;
+// Haiku does them just as reliably and much faster/cheaper. Must be a fully-
+// qualified Bedrock id — the engine forwards opts.model verbatim (a bare alias
+// 400s). NOTE: Haiku uses the "-v1:0" suffix, NOT "[1m]" — only the -v1:0 id is
+// authorized on the BYOA account. Validated end-to-end on the cron path.
+const MECH_MODEL = "global.anthropic.claude-haiku-4-5-20251001-v1:0";
+
 // An issue is known-unselectable if it carries any blocked:* label (e.g.
 // blocked:frontend-decision, blocked:human). These are parked on a human gate
 // and cannot be shipped autonomously until a human clears them — selection
@@ -392,7 +402,7 @@ SUBEOF
 )" --label "triage:fix" --label "${category}" --label "priority:medium"
 
 Return the created issue number.`,
-      { label: `create-sub-${issueNumber}-${sub.order}` },
+      { label: `create-sub-${issueNumber}-${sub.order}`, model: MECH_MODEL },
     );
   }
 
@@ -414,7 +424,7 @@ ${decomposition.subIssues
 _Reasoning: ${decomposition.reasoning}_
 DECOMPEOF
 )"`,
-    { label: `label-epic-${issueNumber}` },
+    { label: `label-epic-${issueNumber}`, model: MECH_MODEL },
   );
 
   log(
@@ -480,7 +490,7 @@ if (fetchResult.labelsToRemove && fetchResult.labelsToRemove.length > 0) {
         agent(
           `Remove the label "${item.label}" from issue #${item.number}:
 gh issue edit ${item.number} --remove-label "${item.label}"`,
-          { label: `unlabel-retriage-${item.number}` },
+          { label: `unlabel-retriage-${item.number}`, model: MECH_MODEL },
         ),
     ),
   );
@@ -622,7 +632,11 @@ TRIAGEEOF
 )"
 
 Do NOT close the issue — only label and comment (if not already commented).`,
-          { label: `label-${result.issueNumber}`, phase: "Label" },
+          {
+            label: `label-${result.issueNumber}`,
+            phase: "Label",
+            model: MECH_MODEL,
+          },
         );
       } else if (result.recommendation === "needs-info") {
         return agent(
@@ -639,13 +653,21 @@ ${result.reasoning}
 _Please provide additional context so this issue can be prioritized._
 TRIAGEEOF
 )"`,
-          { label: `label-${result.issueNumber}`, phase: "Label" },
+          {
+            label: `label-${result.issueNumber}`,
+            phase: "Label",
+            model: MECH_MODEL,
+          },
         );
       } else {
         return agent(
           `Add the labels to issue #${result.issueNumber}:
 gh issue edit ${result.issueNumber} --add-label ${labelsToAdd}`,
-          { label: `label-${result.issueNumber}`, phase: "Label" },
+          {
+            label: `label-${result.issueNumber}`,
+            phase: "Label",
+            model: MECH_MODEL,
+          },
         );
       }
     }),
@@ -800,7 +822,7 @@ For each selected OR decomposed issue, also provide implementationNotes — a co
       `Promote issue #${issueNumber} from triage:defer to triage:fix:
 1. gh issue edit ${issueNumber} --remove-label "triage:defer"
 2. gh issue edit ${issueNumber} --add-label "triage:fix"`,
-      { label: `promote-${issueNumber}` },
+      { label: `promote-${issueNumber}`, model: MECH_MODEL },
     );
   }
 
@@ -822,7 +844,11 @@ For each selected OR decomposed issue, also provide implementationNotes — a co
       `Check if issue #${issueNumber} is still open:
 gh issue view ${issueNumber} --json state --jq '.state'
 Return the state.`,
-      { label: `check-open-${issueNumber}`, schema: ISSUE_STATE_SCHEMA },
+      {
+        label: `check-open-${issueNumber}`,
+        model: MECH_MODEL,
+        schema: ISSUE_STATE_SCHEMA,
+      },
     );
 
     if (!issueCheck) {
@@ -836,7 +862,7 @@ Return the state.`,
       await agent(
         `Remove triage:fix label from closed issue #${issueNumber}:
 gh issue edit ${issueNumber} --remove-label "triage:fix"`,
-        { label: `unlabel-closed-${issueNumber}` },
+        { label: `unlabel-closed-${issueNumber}`, model: MECH_MODEL },
       );
       results.push({ issueNumber, status: "skipped-closed" });
       continue;
@@ -857,7 +883,7 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
       await agent(
         `Remove the triage:fix label from issue #${issueNumber}:
 gh issue edit ${issueNumber} --remove-label "triage:fix"`,
-        { label: `unlabel-${issueNumber}` },
+        { label: `unlabel-${issueNumber}`, model: MECH_MODEL },
       );
     } else if (result && result.status === "awaiting-frontend-decision") {
       log(
@@ -867,7 +893,7 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
         `Issue #${issueNumber} is awaiting a frontend design decision. Re-label it:
 1. gh issue edit ${issueNumber} --remove-label "triage:fix"
 2. gh issue edit ${issueNumber} --add-label "blocked:frontend-decision"`,
-        { label: `block-awaiting-${issueNumber}` },
+        { label: `block-awaiting-${issueNumber}`, model: MECH_MODEL },
       );
     } else if (result && result.status === "blocked-human") {
       log(
@@ -886,7 +912,7 @@ This issue cannot be shipped by the autonomous workflow: ${result.reason || "it 
 It has been labeled \`blocked:human\` and will be skipped by future batch runs until a human comments to unblock it.
 BLOCKEOF
 )"`,
-        { label: `block-human-${issueNumber}` },
+        { label: `block-human-${issueNumber}`, model: MECH_MODEL },
       );
     } else {
       const failPhase = result ? result.phase || result.status : "unknown";
@@ -1053,7 +1079,7 @@ if (selection.demote && selection.demote.length > 0) {
       `Demote issue #${issueNumber} from triage:fix to triage:defer:
 1. gh issue edit ${issueNumber} --remove-label "triage:fix"
 2. gh issue edit ${issueNumber} --add-label "triage:defer"`,
-      { label: `demote-${issueNumber}` },
+      { label: `demote-${issueNumber}`, model: MECH_MODEL },
     );
   }
   log(
@@ -1084,7 +1110,11 @@ for (const issueNumber of selection.selected) {
     `Check if issue #${issueNumber} is still open:
 gh issue view ${issueNumber} --json state --jq '.state'
 Return the state.`,
-    { label: `check-open-${issueNumber}`, schema: ISSUE_STATE_SCHEMA },
+    {
+      label: `check-open-${issueNumber}`,
+      model: MECH_MODEL,
+      schema: ISSUE_STATE_SCHEMA,
+    },
   );
 
   if (!issueCheck) {
@@ -1098,7 +1128,7 @@ Return the state.`,
     await agent(
       `Remove triage:fix label from closed issue #${issueNumber}:
 gh issue edit ${issueNumber} --remove-label "triage:fix"`,
-      { label: `unlabel-closed-${issueNumber}` },
+      { label: `unlabel-closed-${issueNumber}`, model: MECH_MODEL },
     );
     results.push({ issueNumber, status: "skipped-closed" });
     continue;
@@ -1119,7 +1149,7 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
     await agent(
       `Remove the triage:fix label from issue #${issueNumber}:
 gh issue edit ${issueNumber} --remove-label "triage:fix"`,
-      { label: `unlabel-${issueNumber}` },
+      { label: `unlabel-${issueNumber}`, model: MECH_MODEL },
     );
   } else if (result && result.status === "awaiting-frontend-decision") {
     log(
@@ -1129,7 +1159,7 @@ gh issue edit ${issueNumber} --remove-label "triage:fix"`,
       `Issue #${issueNumber} is awaiting a frontend design decision. Re-label it:
 1. gh issue edit ${issueNumber} --remove-label "triage:fix"
 2. gh issue edit ${issueNumber} --add-label "blocked:frontend-decision"`,
-      { label: `block-awaiting-${issueNumber}` },
+      { label: `block-awaiting-${issueNumber}`, model: MECH_MODEL },
     );
   } else if (result && result.status === "blocked-human") {
     log(
@@ -1148,7 +1178,7 @@ This issue cannot be shipped by the autonomous workflow: ${result.reason || "it 
 It has been labeled \`blocked:human\` and will be skipped by future batch runs until a human comments to unblock it.
 BLOCKEOF
 )"`,
-      { label: `block-human-${issueNumber}` },
+      { label: `block-human-${issueNumber}`, model: MECH_MODEL },
     );
   } else {
     const failPhase = result ? result.phase || result.status : "unknown";
