@@ -116,6 +116,7 @@
     :current-player-id="gameState.you.playerId"
     :total-turns="gameState.turnNumber"
     :final-play="finalPlay"
+    :engine-min="gameState.gameType === 'tonk' ? 3 : 2"
     @rematch="onRematch"
   />
 </template>

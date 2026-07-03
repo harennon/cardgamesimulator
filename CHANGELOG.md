@@ -10,6 +10,15 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- **LLD 140: Rematch does not work in games with CPU/AI opponents**
+  - `src/backend/service/gameService.ts` — `createRematch` now re-seats the same number of CPU opponents via the existing `addAiSeats` path when the finished game was a practice game (`gameConfig.practice === true`). Old AI ids are discarded; fresh `ai:<uuid>` seats are minted with new display names. The `< 2` roster guard is replaced with a roster-total-aware check: `projectedTotal = rematchHumanIds.length + (isPractice ? aiSeatCount : 0)` must satisfy `ENGINE_MIN_PLAYERS[gameType]`. A 1-human + N-CPU practice rematch no longer throws `NOT_ENOUGH_PLAYERS`. Human-only rematch behavior is byte-for-byte identical.
+  - `src/backend/websocket/socketHandler.ts` — `handleGameRematch` now mirrors `handleGameStart`'s AI-first timer-skip: the initial `startTurn` is deferred when the first dealt seat is AI, and `autoPlayAbandoned` is called after emitting `game:rematchStarted` so a CPU-first (or all-CPU-until-human) opening is driven synchronously.
+  - `src/frontend/component/game/GameOverView.vue` — new `engineMin: number` prop; `canRematch` now counts connected humans + re-seated CPUs against the engine minimum (Big2 = 2, Tonk = 3). New `data-testid="rematch-lineup"` row ("Rematch: You + N CPUs") shown for host when `canRematch && aiCount >= 1`, using the existing `AiBadge` atom. Too-few hint updated to show `engineMin` in the copy.
+  - `src/frontend/component/game/GameView.vue` — passes `:engine-min="gameState.gameType === 'tonk' ? 3 : 2"` to `GameOverView`.
+  - `tests/service/gameService.test.ts` — replaced the LLD 118 practice-stripping describe block with a comprehensive LLD 140 suite: (a) 1-human + 2-CPU regression, (b) 2-human + 1-CPU regression, re-seat count matching, Tonk guard cases, human-only regressions, maxPlayers headroom, idempotency, edge cases 7/8.
+  - `tests/frontend/gameOverRematchAi.test.ts` — 15 pure-function tests for `canRematch`, `humanCount`, `aiCount`, `showLineup`, `showTooFew`, and `engineMin` derivation.
+  - `tests/integration/rematch-ai.test.ts` — 3 integration tests: CPU-first deal driven, no socket for AI id, human-only rematch broadcast regression.
+
 - **LLD 134: Tonk action/discard buttons clipped at bottom of desktop game screen**
   - `src/frontend/component/game/TonkBoard.vue` — changed the desktop grid's `actions` row from a fixed `64px` to `auto`, so `TonkActionPanel` always has enough room for its one-line (not-your-turn pill), two-line (phase-stepper + buttons), or three-line (error + stepper + buttons) states without being clipped by `overflow: hidden`. Added `min-height: 0` to `.tonk-board__table` (desktop) so the `1fr` table row can yield space to the `auto` actions row at short viewports (768px). `GameBoard.vue` (Big2) and the mobile grid (`--mobile-actions-height`) are untouched.
 

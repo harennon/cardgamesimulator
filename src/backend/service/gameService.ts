@@ -171,17 +171,31 @@ export class GameService {
     }
     const transferCode = oldGame.joinCode;
 
-    // Carry over only connected players, preserving old order, host first.
+    // Determine practice-ness and AI count from the finished game. Both are
+    // read from the persisted config — authoritative, not client-supplied.
+    const oldAiIds = oldGame.gameConfig.aiPlayerIds ?? [];
+    const aiSeatCount = oldAiIds.length;
+    const isPractice = oldGame.gameConfig.practice === true;
+
+    // Build the connected-human roster exactly as before: filter oldGame.playerIds
+    // to connectedPlayerIds (AI ids are never connected, so this already yields
+    // humans only), then put the host first.
     const connectedSet = new Set(connectedPlayerIds);
-    const rematchPlayerIds = oldGame.playerIds.filter((id) =>
+    const rematchHumanIds = oldGame.playerIds.filter((id) =>
       connectedSet.has(id),
     );
-    const hostIndex = rematchPlayerIds.indexOf(requesterId);
+    const hostIndex = rematchHumanIds.indexOf(requesterId);
     if (hostIndex > 0) {
-      rematchPlayerIds.splice(hostIndex, 1);
-      rematchPlayerIds.unshift(requesterId);
+      rematchHumanIds.splice(hostIndex, 1);
+      rematchHumanIds.unshift(requesterId);
     }
-    if (rematchPlayerIds.length < 2) {
+
+    // Roster-total-aware count guard. For practice games the projected total
+    // includes the AI seats that will be re-seated.
+    const projectedTotal =
+      rematchHumanIds.length + (isPractice ? aiSeatCount : 0);
+    const engineMin = ENGINE_MIN_PLAYERS[oldGame.gameType] ?? 2;
+    if (rematchHumanIds.length < 1 || projectedTotal < engineMin) {
       throw new Error("NOT_ENOUGH_PLAYERS");
     }
 
@@ -195,9 +209,10 @@ export class GameService {
     const hostDisplayName =
       oldGame.playerDisplayNames?.[requesterId] ?? requesterId;
 
-    // Strip practice/AI markers: a rematch is always a fresh human-only game.
-    // AI seats never hold a socket, so the connection-roster rebuild already
-    // dropped them; carrying the marker would silently exclude stats.
+    // Strip practice/aiPlayerIds from the config passed to createGame. For a
+    // practice game, addAiSeats (step below) will re-populate both fields with
+    // fresh ids. For a human-only game this is a no-op. Either way, other
+    // game-mechanic config (e.g. deckRoundsTarget) is preserved.
     const {
       practice: _p,
       aiPlayerIds: _ai,
@@ -217,15 +232,21 @@ export class GameService {
       rematchConfig,
     );
 
-    // Attach the remaining carried-over players (createGame only seeds the host).
-    newGame.playerIds = [...rematchPlayerIds];
+    // Attach the remaining carried-over human players (createGame only seeds the host).
+    newGame.playerIds = [...rematchHumanIds];
     newGame.playerDisplayNames = Object.fromEntries(
-      rematchPlayerIds.map((id) => [
-        id,
-        oldGame.playerDisplayNames?.[id] ?? id,
-      ]),
+      rematchHumanIds.map((id) => [id, oldGame.playerDisplayNames?.[id] ?? id]),
     );
     await this.gameRepo.saveGame(newGame);
+
+    // Re-seat AI for practice games. addAiSeats mints fresh ai: ids, assigns
+    // display names, sets practice: true, and populates aiPlayerIds — the same
+    // path as POST /createGame + numAiSeats. The new game is still CREATED here
+    // so addAiSeats's status guard passes. maxPlayers headroom is guaranteed
+    // because humans + aiSeatCount ≤ old total ≤ maxPlayers.
+    if (isPractice && aiSeatCount >= 1) {
+      await this.addAiSeats(newGameId, aiSeatCount);
+    }
 
     this.joinCodeCache.set(newGameId, transferCode);
 
