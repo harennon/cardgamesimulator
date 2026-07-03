@@ -17,7 +17,9 @@
         <span class="opponent__name">{{ player.displayName }}</span>
         <AiBadge v-if="player.isAi" data-testid="ai-badge" />
         <span class="opponent__count">{{ player.cardCount }} cards</span>
-        <span v-if="!player.isConnected" class="opponent__disconnected"
+        <span
+          v-if="!player.isConnected && !player.isAi"
+          class="opponent__disconnected"
           >disconnected</span
         >
         <OpponentTimer
