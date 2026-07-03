@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fix: CPU/AI players incorrectly show as disconnected</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---- Tokens copied verbatim from src/frontend/styles/game-variables.css ---- */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --error-text: #e05555;
+        --ai-accent: #7fb2ff;
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --tonk-phase-discard: #d98c4a;
+        --tonk-phase-draw: #6bbf8a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            ellipse 120% 90% at 50% -10%,
+            #1c120a 0%,
+            var(--bg-dark) 62%
+          ),
+          var(--bg-dark);
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        padding: 40px 24px 72px;
+      }
+
+      .page {
+        max-width: 1080px;
+        margin: 0 auto;
+      }
+
+      header.hero {
+        margin-bottom: 8px;
+      }
+
+      .kicker {
+        font-size: 0.7rem;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        margin: 0 0 10px;
+        font-weight: 700;
+      }
+
+      h1 {
+        font-family: var(--font-card);
+        font-weight: 400;
+        font-size: 1.9rem;
+        line-height: 1.2;
+        margin: 0 0 12px;
+        color: var(--text-primary);
+      }
+
+      .lede {
+        max-width: 720px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        line-height: 1.55;
+        margin: 0;
+      }
+
+      .lede strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* ---- Legend ---- */
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin: 26px 0 34px;
+        padding: 14px 18px;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        background: var(--panel-bg);
+      }
+      .legend__item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .legend__swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        flex-shrink: 0;
+      }
+      .legend__swatch--gold {
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-accent);
+      }
+      .legend__swatch--blue {
+        background: var(--ai-accent);
+        border-radius: 2px;
+      }
+      .legend__swatch--red {
+        background: var(--error-text);
+      }
+
+      /* ---- Board comparison sections ---- */
+      .board-block {
+        margin-bottom: 40px;
+      }
+      .board-block__title {
+        font-family: var(--font-card);
+        font-size: 1.15rem;
+        margin: 0 0 4px;
+        color: var(--text-primary);
+      }
+      .board-block__sub {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin: 0 0 18px;
+      }
+
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      @media (max-width: 900px) {
+        .compare {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--table-rim-light);
+        background: var(--bg-dark);
+        position: relative;
+      }
+      .panel--before {
+        border-color: rgba(224, 85, 85, 0.45);
+      }
+      .panel--after {
+        border-color: rgba(127, 178, 255, 0.4);
+      }
+
+      .panel__tag {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 3;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 5px 12px;
+        border-bottom-right-radius: 10px;
+      }
+      .panel--before .panel__tag {
+        background: rgba(224, 85, 85, 0.16);
+        color: var(--error-text);
+        border-bottom: 1px solid rgba(224, 85, 85, 0.35);
+        border-right: 1px solid rgba(224, 85, 85, 0.35);
+      }
+      .panel--after .panel__tag {
+        background: rgba(127, 178, 255, 0.14);
+        color: var(--ai-accent);
+        border-bottom: 1px solid rgba(127, 178, 255, 0.35);
+        border-right: 1px solid rgba(127, 178, 255, 0.35);
+      }
+
+      /* ---- The seat rail itself: mirrors OpponentRow.vue / TonkSeatRail.vue ---- */
+      .rail {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 34px 16px 24px;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+      }
+
+      .seat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        position: relative;
+        min-width: 96px;
+      }
+      .seat--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      .seat__cards {
+        display: flex;
+      }
+      .card-back {
+        width: 28px;
+        height: 40px;
+        margin-left: -10px;
+        border-radius: 4px;
+        border: 1px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        position: relative;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+      .card-back:first-child {
+        margin-left: 0;
+      }
+      .card-back::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 2px;
+      }
+
+      .seat__info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+      .seat__name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .seat__count {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      .seat__disconnected {
+        font-size: 0.65rem;
+        color: var(--error-text);
+      }
+
+      /* AI badge — matches AiBadge.vue verbatim */
+      .ai-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 0.6rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ai-accent);
+        flex-shrink: 0;
+      }
+      .ai-badge__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 2px;
+        background: var(--ai-accent);
+        flex-shrink: 0;
+      }
+
+      .seat__turn-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-accent);
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.3);
+        }
+      }
+
+      /* Highlight the seat that changed between before/after */
+      .seat.is-changed::before {
+        content: "";
+        position: absolute;
+        inset: -6px;
+        border-radius: 12px;
+        border: 1px dashed rgba(127, 178, 255, 0.55);
+        pointer-events: none;
+      }
+      .panel--before .seat.is-changed::before {
+        border-color: rgba(224, 85, 85, 0.55);
+      }
+
+      /* Tonk-specific seat meta row */
+      .seat__meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .seat__tally {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        background: rgba(0, 0, 0, 0.3);
+        padding: 1px 7px;
+        border-radius: 8px;
+      }
+      .seat__phase-tag {
+        font-size: 0.6rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 1px 6px;
+        border-radius: 6px;
+        color: #1a0f06;
+        background: var(--tonk-phase-discard);
+      }
+      .card-back--tonk {
+        width: 24px;
+        height: 34px;
+      }
+
+      /* ---- Callout note under each comparison ---- */
+      .note {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        margin-top: 16px;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        color: var(--text-muted);
+      }
+      .note code {
+        font-family: "Courier New", monospace;
+        font-size: 0.76rem;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid var(--table-rim-light);
+        padding: 1px 6px;
+        border-radius: 4px;
+        color: var(--text-primary);
+        white-space: nowrap;
+      }
+      .note__marker {
+        color: var(--ai-accent);
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+
+      footer {
+        margin-top: 48px;
+        padding-top: 20px;
+        border-top: 1px solid var(--table-rim-light);
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      footer code {
+        font-family: "Courier New", monospace;
+        color: var(--text-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <p class="kicker">Bug fix · Issue #139 · Route /game/:id</p>
+        <h1>CPU seats no longer show a false "disconnected" label</h1>
+        <p class="lede">
+          AI seats never open a WebSocket, so the backend correctly reports
+          <code style="font-family: monospace">isConnected: false</code> for
+          them — but they are always server-driven and taking their turns
+          normally. Today both boards render a red
+          <strong>disconnected</strong> label under every bot. The fix guards
+          that label so it only appears for
+          <strong>genuinely offline humans</strong>. The
+          <strong>CPU</strong> badge (steel blue) and gold turn-glow are
+          untouched.
+        </p>
+      </header>
+
+      <div class="legend">
+        <div class="legend__item">
+          <span class="legend__swatch legend__swatch--gold"></span> Gold glow /
+          border = whose turn it is
+        </div>
+        <div class="legend__item">
+          <span class="legend__swatch legend__swatch--blue"></span> CPU badge =
+          seat identity (AI)
+        </div>
+        <div class="legend__item">
+          <span class="legend__swatch legend__swatch--red"></span>
+          "disconnected" = human seat with no active socket
+        </div>
+      </div>
+
+      <!-- ============ BIG 2 ============ -->
+      <section class="board-block">
+        <h2 class="board-block__title">Big 2 board — OpponentRow.vue</h2>
+        <p class="board-block__sub">
+          Scenario: 4-player table. You + one human (Dana), plus CPU 1 and CPU
+          2. Dana has genuinely dropped connection. CPU 1's turn is active.
+        </p>
+
+        <div class="compare">
+          <!-- BEFORE -->
+          <div class="panel panel--before">
+            <span class="panel__tag">Before · the bug</span>
+            <div class="rail">
+              <!-- Human, connected -->
+              <div class="seat">
+                <div class="seat__cards">
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">Dana</span>
+                  <span class="seat__count">5 cards</span>
+                </div>
+              </div>
+
+              <!-- AI, active turn -->
+              <div class="seat seat--active is-changed">
+                <div class="seat__cards">
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">CPU 1</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                  <span class="seat__count">3 cards</span>
+                  <span class="seat__disconnected">disconnected</span>
+                </div>
+                <div class="seat__turn-indicator"></div>
+              </div>
+
+              <!-- AI, idle -->
+              <div class="seat is-changed">
+                <div class="seat__cards">
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">CPU 2</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                  <span class="seat__count">6 cards</span>
+                  <span class="seat__disconnected">disconnected</span>
+                </div>
+              </div>
+            </div>
+            <div class="note">
+              <span class="note__marker">✕</span>
+              <span
+                >Both CPU seats show <code>disconnected</code> even though CPU 1
+                is actively taking its turn — misleading and looks broken.</span
+              >
+            </div>
+          </div>
+
+          <!-- AFTER -->
+          <div class="panel panel--after">
+            <span class="panel__tag">After · the fix</span>
+            <div class="rail">
+              <!-- Human, connected -->
+              <div class="seat">
+                <div class="seat__cards">
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">Dana</span>
+                  <span class="seat__count">5 cards</span>
+                </div>
+              </div>
+
+              <!-- AI, active turn -->
+              <div class="seat seat--active is-changed">
+                <div class="seat__cards">
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">CPU 1</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                  <span class="seat__count">3 cards</span>
+                  <!-- no disconnected label -->
+                </div>
+                <div class="seat__turn-indicator"></div>
+              </div>
+
+              <!-- AI, idle -->
+              <div class="seat is-changed">
+                <div class="seat__cards">
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                  <div class="card-back"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">CPU 2</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                  <span class="seat__count">6 cards</span>
+                  <!-- no disconnected label -->
+                </div>
+              </div>
+            </div>
+            <div class="note">
+              <span class="note__marker">✓</span>
+              <span
+                >CPU seats never show the label; the CPU badge + gold turn glow
+                remain. Guard:
+                <code>v-if="!player.isConnected &amp;&amp; !player.isAi"</code
+                >.</span
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TONK ============ -->
+      <section class="board-block">
+        <h2 class="board-block__title">Tonk board — TonkSeatRail.vue</h2>
+        <p class="board-block__sub">
+          Scenario: 4-seat Tonk rail. Human "Marcus" has genuinely disconnected;
+          CPU 1 and CPU 2 are bots. CPU 2's turn is active (discard phase).
+        </p>
+
+        <div class="compare">
+          <!-- BEFORE -->
+          <div class="panel panel--before">
+            <span class="panel__tag">Before · the bug</span>
+            <div class="rail">
+              <!-- Human, DISCONNECTED (correct) -->
+              <div class="seat is-changed">
+                <div class="seat__cards">
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">Marcus</span>
+                  <div class="seat__meta">
+                    <span class="seat__count">3</span>
+                    <span class="seat__tally">12</span>
+                  </div>
+                  <span class="seat__disconnected">disconnected</span>
+                </div>
+              </div>
+
+              <!-- AI idle -->
+              <div class="seat is-changed">
+                <div class="seat__cards">
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">CPU 1</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                  <div class="seat__meta">
+                    <span class="seat__count">4</span>
+                    <span class="seat__tally">8</span>
+                  </div>
+                  <span class="seat__disconnected">disconnected</span>
+                </div>
+              </div>
+
+              <!-- AI active -->
+              <div class="seat seat--active is-changed">
+                <div class="seat__cards">
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">CPU 2</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                  <div class="seat__meta">
+                    <span class="seat__count">2</span>
+                    <span class="seat__tally">5</span>
+                    <span class="seat__phase-tag">Discard</span>
+                  </div>
+                  <span class="seat__disconnected">disconnected</span>
+                </div>
+                <div class="seat__turn-indicator"></div>
+              </div>
+            </div>
+            <div class="note">
+              <span class="note__marker">✕</span>
+              <span
+                >All three seats show <code>disconnected</code> — but only
+                Marcus (human) is truly offline. The two CPU labels are
+                false.</span
+              >
+            </div>
+          </div>
+
+          <!-- AFTER -->
+          <div class="panel panel--after">
+            <span class="panel__tag">After · the fix</span>
+            <div class="rail">
+              <!-- Human, DISCONNECTED (still shows — unchanged) -->
+              <div class="seat">
+                <div class="seat__cards">
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">Marcus</span>
+                  <div class="seat__meta">
+                    <span class="seat__count">3</span>
+                    <span class="seat__tally">12</span>
+                  </div>
+                  <span class="seat__disconnected">disconnected</span>
+                </div>
+              </div>
+
+              <!-- AI idle -->
+              <div class="seat is-changed">
+                <div class="seat__cards">
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">CPU 1</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                  <div class="seat__meta">
+                    <span class="seat__count">4</span>
+                    <span class="seat__tally">8</span>
+                  </div>
+                  <!-- no disconnected label -->
+                </div>
+              </div>
+
+              <!-- AI active -->
+              <div class="seat seat--active is-changed">
+                <div class="seat__cards">
+                  <div class="card-back card-back--tonk"></div>
+                  <div class="card-back card-back--tonk"></div>
+                </div>
+                <div class="seat__info">
+                  <span class="seat__name">CPU 2</span>
+                  <span class="ai-badge"
+                    ><span class="ai-badge__dot"></span>CPU</span
+                  >
+                  <div class="seat__meta">
+                    <span class="seat__count">2</span>
+                    <span class="seat__tally">5</span>
+                    <span class="seat__phase-tag">Discard</span>
+                  </div>
+                  <!-- no disconnected label -->
+                </div>
+                <div class="seat__turn-indicator"></div>
+              </div>
+            </div>
+            <div class="note">
+              <span class="note__marker">✓</span>
+              <span
+                >Marcus (genuinely offline human) still shows
+                <code>disconnected</code>; both CPU seats are clean. Guard:
+                <code>v-if="!seat.isConnected &amp;&amp; !seat.isAi"</code
+                >.</span
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <strong style="color: var(--text-primary)">Scope.</strong> Display-only
+        change in two template lines. Backend serialization
+        (<code>injectConnectionStatus</code>) is unchanged — AI seats correctly
+        report <code>isConnected: false</code>; the boards simply stop surfacing
+        that as a label for AI seats. No new tokens, components, or props:
+        <code>isAi</code> is already present on both seat objects (it drives the
+        CPU badge above).<br />
+        <strong style="color: var(--text-primary)">Verify.</strong> A human seat
+        with <code>isConnected: false</code> must still render the label (see
+        Marcus, right/Tonk); an AI seat with <code>isConnected: false</code>
+        must not.
+      </footer>
+    </div>
+  </body>
+</html>
