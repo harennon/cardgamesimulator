@@ -14,6 +14,7 @@
         ></div>
       </div>
       <div class="opponent__info">
+        <AiAvatar v-if="player.isAi" size="sm" />
         <span class="opponent__name">{{ player.displayName }}</span>
         <AiBadge v-if="player.isAi" data-testid="ai-badge" />
         <span class="opponent__count">{{ player.cardCount }} cards</span>
@@ -42,6 +43,7 @@ import type { PlayerPublicInfo } from "@shared/engine-types";
 import { computed } from "vue";
 import OpponentTimer from "./OpponentTimer.vue";
 import AiBadge from "./AiBadge.vue";
+import AiAvatar from "./AiAvatar.vue";
 
 const props = withDefaults(
   defineProps<{

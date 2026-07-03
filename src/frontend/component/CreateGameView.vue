@@ -5,6 +5,8 @@ import { GAME_TYPE_UI_BOUNDS } from "@/component/statsView";
 import { computed, ref, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { getSession } from "@/service/authService";
+import { aiNameForOrdinal } from "@shared/aiNames";
+import AiAvatar from "@/component/game-ui/AiAvatar.vue";
 
 const DECK_ROUNDS_VALUES = [5, 6, 7, 8, 9, 10, 11, 12] as const;
 
@@ -78,6 +80,14 @@ function decrementAiSeats() {
 function incrementAiSeats() {
   numAiSeats.value = clamp(numAiSeats.value + 1, 0, maxAiSeats.value);
 }
+
+function fillAiSeats() {
+  numAiSeats.value = maxAiSeats.value;
+}
+
+const aiPreviewNames = computed(() =>
+  Array.from({ length: numAiSeats.value }, (_, i) => aiNameForOrdinal(i)),
+);
 
 async function createGame() {
   loading.value = true;
@@ -190,32 +200,58 @@ async function createGame() {
         data-testid="ai-seats-field"
       >
         <label class="form-card__label">AI Opponents</label>
-        <div class="stepper">
+        <div class="ai-seats-controls">
+          <div class="stepper">
+            <button
+              type="button"
+              class="stepper__btn"
+              :disabled="numAiSeats === 0"
+              data-testid="ai-seats-decrement"
+              @click="decrementAiSeats"
+            >
+              −
+            </button>
+            <span class="stepper__value" data-testid="ai-seats-value">{{
+              numAiSeats
+            }}</span>
+            <button
+              type="button"
+              class="stepper__btn"
+              :disabled="numAiSeats >= maxAiSeats"
+              data-testid="ai-seats-increment"
+              @click="incrementAiSeats"
+            >
+              +
+            </button>
+          </div>
           <button
             type="button"
-            class="stepper__btn"
-            :disabled="numAiSeats === 0"
-            data-testid="ai-seats-decrement"
-            @click="decrementAiSeats"
-          >
-            −
-          </button>
-          <span class="stepper__value" data-testid="ai-seats-value">{{
-            numAiSeats
-          }}</span>
-          <button
-            type="button"
-            class="stepper__btn"
+            class="fill-btn"
             :disabled="numAiSeats >= maxAiSeats"
-            data-testid="ai-seats-increment"
-            @click="incrementAiSeats"
+            data-testid="ai-seats-fill"
+            @click="fillAiSeats"
           >
-            +
+            Fill remaining seats
           </button>
         </div>
         <p v-if="numAiSeats >= 1" class="help-text" data-testid="practice-note">
           Practice games don't count toward stats.
         </p>
+        <div
+          v-if="numAiSeats >= 1"
+          class="ai-preview"
+          data-testid="ai-seats-preview"
+        >
+          <div
+            v-for="name in aiPreviewNames"
+            :key="name"
+            class="ai-preview__chip"
+            data-testid="ai-seats-preview-chip"
+          >
+            <AiAvatar />
+            <span class="ai-preview__name">{{ name }}</span>
+          </div>
+        </div>
       </div>
 
       <div class="form-card__field">
@@ -410,5 +446,60 @@ async function createGame() {
   color: var(--ai-accent);
   min-width: 24px;
   text-align: center;
+}
+
+.ai-seats-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fill-btn {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border: 1.5px solid var(--ai-accent);
+  border-radius: var(--input-radius);
+  background: transparent;
+  color: var(--ai-accent);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.fill-btn:not(:disabled):hover {
+  background: rgba(127, 178, 255, 0.15);
+}
+
+.fill-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.ai-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ai-preview__chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(127, 178, 255, 0.08);
+  border: 1px solid var(--ai-accent-line);
+  border-radius: 20px;
+  padding: 4px 10px 4px 4px;
+}
+
+.ai-preview__name {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 </style>

@@ -20,6 +20,7 @@
       </div>
 
       <div class="tonk-seat__info">
+        <AiAvatar v-if="seat.isAi" size="sm" />
         <span class="tonk-seat__name">{{ seat.displayName }}</span>
         <AiBadge v-if="seat.isAi" data-testid="ai-badge" />
         <div class="tonk-seat__meta">
@@ -63,6 +64,7 @@ import type { PlayerPublicInfo } from "@shared/engine-types";
 import type { TonkTurnPhase } from "@shared/tonk-types";
 import OpponentTimer from "./OpponentTimer.vue";
 import AiBadge from "./AiBadge.vue";
+import AiAvatar from "./AiAvatar.vue";
 import {
   isCompactRail,
   isWrappingRail,

@@ -10,6 +10,20 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 128: Polish — AI opponent naming and avatars**
+  - `src/shared/aiNames.ts` — new pure shared module: `AI_NAME_POOL` (7 names: Ace, Bishop, Cortex, Domino, Echo, Fable, Gambit) and `aiNameForOrdinal(ordinal)`, a deterministic helper that assigns names by ordinal with a cycling suffix fallback for tables larger than the pool.
+  - `src/backend/service/gameService.ts` — `addAiSeats` now calls `aiNameForOrdinal(existingAiCount + i)` instead of `"CPU N"`. No signature change; `practice`/`aiPlayerIds` wiring unchanged.
+  - `src/frontend/component/game-ui/AiAvatar.vue` — new presentational atom: Direction B geometric bot glyph (rounded-rect head, two eye dots, antenna) inside a dark disc with `--ai-accent` ring and halo. Props: `size?: "sm" | "md"` (default `md`). `aria-hidden="true"`, `data-testid="ai-avatar"`, `flex-shrink: 0`. Asset-free inline SVG + CSS only.
+  - `src/frontend/styles/game-variables.css` — two new AI tokens: `--ai-accent-line` (ring/border) and `--ai-accent-dim` (halo), both cool-blue variants of `--ai-accent`.
+  - `src/frontend/component/game/GameLobbyView.vue` — renders `<AiAvatar size="sm" />` before the name on AI player rows; `AiBadge` still present after the name.
+  - `src/frontend/component/game-ui/OpponentRow.vue` — renders `<AiAvatar size="sm" />` in `opponent__info` beside the name; `AiBadge` still present.
+  - `src/frontend/component/game-ui/TonkSeatRail.vue` — renders `<AiAvatar size="sm" />` in `tonk-seat__info` beside the name; `AiBadge` still present.
+  - `src/frontend/component/CreateGameView.vue` — adds "Fill remaining seats" button (`data-testid="ai-seats-fill"`, disabled at max), `fillAiSeats()` helper, `aiPreviewNames` computed (uses shared `aiNameForOrdinal`), and a live name-preview block (`data-testid="ai-seats-preview"`) with `<AiAvatar />` md chips rendered when `numAiSeats >= 1`.
+  - `tests/util/aiNames.test.ts` — 13 unit tests: pool size, all 7 ordinal names, cycle boundary (ordinals 7/13/14), determinism, uniqueness within a 7-seat table.
+  - `tests/service/aiNaming.test.ts` — 4 unit tests: first 3 seats get Ace/Bishop/Cortex, no "CPU " string produced, ordinal offset for incremental adds, regression (practice + aiPlayerIds unchanged).
+  - `tests/frontend/aiAvatar.test.ts` — 13 structural tests: SVG glyph present, `aria-hidden`, `data-testid`, no emoji, `flex-shrink: 0`, token usage, size classes, SVG shape elements.
+  - `tests/frontend/aiAvatarRendering.test.ts` — 23 tests: AiAvatar wired into lobby/OpponentRow/TonkSeatRail/CreateGameView; Fill button logic; preview list logic; `aiPreviewNames` computed; `fillAiSeats` logic; `isAi` gate on all surfaces.
+
 - **LLD 127: AI opponent move policy — smarter play beyond auto-timeout heuristic**
   - `src/backend/engine/game-engine.ts` — added `getAiMoveAction(state)` to the `GameEngine` interface (parallel to `getAutoTimeoutAction`; same null contract).
   - `src/backend/engine/big2/ai-policy.ts` — new pure policy module: `chooseBig2Move(myHand, pub, playerId)` with `Big2PolicyView`. Strategy: first-play sheds lowest card in a pair/5-combo if possible; free-play leads cheapest combo of largest size, holding high singletons (never leads a `2`/`A` while lower cards exist); follow-play beats lastPlay when close to out, the beat is cheap (≤J), or it would win the trick — otherwise passes to conserve high cards. Combo-preservation guard prevents breaking pairs to lead a single when a true singleton is available.
