@@ -8,6 +8,13 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Fixed
+
+- **LLD 131: Round/score tallies clipped off the side of the game screen**
+  - `src/frontend/component/game/TonkBoard.vue` — added `padding-right: 12px` to `.tonk-board__log` so the right-hand tally panel content clears the 12px `::after` wood rim overlay on desktop.
+  - `src/frontend/component/game/GameBoard.vue` — added `padding-right: 12px` to `.game-board__log` so the Big2 `GameLog` right column content clears the rim equally.
+  - Both changes are CSS-only, applied to the grid cell (not the panel components), so panel backgrounds and borders are unaffected. The mobile `display: none` rule makes the desktop padding inert at ≤767px.
+
 ### Added
 
 - **LLD 128: Polish — AI opponent naming and avatars**

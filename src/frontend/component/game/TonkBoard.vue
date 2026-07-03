@@ -332,6 +332,7 @@ watch(logDrawerOpen, (open) => {
 
 .tonk-board__log {
   grid-area: log;
+  padding-right: 12px; /* clear the 12px ::after wood rim */
 }
 
 .tonk-board__actions {

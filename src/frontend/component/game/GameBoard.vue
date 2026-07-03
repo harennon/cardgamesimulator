@@ -296,6 +296,7 @@ watch(logDrawerOpen, (open) => {
 
 .game-board__log {
   grid-area: log;
+  padding-right: 12px; /* clear the 12px ::after wood rim */
 }
 
 .game-board__actions {
