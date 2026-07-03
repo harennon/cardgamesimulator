@@ -111,6 +111,25 @@ export interface GameEngine {
   getAutoTimeoutAction(state: InternalGameState): GameAction | null;
 
   /**
+   * Determine the move an AI-controlled seat should make.
+   *
+   * Distinct from getAutoTimeoutAction (which is the minimal-legal move for an
+   * abandoned human). This is a heuristic that plays a reasonable, human-plausible
+   * game while remaining pure and deterministic.
+   *
+   * Contract:
+   * - Returns a valid GameAction for the current player, or null when no auto-
+   *   action applies (COMPLETED / not started / currentPlayerIndex < 0), matching
+   *   getAutoTimeoutAction's null contract exactly.
+   * - Pure: no I/O, no PRNG, no Math.random. Same (state) => same action.
+   * - Information hiding: reads ONLY the current seat's own hand + public state.
+   *   Must never inspect any other seat's hand.
+   * - The returned action is always legal: engine.validateAction(state, action)
+   *   is true for the returned action.
+   */
+  getAiMoveAction(state: InternalGameState): GameAction | null;
+
+  /**
    * Derive the spectator view from current state.
    *
    * Contract:

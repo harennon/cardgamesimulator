@@ -175,7 +175,10 @@ async function autoPlayAbandoned(
     }
 
     const engine = engineFactory.getEngine(currentState.gameType);
-    const autoAction = engine.getAutoTimeoutAction(currentState);
+    const isAi = await gameService.isAiSeat(gameId, currentPlayer.playerId);
+    const autoAction = isAi
+      ? engine.getAiMoveAction(currentState)
+      : engine.getAutoTimeoutAction(currentState);
     if (!autoAction) {
       // B1: engine returned null for a live driven seat — should not happen in
       // normal Big2/Tonk play; arm fallback so the seat is retried on next tick.

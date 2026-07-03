@@ -23,6 +23,10 @@ vi.mock("../../src/backend/engine/game-engine-factory.js", () => {
       type: "pass",
       playerId: "host-id",
     }),
+    getAiMoveAction: vi.fn().mockReturnValue({
+      type: "pass",
+      playerId: "host-id",
+    }),
   };
   return {
     engineFactory: {
@@ -1469,5 +1473,180 @@ describe("socketHandler — autoPlayAbandoned exit-branch regression (LLD 122)",
       (c: unknown[]) => c[0] === "game-1",
     );
     expect(timerArmedCalls).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Routing: AI seat → getAiMoveAction, abandoned human → getAutoTimeoutAction
+// ---------------------------------------------------------------------------
+
+describe("socketHandler — AI vs abandoned-human routing in autoPlayAbandoned", () => {
+  const aiId = "ai:00000000-0000-0000-0000-000000000099";
+  const humanId = "host-id";
+
+  it("AI seat calls getAiMoveAction, not getAutoTimeoutAction", async () => {
+    const { engineFactory: engineFactoryMock } =
+      await import("../../src/backend/engine/game-engine-factory.js");
+
+    const getAiMoveActionSpy = vi.fn().mockReturnValue({
+      type: "pass",
+      playerId: aiId,
+    });
+    const getAutoTimeoutActionSpy = vi.fn().mockReturnValue({
+      type: "pass",
+      playerId: aiId,
+    });
+
+    const spyEngine = {
+      gameType: "big2",
+      getPlayerView: vi.fn().mockReturnValue({ players: [] }),
+      getSpectatorView: vi.fn().mockReturnValue({ players: [] }),
+      getAutoTimeoutAction: getAutoTimeoutActionSpy,
+      getAiMoveAction: getAiMoveActionSpy,
+    };
+    (engineFactoryMock.getEngine as ReturnType<typeof vi.fn>).mockReturnValue(
+      spyEngine,
+    );
+
+    const aiState = {
+      gameId: "game-1",
+      gameType: "big2",
+      status: "IN_PROGRESS" as const,
+      version: 2,
+      players: [
+        { playerId: humanId, displayName: "Host" },
+        { playerId: aiId, displayName: "CPU 1" },
+      ],
+      currentPlayerIndex: 1,
+      turnNumber: 2,
+      gameSpecificState: null,
+      winner: null,
+      scores: null,
+      randomSeed: "seed",
+    };
+
+    const humanTurnState = { ...aiState, currentPlayerIndex: 0, version: 3 };
+
+    let getStateCount = 0;
+    const gameService = {
+      getGame: vi.fn().mockResolvedValue(makeGame({ turnTimerSeconds: 30 })),
+      getJoinCode: vi.fn().mockResolvedValue(null),
+      getGameState: vi.fn().mockImplementation(async () => {
+        const count = ++getStateCount;
+        if (count <= 4) return { ...aiState, version: 2 };
+        return humanTurnState;
+      }),
+      getPlayerView: vi.fn().mockResolvedValue({ players: [] }),
+      getSpectatorView: vi.fn().mockResolvedValue(null),
+      applyAction: vi.fn().mockResolvedValue(humanTurnState),
+      isAiSeat: vi
+        .fn()
+        .mockImplementation(async (_gId: string, pId: string) => pId === aiId),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set([aiId])),
+    } as unknown as GameService;
+
+    const { socket } = makeSocket(humanId, "Host");
+    const { fireGameAction } = setupHandlersWithAction(
+      gameService,
+      makeConnectionManager(),
+      makeTurnTimerService(),
+    );
+
+    await fireGameAction(
+      socket,
+      "game-1",
+      { type: "pass", playerId: humanId },
+      () => {},
+    );
+
+    expect(getAiMoveActionSpy).toHaveBeenCalled();
+    expect(getAutoTimeoutActionSpy).not.toHaveBeenCalled();
+  });
+
+  it("handleTimerExpired uses getAutoTimeoutAction, not getAiMoveAction", async () => {
+    const { engineFactory: engineFactoryMock } =
+      await import("../../src/backend/engine/game-engine-factory.js");
+
+    const getAiMoveActionSpy = vi.fn().mockReturnValue(null);
+    const getAutoTimeoutActionSpy = vi.fn().mockReturnValue({
+      type: "pass",
+      playerId: humanId,
+    });
+
+    (engineFactoryMock.getEngine as ReturnType<typeof vi.fn>).mockReturnValue({
+      gameType: "big2",
+      getPlayerView: vi.fn().mockReturnValue({ players: [] }),
+      getSpectatorView: vi.fn().mockReturnValue({ players: [] }),
+      getAutoTimeoutAction: getAutoTimeoutActionSpy,
+      getAiMoveAction: getAiMoveActionSpy,
+    });
+
+    const humanState = {
+      gameId: "game-1",
+      gameType: "big2",
+      status: "IN_PROGRESS" as const,
+      version: 1,
+      players: [
+        { playerId: humanId, displayName: "Host" },
+        { playerId: aiId, displayName: "CPU 1" },
+      ],
+      currentPlayerIndex: 0,
+      turnNumber: 1,
+      gameSpecificState: null,
+      winner: null,
+      scores: null,
+      randomSeed: "seed",
+    };
+
+    const completedState = {
+      ...humanState,
+      status: "COMPLETED" as const,
+      currentPlayerIndex: -1,
+      version: 3,
+    };
+
+    let stateCount = 0;
+    const gameService = {
+      getGame: vi.fn().mockResolvedValue(makeGame({ turnTimerSeconds: 30 })),
+      getJoinCode: vi.fn().mockResolvedValue(null),
+      getGameState: vi.fn().mockImplementation(async () => {
+        const n = ++stateCount;
+        if (n === 1) return humanState;
+        return completedState;
+      }),
+      getPlayerView: vi.fn().mockResolvedValue({ players: [] }),
+      getSpectatorView: vi.fn().mockResolvedValue(null),
+      applyAction: vi.fn().mockResolvedValue(completedState),
+      isAiSeat: vi
+        .fn()
+        .mockImplementation(async (_gId: string, pId: string) => pId === aiId),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set([aiId])),
+    } as unknown as GameService;
+
+    const { handleTimerExpired } =
+      await import("../../src/backend/websocket/socketHandler.js");
+
+    const chainable: { to: unknown; emit: unknown } = {
+      emit: vi.fn(),
+      to: vi.fn(),
+    };
+    (chainable.to as ReturnType<typeof vi.fn>).mockReturnValue(chainable);
+    const io = {
+      on: vi.fn(),
+      to: vi.fn().mockReturnValue(chainable),
+    } as unknown as TypedServer;
+
+    await handleTimerExpired(
+      io,
+      "game-1",
+      gameService,
+      makeConnectionManager(),
+      makeTurnTimerService(),
+    );
+
+    // handleTimerExpired fires for a human seat and must use getAutoTimeoutAction
+    expect(getAutoTimeoutActionSpy).toHaveBeenCalled();
+    // getAiMoveAction must NOT be called by handleTimerExpired
+    expect(getAiMoveActionSpy).not.toHaveBeenCalled();
   });
 });
