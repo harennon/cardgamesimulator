@@ -12,6 +12,9 @@ export interface GameConfig {
   practice?: boolean;
   // Synthetic playerIds seated as AI; subset of Game.playerIds.
   aiPlayerIds?: string[];
+  // Pace (ms) between successive auto-driven moves; default 1000, clamp [0, 3000].
+  // Absent → default applies. 0 → instant (opt-out). Future UI may set this per game.
+  aiMoveDelayMs?: number;
 }
 
 export interface CreateGameRequest {

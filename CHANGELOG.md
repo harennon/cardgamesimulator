@@ -10,6 +10,15 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **LLD 137: AI/CPU move pacing delay (configurable, injectable)**
+  - `src/backend/websocket/delayer.ts` — new `Delayer` interface with `RealDelayer` (production, `setTimeout`-backed with fast-path for `ms <= 0`) and `ImmediateDelayer` (tests, zero wall-clock).
+  - `src/shared/model.ts` — `GameConfig.aiMoveDelayMs?: number` added; persisted in `games.game_config` JSONB; absent → default 1000ms; 0 → instant opt-out; clamped to [0, 3000].
+  - `src/backend/websocket/socketHandler.ts` — `autoPlayAbandoned` gains a `Delayer` parameter; after each successful `broadcastGameState` inside the loop it `await delayer.delay(delayMs)` (paced gap between successive auto-driven moves). Delay is skipped on COMPLETED, B1/B2/B3 guard exits, and on human-only games (never enters the delay branch). Named constants `DEFAULT_AI_MOVE_DELAY_MS = 1000` and `MAX_AI_MOVE_DELAY_MS = 3000` exported. `handleGameJoin`, `handleGameStart`, `handleGameAction`, `handleTimerExpired`, and `registerSocketHandlers` all gain a `delayer` parameter threaded to every `autoPlayAbandoned` call.
+  - `src/backend/server.ts` — constructs `new RealDelayer()` and threads it into `handleTimerExpired` and `registerSocketHandlers`.
+  - `tests/integration/helpers/testServer.ts` — injects `new ImmediateDelayer()` so all integration tests run at zero delay and remain fast.
+  - `tests/websocket/socketHandler.test.ts` — all `setupHandlers*` helpers and the `handleTimerExpired` call updated to pass `new ImmediateDelayer()`.
+  - `tests/websocket/delayer.test.ts` — 14 new tests: `RealDelayer` fast-path and timer-based; `ImmediateDelayer`; pacing insertion verified via `RecordingDelayer` (delay count + value for default, config-override 500ms, 0ms opt-out, absurd clamped to MAX); no-delay on completion/B1/B2; abandoned-human pacing matches AI pacing; human-only game never triggers delay.
+
 - **LLD 128: Polish — AI opponent naming and avatars**
   - `src/shared/aiNames.ts` — new pure shared module: `AI_NAME_POOL` (7 names: Ace, Bishop, Cortex, Domino, Echo, Fable, Gambit) and `aiNameForOrdinal(ordinal)`, a deterministic helper that assigns names by ordinal with a cycling suffix fallback for tables larger than the pool.
   - `src/backend/service/gameService.ts` — `addAiSeats` now calls `aiNameForOrdinal(existingAiCount + i)` instead of `"CPU N"`. No signature change; `practice`/`aiPlayerIds` wiring unchanged.
