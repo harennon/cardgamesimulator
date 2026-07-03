@@ -8,6 +8,11 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Fixed
+
+- **LLD 134: Tonk action/discard buttons clipped at bottom of desktop game screen**
+  - `src/frontend/component/game/TonkBoard.vue` — changed the desktop grid's `actions` row from a fixed `64px` to `auto`, so `TonkActionPanel` always has enough room for its one-line (not-your-turn pill), two-line (phase-stepper + buttons), or three-line (error + stepper + buttons) states without being clipped by `overflow: hidden`. Added `min-height: 0` to `.tonk-board__table` (desktop) so the `1fr` table row can yield space to the `auto` actions row at short viewports (768px). `GameBoard.vue` (Big2) and the mobile grid (`--mobile-actions-height`) are untouched.
+
 ### Added
 
 - **LLD 128: Polish — AI opponent naming and avatars**
