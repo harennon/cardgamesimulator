@@ -5,7 +5,7 @@
 //
 // This module is held to LLD 111 decision 7 by the walkthrough source-scan test:
 // it imports nothing from a live-state source. Its only inputs are the route
-// path string, a boolean breakpoint flag, and the coarse feedback-phase enum.
+// path string and the coarse feedback-phase enum.
 
 import type { FeedbackGamePhase } from "@/composables/useFeedbackContext";
 
@@ -15,17 +15,11 @@ const BOARD_PATH = /^\/game\/[^/]+$/;
 export interface ClusterPlacement {
   // Over a live board (Big2 GameBoard / Tonk TonkBoard) — apply the board offset.
   onBoard: boolean;
-  // Collapse the cluster to the single (?) FAB (hide the bug icon) — only on the
-  // narrow board so the hand keeps full width.
-  collapseBug: boolean;
+  // collapseBug removed (LLD 126): the bug icon shows on the board at every width.
 }
 
-export function clusterPlacement(
-  path: string,
-  isNarrow: boolean,
-): ClusterPlacement {
-  const onBoard = BOARD_PATH.test(path);
-  return { onBoard, collapseBug: onBoard && isNarrow };
+export function clusterPlacement(path: string): ClusterPlacement {
+  return { onBoard: BOARD_PATH.test(path) };
 }
 
 // The game-start toast fires only when the game starts WHILE the walkthrough is

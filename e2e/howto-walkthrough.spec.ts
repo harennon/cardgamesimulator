@@ -600,7 +600,7 @@ test.describe("How-to-play walkthrough — FAB hardening (LLD 117)", () => {
     await context.close();
   });
 
-  test("mobile board: the cluster collapses to a single (?) FAB (bug icon hidden)", async ({
+  test("mobile board: both (?) FAB and bug icon are visible, lifted above action row (LLD 126)", async ({
     browser,
     request,
   }) => {
@@ -609,22 +609,20 @@ test.describe("How-to-play walkthrough — FAB hardening (LLD 117)", () => {
       height: 667,
     });
 
-    await expect(page.locator('[data-testid="howto-fab"]')).toBeVisible();
-    // The bug icon is collapsed away on the mobile board (single-FAB) so the
-    // hand keeps full width — Direction A (LLD 117 §3.1 mobile row, E2).
-    await expect(
-      page.locator('[data-testid="feedback-trigger"]'),
-    ).not.toBeVisible();
-
-    // The single (?) FAB is lifted above the action row so it never obstructs
-    // Play/Pass (E1 headline) — the authoritative offset from §4.3.
+    // Both FABs visible on the mobile board (LLD 126 Option B restores the bug icon).
     const fab = page.locator('[data-testid="howto-fab"]');
+    const bugButton = page.locator('[data-testid="feedback-trigger"]');
+    await expect(fab).toBeVisible();
+    await expect(bugButton).toBeVisible();
+
+    // Both FABs are lifted above the action row — E1 guardrail.
     const fabBox = await fab.boundingBox();
+    const bugBox = await bugButton.boundingBox();
     const panelBox = await page.locator(".action-panel").boundingBox();
     expect(boxesDisjoint(fabBox!, panelBox!)).toBe(true);
+    expect(boxesDisjoint(bugBox!, panelBox!)).toBe(true);
 
-    // It also does not obscure the player's own cards (the hand renders its
-    // cards on the left; the corner FAB clears them).
+    // Neither FAB obscures the player's own cards — E2 guardrail.
     const cardBoxes = await page
       .locator(".player-hand__card")
       .evaluateAll((els) =>
@@ -639,7 +637,23 @@ test.describe("How-to-play walkthrough — FAB hardening (LLD 117)", () => {
       );
     for (const card of cardBoxes) {
       expect(boxesDisjoint(fabBox!, card)).toBe(true);
+      expect(boxesDisjoint(bugBox!, card)).toBe(true);
     }
+
+    await context.close();
+  });
+
+  test("mobile board: tapping the bug icon opens the feedback modal (LLD 126 E6)", async ({
+    browser,
+    request,
+  }) => {
+    const { context, page } = await seedBig2Board(browser, request, {
+      width: 375,
+      height: 667,
+    });
+
+    await page.click('[data-testid="feedback-trigger"]');
+    await expect(page.locator('[data-testid="feedback-modal"]')).toBeVisible();
 
     await context.close();
   });

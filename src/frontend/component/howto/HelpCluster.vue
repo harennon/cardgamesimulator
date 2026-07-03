@@ -25,9 +25,9 @@ const walkthroughOpen = ref(false);
 const steps = computed(() => getWalkthrough(currentGameType.value));
 const gameLabel = computed(() => GAME_LABEL[currentGameType.value]);
 
-// Surface awareness (LLD 117): lift the cluster above the board action row and,
-// on the narrow board, collapse to the single (?) FAB. Placement reads only the
-// route path and the board's own mobile breakpoint — never live game state.
+// Surface awareness (LLD 117/126): lift the cluster above the board action row.
+// isNarrow drives the compact mobile-board CSS class only — not visibility.
+// Placement reads only the route path — never live game state.
 const route = useRoute();
 const mql = window.matchMedia("(max-width: 767px)");
 const isNarrow = ref(mql.matches);
@@ -40,9 +40,8 @@ onUnmounted(() => {
   if (toastTimer) clearTimeout(toastTimer);
 });
 
-const placement = computed(() => clusterPlacement(route.path, isNarrow.value));
+const placement = computed(() => clusterPlacement(route.path));
 const onBoard = computed(() => placement.value.onBoard);
-const collapseBug = computed(() => placement.value.collapseBug);
 
 // Game-starts-while-open (E4): watch the EXISTING feedback-phase enum only while
 // the walkthrough is open; on the lobby->in-progress edge show a non-blocking
@@ -87,7 +86,7 @@ function openFeedback(): void {
     class="help-cluster"
     :class="{
       'help-cluster--board': onBoard,
-      'help-cluster--board-mobile': collapseBug,
+      'help-cluster--board-mobile': onBoard && isNarrow,
     }"
   >
     <div
@@ -109,7 +108,6 @@ function openFeedback(): void {
       ?
     </button>
     <button
-      v-if="!collapseBug"
       class="help-fab help-fab--bug"
       type="button"
       aria-label="Report a bug"
@@ -167,12 +165,25 @@ function openFeedback(): void {
   bottom: calc(64px + 16px + env(safe-area-inset-bottom, 0px));
 }
 
-/* Live board (mobile ≤767px): clear the mobile action row; the bug icon is
-   hidden via v-if so only the single (?) FAB shows (hand keeps full width). */
+/* Live board (mobile ≤767px): clear the mobile action row; both FABs shown,
+   compact sizing so the restored bug icon fits without crowding (LLD 126). */
 .help-cluster--board-mobile {
   bottom: calc(
     var(--mobile-actions-height) + 12px + env(safe-area-inset-bottom, 0px)
   );
+  gap: 9px;
+}
+
+/* Shrink the (?) FAB and bug FAB on the mobile board so the two-FAB cluster
+   keeps a small bottom-right footprint and stays clear of the hand. */
+.help-cluster--board-mobile .help-fab {
+  width: 42px;
+  height: 42px;
+}
+
+.help-cluster--board-mobile .help-fab--bug {
+  width: 32px;
+  height: 32px;
 }
 
 /* Non-blocking game-start toast (E4). Column-reverse stacks the FAB(s) from the

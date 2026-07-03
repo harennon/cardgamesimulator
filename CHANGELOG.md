@@ -10,6 +10,12 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- **LLD 126: Bug report / feedback button missing on the in-game screen (mobile)**
+  - `src/frontend/component/howto/clusterPlacement.ts` — retired `collapseBug` and the `isNarrow` parameter (LLD 126 shape A); `clusterPlacement(path)` now returns `{ onBoard }` only. The bug icon shows on the board at every width.
+  - `src/frontend/component/howto/HelpCluster.vue` — removed `v-if="!collapseBug"` from the bug FAB so it always renders; `isNarrow` now drives the compact CSS class only. Added compact mobile-board sizing under `.help-cluster--board-mobile` (42/32px FABs, 9px gap) so the restored second FAB fits above the action row without crowding.
+  - `tests/frontend/walkthroughs.test.ts` — updated `clusterPlacement` describe block to match the new single-argument signature; removed collapsed-bug expectations.
+  - `e2e/howto-walkthrough.spec.ts` — inverted the mobile-board collapse test to assert both FABs visible, both disjoint from action row and hand cards; added a new test asserting the feedback modal opens when the bug icon is tapped from the mobile board.
+
 - **LLD 125: CPU/AI players incorrectly show as disconnected in game**
   - `src/frontend/component/game-ui/OpponentRow.vue` — guarded the disconnected label: `v-if="!player.isConnected && !player.isAi"` so bots no longer display a false red "disconnected" badge while genuinely offline humans still do.
   - `src/frontend/component/game-ui/TonkSeatRail.vue` — same guard applied: `v-if="!seat.isConnected && !seat.isAi"`.
