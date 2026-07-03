@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mobile board — feedback affordance options</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---- Tokens copied verbatim from src/frontend/styles/game-variables.css ---- */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --card-panel-bg: var(--panel-bg);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --mobile-actions-height: 56px;
+        --mobile-opponent-height: 52px;
+        --mobile-hand-height: 160px;
+        --mobile-rim-width: 4px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: #050505;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        padding: 32px 20px 80px;
+        line-height: 1.5;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 28px;
+      }
+      .page-head h1 {
+        font-family: var(--font-card);
+        font-size: 1.5rem;
+        color: var(--gold-accent);
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .page-head p {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        max-width: 760px;
+      }
+      .page-head code {
+        color: var(--text-primary);
+        background: rgba(201, 168, 76, 0.1);
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+      }
+
+      .options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 40px;
+        justify-content: center;
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      .option {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        width: 340px;
+      }
+
+      .option__label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .option__label .tag {
+        font-size: 0.68rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .option__label h2 {
+        font-family: var(--font-card);
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+      .option__label p {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+
+      /* ---- Simulated mobile board (matches GameBoard.vue --mobile grid) ---- */
+      .phone {
+        position: relative;
+        width: 320px;
+        height: 620px;
+        margin: 0 auto;
+        border-radius: 26px;
+        padding: 10px;
+        background: #1c1c1e;
+        box-shadow:
+          0 0 0 2px #000,
+          0 24px 60px rgba(0, 0, 0, 0.6);
+      }
+
+      .board {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 18px;
+        overflow: hidden;
+        background: radial-gradient(
+          ellipse 120% 80% at 50% 42%,
+          var(--felt-light),
+          var(--felt) 70%
+        );
+        display: grid;
+        grid-template-rows:
+          var(--mobile-opponent-height) 1fr var(--mobile-hand-height)
+          var(--mobile-actions-height);
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand"
+          "actions";
+      }
+      .board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 18px;
+        border: var(--mobile-rim-width) solid var(--table-rim);
+        pointer-events: none;
+        z-index: 100;
+      }
+
+      /* opponents row */
+      .opponents {
+        grid-area: opponents;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 0 46px 0 10px; /* leave room top-right for chip/log */
+        border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+      }
+      .opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+      }
+      .opp .backs {
+        display: flex;
+      }
+      .opp .backs i {
+        width: 12px;
+        height: 17px;
+        border-radius: 2px;
+        margin-left: -6px;
+        background: repeating-linear-gradient(
+          45deg,
+          #6a2020,
+          #6a2020 2px,
+          #822828 2px,
+          #822828 4px
+        );
+        border: 0.5px solid #3a1010;
+      }
+      .opp .backs i:first-child {
+        margin-left: 0;
+      }
+      .opp .name {
+        font-size: 0.56rem;
+        color: var(--text-primary);
+      }
+      .opp .cnt {
+        font-size: 0.52rem;
+        color: var(--text-muted);
+      }
+      .opp--turn .name {
+        color: var(--gold-accent);
+      }
+
+      /* room code chip + log toggle, top-right */
+      .chip {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 205;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .roomcode {
+        font-size: 0.55rem;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 5px;
+        padding: 3px 6px;
+      }
+      .roomcode b {
+        color: var(--gold-accent);
+      }
+      .log-toggle {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--text-muted);
+        color: var(--text-primary);
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+
+      /* table / play area */
+      .table {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .last-label {
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .play-cards {
+        display: flex;
+        gap: 5px;
+      }
+      .pcard {
+        width: 34px;
+        height: 48px;
+        border-radius: 4px;
+        background: var(--card-face);
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 3px 4px;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.66rem;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      }
+      .pcard.red {
+        color: var(--red-suit);
+      }
+      .pcard.black {
+        color: var(--black-suit);
+      }
+      .turn-banner {
+        margin-top: 4px;
+        font-size: 0.62rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.08em;
+      }
+
+      /* hand */
+      .hand {
+        grid-area: hand;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: 6px;
+      }
+      .hcard {
+        width: 34px;
+        height: 50px;
+        border-radius: 4px;
+        background: var(--card-face);
+        margin-left: -14px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        padding: 3px 4px;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.62rem;
+      }
+      .hcard:first-child {
+        margin-left: 0;
+      }
+      .hcard.red {
+        color: var(--red-suit);
+      }
+      .hcard.black {
+        color: var(--black-suit);
+      }
+      .hcard.sel {
+        transform: translateY(-12px);
+        box-shadow: 0 0 0 1.5px var(--gold-accent);
+      }
+
+      /* actions */
+      .actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        border-top: 1px solid rgba(0, 0, 0, 0.35);
+        background: rgba(0, 0, 0, 0.18);
+      }
+      .abtn {
+        font-family: var(--font-ui);
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 8px 22px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .abtn--play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border: 1px solid var(--gold-accent);
+      }
+      .abtn--pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--text-muted);
+      }
+
+      /* ---- Help cluster (shared) ---- */
+      .help-cluster {
+        position: absolute;
+        right: 12px;
+        bottom: calc(var(--mobile-actions-height) + 12px);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 9px;
+        align-items: center;
+      }
+      .help-fab {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: 1px solid var(--gold-accent);
+        background: rgba(20, 12, 8, 0.92);
+        color: var(--gold-accent);
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.15rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+      }
+      .help-fab--bug {
+        border-color: var(--text-muted);
+        color: var(--text-muted);
+        width: 36px;
+        height: 36px;
+      }
+      .help-fab svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      /* dimmed context wash so the affordance under study pops */
+      .board.study .opponents,
+      .board.study .table,
+      .board.study .hand,
+      .board.study .actions {
+        opacity: 0.72;
+      }
+
+      /* callout ring on the highlighted affordance */
+      .ring {
+        outline: 2px dashed var(--gold-accent);
+        outline-offset: 3px;
+        border-radius: 50%;
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+      .ring-sq {
+        outline: 2px dashed var(--gold-accent);
+        outline-offset: 3px;
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          outline-color: rgba(201, 168, 76, 0.35);
+        }
+        50% {
+          outline-color: rgba(201, 168, 76, 1);
+        }
+      }
+
+      /* ============ OPTION A: bug moves into the log toggle → a compact menu ============ */
+      .menu-toggle {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--gold-accent);
+        color: var(--gold-accent);
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .menu-sheet {
+        position: absolute;
+        top: 44px;
+        right: 8px;
+        z-index: 400;
+        width: 176px;
+        background: var(--card-panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        overflow: hidden;
+        backdrop-filter: blur(6px);
+      }
+      .menu-sheet__item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 13px;
+        font-size: 0.78rem;
+        color: var(--text-primary);
+        cursor: pointer;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.5);
+      }
+      .menu-sheet__item:last-child {
+        border-bottom: none;
+      }
+      .menu-sheet__item svg {
+        width: 16px;
+        height: 16px;
+        color: var(--text-muted);
+        flex-shrink: 0;
+      }
+      .menu-sheet__item.hl {
+        color: var(--gold-accent);
+      }
+      .menu-sheet__item.hl svg {
+        color: var(--gold-accent);
+      }
+
+      /* ============ OPTION B: second FAB kept in the cluster (compact) ============ */
+
+      /* ============ OPTION C: "Report a bug" row folded into walkthrough footer ============ */
+      .wt {
+        position: absolute;
+        inset: 0;
+        z-index: 1100;
+        background: rgba(0, 0, 0, 0.66);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+      }
+      .wt-modal {
+        width: 100%;
+        max-width: 260px;
+        background: var(--card-panel-bg);
+        border: 1.5px solid var(--table-rim-light);
+        border-radius: 14px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .wt-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 13px;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .wt-head b {
+        font-family: var(--font-card);
+        color: var(--gold-accent);
+        font-size: 0.85rem;
+      }
+      .wt-head b small {
+        display: block;
+        font-family: var(--font-ui);
+        font-weight: 500;
+        color: var(--text-muted);
+        font-size: 0.54rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin-top: 2px;
+      }
+      .wt-x {
+        width: 26px;
+        height: 26px;
+        border-radius: 5px;
+        border: 1px solid var(--table-rim-light);
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      .wt-illus {
+        height: 92px;
+        margin: 12px;
+        border-radius: 8px;
+        background: radial-gradient(
+          ellipse at 50% 40%,
+          var(--felt-light),
+          var(--felt)
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+      .wt-illus .pcard {
+        width: 30px;
+        height: 42px;
+      }
+      .wt-cap {
+        padding: 0 14px;
+        font-size: 0.72rem;
+        color: var(--text-primary);
+        line-height: 1.45;
+        text-align: center;
+      }
+      .wt-cap b {
+        color: var(--gold-accent);
+      }
+      .wt-dots {
+        display: flex;
+        gap: 5px;
+        justify-content: center;
+        padding: 12px 0 4px;
+      }
+      .wt-dots i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--table-rim-light);
+      }
+      .wt-dots i.on {
+        width: 16px;
+        border-radius: 3px;
+        background: var(--gold-accent);
+      }
+      .wt-foot {
+        padding: 10px 13px 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+        border-top: 1px solid var(--table-rim-light);
+      }
+      .wt-nav {
+        display: flex;
+        gap: 8px;
+      }
+      .wt-navbtn {
+        flex: 1;
+        font-family: var(--font-ui);
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 9px;
+        border-radius: 6px;
+        border: 1px solid var(--text-muted);
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+      }
+      .wt-navbtn--primary {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        border-color: var(--gold-accent);
+      }
+      .wt-report {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        padding-top: 3px;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-family: var(--font-ui);
+      }
+      .wt-report svg {
+        width: 14px;
+        height: 14px;
+      }
+      .wt-report b {
+        color: var(--gold-accent);
+        border-bottom: 1px solid rgba(201, 168, 76, 0.4);
+      }
+
+      /* feedback modal preview (shared destination for all options) */
+      .fb-note {
+        margin-top: 4px;
+        font-size: 0.74rem;
+        color: var(--text-muted);
+        padding: 10px 12px;
+        border: 1px dashed var(--table-rim-light);
+        border-radius: 8px;
+        background: rgba(20, 12, 8, 0.4);
+      }
+      .fb-note b {
+        color: var(--gold-accent);
+      }
+
+      .tradeoffs {
+        max-width: 1180px;
+        margin: 48px auto 0;
+        border-top: 1px solid var(--table-rim-light);
+        padding-top: 24px;
+      }
+      .tradeoffs h3 {
+        font-family: var(--font-card);
+        color: var(--gold-accent);
+        margin-bottom: 14px;
+      }
+      .tradeoffs table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+      }
+      .tradeoffs th,
+      .tradeoffs td {
+        text-align: left;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--table-rim-light);
+        vertical-align: top;
+      }
+      .tradeoffs th {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+      .tradeoffs td:first-child {
+        color: var(--text-primary);
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .rec {
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Mobile board — feedback affordance</h1>
+      <p>
+        On the mobile game board (<code>/game/:gameId</code>, ≤767px) the help
+        cluster collapses to just the <code>?</code> FAB, hiding the only bug /
+        feedback trigger in the app. Three ways to give mobile players back a
+        reachable path to the feedback modal without shrinking the hand or
+        overlapping the Play/Pass action row. All reuse the shipped visual
+        language (dark felt, gold accent, DM Sans + Libre Baskerville) and open
+        the same <code>FeedbackWidget</code> modal with full game-context
+        metadata.
+      </p>
+    </div>
+
+    <div class="options">
+      <!-- ============================ OPTION A ============================ -->
+      <div class="option">
+        <div class="option__label">
+          <span class="tag">Option A · Recommended</span>
+          <h2>Fold into a top-right board menu</h2>
+          <p>
+            The mobile log toggle (☰) becomes a small overflow menu: Game Log +
+            Report a bug. The bottom cluster stays a single <code>?</code> FAB —
+            hand unchanged. Uses existing top-right real estate that never
+            overlaps the hand or action row.
+          </p>
+        </div>
+        <div class="phone">
+          <div class="board study">
+            <div class="chip">
+              <span class="roomcode">ROOM <b>7F3K</b></span>
+              <div class="menu-toggle ring">⋯</div>
+            </div>
+            <!-- open menu sheet -->
+            <div class="menu-sheet">
+              <div class="menu-sheet__item">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                >
+                  <path d="M4 6h16M4 12h16M4 18h10" />
+                </svg>
+                Game log
+              </div>
+              <div class="menu-sheet__item hl">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3" />
+                </svg>
+                Report a bug
+              </div>
+            </div>
+
+            <div class="opponents">
+              <div class="opp opp--turn">
+                <div class="backs"><i></i><i></i><i></i></div>
+                <span class="name">Bob</span><span class="cnt">9</span>
+              </div>
+              <div class="opp">
+                <div class="backs"><i></i><i></i><i></i></div>
+                <span class="name">Cara</span><span class="cnt">11</span>
+              </div>
+              <div class="opp">
+                <div class="backs"><i></i><i></i><i></i></div>
+                <span class="name">Dan</span><span class="cnt">8</span>
+              </div>
+            </div>
+            <div class="table">
+              <span class="last-label">Last play — Bob · Pair</span>
+              <div class="play-cards">
+                <div class="pcard red">7♥</div>
+                <div class="pcard black">7♠</div>
+              </div>
+              <span class="turn-banner">◆ Your turn · 0:42</span>
+            </div>
+            <div class="hand">
+              <div class="hcard black">3♣</div>
+              <div class="hcard red">4♦</div>
+              <div class="hcard red">5♥</div>
+              <div class="hcard black">5♠</div>
+              <div class="hcard red">7♦</div>
+              <div class="hcard black">9♣</div>
+              <div class="hcard red">J♥</div>
+              <div class="hcard black">Q♠</div>
+              <div class="hcard red">K♦</div>
+              <div class="hcard black">2♠</div>
+            </div>
+            <div class="actions">
+              <button class="abtn abtn--play">Play</button>
+              <button class="abtn abtn--pass">Pass</button>
+            </div>
+
+            <div class="help-cluster">
+              <div class="help-fab">?</div>
+            </div>
+          </div>
+        </div>
+        <div class="fb-note">
+          Tapping <b>Report a bug</b> opens the existing feedback modal with
+          route / gameId / gamePhase metadata intact.
+        </div>
+      </div>
+
+      <!-- ============================ OPTION B ============================ -->
+      <div class="option">
+        <div class="option__label">
+          <span class="tag">Option B</span>
+          <h2>Keep a compact bug FAB in the cluster</h2>
+          <p>
+            Reverse the LLD 117 collapse: keep both FABs on the mobile board but
+            shrink the bug icon (32px) and tighten the gap. Lowest-effort — one
+            <code>v-if</code> change — but re-introduces the exact crowding LLD
+            117 removed on the narrowest screens.
+          </p>
+        </div>
+        <div class="phone">
+          <div class="board study">
+            <div class="chip">
+              <span class="roomcode">ROOM <b>7F3K</b></span>
+              <div class="log-toggle">☰</div>
+            </div>
+            <div class="opponents">
+              <div class="opp opp--turn">
+                <div class="backs"><i></i><i></i><i></i></div>
+                <span class="name">Bob</span><span class="cnt">9</span>
+              </div>
+              <div class="opp">
+                <div class="backs"><i></i><i></i><i></i></div>
+                <span class="name">Cara</span><span class="cnt">11</span>
+              </div>
+              <div class="opp">
+                <div class="backs"><i></i><i></i><i></i></div>
+                <span class="name">Dan</span><span class="cnt">8</span>
+              </div>
+            </div>
+            <div class="table">
+              <span class="last-label">Last play — Bob · Pair</span>
+              <div class="play-cards">
+                <div class="pcard red">7♥</div>
+                <div class="pcard black">7♠</div>
+              </div>
+              <span class="turn-banner">◆ Your turn · 0:42</span>
+            </div>
+            <div class="hand">
+              <div class="hcard black">3♣</div>
+              <div class="hcard red">4♦</div>
+              <div class="hcard red">5♥</div>
+              <div class="hcard black">5♠</div>
+              <div class="hcard red">7♦</div>
+              <div class="hcard black">9♣</div>
+              <div class="hcard red">J♥</div>
+              <div class="hcard black">Q♠</div>
+              <div class="hcard red">K♦</div>
+              <div class="hcard black">2♠</div>
+            </div>
+            <div class="actions">
+              <button class="abtn abtn--play">Play</button>
+              <button class="abtn abtn--pass">Pass</button>
+            </div>
+
+            <div class="help-cluster ring-sq">
+              <div class="help-fab">?</div>
+              <div class="help-fab help-fab--bug">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                  <rect x="7" y="6" width="10" height="12" rx="5" />
+                  <path
+                    d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3M5 6l2 2M19 6l-2 2M5 19l2-2M19 19l-2-2"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="fb-note">
+          Bug FAB opens the feedback modal directly — identical to desktop, just
+          smaller. Trades hand breathing room for zero new UI.
+        </div>
+      </div>
+
+      <!-- ============================ OPTION C ============================ -->
+      <div class="option">
+        <div class="option__label">
+          <span class="tag">Option C</span>
+          <h2>“Report a bug” link in the help walkthrough</h2>
+          <p>
+            The single <code>?</code> FAB already opens the How-to-Play
+            walkthrough. Add a quiet “Report a bug” link in its footer. Zero new
+            board chrome, but feedback is now two taps deep and semantically
+            lives inside “help”.
+          </p>
+        </div>
+        <div class="phone">
+          <div class="board">
+            <div class="chip">
+              <span class="roomcode">ROOM <b>7F3K</b></span>
+              <div class="log-toggle">☰</div>
+            </div>
+            <div class="opponents">
+              <div class="opp">
+                <div class="backs"><i></i><i></i></div>
+                <span class="name">Bob</span>
+              </div>
+              <div class="opp">
+                <div class="backs"><i></i><i></i></div>
+                <span class="name">Cara</span>
+              </div>
+              <div class="opp">
+                <div class="backs"><i></i><i></i></div>
+                <span class="name">Dan</span>
+              </div>
+            </div>
+            <div class="table"></div>
+            <div class="hand"></div>
+            <div class="actions"></div>
+
+            <!-- walkthrough modal open over the board -->
+            <div class="wt">
+              <div class="wt-modal">
+                <div class="wt-head">
+                  <b>How to Play<small>Big 2</small></b>
+                  <button class="wt-x">×</button>
+                </div>
+                <div class="wt-illus">
+                  <div class="pcard red">7♥</div>
+                  <div class="pcard black">7♠</div>
+                </div>
+                <p class="wt-cap">
+                  Beat the last play with a <b>higher combination</b> of the
+                  same size, or <b>pass</b>.
+                </p>
+                <div class="wt-dots">
+                  <i></i><i class="on"></i><i></i><i></i>
+                </div>
+                <div class="wt-foot">
+                  <div class="wt-nav">
+                    <button class="wt-navbtn">Back</button>
+                    <button class="wt-navbtn wt-navbtn--primary">Next →</button>
+                  </div>
+                  <button class="wt-report ring-sq">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+                      <rect x="7" y="6" width="10" height="12" rx="5" />
+                      <path d="M12 6v12M4 10h3M4 15h3M17 10h3M17 15h3" />
+                    </svg>
+                    Found a problem? <b>Report a bug</b>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="help-cluster">
+              <div class="help-fab">?</div>
+            </div>
+          </div>
+        </div>
+        <div class="fb-note">
+          The footer link closes the walkthrough and opens the feedback modal.
+          Discoverability is lowest of the three — the user has to open help
+          first.
+        </div>
+      </div>
+    </div>
+
+    <div class="tradeoffs">
+      <h3>Trade-offs at a glance</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Discoverability</th>
+            <th>Hand / action-row impact</th>
+            <th>Implementation surface</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="rec">A · Board menu</td>
+            <td>High — visible affordance, top-right, one tap to menu</td>
+            <td>None — reuses the existing log-toggle corner</td>
+            <td>
+              Turn log-toggle into a small menu (Game log + Report a bug);
+              cluster stays single-FAB
+            </td>
+            <td class="rec">
+              Recommended: gives the affordance back without touching the hand
+              or the LLD 117 collapse rationale
+            </td>
+          </tr>
+          <tr>
+            <td>B · Compact bug FAB</td>
+            <td>High — same as desktop</td>
+            <td>Reintroduces mobile hand/action crowding LLD 117 removed</td>
+            <td>Smallest — flip one <code>v-if</code> + shrink token</td>
+            <td>
+              Directly contradicts LLD 117 §2.2; likely to re-open the original
+              crowding complaint
+            </td>
+          </tr>
+          <tr>
+            <td>C · In walkthrough</td>
+            <td>Low — hidden behind the ? / help open</td>
+            <td>None</td>
+            <td>
+              Add a footer link to WalkthroughModal + wire to
+              FeedbackWidget.open()
+            </td>
+            <td>
+              Cleanest board, but couples "report a bug" to "how to play"; two
+              taps deep
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>
