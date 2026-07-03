@@ -1,0 +1,1408 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tonk — Round-End Card Review Pause Mockups</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===== Tokens lifted from src/frontend/styles/game-variables.css ===== */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --tonk-cyan: #3fd0d8;
+        --tonk-near-150: #e09a30;
+        --win-green: #6fbf73;
+        --loss-red: #e07a5f;
+
+        --card-hand-width: 44px;
+        --card-hand-height: 62px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #0d0d0d;
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        padding: 28px 16px 96px;
+      }
+
+      /* ===== Doc scaffolding (not part of the product UI) ===== */
+      .doc-head {
+        max-width: 960px;
+        margin: 0 auto 8px;
+      }
+      .doc-head h1 {
+        font-family: var(--font-card);
+        font-size: 1.5rem;
+        color: var(--gold-accent);
+        margin: 0 0 6px;
+      }
+      .doc-head p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin: 0 0 4px;
+      }
+      .doc-controls {
+        max-width: 960px;
+        margin: 16px auto 28px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 18px;
+        align-items: center;
+        padding: 12px 16px;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        background: rgba(20, 12, 8, 0.5);
+      }
+      .doc-controls label {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        cursor: pointer;
+      }
+      .doc-controls .group-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        font-weight: 700;
+      }
+      .doc-section-label {
+        max-width: 960px;
+        margin: 40px auto 14px;
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+      }
+      .doc-section-label .tag {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #1a0f06;
+        background: var(--gold-accent);
+        padding: 3px 9px;
+        border-radius: 4px;
+      }
+      .doc-section-label h2 {
+        font-family: var(--font-card);
+        font-size: 1.12rem;
+        margin: 0;
+        color: var(--text-primary);
+      }
+      .doc-section-label .note {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+
+      /* ===== The stage: a scaled-down game board with the reveal on top ===== */
+      .stage {
+        max-width: 960px;
+        margin: 0 auto;
+        position: relative;
+        height: 560px;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 10px solid var(--table-rim);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      }
+      .stage--mobile {
+        max-width: 390px;
+        height: 640px;
+        border-width: 6px;
+      }
+
+      /* --- The live board underneath (already the NEXT round's fresh deal) --- */
+      .board {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        display: grid;
+        grid-template-rows: 64px 1fr 120px;
+        transition:
+          filter 0.4s ease,
+          transform 0.4s ease;
+      }
+      .board__opp {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+        font-size: 0.72rem;
+        color: var(--text-primary);
+      }
+      .board__opp .seat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+      }
+      .board__opp .fan {
+        display: flex;
+      }
+      .board__opp .fan .cb {
+        width: 20px;
+        height: 28px;
+        margin-left: -12px;
+        border-radius: 3px;
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1px solid #c9a84c;
+      }
+      .board__opp .fan .cb:first-child {
+        margin-left: 0;
+      }
+      .board__table {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+      }
+      .board__pile {
+        width: 56px;
+        height: 78px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.66rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+      .board__pile.stock {
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1.5px solid #c9a84c;
+        color: #f0dca8;
+      }
+      .board__pile.discard {
+        background: var(--card-face);
+        border: 1.5px solid #c8b89a;
+        color: var(--black-suit);
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .board__hand {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: 16px;
+        gap: 3px;
+      }
+
+      /* ===== Card primitive (used inside the reveal panels) ===== */
+      .card {
+        position: relative;
+        width: var(--card-hand-width);
+        height: var(--card-hand-height);
+        border-radius: 5px;
+        border: 1.25px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.92rem;
+        box-shadow: 1px 2px 5px var(--card-shadow);
+        flex-shrink: 0;
+      }
+      .card .corner {
+        position: absolute;
+        top: 2px;
+        left: 3px;
+        font-size: 8px;
+        line-height: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .card.red {
+        color: var(--red-suit);
+      }
+      .card.black {
+        color: var(--black-suit);
+      }
+      .card.joker {
+        background: linear-gradient(135deg, #faf3e8 0%, #efe2cb 100%);
+      }
+      .card.joker .pip {
+        color: var(--gold-accent);
+        font-size: 1.5em;
+        text-shadow: 0 0 6px var(--gold-glow);
+      }
+      .card--sm {
+        --card-hand-width: 34px;
+        --card-hand-height: 48px;
+        font-size: 0.72rem;
+        border-radius: 4px;
+      }
+      .card--sm .corner {
+        display: none;
+      }
+
+      /* ===== SHARED reveal chrome (scrim + entrance animation) ===== */
+      .reveal {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+      }
+      .reveal__scrim {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 75% 60% at 50% 45%,
+          rgba(10, 6, 3, 0.62) 0%,
+          rgba(8, 5, 2, 0.9) 100%
+        );
+      }
+      .reveal__inner {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 720px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* Verdict banner shared across directions */
+      .verdict {
+        text-align: center;
+        margin-bottom: 14px;
+        animation: rise 0.45s ease both;
+      }
+      .verdict__reason {
+        font-family: var(--font-ui);
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--gold-accent);
+      }
+      .verdict__headline {
+        font-family: var(--font-card);
+        font-size: 1.55rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 3px 0 0;
+        text-shadow: 0 0 22px rgba(0, 0, 0, 0.6);
+      }
+      .verdict__headline .name {
+        color: var(--gold-accent);
+        text-shadow: 0 0 26px var(--gold-glow);
+      }
+      .verdict__sub {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      /* CTA + timer (shared) */
+      .reveal__cta {
+        margin-top: 18px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        animation: rise 0.45s ease 0.18s both;
+      }
+      .continue-btn {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 12px 34px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        background: var(--gold-accent);
+        color: #1a0f06;
+        min-height: 46px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+        position: relative;
+        overflow: hidden;
+      }
+      .continue-btn:hover {
+        background: #d4b45a;
+      }
+      /* auto-dismiss progress hairline riding the bottom of the button */
+      .continue-btn .progress {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 3px;
+        width: 100%;
+        background: rgba(26, 15, 6, 0.35);
+        transform-origin: left;
+        animation: countdown 6s linear forwards;
+      }
+      .timer-hint {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+      }
+      .timer-hint b {
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+      .waiting-hint {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+      @keyframes rise {
+        from {
+          transform: translateY(14px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      @keyframes countdown {
+        from {
+          transform: scaleX(1);
+        }
+        to {
+          transform: scaleX(0);
+        }
+      }
+      @keyframes flip {
+        from {
+          transform: rotateY(90deg);
+          opacity: 0;
+        }
+        to {
+          transform: rotateY(0);
+          opacity: 1;
+        }
+      }
+
+      /* ============================================================= */
+      /* DIRECTION A — "Showdown table": each player a card, hands fanned */
+      /* ============================================================= */
+      .showdown {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+        animation: rise 0.45s ease 0.08s both;
+      }
+      .showdown__player {
+        display: grid;
+        grid-template-columns: 128px 1fr auto;
+        align-items: center;
+        gap: 14px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: rgba(20, 12, 8, 0.55);
+        border: 1px solid var(--table-rim-light);
+      }
+      .showdown__player.is-caller {
+        border-color: var(--gold-accent);
+        box-shadow: 0 0 0 1px var(--gold-accent) inset;
+        background: rgba(60, 44, 20, 0.55);
+      }
+      .showdown__id {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .showdown__name {
+        font-weight: 600;
+        font-size: 0.92rem;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .showdown__badge {
+        font-size: 0.6rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .badge--tonk {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .badge--win {
+        background: rgba(111, 191, 115, 0.18);
+        color: var(--win-green);
+        border: 1px solid rgba(111, 191, 115, 0.5);
+      }
+      .showdown__handmeta {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      .showdown__cards {
+        display: flex;
+        gap: 3px;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+      .showdown__cards .card {
+        animation: flip 0.4s ease both;
+      }
+      .showdown__delta {
+        font-family: var(--font-ui);
+        font-weight: 700;
+        font-size: 1.15rem;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        min-width: 56px;
+      }
+      .delta--best {
+        color: var(--win-green);
+      }
+      .delta--penalty {
+        color: var(--loss-red);
+      }
+      .delta__total {
+        display: block;
+        font-size: 0.62rem;
+        font-weight: 500;
+        color: var(--text-muted);
+      }
+
+      /* ============================================================= */
+      /* DIRECTION B — "Scoreboard focus": compact tally-delta table,   */
+      /* hands shown as thumbnails inline                               */
+      /* ============================================================= */
+      .scoreboard {
+        width: 100%;
+        max-width: 540px;
+        background: rgba(20, 12, 8, 0.75);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 12px;
+        overflow: hidden;
+        animation: rise 0.45s ease 0.08s both;
+      }
+      .scoreboard__head,
+      .scoreboard__row {
+        display: grid;
+        grid-template-columns: 1fr auto 70px;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+      }
+      .scoreboard__head {
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        font-weight: 700;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .scoreboard__head span:nth-child(2),
+      .scoreboard__row .sb-hand {
+        justify-self: center;
+      }
+      .scoreboard__head span:last-child,
+      .scoreboard__row .sb-delta {
+        text-align: right;
+      }
+      .scoreboard__row {
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+      }
+      .scoreboard__row:last-child {
+        border-bottom: none;
+      }
+      .scoreboard__row.is-caller {
+        background: rgba(60, 44, 20, 0.45);
+      }
+      .sb-id {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      .sb-hand {
+        display: flex;
+        gap: 2px;
+      }
+      .sb-delta {
+        font-weight: 700;
+        font-size: 1.05rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .sb-delta small {
+        display: block;
+        font-size: 0.6rem;
+        font-weight: 500;
+        color: var(--text-muted);
+      }
+
+      /* ============================================================= */
+      /* DIRECTION C — "Spotlight loser + grid": dramatic focus on who   */
+      /* took the hit, others in a supporting grid                      */
+      /* ============================================================= */
+      .spotlight {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        animation: rise 0.45s ease 0.08s both;
+      }
+      .spotlight__hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .spotlight__hero .card {
+        animation: flip 0.4s ease both;
+        box-shadow:
+          0 8px 26px rgba(0, 0, 0, 0.7),
+          0 0 0 2px rgba(201, 168, 76, 0.25);
+      }
+      .spotlight__hero-cards {
+        display: flex;
+        gap: 4px;
+      }
+      .spotlight__hero-meta {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .spotlight__grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        width: 100%;
+        max-width: 620px;
+      }
+      .spotlight__cell {
+        background: rgba(20, 12, 8, 0.6);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+      }
+      .spotlight__cell.is-caller {
+        border-color: var(--gold-accent);
+      }
+      .spotlight__cell-name {
+        font-size: 0.78rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .spotlight__cell-hand {
+        display: flex;
+        gap: 2px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .spotlight__cell-delta {
+        font-size: 0.82rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ===== Mobile adaptations of Direction A (the recommended one) ===== */
+      .stage--mobile .board {
+        grid-template-rows: 48px 1fr 96px;
+      }
+      .stage--mobile .verdict__headline {
+        font-size: 1.3rem;
+      }
+      .stage--mobile .showdown__player {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          "id delta"
+          "cards cards";
+        gap: 6px 10px;
+        padding: 8px 10px;
+      }
+      .stage--mobile .showdown__id {
+        grid-area: id;
+      }
+      .stage--mobile .showdown__delta {
+        grid-area: delta;
+      }
+      .stage--mobile .showdown__cards {
+        grid-area: cards;
+      }
+      .stage--mobile .card--sm {
+        --card-hand-width: 28px;
+        --card-hand-height: 40px;
+      }
+
+      /* reduced motion */
+      @media (prefers-reduced-motion: reduce) {
+        .verdict,
+        .reveal__cta,
+        .showdown,
+        .scoreboard,
+        .spotlight,
+        .showdown__cards .card,
+        .spotlight__hero .card,
+        .continue-btn .progress {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc-head">
+      <h1>Tonk — Round-End Card Review Pause</h1>
+      <p>
+        When a Tonk round ends (a player calls TONK, or the stock runs out) the
+        engine immediately deals the next round. Today the only place the
+        revealed hands appear is the game log (a drawer on mobile), so players
+        never get a beat to see who won/lost the round. These mockups add a
+        reveal overlay that shows every player's revealed hand + the points each
+        seat took, before the next round's board becomes interactive.
+      </p>
+      <p>
+        The board underneath each panel is intentionally the
+        <em>already-dealt next round</em> — the overlay is what buys the review
+        pause. Three distinct directions below, then a mobile view and the two
+        end reasons (TONK vs stock-out).
+      </p>
+    </div>
+
+    <div class="doc-controls">
+      <span class="group-label">Dismiss model</span>
+      <label
+        ><input
+          type="radio"
+          name="dismiss"
+          value="timer"
+          checked
+          onchange="setDismiss(this.value)"
+        />
+        Auto-dismiss timer + skip</label
+      >
+      <label
+        ><input
+          type="radio"
+          name="dismiss"
+          value="button"
+          onchange="setDismiss(this.value)"
+        />
+        Explicit Continue only</label
+      >
+      <span class="group-label" style="margin-left: 12px">Board behind</span>
+      <label
+        ><input
+          type="checkbox"
+          id="blurToggle"
+          checked
+          onchange="toggleBlur(this.checked)"
+        />
+        Blur + dim (matches LLD 105 game-over reveal)</label
+      >
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DIRECTION A -->
+    <!-- ============================================================ -->
+    <div class="doc-section-label">
+      <span class="tag">Direction A</span>
+      <h2>Showdown table (recommended)</h2>
+      <span class="note"
+        >One row per player: fanned revealed hand, hand value, points taken this
+        round. TONK caller flagged, best hand flagged.</span
+      >
+    </div>
+    <div class="stage" data-stage>
+      <div class="board board-el">
+        <div class="board__opp">
+          <div class="seat">
+            <span>Mara &nbsp;·&nbsp; 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+          <div class="seat">
+            <span>Devin &nbsp;·&nbsp; 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+          <div class="seat">
+            <span>Priya &nbsp;·&nbsp; 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+        </div>
+        <div class="board__table">
+          <div class="board__pile stock">Stock<br />31</div>
+          <div class="board__pile discard">7&spades;</div>
+        </div>
+        <div class="board__hand">
+          <span class="card red"
+            ><span class="corner">2&hearts;</span>2&hearts;</span
+          >
+          <span class="card black"
+            ><span class="corner">6&clubs;</span>6&clubs;</span
+          >
+          <span class="card red"
+            ><span class="corner">9&diams;</span>9&diams;</span
+          >
+          <span class="card black"
+            ><span class="corner">J&spades;</span>J&spades;</span
+          >
+          <span class="card red"
+            ><span class="corner">K&hearts;</span>K&hearts;</span
+          >
+        </div>
+      </div>
+
+      <div class="reveal">
+        <div class="reveal__scrim scrim-el"></div>
+        <div class="reveal__inner">
+          <div class="verdict">
+            <div class="verdict__reason reason-el">&#9670; TONK called</div>
+            <h2 class="verdict__headline">
+              <span class="name">You</span> called Tonk
+            </h2>
+            <div class="verdict__sub">Round 4 · lowest hand takes nothing</div>
+          </div>
+
+          <div class="showdown">
+            <!-- You: caller + best -->
+            <div class="showdown__player is-caller">
+              <div class="showdown__id">
+                <span class="showdown__name"
+                  >You
+                  <span class="showdown__badge badge--tonk">Tonk</span></span
+                >
+                <span class="showdown__handmeta">hand value 12</span>
+              </div>
+              <div class="showdown__cards">
+                <span class="card red"
+                  ><span class="corner">2&hearts;</span>2&hearts;</span
+                >
+                <span class="card black"
+                  ><span class="corner">3&clubs;</span>3&clubs;</span
+                >
+                <span class="card red"
+                  ><span class="corner">3&diams;</span>3&diams;</span
+                >
+                <span class="card black"
+                  ><span class="corner">4&spades;</span>4&spades;</span
+                >
+              </div>
+              <div class="showdown__delta delta--best">
+                +0<span class="delta__total">total 42</span>
+              </div>
+            </div>
+
+            <!-- Mara -->
+            <div class="showdown__player">
+              <div class="showdown__id">
+                <span class="showdown__name">Mara</span>
+                <span class="showdown__handmeta">hand value 19</span>
+              </div>
+              <div class="showdown__cards">
+                <span class="card black"
+                  ><span class="corner">5&spades;</span>5&spades;</span
+                >
+                <span class="card red"
+                  ><span class="corner">6&hearts;</span>6&hearts;</span
+                >
+                <span class="card black"
+                  ><span class="corner">8&clubs;</span>8&clubs;</span
+                >
+              </div>
+              <div class="showdown__delta delta--penalty">
+                +19<span class="delta__total">total 61</span>
+              </div>
+            </div>
+
+            <!-- Devin -->
+            <div class="showdown__player">
+              <div class="showdown__id">
+                <span class="showdown__name">Devin</span>
+                <span class="showdown__handmeta">hand value 24</span>
+              </div>
+              <div class="showdown__cards">
+                <span class="card red"
+                  ><span class="corner">K&hearts;</span>K&hearts;</span
+                >
+                <span class="card joker"><span class="pip">&#9733;</span></span>
+                <span class="card black"
+                  ><span class="corner">4&spades;</span>4&spades;</span
+                >
+              </div>
+              <div class="showdown__delta delta--penalty">
+                +24<span class="delta__total">total 118</span>
+              </div>
+            </div>
+
+            <!-- Priya -->
+            <div class="showdown__player">
+              <div class="showdown__id">
+                <span class="showdown__name">Priya</span>
+                <span class="showdown__handmeta">hand value 15</span>
+              </div>
+              <div class="showdown__cards">
+                <span class="card red"
+                  ><span class="corner">7&diams;</span>7&diams;</span
+                >
+                <span class="card black"
+                  ><span class="corner">8&spades;</span>8&spades;</span
+                >
+              </div>
+              <div class="showdown__delta delta--penalty">
+                +15<span class="delta__total">total 33</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="reveal__cta">
+            <button class="continue-btn">
+              Continue
+              <span class="progress progress-el"></span>
+            </button>
+            <span class="timer-hint hint-timer"
+              >Next round in <b class="count">6</b>s · everyone continues on
+              their own</span
+            >
+            <span class="waiting-hint hint-button" style="display: none"
+              >Tap Continue when you've reviewed the hands</span
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DIRECTION B -->
+    <!-- ============================================================ -->
+    <div class="doc-section-label">
+      <span class="tag">Direction B</span>
+      <h2>Scoreboard focus</h2>
+      <span class="note"
+        >Compact score-first table: names + hand thumbnails + delta, ranked by
+        who took the fewest points. Reads like a round scorecard.</span
+      >
+    </div>
+    <div class="stage" data-stage>
+      <div class="board board-el">
+        <div class="board__opp">
+          <div class="seat">
+            <span>Mara &nbsp;·&nbsp; 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+          <div class="seat">
+            <span>Devin &nbsp;·&nbsp; 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+          <div class="seat">
+            <span>Priya &nbsp;·&nbsp; 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+        </div>
+        <div class="board__table">
+          <div class="board__pile stock">Stock<br />31</div>
+          <div class="board__pile discard">7&spades;</div>
+        </div>
+        <div class="board__hand">
+          <span class="card red"
+            ><span class="corner">2&hearts;</span>2&hearts;</span
+          >
+          <span class="card black"
+            ><span class="corner">6&clubs;</span>6&clubs;</span
+          >
+          <span class="card red"
+            ><span class="corner">9&diams;</span>9&diams;</span
+          >
+          <span class="card black"
+            ><span class="corner">J&spades;</span>J&spades;</span
+          >
+          <span class="card red"
+            ><span class="corner">K&hearts;</span>K&hearts;</span
+          >
+        </div>
+      </div>
+
+      <div class="reveal">
+        <div class="reveal__scrim scrim-el"></div>
+        <div class="reveal__inner">
+          <div class="verdict">
+            <div class="verdict__reason reason-el">&#9670; TONK called</div>
+            <h2 class="verdict__headline">
+              Round 4 &middot; <span class="name">You</span> win the round
+            </h2>
+          </div>
+
+          <div class="scoreboard">
+            <div class="scoreboard__head">
+              <span>Player</span><span>Revealed hand</span><span>Points</span>
+            </div>
+            <div class="scoreboard__row is-caller">
+              <div class="sb-id">
+                You <span class="showdown__badge badge--tonk">Tonk</span>
+              </div>
+              <div class="sb-hand">
+                <span class="card card--sm red">2&hearts;</span>
+                <span class="card card--sm black">3&clubs;</span>
+                <span class="card card--sm red">3&diams;</span>
+                <span class="card card--sm black">4&spades;</span>
+              </div>
+              <div class="sb-delta delta--best">+0<small>total 42</small></div>
+            </div>
+            <div class="scoreboard__row">
+              <div class="sb-id">Priya</div>
+              <div class="sb-hand">
+                <span class="card card--sm red">7&diams;</span>
+                <span class="card card--sm black">8&spades;</span>
+              </div>
+              <div class="sb-delta delta--penalty">
+                +15<small>total 33</small>
+              </div>
+            </div>
+            <div class="scoreboard__row">
+              <div class="sb-id">Mara</div>
+              <div class="sb-hand">
+                <span class="card card--sm black">5&spades;</span>
+                <span class="card card--sm red">6&hearts;</span>
+                <span class="card card--sm black">8&clubs;</span>
+              </div>
+              <div class="sb-delta delta--penalty">
+                +19<small>total 61</small>
+              </div>
+            </div>
+            <div class="scoreboard__row">
+              <div class="sb-id">Devin</div>
+              <div class="sb-hand">
+                <span class="card card--sm red">K&hearts;</span>
+                <span class="card card--sm joker"
+                  ><span class="pip">&#9733;</span></span
+                >
+                <span class="card card--sm black">4&spades;</span>
+              </div>
+              <div class="sb-delta delta--penalty">
+                +24<small>total 118</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="reveal__cta">
+            <button class="continue-btn">
+              Continue
+              <span class="progress progress-el"></span>
+            </button>
+            <span class="timer-hint hint-timer"
+              >Next round in <b class="count">6</b>s · everyone continues on
+              their own</span
+            >
+            <span class="waiting-hint hint-button" style="display: none"
+              >Tap Continue when you've reviewed the hands</span
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DIRECTION C -->
+    <!-- ============================================================ -->
+    <div class="doc-section-label">
+      <span class="tag">Direction C</span>
+      <h2>Spotlight + grid</h2>
+      <span class="note"
+        >Dramatic: the round's biggest hit gets a large spotlight, everyone else
+        sits in a supporting 3-up grid. Most "event"-like; least dense.</span
+      >
+    </div>
+    <div class="stage" data-stage>
+      <div class="board board-el">
+        <div class="board__opp">
+          <div class="seat">
+            <span>Mara &nbsp;·&nbsp; 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+          <div class="seat">
+            <span>Devin &nbsp;·&nbsp; 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+          <div class="seat">
+            <span>Priya &nbsp;·&nbsp; 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+        </div>
+        <div class="board__table">
+          <div class="board__pile stock">Stock<br />31</div>
+          <div class="board__pile discard">7&spades;</div>
+        </div>
+        <div class="board__hand">
+          <span class="card red"
+            ><span class="corner">2&hearts;</span>2&hearts;</span
+          >
+          <span class="card black"
+            ><span class="corner">6&clubs;</span>6&clubs;</span
+          >
+          <span class="card red"
+            ><span class="corner">9&diams;</span>9&diams;</span
+          >
+          <span class="card black"
+            ><span class="corner">J&spades;</span>J&spades;</span
+          >
+          <span class="card red"
+            ><span class="corner">K&hearts;</span>K&hearts;</span
+          >
+        </div>
+      </div>
+
+      <div class="reveal">
+        <div class="reveal__scrim scrim-el"></div>
+        <div class="reveal__inner">
+          <div class="verdict">
+            <div class="verdict__reason reason-el">&#9670; TONK called</div>
+            <h2 class="verdict__headline">
+              <span class="name">Devin</span> takes the biggest hit
+            </h2>
+          </div>
+
+          <div class="spotlight">
+            <div class="spotlight__hero">
+              <div class="spotlight__hero-cards">
+                <span class="card"
+                  ><span class="corner red" style="color: var(--red-suit)"
+                    >K&hearts;</span
+                  ><span style="color: var(--red-suit)">K&hearts;</span></span
+                >
+                <span class="card joker"><span class="pip">&#9733;</span></span>
+                <span class="card black"
+                  ><span class="corner">4&spades;</span>4&spades;</span
+                >
+              </div>
+              <div class="spotlight__hero-meta">
+                <b style="color: var(--loss-red)">Devin +24</b> · hand value 24
+                · total 118
+              </div>
+            </div>
+
+            <div class="spotlight__grid">
+              <div class="spotlight__cell is-caller">
+                <span class="spotlight__cell-name"
+                  >You
+                  <span class="showdown__badge badge--tonk">Tonk</span></span
+                >
+                <div class="spotlight__cell-hand">
+                  <span class="card card--sm red">2&hearts;</span>
+                  <span class="card card--sm black">3&clubs;</span>
+                  <span class="card card--sm red">3&diams;</span>
+                  <span class="card card--sm black">4&spades;</span>
+                </div>
+                <span class="spotlight__cell-delta delta--best">+0</span>
+              </div>
+              <div class="spotlight__cell">
+                <span class="spotlight__cell-name">Priya</span>
+                <div class="spotlight__cell-hand">
+                  <span class="card card--sm red">7&diams;</span>
+                  <span class="card card--sm black">8&spades;</span>
+                </div>
+                <span class="spotlight__cell-delta delta--penalty">+15</span>
+              </div>
+              <div class="spotlight__cell">
+                <span class="spotlight__cell-name">Mara</span>
+                <div class="spotlight__cell-hand">
+                  <span class="card card--sm black">5&spades;</span>
+                  <span class="card card--sm red">6&hearts;</span>
+                  <span class="card card--sm black">8&clubs;</span>
+                </div>
+                <span class="spotlight__cell-delta delta--penalty">+19</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="reveal__cta">
+            <button class="continue-btn">
+              Continue
+              <span class="progress progress-el"></span>
+            </button>
+            <span class="timer-hint hint-timer"
+              >Next round in <b class="count">6</b>s · everyone continues on
+              their own</span
+            >
+            <span class="waiting-hint hint-button" style="display: none"
+              >Tap Continue when you've reviewed the hands</span
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MOBILE + STOCK-OUT variant (Direction A) -->
+    <!-- ============================================================ -->
+    <div class="doc-section-label">
+      <span class="tag">Mobile</span>
+      <h2>Direction A on a phone &middot; stock-out ending</h2>
+      <span class="note"
+        >Rows collapse to name+delta above the fanned hand. This also shows the
+        second end reason: the stock ran out (no one called Tonk).</span
+      >
+    </div>
+    <div class="stage stage--mobile" data-stage>
+      <div class="board board-el">
+        <div class="board__opp">
+          <div class="seat">
+            <span style="font-size: 0.62rem">Mara · 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+          <div class="seat">
+            <span style="font-size: 0.62rem">Devin · 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+          <div class="seat">
+            <span style="font-size: 0.62rem">Priya · 5</span>
+            <div class="fan">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+          </div>
+        </div>
+        <div class="board__table">
+          <div class="board__pile stock" style="width: 44px; height: 62px">
+            Stock<br />28
+          </div>
+          <div class="board__pile discard" style="width: 44px; height: 62px">
+            5&clubs;
+          </div>
+        </div>
+        <div class="board__hand">
+          <span class="card red card--sm">2&hearts;</span>
+          <span class="card black card--sm">6&clubs;</span>
+          <span class="card red card--sm">9&diams;</span>
+          <span class="card black card--sm">J&spades;</span>
+        </div>
+      </div>
+
+      <div class="reveal">
+        <div class="reveal__scrim scrim-el"></div>
+        <div class="reveal__inner">
+          <div class="verdict">
+            <div class="verdict__reason reason-el">&#9670; Stock ran out</div>
+            <h2 class="verdict__headline">
+              Round 4 · <span class="name">Priya</span> wins
+            </h2>
+            <div class="verdict__sub">No one called Tonk</div>
+          </div>
+
+          <div class="showdown">
+            <div class="showdown__player">
+              <div class="showdown__id">
+                <span class="showdown__name"
+                  >Priya
+                  <span class="showdown__badge badge--win">Low</span></span
+                >
+                <span class="showdown__handmeta">hand value 15</span>
+              </div>
+              <div class="showdown__cards">
+                <span class="card card--sm red">7&diams;</span>
+                <span class="card card--sm black">8&spades;</span>
+              </div>
+              <div class="showdown__delta delta--best">+0</div>
+            </div>
+            <div class="showdown__player">
+              <div class="showdown__id">
+                <span class="showdown__name">You</span>
+                <span class="showdown__handmeta">hand value 18</span>
+              </div>
+              <div class="showdown__cards">
+                <span class="card card--sm red">2&hearts;</span>
+                <span class="card card--sm black">3&clubs;</span>
+                <span class="card card--sm red">6&diams;</span>
+                <span class="card card--sm black">7&spades;</span>
+              </div>
+              <div class="showdown__delta delta--penalty">+18</div>
+            </div>
+            <div class="showdown__player">
+              <div class="showdown__id">
+                <span class="showdown__name">Mara</span>
+                <span class="showdown__handmeta">hand value 19</span>
+              </div>
+              <div class="showdown__cards">
+                <span class="card card--sm black">5&spades;</span>
+                <span class="card card--sm red">6&hearts;</span>
+                <span class="card card--sm black">8&clubs;</span>
+              </div>
+              <div class="showdown__delta delta--penalty">+19</div>
+            </div>
+            <div class="showdown__player">
+              <div class="showdown__id">
+                <span class="showdown__name">Devin</span>
+                <span class="showdown__handmeta">hand value 24</span>
+              </div>
+              <div class="showdown__cards">
+                <span class="card card--sm red">K&hearts;</span>
+                <span class="card card--sm joker"
+                  ><span class="pip">&#9733;</span></span
+                >
+                <span class="card card--sm black">4&spades;</span>
+              </div>
+              <div class="showdown__delta delta--penalty">+24</div>
+            </div>
+          </div>
+
+          <div class="reveal__cta">
+            <button class="continue-btn" style="width: 100%">
+              Continue
+              <span class="progress progress-el"></span>
+            </button>
+            <span class="timer-hint hint-timer"
+              >Next round in <b class="count">6</b>s</span
+            >
+            <span class="waiting-hint hint-button" style="display: none"
+              >Tap Continue when you've reviewed the hands</span
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Toggle blur on the board layer behind every reveal.
+      function toggleBlur(on) {
+        document.querySelectorAll(".board-el").forEach((b) => {
+          if (on) {
+            b.style.filter = "blur(7px) brightness(0.5) saturate(0.8)";
+            b.style.transform = "scale(1.03)";
+          } else {
+            b.style.filter = "none";
+            b.style.transform = "none";
+          }
+        });
+      }
+
+      // Switch between auto-dismiss-timer and explicit-Continue-only models.
+      function setDismiss(mode) {
+        const timer = mode === "timer";
+        document.querySelectorAll(".progress-el").forEach((p) => {
+          p.style.display = timer ? "block" : "none";
+        });
+        document.querySelectorAll(".hint-timer").forEach((h) => {
+          h.style.display = timer ? "" : "none";
+        });
+        document.querySelectorAll(".hint-button").forEach((h) => {
+          h.style.display = timer ? "none" : "";
+        });
+        if (timer) restartCountdowns();
+      }
+
+      // Fake the countdown text ticking so reviewers feel the timer model.
+      let countdownTimer = null;
+      function restartCountdowns() {
+        if (countdownTimer) clearInterval(countdownTimer);
+        let n = 6;
+        document.querySelectorAll(".count").forEach((c) => (c.textContent = n));
+        // also restart the CSS progress animations
+        document.querySelectorAll(".progress-el").forEach((p) => {
+          p.style.animation = "none";
+          void p.offsetWidth;
+          p.style.animation = "";
+        });
+        countdownTimer = setInterval(() => {
+          n -= 1;
+          if (n < 0) {
+            n = 6;
+            document.querySelectorAll(".progress-el").forEach((p) => {
+              p.style.animation = "none";
+              void p.offsetWidth;
+              p.style.animation = "";
+            });
+          }
+          document
+            .querySelectorAll(".count")
+            .forEach((c) => (c.textContent = n));
+        }, 1000);
+      }
+
+      // Init
+      toggleBlur(true);
+      restartCountdowns();
+    </script>
+  </body>
+</html>
