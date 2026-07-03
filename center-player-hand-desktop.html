@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Center Player Hand on Desktop — Mockups</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --card-hand-width: 64px;
+        --card-hand-height: 90px;
+        --card-overlap: -20px;
+        --card-selected-lift: -20px;
+        --card-hover-lift: -8px;
+        --card-selected-hover-lift: -24px;
+        --card-select-duration: 150ms;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 24px 96px;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 24px;
+      }
+      .page-head h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin-top: 8px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 820px;
+        line-height: 1.55;
+      }
+
+      /* ---- Live controls ---- */
+      .controls {
+        max-width: 1180px;
+        margin: 0 auto 32px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        align-items: center;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 16px 20px;
+      }
+      .controls .group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .controls label.title {
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .seg button {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 500;
+        background: transparent;
+        color: var(--text-primary);
+        border: none;
+        padding: 8px 14px;
+        cursor: pointer;
+        border-right: 1px solid var(--table-rim-light);
+        transition: background 0.15s ease;
+      }
+      .seg button:last-child {
+        border-right: none;
+      }
+      .seg button:hover {
+        background: rgba(201, 168, 76, 0.12);
+      }
+      .seg button.active {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-weight: 700;
+      }
+
+      /* ---- Direction blocks ---- */
+      .direction {
+        max-width: 1180px;
+        margin: 0 auto 44px;
+      }
+      .direction > h2 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+      }
+      .direction > h2 .tag {
+        font-size: 0.62rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #1a0f06;
+        background: var(--gold-accent);
+        border-radius: 4px;
+        padding: 2px 7px;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+      .direction > h2 .tag.alt {
+        color: var(--text-primary);
+        background: transparent;
+        border: 1px solid var(--text-muted);
+      }
+      .direction > p.note {
+        color: var(--text-muted);
+        font-size: 0.86rem;
+        line-height: 1.5;
+        margin-bottom: 14px;
+        max-width: 900px;
+      }
+      .direction > p.note b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* ---- Simulated board region ---- */
+      /* .stage mimics the width of the left column of the game board grid
+         (the felt hand strip occupies grid col 1; a 280px log column sits to the
+         right on desktop). We render just the strip. */
+      .stage {
+        border: 12px solid var(--table-rim);
+        border-radius: 4px;
+        background: radial-gradient(
+          ellipse 90% 120% at 50% 0%,
+          var(--felt-light) 0%,
+          var(--felt) 70%,
+          #0f2e1c 100%
+        );
+        overflow: hidden;
+        transition: max-width 0.25s ease;
+      }
+      /* Width presets driven by JS toggling classes on <body> */
+      body[data-vp="wide"] .stage {
+        max-width: 1160px;
+      }
+      body[data-vp="narrow"] .stage {
+        max-width: 820px;
+      }
+      body[data-vp="mobile"] .stage {
+        max-width: 380px;
+      }
+
+      .stage-caption {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin: 12px 0 6px;
+      }
+
+      /* The felt hand cell (mirrors .game-board__hand) */
+      .hand-cell {
+        display: flex;
+        align-items: center;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        min-height: 172px;
+      }
+
+      .hand-label {
+        font-family: var(--font-ui);
+        font-size: 0.6rem;
+        color: var(--text-primary);
+        opacity: 0.72;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding-left: 12px;
+        white-space: nowrap;
+      }
+
+      /* The scrollable hand (mirrors .player-hand) */
+      .player-hand {
+        display: flex;
+        align-items: flex-end;
+        padding: 24px 16px 8px;
+        overflow-x: auto;
+      }
+      .player-hand::-webkit-scrollbar {
+        height: 8px;
+      }
+      .player-hand::-webkit-scrollbar-thumb {
+        background: rgba(201, 168, 76, 0.35);
+        border-radius: 4px;
+      }
+
+      /* ---- Cards ---- */
+      .card {
+        position: relative;
+        width: var(--card-hand-width);
+        height: var(--card-hand-height);
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.1rem;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        transition:
+          transform var(--card-select-duration) ease,
+          box-shadow var(--card-select-duration) ease,
+          border-color var(--card-select-duration) ease;
+        flex-shrink: 0;
+        margin-left: var(--card-overlap);
+        cursor: pointer;
+        will-change: transform;
+      }
+      .card:first-child {
+        margin-left: 0;
+      }
+      .card .corner {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+      }
+      .card .corner .r {
+        font-size: 11px;
+      }
+      .card .corner .s {
+        font-size: 10px;
+        margin-top: -2px;
+      }
+      .card .rank {
+        line-height: 1;
+      }
+      .card .suit {
+        line-height: 1;
+        font-size: 1.2em;
+      }
+      .card.red .rank,
+      .card.red .suit,
+      .card.red .corner .r,
+      .card.red .corner .s {
+        color: var(--red-suit);
+      }
+      .card.black .rank,
+      .card.black .suit,
+      .card.black .corner .r,
+      .card.black .corner .s {
+        color: var(--black-suit);
+      }
+      @media (hover: hover) {
+        .card:hover {
+          transform: translateY(var(--card-hover-lift));
+        }
+        .card.selected:hover {
+          transform: translateY(var(--card-selected-hover-lift));
+        }
+      }
+      .card.selected {
+        transform: translateY(var(--card-selected-lift));
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* =========================================================
+         OPTION A — margin:auto auto-centering (overflow-safe)
+         The hand uses justify-content:flex-start (default) but the
+         hand element gets margin-inline:auto INSIDE a flex row-cell
+         so it centers when narrow, and hugs left / stays fully
+         scrollable when it overflows. Label stays pinned left.
+         ========================================================= */
+      body[data-opt="A"] .hand-cell {
+        /* label on the far left; hand centers in the remaining space */
+      }
+      body[data-opt="A"] .hand-label {
+        flex-shrink: 0;
+      }
+      body[data-opt="A"] .player-hand {
+        margin-inline: auto;
+        justify-content: flex-start;
+      }
+
+      /* =========================================================
+         OPTION B — justify-content:center on the hand itself.
+         Simplest CSS. BUT: when content overflows a scroll
+         container, centered items clip on the LEFT and the first
+         cards become unreachable. Shown here so the tradeoff is
+         visible. Label stays left.
+         ========================================================= */
+      body[data-opt="B"] .player-hand {
+        justify-content: center;
+      }
+
+      /* =========================================================
+         OPTION C — Centered stack: label centered ABOVE the cards,
+         hand strip centered via margin:auto (overflow-safe).
+         Column layout on desktop too — reads as a tidy centered
+         "tray". Most visually balanced.
+         ========================================================= */
+      body[data-opt="C"] .hand-cell {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        gap: 2px;
+      }
+      body[data-opt="C"] .hand-label {
+        text-align: center;
+        padding-left: 0;
+        padding-top: 10px;
+      }
+      body[data-opt="C"] .player-hand {
+        margin-inline: auto;
+        justify-content: flex-start;
+        padding-top: 8px;
+      }
+
+      /* Mobile emulation: when vp=mobile, stack + left-align exactly
+         like the current production mobile rules (unchanged). */
+      body[data-vp="mobile"] .hand-cell {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        min-height: 150px;
+      }
+      body[data-vp="mobile"] .hand-label {
+        text-align: left;
+        padding-left: 12px;
+        padding-top: 10px;
+      }
+      body[data-vp="mobile"] .player-hand {
+        width: 100%;
+        margin-inline: 0;
+        justify-content: flex-start;
+        padding: 16px 12px 4px;
+      }
+
+      .legend {
+        max-width: 1180px;
+        margin: 0 auto;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+        border-top: 1px solid var(--table-rim-light);
+        padding-top: 18px;
+      }
+      .legend b {
+        color: var(--text-primary);
+      }
+      .legend code {
+        font-family: monospace;
+        color: var(--gold-accent);
+        font-size: 0.9em;
+      }
+      .warn {
+        color: #e0a24a;
+      }
+    </style>
+  </head>
+  <body data-vp="wide" data-opt="A" data-hand="few">
+    <div class="page-head">
+      <h1>Center the player's hand on desktop</h1>
+      <p>
+        Issue #147 — the desktop hand is left-aligned in a full-width strip, so
+        a small hand feels shoved into the corner. Below are three centering
+        strategies. Use the controls to switch option, viewport width, and hand
+        size. The key thing to check: with a <b>full 13-card hand</b> in a
+        <b>narrow</b> window, are the leftmost cards still reachable (not
+        clipped)?
+      </p>
+    </div>
+
+    <div class="controls">
+      <div class="group">
+        <label class="title">Centering option</label>
+        <div class="seg" id="opt">
+          <button data-opt="A" class="active">A · auto-center</button>
+          <button data-opt="B">B · justify-center</button>
+          <button data-opt="C">C · centered tray</button>
+        </div>
+      </div>
+      <div class="group">
+        <label class="title">Viewport</label>
+        <div class="seg" id="vp">
+          <button data-vp="wide" class="active">Desktop wide</button>
+          <button data-vp="narrow">Desktop narrow</button>
+          <button data-vp="mobile">Mobile &lt;768</button>
+        </div>
+      </div>
+      <div class="group">
+        <label class="title">Hand size</label>
+        <div class="seg" id="hand">
+          <button data-hand="few" class="active">Few (5)</button>
+          <button data-hand="mid">Mid (9)</button>
+          <button data-hand="full">Full (13)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="direction">
+      <h2 id="opt-title">Option A — Auto-center (recommended)</h2>
+      <p class="note" id="opt-note"></p>
+      <div class="stage-caption" id="cap"></div>
+      <div class="stage">
+        <div class="hand-cell">
+          <div class="hand-label" id="label">Your hand (5)</div>
+          <div class="player-hand" id="hand-strip"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <p>
+        <b>Option A — auto-center (<code>margin-inline: auto</code>):</b> hand
+        hugs left when it overflows (fully scrollable, nothing clipped), and
+        centers when it fits. Label stays pinned left. Safest — recommended
+        default.
+      </p>
+      <p>
+        <b>Option B — <code>justify-content: center</code>:</b> simplest, but
+        with a full hand in a narrow window the
+        <span class="warn"
+          >leftmost cards clip off the left edge and can't be scrolled to</span
+        >
+        (a known flexbox + overflow bug). Try Option B + narrow + full to see
+        the failure.
+      </p>
+      <p>
+        <b>Option C — centered tray:</b> label centered above the cards, hand
+        centered via <code>margin-inline: auto</code>. Same overflow safety as
+        A, more visually balanced, but changes the label position from beside
+        the cards to above them. Bigger visual change.
+      </p>
+      <p style="margin-top: 10px">
+        All three leave the existing
+        <code>@media (max-width: 767px)</code> mobile rules untouched — switch
+        Viewport to <b>Mobile</b> to confirm the mobile layout is unchanged
+        (stacked label + left-aligned scroll).
+      </p>
+    </div>
+
+    <script>
+      // Real Big2 hands (sorted). Suits: c/d/h/s
+      const HANDS = {
+        few: [
+          ["5", "d", "red"],
+          ["9", "c", "black"],
+          ["J", "h", "red"],
+          ["Q", "s", "black"],
+          ["2", "s", "black"],
+        ],
+        mid: [
+          ["3", "c", "black"],
+          ["4", "d", "red"],
+          ["5", "h", "red"],
+          ["7", "d", "red"],
+          ["9", "c", "black"],
+          ["10", "s", "black"],
+          ["J", "h", "red"],
+          ["K", "d", "red"],
+          ["A", "s", "black"],
+        ],
+        full: [
+          ["3", "c", "black"],
+          ["4", "d", "red"],
+          ["5", "h", "red"],
+          ["5", "s", "black"],
+          ["7", "d", "red"],
+          ["8", "c", "black"],
+          ["9", "c", "black"],
+          ["10", "h", "red"],
+          ["J", "h", "red"],
+          ["Q", "s", "black"],
+          ["K", "d", "red"],
+          ["A", "c", "black"],
+          ["2", "s", "black"],
+        ],
+      };
+      const SUIT = { c: "♣", d: "♦", h: "♥", s: "♠" };
+      const NOTES = {
+        A: "Hand centers when it fits and hugs-left (fully scrollable) when it overflows, via <code>margin-inline:auto</code>. The label stays pinned left. No card is ever clipped or unreachable. <b>Recommended.</b>",
+        B: "Uses <code>justify-content:center</code> on the scroll container. Clean when the hand fits — but switch to <b>narrow + full</b>: the first cards clip past the left edge and cannot be scrolled into view. Shown to make the tradeoff explicit.",
+        C: "Label is centered directly above a centered card tray. Overflow-safe like A. Most balanced look, but relocates the label (above vs beside) — a slightly larger visual departure from today.",
+      };
+      const TITLES = {
+        A: "Option A — Auto-center (recommended)",
+        B: "Option B — justify-content: center (shows clip tradeoff)",
+        C: "Option C — Centered tray (label above)",
+      };
+
+      const body = document.body;
+      const strip = document.getElementById("hand-strip");
+      const label = document.getElementById("label");
+
+      function render() {
+        const size = body.dataset.hand;
+        const cards = HANDS[size];
+        label.textContent = `Your hand (${cards.length})`;
+        strip.innerHTML = "";
+        cards.forEach(([rank, s, color], i) => {
+          const el = document.createElement("div");
+          el.className = `card ${color}`;
+          if (i === 0 || i === 3) el.classList.add("selected"); // demo selection
+          el.innerHTML = `
+            <div class="corner"><span class="r">${rank}</span><span class="s">${SUIT[s]}</span></div>
+            <span class="rank">${rank}</span>
+            <span class="suit">${SUIT[s]}</span>`;
+          el.addEventListener("click", () => el.classList.toggle("selected"));
+          strip.appendChild(el);
+        });
+        document.getElementById("opt-title").textContent =
+          TITLES[body.dataset.opt];
+        document.getElementById("opt-note").innerHTML = NOTES[body.dataset.opt];
+        const vpName = {
+          wide: "Desktop wide (~1160px strip)",
+          narrow: "Desktop narrow (~820px strip)",
+          mobile: "Mobile (<768px — production mobile rules, unchanged)",
+        };
+        document.getElementById("cap").textContent = vpName[body.dataset.vp];
+      }
+
+      function wire(id, attr) {
+        const seg = document.getElementById(id);
+        seg.querySelectorAll("button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            seg
+              .querySelectorAll("button")
+              .forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            body.dataset[attr] = btn.dataset[attr];
+            render();
+          });
+        });
+      }
+      wire("opt", "opt");
+      wire("vp", "vp");
+      wire("hand", "hand");
+      render();
+    </script>
+  </body>
+</html>
