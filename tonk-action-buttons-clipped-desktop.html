@@ -1,0 +1,1513 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tonk desktop action buttons clipped — Mockups</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --error-text: #e05555;
+        --font-ui: "DM Sans", sans-serif;
+        --font-mono: "JetBrains Mono", "Courier New", monospace;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 24px 100px;
+        line-height: 1.5;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 8px;
+      }
+      .page-head h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        margin-top: 10px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+        max-width: 860px;
+      }
+      .page-head code {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        color: var(--text-primary);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+      .toc {
+        max-width: 1180px;
+        margin: 20px auto 40px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .toc a {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        color: var(--text-primary);
+        text-decoration: none;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 5px;
+        padding: 6px 12px;
+        transition: all 0.15s ease;
+      }
+      .toc a:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+      .toc a.toc--bug {
+        border-color: rgba(224, 85, 85, 0.5);
+        color: var(--error-text);
+      }
+
+      .direction {
+        max-width: 1180px;
+        margin: 0 auto 64px;
+      }
+      .direction__head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+      }
+      .direction__tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #0a0a0a;
+        background: var(--gold-accent);
+        padding: 3px 9px;
+        border-radius: 4px;
+      }
+      .direction__tag--bug {
+        background: var(--error-text);
+        color: #1a0f06;
+      }
+      .direction__head h2 {
+        font-size: 1.18rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .direction__desc {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin: 8px 0 22px;
+        max-width: 880px;
+      }
+      .direction__desc strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .direction__desc .good {
+        color: #7fc98a;
+        font-weight: 600;
+      }
+      .direction__desc .bad {
+        color: var(--error-text);
+        font-weight: 600;
+      }
+
+      .frames {
+        display: flex;
+        gap: 28px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      .frame-wrap {
+        flex: 1 1 340px;
+        min-width: 320px;
+      }
+      .frame-label {
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+      .frame-label b {
+        color: var(--gold-accent);
+      }
+
+      /* ==================== BOARD FRAME ==================== */
+      /* Simulates a fixed desktop viewport of a chosen height. The board
+         inside is `position:absolute inset:0` mirroring the real
+         `position:fixed inset:0` grid. */
+      .board-frame {
+        position: relative;
+        width: 100%;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(0, 0, 0, 0.6);
+      }
+      .board-frame--768 {
+        height: 384px;
+      } /* 768px viewport scaled 0.5 */
+      .board-frame--900 {
+        height: 450px;
+      } /* 900px viewport scaled 0.5 */
+      .board-frame--1080 {
+        height: 540px;
+      } /* 1080px viewport scaled 0.5 */
+
+      .board {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: 1fr 128px;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        overflow: hidden;
+      }
+      .board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 6px solid var(--table-rim);
+        pointer-events: none;
+        z-index: 100;
+      }
+
+      /* --- BUG layout: fixed 64px actions row --- */
+      .board--bug {
+        grid-template-rows: 40px 1fr 110px 32px;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+      }
+      /* --- FIX A: taller fixed actions row --- */
+      .board--fixA {
+        grid-template-rows: 40px 1fr 110px 58px;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+      }
+      /* --- FIX B: auto actions row (content-sized), hand flexes --- */
+      .board--fixB {
+        grid-template-rows: 40px 1fr 110px auto;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+      }
+      /* --- FIX C: floating overlay panel, grid unchanged --- */
+      .board--fixC {
+        grid-template-rows: 40px 1fr 110px 32px;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+      }
+
+      .zone {
+        position: relative;
+        z-index: 1;
+      }
+      .zone--opponents {
+        grid-area: opponents;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+      }
+      .seat {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.58rem;
+        color: var(--text-muted);
+        padding: 3px 7px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.25);
+      }
+      .seat--active {
+        color: var(--gold-accent);
+        box-shadow: 0 0 0 1px var(--gold-accent);
+      }
+      .seat__dot {
+        width: 12px;
+        height: 16px;
+        border-radius: 2px;
+        background: #14361f;
+        border: 1px solid rgba(0, 0, 0, 0.4);
+      }
+
+      .zone--table {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 0;
+      }
+      .phase-banner {
+        font-size: 0.56rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+      .piles {
+        display: flex;
+        gap: 14px;
+      }
+      .pile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+      }
+      .pile__label {
+        font-size: 0.5rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .mini-card {
+        width: 34px;
+        height: 48px;
+        border-radius: 4px;
+        background: var(--card-face);
+        color: var(--black-suit);
+        font-family: var(--font-card);
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+      }
+      .mini-card--red {
+        color: var(--red-suit);
+      }
+      .mini-card--back {
+        background: repeating-linear-gradient(
+          45deg,
+          #3a1d12,
+          #3a1d12 3px,
+          #4a2c1e 3px,
+          #4a2c1e 6px
+        );
+        border: 1px solid var(--table-rim-light);
+      }
+      .mini-card--ring {
+        box-shadow:
+          0 0 0 2px var(--tonk-cyan, #3fd0d8),
+          0 3px 8px rgba(0, 0, 0, 0.45);
+      }
+
+      .zone--hand {
+        grid-area: hand;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        background: var(--felt-light);
+        border-top: 1px solid var(--table-rim-light);
+        min-height: 0;
+      }
+      .zone--hand .hand-label {
+        font-size: 0.5rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding-left: 10px;
+        margin-bottom: 3px;
+      }
+      .hand-row {
+        display: flex;
+        gap: 2px;
+        padding: 0 10px;
+        overflow: hidden;
+      }
+      .hand-card {
+        width: 30px;
+        height: 44px;
+        border-radius: 4px;
+        background: var(--card-face);
+        color: var(--black-suit);
+        font-family: var(--font-card);
+        font-size: 0.6rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+        flex-shrink: 0;
+      }
+      .hand-card--red {
+        color: var(--red-suit);
+      }
+      .hand-card--sel {
+        transform: translateY(-8px);
+        box-shadow:
+          0 0 0 2px var(--gold-accent),
+          0 6px 12px rgba(0, 0, 0, 0.5);
+      }
+      .hand-card--dim {
+        opacity: 0.42;
+      }
+
+      .zone--log {
+        grid-area: log;
+        background: rgba(0, 0, 0, 0.18);
+        border-left: 1px solid rgba(0, 0, 0, 0.3);
+        padding: 8px 6px;
+        font-size: 0.5rem;
+        color: var(--text-muted);
+        overflow: hidden;
+      }
+      .zone--log .log-title {
+        color: var(--text-primary);
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 0.48rem;
+        margin-bottom: 5px;
+      }
+      .zone--log p {
+        margin-bottom: 3px;
+        line-height: 1.35;
+      }
+
+      .zone--actions {
+        grid-area: actions;
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+      }
+
+      /* ===== Tonk action panel (scaled-down replica of TonkActionPanel.vue) ===== */
+      .tap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        height: 100%;
+        padding: 8px 12px;
+        background: var(--table-rim);
+        border-top: 1px solid var(--table-rim-light);
+      }
+      /* When placed in the 64px bug row the panel content overflows below,
+         clipped by the board's overflow:hidden. We emulate that by letting the
+         panel keep its natural height while the row stays short. */
+      .tap--natural {
+        height: auto;
+        min-height: 100%;
+      }
+      .tap__error {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.56rem;
+        color: var(--error-text);
+        background: rgba(224, 85, 85, 0.1);
+        border: 1px solid rgba(224, 85, 85, 0.35);
+        border-radius: 5px;
+        padding: 4px 8px;
+      }
+      .tap__error::before {
+        content: "!";
+        flex-shrink: 0;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--error-text);
+        color: #1a0f06;
+        font-weight: 700;
+        font-size: 0.52rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .tap__stepper {
+        display: flex;
+        align-items: center;
+        font-size: 0.54rem;
+        font-weight: 600;
+      }
+      .tap__step {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--text-muted);
+        padding: 2px 3px;
+      }
+      .tap__step-num {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        border: 1px solid var(--text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.48rem;
+        font-family: var(--font-mono);
+      }
+      .tap__step--active {
+        color: var(--gold-accent);
+      }
+      .tap__step--active .tap__step-num {
+        border-color: var(--gold-accent);
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .tap__arrow {
+        color: var(--text-muted);
+        margin: 0 5px;
+        font-size: 0.62rem;
+      }
+      .tap__turn-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.54rem;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 14px;
+        background: rgba(0, 0, 0, 0.3);
+        color: var(--text-muted);
+      }
+      .tap__dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .tap__buttons {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.66rem;
+        font-weight: 600;
+        padding: 7px 16px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        min-height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+      .btn--primary {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--primary:hover {
+        background: #d4b45a;
+        box-shadow: 0 3px 12px var(--gold-glow);
+      }
+      .btn--ghost {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--text-muted);
+      }
+      .btn--source {
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px 14px;
+        min-width: 82px;
+      }
+      .btn__sub {
+        font-size: 0.48rem;
+        font-weight: 400;
+        opacity: 0.8;
+      }
+      .btn--tonk {
+        background: transparent;
+        color: #b8324a;
+        border: 1px solid #b8324a;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+      .btn__badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 13px;
+        height: 13px;
+        padding: 0 3px;
+        border-radius: 7px;
+        background: rgba(0, 0, 0, 0.25);
+        font-size: 0.52rem;
+        font-family: var(--font-mono);
+      }
+
+      /* clip marker line = the real visible viewport bottom */
+      .clipline {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 0;
+        border-top: 2px dashed rgba(224, 85, 85, 0.85);
+        z-index: 200;
+        pointer-events: none;
+      }
+      .clipline::after {
+        content: "viewport bottom — content below here is CLIPPED";
+        position: absolute;
+        right: 6px;
+        bottom: 3px;
+        font-family: var(--font-mono);
+        font-size: 0.5rem;
+        color: var(--error-text);
+        background: rgba(10, 6, 3, 0.85);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      /* FIX C floating overlay panel */
+      .float-panel {
+        position: absolute;
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        z-index: 150;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: rgba(20, 12, 8, 0.92);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(6px);
+      }
+
+      .notes {
+        max-width: 1180px;
+        margin: 40px auto 0;
+        border-top: 1px solid var(--table-rim-light);
+        padding-top: 24px;
+      }
+      .notes h3 {
+        color: var(--gold-accent);
+        font-size: 1rem;
+        margin-bottom: 12px;
+      }
+      .notes table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+      }
+      .notes th,
+      .notes td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        vertical-align: top;
+      }
+      .notes th {
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .notes td {
+        color: var(--text-muted);
+      }
+      .notes td:first-child {
+        color: var(--text-primary);
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill-rec {
+        font-family: var(--font-mono);
+        font-size: 0.6rem;
+        color: #0a0a0a;
+        background: #7fc98a;
+        padding: 1px 6px;
+        border-radius: 3px;
+        letter-spacing: 0.04em;
+      }
+
+      :root {
+        --tonk-cyan: #3fd0d8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Tonk desktop action buttons — clipped at bottom of screen</h1>
+      <p>
+        On desktop, the Tonk board uses a fixed grid
+        <code>grid-template-rows: 80px 1fr 220px 64px</code> with
+        <code>overflow: hidden</code>. On the local player's turn the Tonk
+        action panel is a <strong>two-line column</strong> (phase stepper / turn
+        pill + button row), needing roughly <strong>~102px</strong> — well over
+        the 64px row. The buttons overflow below the viewport bottom and are
+        clipped, so the Discard / Draw / Take-discard / Call-TONK buttons cannot
+        be seen or clicked. Big2's panel is a single ~44px button row and fits.
+        Frames are rendered at 0.5&times; scale of common desktop viewport
+        heights.
+      </p>
+    </div>
+
+    <div class="toc">
+      <a class="toc--bug" href="#bug">The bug</a>
+      <a href="#fixA">Fix A — Taller fixed row</a>
+      <a href="#fixB">Fix B — Auto-height row (recommended)</a>
+      <a href="#fixC">Fix C — Floating overlay panel</a>
+    </div>
+
+    <!-- ============================================================ BUG -->
+    <section class="direction" id="bug">
+      <div class="direction__head">
+        <span class="direction__tag direction__tag--bug">Current bug</span>
+        <h2>64px fixed actions row clips the two-line Tonk panel</h2>
+      </div>
+      <p class="direction__desc">
+        The panel renders at its natural ~102px height but the grid row is only
+        64px and the board is <code>overflow: hidden</code>. Everything below
+        the dashed line — <span class="bad">the entire button row</span> — is
+        cut off. The player literally cannot reach Discard. Shown at a 768px
+        viewport (worst common case) and 1080px; note the row is a
+        <strong>fixed height</strong>, so a taller screen does not help — the
+        clip happens at every desktop height.
+      </p>
+      <div class="frames">
+        <div class="frame-wrap">
+          <div class="frame-label">
+            768px viewport &middot; <b>your turn, discard phase</b>
+          </div>
+          <div class="board-frame board-frame--768">
+            <div class="board board--bug">
+              <div class="zone zone--opponents">
+                <div class="seat">
+                  <span class="seat__dot"></span>Bri &middot; 7
+                </div>
+                <div class="seat">
+                  <span class="seat__dot"></span>Cy &middot; 6
+                </div>
+                <div class="seat seat--active">
+                  <span class="seat__dot"></span>You &middot; 5
+                </div>
+              </div>
+              <div class="zone zone--table">
+                <div class="phase-banner">Your turn &middot; Discard</div>
+                <div class="piles">
+                  <div class="pile">
+                    <span class="pile__label">Stock</span>
+                    <span class="mini-card mini-card--back"></span>
+                  </div>
+                  <div class="pile">
+                    <span class="pile__label">Discard</span>
+                    <span class="mini-card mini-card--ring mini-card--red"
+                      >9&hearts;</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="zone zone--hand">
+                <div class="hand-label">Your hand (5)</div>
+                <div class="hand-row">
+                  <span class="hand-card hand-card--sel">Q&spades;</span>
+                  <span class="hand-card hand-card--sel hand-card--red"
+                    >Q&hearts;</span
+                  >
+                  <span class="hand-card hand-card--dim hand-card--red"
+                    >4&diams;</span
+                  >
+                  <span class="hand-card hand-card--dim">8&clubs;</span>
+                  <span class="hand-card hand-card--dim hand-card--red"
+                    >K&hearts;</span
+                  >
+                </div>
+              </div>
+              <div class="zone zone--log">
+                <div class="log-title">Log</div>
+                <p>Cy discarded 9&hearts;</p>
+                <p>Bri drew stock</p>
+                <p>Cy took discard</p>
+              </div>
+              <div class="zone zone--actions">
+                <div class="tap tap--natural">
+                  <div class="tap__stepper">
+                    <span class="tap__step tap__step--active"
+                      ><span class="tap__step-num">1</span>Discard</span
+                    >
+                    <span class="tap__arrow">&rarr;</span>
+                    <span class="tap__step"
+                      ><span class="tap__step-num">2</span>Draw</span
+                    >
+                  </div>
+                  <div class="tap__buttons">
+                    <button class="btn btn--tonk">Call TONK</button>
+                    <button class="btn btn--primary">
+                      Discard<span class="btn__badge">2</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="clipline" style="bottom: 32px"></div>
+          </div>
+        </div>
+
+        <div class="frame-wrap">
+          <div class="frame-label">
+            1080px viewport &middot;
+            <b>same clip (fixed row, not viewport-dependent)</b>
+          </div>
+          <div class="board-frame board-frame--1080">
+            <div
+              class="board board--bug"
+              style="grid-template-rows: 40px 1fr 110px 32px"
+            >
+              <div class="zone zone--opponents">
+                <div class="seat">
+                  <span class="seat__dot"></span>Bri &middot; 7
+                </div>
+                <div class="seat seat--active">
+                  <span class="seat__dot"></span>You &middot; 5
+                </div>
+              </div>
+              <div class="zone zone--table">
+                <div class="phase-banner">Your turn &middot; Draw</div>
+                <div class="piles">
+                  <div class="pile">
+                    <span class="pile__label">Stock</span>
+                    <span class="mini-card mini-card--back"></span>
+                  </div>
+                  <div class="pile">
+                    <span class="pile__label">Discard</span>
+                    <span class="mini-card mini-card--ring">Q&spades;</span>
+                  </div>
+                </div>
+              </div>
+              <div class="zone zone--hand">
+                <div class="hand-label">Your hand (3)</div>
+                <div class="hand-row">
+                  <span class="hand-card">4&diams;</span>
+                  <span class="hand-card">8&clubs;</span>
+                  <span class="hand-card hand-card--red">K&hearts;</span>
+                </div>
+              </div>
+              <div class="zone zone--log">
+                <div class="log-title">Log</div>
+                <p>You discarded Q&spades; Q&hearts;</p>
+              </div>
+              <div class="zone zone--actions">
+                <div class="tap tap--natural">
+                  <div class="tap__stepper">
+                    <span class="tap__step"
+                      ><span
+                        class="tap__step-num"
+                        style="
+                          border-color: var(--text-primary);
+                          color: var(--text-primary);
+                        "
+                        >&check;</span
+                      >Discard</span
+                    >
+                    <span class="tap__arrow">&rarr;</span>
+                    <span class="tap__step tap__step--active"
+                      ><span class="tap__step-num">2</span>Draw</span
+                    >
+                  </div>
+                  <div class="tap__buttons">
+                    <button class="btn btn--primary btn--source">
+                      <span>Draw stock</span
+                      ><span class="btn__sub">31 face-down</span>
+                    </button>
+                    <button class="btn btn--ghost btn--source">
+                      <span>Take discard</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="clipline" style="bottom: 32px"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ FIX A -->
+    <section class="direction" id="fixA">
+      <div class="direction__head">
+        <span class="direction__tag">Fix A</span>
+        <h2>Taller fixed actions row + a Tonk-specific row height</h2>
+      </div>
+      <p class="direction__desc">
+        Raise the actions grid row to a fixed height that fits the two-line Tonk
+        panel plus the error row — introduce a
+        <code>--tonk-actions-height</code> token (e.g. <strong>116px</strong>)
+        applied only on the Tonk board's desktop grid; Big2 keeps its
+        <strong>64px</strong> row.
+        <span class="good">Smallest, most explicit change.</span>
+        Trade-off: the 1fr table row loses ~52px of height and the number is a
+        magic constant that must be re-checked if the panel ever grows a third
+        line. Shown with the error row present (worst case) to prove it still
+        fits.
+      </p>
+      <div class="frames">
+        <div class="frame-wrap">
+          <div class="frame-label">
+            768px &middot; <b>discard phase, no error</b>
+          </div>
+          <div class="board-frame board-frame--768">
+            <div class="board board--fixA">
+              <div class="zone zone--opponents">
+                <div class="seat">
+                  <span class="seat__dot"></span>Bri &middot; 7
+                </div>
+                <div class="seat">
+                  <span class="seat__dot"></span>Cy &middot; 6
+                </div>
+                <div class="seat seat--active">
+                  <span class="seat__dot"></span>You &middot; 5
+                </div>
+              </div>
+              <div class="zone zone--table">
+                <div class="phase-banner">Your turn &middot; Discard</div>
+                <div class="piles">
+                  <div class="pile">
+                    <span class="pile__label">Stock</span
+                    ><span class="mini-card mini-card--back"></span>
+                  </div>
+                  <div class="pile">
+                    <span class="pile__label">Discard</span
+                    ><span class="mini-card mini-card--ring mini-card--red"
+                      >9&hearts;</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="zone zone--hand">
+                <div class="hand-label">Your hand (5)</div>
+                <div class="hand-row">
+                  <span class="hand-card hand-card--sel">Q&spades;</span>
+                  <span class="hand-card hand-card--sel hand-card--red"
+                    >Q&hearts;</span
+                  >
+                  <span class="hand-card hand-card--dim hand-card--red"
+                    >4&diams;</span
+                  >
+                  <span class="hand-card hand-card--dim">8&clubs;</span>
+                  <span class="hand-card hand-card--dim hand-card--red"
+                    >K&hearts;</span
+                  >
+                </div>
+              </div>
+              <div class="zone zone--log">
+                <div class="log-title">Log</div>
+                <p>Cy discarded 9&hearts;</p>
+                <p>Bri drew stock</p>
+              </div>
+              <div class="zone zone--actions">
+                <div class="tap">
+                  <div class="tap__stepper">
+                    <span class="tap__step tap__step--active"
+                      ><span class="tap__step-num">1</span>Discard</span
+                    >
+                    <span class="tap__arrow">&rarr;</span>
+                    <span class="tap__step"
+                      ><span class="tap__step-num">2</span>Draw</span
+                    >
+                  </div>
+                  <div class="tap__buttons">
+                    <button class="btn btn--tonk">Call TONK</button>
+                    <button class="btn btn--primary">
+                      Discard<span class="btn__badge">2</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="frame-wrap">
+          <div class="frame-label">
+            768px &middot; <b>with error row (rejected discard)</b>
+          </div>
+          <div class="board-frame board-frame--768">
+            <div
+              class="board board--fixA"
+              style="grid-template-rows: 40px 1fr 110px 78px"
+            >
+              <div class="zone zone--opponents">
+                <div class="seat">
+                  <span class="seat__dot"></span>Bri &middot; 7
+                </div>
+                <div class="seat seat--active">
+                  <span class="seat__dot"></span>You &middot; 5
+                </div>
+              </div>
+              <div class="zone zone--table">
+                <div class="phase-banner">Your turn &middot; Discard</div>
+                <div class="piles">
+                  <div class="pile">
+                    <span class="pile__label">Stock</span
+                    ><span class="mini-card mini-card--back"></span>
+                  </div>
+                  <div class="pile">
+                    <span class="pile__label">Discard</span
+                    ><span class="mini-card mini-card--ring mini-card--red"
+                      >9&hearts;</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="zone zone--hand">
+                <div class="hand-label">Your hand (5)</div>
+                <div class="hand-row">
+                  <span class="hand-card hand-card--sel">Q&spades;</span>
+                  <span class="hand-card hand-card--sel hand-card--red"
+                    >4&diams;</span
+                  >
+                  <span class="hand-card">8&clubs;</span>
+                </div>
+              </div>
+              <div class="zone zone--log">
+                <div class="log-title">Log</div>
+                <p>You tried a mixed discard</p>
+              </div>
+              <div class="zone zone--actions">
+                <div class="tap">
+                  <div class="tap__error">Discard must be a single rank.</div>
+                  <div class="tap__stepper">
+                    <span class="tap__step tap__step--active"
+                      ><span class="tap__step-num">1</span>Discard</span
+                    >
+                    <span class="tap__arrow">&rarr;</span>
+                    <span class="tap__step"
+                      ><span class="tap__step-num">2</span>Draw</span
+                    >
+                  </div>
+                  <div class="tap__buttons">
+                    <button class="btn btn--primary">
+                      Discard<span class="btn__badge">2</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ FIX B -->
+    <section class="direction" id="fixB">
+      <div class="direction__head">
+        <span class="direction__tag">Fix B</span>
+        <h2>
+          Auto-height actions row — the panel sizes itself, the table flexes
+        </h2>
+        <span class="pill-rec">RECOMMENDED</span>
+      </div>
+      <p class="direction__desc">
+        Change the Tonk desktop grid's last row from a fixed
+        <code>64px</code> to <code>auto</code> (and let the table's
+        <code>1fr</code> row absorb the difference). The panel is
+        <strong>always exactly as tall as its content</strong>
+        — one line, two lines, or two lines + error — with
+        <span class="good">no magic number to maintain</span> and
+        <span class="good"
+          >no clipping at any viewport height or any future third line.</span
+        >
+        Because the panel stops stretching to fill a fixed row, the button row
+        also sits <strong>tighter and more intentional</strong> instead of
+        floating in dead space. Big2's grid is untouched (still 64px). This is
+        the most robust and the least likely to regress. Shown across all three
+        states.
+      </p>
+      <div class="frames">
+        <div class="frame-wrap">
+          <div class="frame-label">768px &middot; <b>discard phase</b></div>
+          <div class="board-frame board-frame--768">
+            <div class="board board--fixB">
+              <div class="zone zone--opponents">
+                <div class="seat">
+                  <span class="seat__dot"></span>Bri &middot; 7
+                </div>
+                <div class="seat">
+                  <span class="seat__dot"></span>Cy &middot; 6
+                </div>
+                <div class="seat seat--active">
+                  <span class="seat__dot"></span>You &middot; 5
+                </div>
+              </div>
+              <div class="zone zone--table">
+                <div class="phase-banner">Your turn &middot; Discard</div>
+                <div class="piles">
+                  <div class="pile">
+                    <span class="pile__label">Stock</span
+                    ><span class="mini-card mini-card--back"></span>
+                  </div>
+                  <div class="pile">
+                    <span class="pile__label">Discard</span
+                    ><span class="mini-card mini-card--ring mini-card--red"
+                      >9&hearts;</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="zone zone--hand">
+                <div class="hand-label">Your hand (5)</div>
+                <div class="hand-row">
+                  <span class="hand-card hand-card--sel">Q&spades;</span>
+                  <span class="hand-card hand-card--sel hand-card--red"
+                    >Q&hearts;</span
+                  >
+                  <span class="hand-card hand-card--dim hand-card--red"
+                    >4&diams;</span
+                  >
+                  <span class="hand-card hand-card--dim">8&clubs;</span>
+                  <span class="hand-card hand-card--dim hand-card--red"
+                    >K&hearts;</span
+                  >
+                </div>
+              </div>
+              <div class="zone zone--log">
+                <div class="log-title">Log</div>
+                <p>Cy discarded 9&hearts;</p>
+                <p>Bri drew stock</p>
+              </div>
+              <div class="zone zone--actions">
+                <div class="tap tap--natural">
+                  <div class="tap__stepper">
+                    <span class="tap__step tap__step--active"
+                      ><span class="tap__step-num">1</span>Discard</span
+                    >
+                    <span class="tap__arrow">&rarr;</span>
+                    <span class="tap__step"
+                      ><span class="tap__step-num">2</span>Draw</span
+                    >
+                  </div>
+                  <div class="tap__buttons">
+                    <button class="btn btn--tonk">Call TONK</button>
+                    <button class="btn btn--primary">
+                      Discard<span class="btn__badge">2</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="frame-wrap">
+          <div class="frame-label">768px &middot; <b>draw phase</b></div>
+          <div class="board-frame board-frame--768">
+            <div class="board board--fixB">
+              <div class="zone zone--opponents">
+                <div class="seat">
+                  <span class="seat__dot"></span>Bri &middot; 7
+                </div>
+                <div class="seat seat--active">
+                  <span class="seat__dot"></span>You &middot; 3
+                </div>
+              </div>
+              <div class="zone zone--table">
+                <div class="phase-banner">Your turn &middot; Draw</div>
+                <div class="piles">
+                  <div class="pile">
+                    <span class="pile__label">Stock</span
+                    ><span class="mini-card mini-card--back"></span>
+                  </div>
+                  <div class="pile">
+                    <span class="pile__label">Discard</span
+                    ><span class="mini-card mini-card--ring">Q&spades;</span>
+                  </div>
+                </div>
+              </div>
+              <div class="zone zone--hand">
+                <div class="hand-label">Your hand (3)</div>
+                <div class="hand-row">
+                  <span class="hand-card hand-card--red">4&diams;</span>
+                  <span class="hand-card">8&clubs;</span>
+                  <span class="hand-card hand-card--red">K&hearts;</span>
+                </div>
+              </div>
+              <div class="zone zone--log">
+                <div class="log-title">Log</div>
+                <p>You discarded Q&spades; Q&hearts;</p>
+              </div>
+              <div class="zone zone--actions">
+                <div class="tap tap--natural">
+                  <div class="tap__stepper">
+                    <span class="tap__step"
+                      ><span
+                        class="tap__step-num"
+                        style="
+                          border-color: var(--text-primary);
+                          color: var(--text-primary);
+                        "
+                        >&check;</span
+                      >Discard</span
+                    >
+                    <span class="tap__arrow">&rarr;</span>
+                    <span class="tap__step tap__step--active"
+                      ><span class="tap__step-num">2</span>Draw</span
+                    >
+                  </div>
+                  <div class="tap__buttons">
+                    <button class="btn btn--primary btn--source">
+                      <span>Draw stock</span
+                      ><span class="btn__sub">31 face-down</span>
+                    </button>
+                    <button class="btn btn--ghost btn--source">
+                      <span>Take discard</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="frame-wrap">
+          <div class="frame-label">
+            900px &middot; <b>not your turn (single-line pill)</b>
+          </div>
+          <div class="board-frame board-frame--900">
+            <div class="board board--fixB">
+              <div class="zone zone--opponents">
+                <div class="seat seat--active">
+                  <span class="seat__dot"></span>Bri &middot; 7
+                </div>
+                <div class="seat">
+                  <span class="seat__dot"></span>You &middot; 5
+                </div>
+              </div>
+              <div class="zone zone--table">
+                <div class="phase-banner">Bri's turn</div>
+                <div class="piles">
+                  <div class="pile">
+                    <span class="pile__label">Stock</span
+                    ><span class="mini-card mini-card--back"></span>
+                  </div>
+                  <div class="pile">
+                    <span class="pile__label">Discard</span
+                    ><span class="mini-card mini-card--red">9&hearts;</span>
+                  </div>
+                </div>
+              </div>
+              <div class="zone zone--hand">
+                <div class="hand-label">Your hand (5)</div>
+                <div class="hand-row">
+                  <span class="hand-card">Q&spades;</span>
+                  <span class="hand-card hand-card--red">Q&hearts;</span>
+                  <span class="hand-card hand-card--red">4&diams;</span>
+                  <span class="hand-card">8&clubs;</span>
+                  <span class="hand-card hand-card--red">K&hearts;</span>
+                </div>
+              </div>
+              <div class="zone zone--log">
+                <div class="log-title">Log</div>
+                <p>Cy drew stock</p>
+                <p>Bri is deciding&hellip;</p>
+              </div>
+              <div class="zone zone--actions">
+                <div class="tap tap--natural">
+                  <div class="tap__turn-pill">
+                    <span class="tap__dot"></span>Bri is taking their
+                    turn&hellip;
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ FIX C -->
+    <section class="direction" id="fixC">
+      <div class="direction__head">
+        <span class="direction__tag">Fix C</span>
+        <h2>Floating overlay panel — decoupled from the grid entirely</h2>
+      </div>
+      <p class="direction__desc">
+        Lift the action panel out of the grid flow and pin it as a
+        <code>position: absolute</code> floating card centered near the bottom
+        of the felt, above the wood rim. The grid rows are untouched (Big2
+        unaffected), and the panel can be <strong>any height</strong> because it
+        no longer lives in a fixed track — it floats over the table.
+        <span class="good"
+          >Most flexible, gives the panel visual prominence.</span
+        >
+        Trade-offs: <span class="bad">it overlaps the hand/table area</span> and
+        needs a z-index and a reserved bottom margin so it never covers the hand
+        row; a bigger structural departure from the current footer-bar
+        convention shared with Big2.
+      </p>
+      <div class="frames">
+        <div class="frame-wrap">
+          <div class="frame-label">
+            768px &middot; <b>discard phase, floating</b>
+          </div>
+          <div class="board-frame board-frame--768">
+            <div class="board board--fixC">
+              <div class="zone zone--opponents">
+                <div class="seat">
+                  <span class="seat__dot"></span>Bri &middot; 7
+                </div>
+                <div class="seat">
+                  <span class="seat__dot"></span>Cy &middot; 6
+                </div>
+                <div class="seat seat--active">
+                  <span class="seat__dot"></span>You &middot; 5
+                </div>
+              </div>
+              <div class="zone zone--table">
+                <div class="phase-banner">Your turn &middot; Discard</div>
+                <div class="piles">
+                  <div class="pile">
+                    <span class="pile__label">Stock</span
+                    ><span class="mini-card mini-card--back"></span>
+                  </div>
+                  <div class="pile">
+                    <span class="pile__label">Discard</span
+                    ><span class="mini-card mini-card--ring mini-card--red"
+                      >9&hearts;</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="zone zone--hand">
+                <div class="hand-label">Your hand (5)</div>
+                <div class="hand-row">
+                  <span class="hand-card hand-card--sel">Q&spades;</span>
+                  <span class="hand-card hand-card--sel hand-card--red"
+                    >Q&hearts;</span
+                  >
+                  <span class="hand-card hand-card--dim hand-card--red"
+                    >4&diams;</span
+                  >
+                  <span class="hand-card hand-card--dim">8&clubs;</span>
+                  <span class="hand-card hand-card--dim hand-card--red"
+                    >K&hearts;</span
+                  >
+                </div>
+              </div>
+              <div class="zone zone--log">
+                <div class="log-title">Log</div>
+                <p>Cy discarded 9&hearts;</p>
+                <p>Bri drew stock</p>
+              </div>
+              <div class="zone zone--actions"></div>
+            </div>
+            <div class="float-panel">
+              <div class="tap__stepper">
+                <span class="tap__step tap__step--active"
+                  ><span class="tap__step-num">1</span>Discard</span
+                >
+                <span class="tap__arrow">&rarr;</span>
+                <span class="tap__step"
+                  ><span class="tap__step-num">2</span>Draw</span
+                >
+              </div>
+              <div class="tap__buttons">
+                <button class="btn btn--tonk">Call TONK</button>
+                <button class="btn btn--primary">
+                  Discard<span class="btn__badge">2</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="frame-wrap">
+          <div class="frame-label">
+            1080px &middot; <b>draw phase, floating</b>
+          </div>
+          <div class="board-frame board-frame--1080">
+            <div class="board board--fixC">
+              <div class="zone zone--opponents">
+                <div class="seat">
+                  <span class="seat__dot"></span>Bri &middot; 7
+                </div>
+                <div class="seat seat--active">
+                  <span class="seat__dot"></span>You &middot; 3
+                </div>
+              </div>
+              <div class="zone zone--table">
+                <div class="phase-banner">Your turn &middot; Draw</div>
+                <div class="piles">
+                  <div class="pile">
+                    <span class="pile__label">Stock</span
+                    ><span class="mini-card mini-card--back"></span>
+                  </div>
+                  <div class="pile">
+                    <span class="pile__label">Discard</span
+                    ><span class="mini-card mini-card--ring">Q&spades;</span>
+                  </div>
+                </div>
+              </div>
+              <div class="zone zone--hand">
+                <div class="hand-label">Your hand (3)</div>
+                <div class="hand-row">
+                  <span class="hand-card hand-card--red">4&diams;</span>
+                  <span class="hand-card">8&clubs;</span>
+                  <span class="hand-card hand-card--red">K&hearts;</span>
+                </div>
+              </div>
+              <div class="zone zone--log">
+                <div class="log-title">Log</div>
+                <p>You discarded Q&spades; Q&hearts;</p>
+              </div>
+              <div class="zone zone--actions"></div>
+            </div>
+            <div class="float-panel">
+              <div class="tap__stepper">
+                <span class="tap__step"
+                  ><span
+                    class="tap__step-num"
+                    style="
+                      border-color: var(--text-primary);
+                      color: var(--text-primary);
+                    "
+                    >&check;</span
+                  >Discard</span
+                >
+                <span class="tap__arrow">&rarr;</span>
+                <span class="tap__step tap__step--active"
+                  ><span class="tap__step-num">2</span>Draw</span
+                >
+              </div>
+              <div class="tap__buttons">
+                <button class="btn btn--primary btn--source">
+                  <span>Draw stock</span
+                  ><span class="btn__sub">31 face-down</span>
+                </button>
+                <button class="btn btn--ghost btn--source">
+                  <span>Take discard</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="notes">
+      <h3>Comparison</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>What changes</th>
+            <th>Pros</th>
+            <th>Cons</th>
+            <th>Big2</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A — Taller fixed row</td>
+            <td>
+              Tonk desktop grid last row 64px&rarr;~116px via a
+              <code>--tonk-actions-height</code> token
+            </td>
+            <td>Tiny, explicit, obvious diff</td>
+            <td>
+              Magic number; must re-check if panel grows; steals ~52px from the
+              table row on short screens
+            </td>
+            <td>Unchanged (64px)</td>
+          </tr>
+          <tr>
+            <td>
+              <b>B — Auto-height row</b> <span class="pill-rec">REC</span>
+            </td>
+            <td>
+              Tonk desktop grid last row 64px&rarr;<code>auto</code>; table 1fr
+              absorbs it
+            </td>
+            <td>
+              Self-sizing; no magic number; never clips (1/2 lines + error);
+              tighter button row
+            </td>
+            <td>
+              Actions height varies slightly by state (acceptable — footer is at
+              the edge)
+            </td>
+            <td>Unchanged (64px)</td>
+          </tr>
+          <tr>
+            <td>C — Floating overlay</td>
+            <td>
+              Panel becomes <code>position: absolute</code>, pinned above the
+              felt; grid row emptied
+            </td>
+            <td>Any height; prominent; grid fully decoupled</td>
+            <td>
+              Overlaps hand/table; z-index + reserved margin; departs from
+              Big2's shared footer pattern
+            </td>
+            <td>Unchanged</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 16px">
+        All three keep Big2's <code>ActionPanel.vue</code> and its 64px row
+        byte-for-byte unchanged, and none touch the mobile
+        <code>--mobile-actions-height</code> rules. Recommendation:
+        <strong>Fix B</strong>
+        — it removes the fixed-height mismatch at the root, tolerates the error
+        row and any future panel line without a re-tuned constant, and is the
+        smallest conceptual change that cannot silently regress.
+      </p>
+    </div>
+  </body>
+</html>
