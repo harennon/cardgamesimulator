@@ -47,6 +47,7 @@ async function createAndStartPracticeGame(
       gameType: "big2",
       maxPlayers: opts.maxPlayers,
       numAiSeats: opts.numAiSeats,
+      turnTimerSeconds: 30,
     });
   expect(createRes.status).toBe(200);
   const gameId = createRes.body.gameId as string;
@@ -264,7 +265,7 @@ describe("Rematch AI integration (LLD 140)", () => {
       const createRes = await request(localCtx.app)
         .post("/createGame")
         .set("Authorization", `Bearer ${userA.accessToken}`)
-        .send({ gameType: "big2", maxPlayers: 2 });
+        .send({ gameType: "big2", maxPlayers: 2, turnTimerSeconds: 30 });
       expect(createRes.status).toBe(200);
       const gameId = createRes.body.gameId as string;
 
