@@ -23,13 +23,11 @@ import type { TurnTimerService } from "@/timer/turnTimerService";
 import { injectBoardAi, buildLobbyPlayers } from "@/websocket/socketAiUtils";
 
 /**
- * Upper bound on auto-timeout actions any engine takes to advance one seat to
- * the next. Big2 = 1 (pass/playCards advances immediately). Tonk = 2
- * (discard then draw advance the same seat through two phases before the
- * seat changes). Used only as a divergence guard for autoPlayAbandoned —
- * loop correctness comes from the semantic exit conditions, not this number.
+ * Maximum hand size for Big2 (13 cards per player in a 4-player game).
+ * Used to size the auto-play loop ceiling so it covers driving all remaining
+ * seats to completion without truncating a legitimate play-out.
  */
-const MAX_AUTO_ACTIONS_PER_SEAT = 2;
+const MAX_HAND_SIZE = 13;
 
 function emitSpectatorCount(
   io: TypedServer,
@@ -117,9 +115,28 @@ async function shouldAutoPlay(
 }
 
 /**
+ * Arm a 1x turn timer as a fallback when the auto-play loop exits while a
+ * driven seat is still current, so the game advances on the next tick rather
+ * than stalling. No-op when the game has no timer configured (hasTimer false).
+ */
+function armFallbackTimer(
+  gameId: string,
+  turnTimerService: TurnTimerService,
+): void {
+  if (turnTimerService.hasTimer(gameId)) {
+    turnTimerService.startTurn(gameId, false);
+  }
+}
+
+/**
  * After a state change, if the new current player should be auto-driven
  * (AI seat or abandoned), play them immediately.
  * Loops until a non-driven player's turn or game completion.
+ *
+ * The loop ceiling is sized to cover driving all remaining seats to completion
+ * (players * (maxHandSize + players) comfortably exceeds any legitimate play-out).
+ * A version-progress check detects genuine non-progress (engine not advancing)
+ * independently of the count, so the ceiling is only a last-resort safety net.
  */
 async function autoPlayAbandoned(
   io: TypedServer,
@@ -129,11 +146,12 @@ async function autoPlayAbandoned(
   turnTimerService: TurnTimerService,
 ): Promise<void> {
   const state = await gameService.getGameState(gameId);
-  // Divergence guard only. A seat may take multiple auto-actions to advance
-  // (Tonk: discard then draw), so the cap is sized per-seat, not per-iteration.
-  // Loop correctness comes from the semantic exit conditions below, not this cap.
   const playerCount = state?.players.length ?? 4;
-  const maxIterations = playerCount * MAX_AUTO_ACTIONS_PER_SEAT;
+  // Ceiling: generous enough to drive all remaining seats through their entire
+  // hands across multiple tricks; much larger than the old playerCount * 2 cap.
+  const maxIterations = playerCount * (MAX_HAND_SIZE + playerCount);
+
+  let lastVersion = state?.version ?? -1;
 
   for (let i = 0; i < maxIterations; i++) {
     const currentState = await gameService.getGameState(gameId);
@@ -158,12 +176,24 @@ async function autoPlayAbandoned(
 
     const engine = engineFactory.getEngine(currentState.gameType);
     const autoAction = engine.getAutoTimeoutAction(currentState);
-    if (!autoAction) return;
+    if (!autoAction) {
+      // B1: engine returned null for a live driven seat — should not happen in
+      // normal Big2/Tonk play; arm fallback so the seat is retried on next tick.
+      armFallbackTimer(gameId, turnTimerService);
+      return;
+    }
 
     try {
       await gameService.applyAction(gameId, autoAction);
-    } catch {
-      return; // Concurrent action already advanced the turn
+    } catch (err: unknown) {
+      // B2: engine rejected the auto-action — a real defect, not a benign race
+      // for AI/auto seats which are single-threaded. Arm fallback for bounded retry.
+      console.warn(
+        `autoPlayAbandoned: auto-action rejected by engine for game ${gameId}; armed fallback timer`,
+        err,
+      );
+      armFallbackTimer(gameId, turnTimerService);
+      return;
     }
 
     const newState = await gameService.getGameState(gameId);
@@ -180,6 +210,17 @@ async function autoPlayAbandoned(
       return;
     }
 
+    // Version-progress check: if a successful applyAction failed to advance the
+    // engine state, treat it as divergence (B3) rather than looping forever.
+    if (newState != null && newState.version === lastVersion) {
+      console.warn(
+        `autoPlayAbandoned: divergence guard hit (version stall after ${i + 1} iterations) for game ${gameId}; armed fallback timer`,
+      );
+      armFallbackTimer(gameId, turnTimerService);
+      return;
+    }
+    lastVersion = newState?.version ?? lastVersion;
+
     await broadcastGameState(
       io,
       gameId,
@@ -190,13 +231,11 @@ async function autoPlayAbandoned(
     // Loop continues to check the next player
   }
 
-  // E7: the safety cap was exhausted without reaching a non-abandoned seat or
-  // completion — only reachable if an engine never advances/completes (a bug).
-  // Fail safe: do NOT arm a timer on a still-abandoned seat; log so it is
-  // observable rather than a silent stall.
+  // B3: absolute ceiling exhausted — genuine engine non-progress.
   console.warn(
-    `autoPlayAbandoned hit divergence guard (${maxIterations} iterations) for game ${gameId}; no timer armed`,
+    `autoPlayAbandoned: divergence guard hit (${maxIterations} iterations) for game ${gameId}; armed fallback timer`,
   );
+  armFallbackTimer(gameId, turnTimerService);
 }
 
 async function handleGameJoin(
