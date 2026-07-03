@@ -8,6 +8,16 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Fixed
+
+- **LLD 122: AI/CPU players hang for ~60s after a human wins**
+  - `src/backend/websocket/socketHandler.ts` — fixed `autoPlayAbandoned` loop bound from `playerCount * 2` (too small for multi-seat play-out) to `playerCount * (MAX_HAND_SIZE + playerCount)`, a ceiling that comfortably covers driving all remaining AI seats to `COMPLETED` in a single synchronous pass without truncating any legitimate game play-out.
+  - Added a version-progress check inside the loop: if `applyAction` succeeds but `state.version` does not advance, the divergence guard fires immediately (B3) without waiting for the absolute ceiling.
+  - Added `armFallbackTimer` helper: arms a 1× turn timer on every exit that stops on a still-driven seat while the game is `IN_PROGRESS` (B1 — null auto-action, B2 — engine rejects action, B3 — divergence guard). Previously these three branches armed no timer, leaving the game silently stalled. No-op when the game has no timer configured.
+  - B2 branch now logs via `console.warn` with the caught error (was: silent swallow).
+  - `MAX_AUTO_ACTIONS_PER_SEAT` constant removed; replaced by `MAX_HAND_SIZE = 13` used in the completion-sized ceiling.
+  - Tests: 5 new unit tests in `tests/websocket/socketHandler.test.ts` (B1, B2, B3, happy-path arm, completion path) + 2 new integration tests in `tests/integration/ai-completion.test.ts` (4-player seeded near-end reproduction; 2-player last-two-players path) — both assert game reaches `COMPLETED` synchronously with `timerProvider.pendingCount === 0` and zero `game:timerExpired` events.
+
 ### Added
 
 - **LLD 120: Create-game + lobby/board UI — AI seats and human/AI labels**

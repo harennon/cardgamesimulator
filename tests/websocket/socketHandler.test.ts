@@ -971,3 +971,503 @@ describe("socketHandler — AI-seat: shouldAutoPlay and handleGameStart", () => 
     expect(sockets.every((s) => s.playerId !== aiId)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// LLD 122: autoPlayAbandoned exit-branch regression tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper that captures game:action so we can fire it directly.
+ */
+function setupHandlersWithAction(
+  gameService: GameService,
+  connectionManager: ConnectionManager,
+  turnTimerService: TurnTimerService,
+): {
+  fireGameAction: (
+    socket: TypedSocket,
+    gameId: string,
+    action: { type: string; playerId: string; cards?: unknown[] },
+    ack: (r: { success: boolean; error?: string }) => void,
+  ) => Promise<void>;
+} {
+  let onConnection: ((socket: TypedSocket) => void) | null = null;
+
+  const io = {
+    on: vi
+      .fn()
+      .mockImplementation(
+        (event: string, cb: (socket: TypedSocket) => void) => {
+          if (event === "connection") {
+            onConnection = cb;
+          }
+        },
+      ),
+    to: vi.fn().mockReturnValue({ emit: vi.fn() }),
+  } as unknown as TypedServer;
+
+  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
+
+  const fireGameAction = (
+    socket: TypedSocket,
+    gameId: string,
+    action: { type: string; playerId: string; cards?: unknown[] },
+    ack: (r: { success: boolean; error?: string }) => void,
+  ): Promise<void> => {
+    if (!onConnection) throw new Error("onConnection not captured");
+
+    let gameActionHandler: (
+      payload: {
+        gameId: string;
+        action: { type: string; playerId: string; cards?: unknown[] };
+      },
+      ack: (r: { success: boolean; error?: string }) => void,
+    ) => void = () => {};
+
+    const proxySocket = new Proxy(socket, {
+      get(target, prop) {
+        if (prop === "on") {
+          return (event: string, handler: (...args: unknown[]) => void) => {
+            if (event === "game:action") {
+              gameActionHandler = handler as typeof gameActionHandler;
+            }
+          };
+        }
+        return (target as Record<string | symbol, unknown>)[prop];
+      },
+    });
+
+    onConnection(proxySocket);
+
+    return new Promise<void>((resolve) => {
+      gameActionHandler({ gameId, action }, (response) => {
+        ack(response);
+        resolve();
+      });
+    });
+  };
+
+  return { fireGameAction };
+}
+
+/**
+ * Shared state factories for branch tests.
+ * All branch tests set up: human acts first, state advances to an AI seat,
+ * then autoPlayAbandoned is triggered from handleGameAction's auto-play branch.
+ */
+function makeAiFirstState(aiId: string, humanId: string) {
+  return {
+    gameId: "game-1",
+    gameType: "big2",
+    status: "IN_PROGRESS" as const,
+    version: 2,
+    players: [
+      { playerId: humanId, displayName: "Host" },
+      { playerId: aiId, displayName: "CPU 1" },
+    ],
+    currentPlayerIndex: 1, // AI seat is current after human's action
+    turnNumber: 2,
+    gameSpecificState: null,
+    winner: null,
+    scores: null,
+    randomSeed: "seed",
+  };
+}
+
+describe("socketHandler — autoPlayAbandoned exit-branch regression (LLD 122)", () => {
+  const aiId = "ai:00000000-0000-0000-0000-000000000002";
+  const humanId = "host-id";
+
+  /**
+   * B1: getAutoTimeoutAction returns null for the current AI seat.
+   * armFallbackTimer must be called (startTurn(gameId, false)) in a timer-configured game.
+   */
+  it("B1: getAutoTimeoutAction returns null → armFallbackTimer called, no throw", async () => {
+    // Override the engine mock to return null for getAutoTimeoutAction
+    const { engineFactory: engineFactoryMock } =
+      await import("../../src/backend/engine/game-engine-factory.js");
+    (
+      engineFactoryMock.getEngine as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce({
+      gameType: "big2",
+      getPlayerView: vi.fn().mockReturnValue({ players: [] }),
+      getSpectatorView: vi.fn().mockReturnValue({ players: [] }),
+      getAutoTimeoutAction: vi.fn().mockReturnValue(null),
+    });
+
+    const aiState = makeAiFirstState(aiId, humanId);
+    // State after human's action: AI is current; after B1 the state stays the same
+    const postActionState = {
+      ...aiState,
+      version: 3, // advanced by human's action (not the AI's)
+    };
+
+    const turnTimerService = {
+      ...makeTurnTimerService(),
+      hasTimer: vi.fn().mockReturnValue(true),
+      startTurn: vi.fn(),
+      unregisterGame: vi.fn(),
+      getDeadline: vi.fn().mockReturnValue(null),
+    } as unknown as TurnTimerService;
+
+    const connectionManager = makeConnectionManager();
+
+    const gameService = {
+      getGame: vi.fn().mockResolvedValue(makeGame({ turnTimerSeconds: 30 })),
+      getJoinCode: vi.fn().mockResolvedValue(null),
+      getGameState: vi
+        .fn()
+        .mockResolvedValueOnce(postActionState) // handleGameAction reads state after applyAction
+        .mockResolvedValue(aiState), // autoPlayAbandoned reads state on each iteration
+      getPlayerView: vi.fn().mockResolvedValue({ players: [] }),
+      getSpectatorView: vi.fn().mockResolvedValue(null),
+      applyAction: vi.fn().mockResolvedValue(postActionState), // human's action succeeds
+      isAiSeat: vi
+        .fn()
+        .mockImplementation(async (_gId: string, pId: string) => pId === aiId),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set([aiId])),
+    } as unknown as GameService;
+
+    const { socket } = makeSocket(humanId, "Host");
+    const { fireGameAction } = setupHandlersWithAction(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    const ackResult: { success: boolean; error?: string }[] = [];
+    await fireGameAction(
+      socket,
+      "game-1",
+      { type: "pass", playerId: humanId },
+      (r) => ackResult.push(r),
+    );
+
+    // The action ack still resolves success (B1 does not propagate an error)
+    expect(ackResult[0]?.success).toBe(true);
+
+    // armFallbackTimer must have armed the timer for the AI seat
+    const startTurnCalls = (
+      turnTimerService.startTurn as ReturnType<typeof vi.fn>
+    ).mock.calls;
+    const fallbackCall = startTurnCalls.find(
+      (c: unknown[]) => c[0] === "game-1" && c[1] === false,
+    );
+    expect(fallbackCall).toBeDefined();
+  });
+
+  /**
+   * B2: applyAction throws for the AI auto-action.
+   * armFallbackTimer must be called; error must NOT be rethrown; console.warn called.
+   */
+  it("B2: applyAction throws on AI auto-action → armFallbackTimer called, warn logged, no throw", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const aiState = makeAiFirstState(aiId, humanId);
+    const postActionState = { ...aiState, version: 3 };
+    const aiStateWithProgress = { ...aiState, version: 3 };
+
+    const applyActionCallCount = { value: 0 };
+
+    const turnTimerService = {
+      ...makeTurnTimerService(),
+      hasTimer: vi.fn().mockReturnValue(true),
+      startTurn: vi.fn(),
+      unregisterGame: vi.fn(),
+      getDeadline: vi.fn().mockReturnValue(null),
+    } as unknown as TurnTimerService;
+
+    const connectionManager = makeConnectionManager();
+
+    const thrownError = new Error("engine rejected action");
+
+    const gameService = {
+      getGame: vi.fn().mockResolvedValue(makeGame({ turnTimerSeconds: 30 })),
+      getJoinCode: vi.fn().mockResolvedValue(null),
+      getGameState: vi
+        .fn()
+        .mockResolvedValueOnce(postActionState) // handleGameAction after human's applyAction
+        .mockResolvedValue(aiStateWithProgress), // autoPlayAbandoned loop reads
+      getPlayerView: vi.fn().mockResolvedValue({ players: [] }),
+      getSpectatorView: vi.fn().mockResolvedValue(null),
+      applyAction: vi.fn().mockImplementation(async () => {
+        const count = ++applyActionCallCount.value;
+        if (count === 1) {
+          // Human's action succeeds
+          return postActionState;
+        }
+        // AI's auto-action throws
+        throw thrownError;
+      }),
+      isAiSeat: vi
+        .fn()
+        .mockImplementation(async (_gId: string, pId: string) => pId === aiId),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set([aiId])),
+    } as unknown as GameService;
+
+    const { socket } = makeSocket(humanId, "Host");
+    const { fireGameAction } = setupHandlersWithAction(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    const ackResult: { success: boolean; error?: string }[] = [];
+    await fireGameAction(
+      socket,
+      "game-1",
+      { type: "pass", playerId: humanId },
+      (r) => ackResult.push(r),
+    );
+
+    // B2 must not rethrow — action ack resolves success
+    expect(ackResult[0]?.success).toBe(true);
+
+    // armFallbackTimer called (timer armed for the AI seat)
+    const startTurnCalls = (
+      turnTimerService.startTurn as ReturnType<typeof vi.fn>
+    ).mock.calls;
+    const fallbackCall = startTurnCalls.find(
+      (c: unknown[]) => c[0] === "game-1" && c[1] === false,
+    );
+    expect(fallbackCall).toBeDefined();
+
+    // console.warn called once with the caught error (B2 log)
+    expect(warnSpy).toHaveBeenCalledOnce();
+    const warnArgs = warnSpy.mock.calls[0];
+    // The thrown error must be passed as an argument
+    expect(warnArgs).toContain(thrownError);
+
+    warnSpy.mockRestore();
+  });
+
+  /**
+   * B3: divergence guard exhausted — every applyAction succeeds but state.version
+   * never advances (version stays at the same value after each apply).
+   * armFallbackTimer must be called and console.warn must be called once.
+   */
+  it("B3: version-stall divergence → armFallbackTimer called, warn logged", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // AI is current; version is always the same after any apply (no progress)
+    const stalledAiState = makeAiFirstState(aiId, humanId);
+    const postActionState = { ...stalledAiState, version: 3 };
+    // After AI's applyAction, the version stays at 3 (no advance)
+    const stalledAfterApply = { ...stalledAiState, version: 3 };
+
+    const turnTimerService = {
+      ...makeTurnTimerService(),
+      hasTimer: vi.fn().mockReturnValue(true),
+      startTurn: vi.fn(),
+      unregisterGame: vi.fn(),
+      getDeadline: vi.fn().mockReturnValue(null),
+    } as unknown as TurnTimerService;
+
+    const connectionManager = makeConnectionManager();
+
+    let applyCallCount = 0;
+    const gameService = {
+      getGame: vi.fn().mockResolvedValue(makeGame({ turnTimerSeconds: 30 })),
+      getJoinCode: vi.fn().mockResolvedValue(null),
+      // After human's action: AI is current (postActionState).
+      // Then autoPlayAbandoned reads stalledAfterApply each time (version never advances).
+      getGameState: vi.fn().mockImplementation(async () => {
+        if (applyCallCount === 0) return postActionState;
+        return stalledAfterApply; // version=3 always; never advances
+      }),
+      getPlayerView: vi.fn().mockResolvedValue({ players: [] }),
+      getSpectatorView: vi.fn().mockResolvedValue(null),
+      applyAction: vi.fn().mockImplementation(async () => {
+        applyCallCount++;
+        // Return something but getGameState will still return stalled version
+        return stalledAfterApply;
+      }),
+      isAiSeat: vi
+        .fn()
+        .mockImplementation(async (_gId: string, pId: string) => pId === aiId),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set([aiId])),
+    } as unknown as GameService;
+
+    const { socket } = makeSocket(humanId, "Host");
+    const { fireGameAction } = setupHandlersWithAction(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    const ackResult: { success: boolean; error?: string }[] = [];
+    await fireGameAction(
+      socket,
+      "game-1",
+      { type: "pass", playerId: humanId },
+      (r) => ackResult.push(r),
+    );
+
+    // B3 exits the loop; action ack resolves success (the human's action itself succeeded)
+    expect(ackResult[0]?.success).toBe(true);
+
+    // armFallbackTimer must have been called (was: never armed on B3 in original code)
+    const startTurnCalls = (
+      turnTimerService.startTurn as ReturnType<typeof vi.fn>
+    ).mock.calls;
+    const fallbackCall = startTurnCalls.find(
+      (c: unknown[]) => c[0] === "game-1" && c[1] === false,
+    );
+    expect(fallbackCall).toBeDefined();
+
+    // console.warn called exactly once for the divergence guard
+    expect(warnSpy).toHaveBeenCalledOnce();
+
+    warnSpy.mockRestore();
+  });
+
+  /**
+   * Happy-path regression: AI seat drives to a human seat → startTurn(false) called
+   * exactly once for the human, and no fallback timer is armed via B1/B2/B3.
+   */
+  it("happy-path: AI seat drives to human → startTurn(false) called once, no B1/B2/B3", async () => {
+    const aiState = makeAiFirstState(aiId, humanId);
+    // After AI's auto-action, turn returns to human
+    const humanTurnState = {
+      ...aiState,
+      currentPlayerIndex: 0, // human's turn
+      version: 4,
+    };
+
+    const turnTimerService = {
+      ...makeTurnTimerService(),
+      hasTimer: vi.fn().mockReturnValue(true),
+      startTurn: vi.fn(),
+      unregisterGame: vi.fn(),
+      getDeadline: vi.fn().mockReturnValue(null),
+    } as unknown as TurnTimerService;
+
+    const connectionManager = makeConnectionManager();
+
+    // getGameState call sequence:
+    // 1 - handleGameAction post-apply check (AI current, version 3)
+    // 2 - broadcastGameState before autoPlayAbandoned (AI current, version 3)
+    // 3 - autoPlayAbandoned initial read for playerCount (AI current, version 3)
+    // 4 - loop i=0 current-state check (AI current, version 3)
+    // 5 - post-apply in loop (AI auto-action applied → human turn, version 4)
+    // 6 - broadcastGameState in loop (human turn, version 4)
+    // 7 - loop i=1 current-state check (human current) → arm timer → return
+    let getGameStateCallCount = 0;
+    const gameService = {
+      getGame: vi.fn().mockResolvedValue(makeGame({ turnTimerSeconds: 30 })),
+      getJoinCode: vi.fn().mockResolvedValue(null),
+      getGameState: vi.fn().mockImplementation(async () => {
+        const count = ++getGameStateCallCount;
+        if (count <= 4) return { ...aiState, version: 3 }; // still AI current
+        return humanTurnState; // after AI's auto-action, human's turn
+      }),
+      getPlayerView: vi.fn().mockResolvedValue({ players: [] }),
+      getSpectatorView: vi.fn().mockResolvedValue(null),
+      applyAction: vi.fn().mockResolvedValue(humanTurnState),
+      isAiSeat: vi
+        .fn()
+        .mockImplementation(async (_gId: string, pId: string) => pId === aiId),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set([aiId])),
+    } as unknown as GameService;
+
+    const { socket } = makeSocket(humanId, "Host");
+    const { fireGameAction } = setupHandlersWithAction(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    await fireGameAction(
+      socket,
+      "game-1",
+      { type: "pass", playerId: humanId },
+      () => {},
+    );
+
+    // startTurn(false) called for the human seat (happy-path arm)
+    const startTurnCalls = (
+      turnTimerService.startTurn as ReturnType<typeof vi.fn>
+    ).mock.calls;
+    const humanArmCalls = startTurnCalls.filter(
+      (c: unknown[]) => c[0] === "game-1" && c[1] === false,
+    );
+    expect(humanArmCalls.length).toBeGreaterThanOrEqual(1);
+    // unregisterGame not called (game not completed)
+    expect(turnTimerService.unregisterGame).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Completion path: AI auto-action results in COMPLETED →
+   * unregisterGame called, startTurn NOT called, and no fallback timer armed.
+   */
+  it("completion path: AI auto-action → COMPLETED → unregisterGame called, no timer armed", async () => {
+    const aiState = makeAiFirstState(aiId, humanId);
+    const completedState = {
+      ...aiState,
+      status: "COMPLETED" as const,
+      version: 5,
+      winner: humanId,
+      scores: { [humanId]: 0, [aiId]: 13 },
+    };
+
+    const turnTimerService = {
+      ...makeTurnTimerService(),
+      hasTimer: vi.fn().mockReturnValue(true),
+      startTurn: vi.fn(),
+      unregisterGame: vi.fn(),
+      getDeadline: vi.fn().mockReturnValue(null),
+    } as unknown as TurnTimerService;
+
+    const connectionManager = makeConnectionManager();
+
+    // getGameState call sequence:
+    // 1 - handleGameAction post-apply check (AI current, version 3)
+    // 2 - broadcastGameState before autoPlayAbandoned (AI current, version 3)
+    // 3 - autoPlayAbandoned initial read for playerCount (AI current, version 3)
+    // 4 - loop i=0 current-state check (AI current, version 3)
+    // 5 - post-apply in loop → COMPLETED (version 5)
+    // (broadcastGameState called for completed state, then returns)
+    let getStateCount = 0;
+    const gameService = {
+      getGame: vi.fn().mockResolvedValue(makeGame({ turnTimerSeconds: 30 })),
+      getJoinCode: vi.fn().mockResolvedValue(null),
+      getGameState: vi.fn().mockImplementation(async () => {
+        const count = ++getStateCount;
+        if (count <= 4) return { ...aiState, version: 3 }; // still AI current
+        return completedState; // post AI apply → COMPLETED
+      }),
+      getPlayerView: vi.fn().mockResolvedValue({ players: [] }),
+      getSpectatorView: vi.fn().mockResolvedValue(null),
+      applyAction: vi.fn().mockResolvedValue(completedState),
+      isAiSeat: vi
+        .fn()
+        .mockImplementation(async (_gId: string, pId: string) => pId === aiId),
+      getAiSeatIds: vi.fn().mockResolvedValue(new Set([aiId])),
+    } as unknown as GameService;
+
+    const { socket } = makeSocket(humanId, "Host");
+    const { fireGameAction } = setupHandlersWithAction(
+      gameService,
+      connectionManager,
+      turnTimerService,
+    );
+
+    await fireGameAction(
+      socket,
+      "game-1",
+      { type: "pass", playerId: humanId },
+      () => {},
+    );
+
+    // unregisterGame must be called when COMPLETED
+    expect(turnTimerService.unregisterGame).toHaveBeenCalledWith("game-1");
+    // startTurn must NOT be called for the completed game (no fallback timer)
+    const startTurnCalls = (
+      turnTimerService.startTurn as ReturnType<typeof vi.fn>
+    ).mock.calls;
+    const timerArmedCalls = startTurnCalls.filter(
+      (c: unknown[]) => c[0] === "game-1",
+    );
+    expect(timerArmedCalls).toHaveLength(0);
+  });
+});
