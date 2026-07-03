@@ -49,6 +49,8 @@ import {
   computeDrawableSnapshot,
   nextStarterIndex,
 } from "./turn.js";
+import { chooseTonkMove } from "./ai-policy.js";
+import type { TonkPolicyView } from "./ai-policy.js";
 
 export class TonkEngine implements GameEngine {
   readonly gameType = "tonk" as const;
@@ -239,6 +241,35 @@ export class TonkEngine implements GameEngine {
       cards: [chosen],
     };
     return discardAction;
+  }
+
+  getAiMoveAction(state: InternalGameState): GameAction | null {
+    if (state.status !== "IN_PROGRESS") return null;
+    if (state.currentPlayerIndex < 0) return null;
+
+    const playerId = state.players[state.currentPlayerIndex]!.playerId;
+    const tonkState = state.gameSpecificState as TonkState;
+    const myHand = tonkState.hands[state.currentPlayerIndex] ?? [];
+
+    const pub: TonkPolicyView = {
+      turnPhase: tonkState.turnPhase,
+      tonkGateOpen: isTonkGateOpen(
+        tonkState.trickTurnCount,
+        state.players.length,
+      ),
+      drawableDiscard: tonkState.drawableDiscard,
+      stockCount: tonkState.stock.length,
+    };
+
+    const action = chooseTonkMove(myHand, pub, playerId);
+
+    // Legality fallback: if policy returned an invalid action (should not
+    // happen), fall back to the timeout action for safety.
+    if (!this.validateAction(state, action)) {
+      return this.getAutoTimeoutAction(state);
+    }
+
+    return action;
   }
 
   getSpectatorView(

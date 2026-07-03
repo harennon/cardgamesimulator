@@ -8,6 +8,19 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Added
+
+- **LLD 127: AI opponent move policy — smarter play beyond auto-timeout heuristic**
+  - `src/backend/engine/game-engine.ts` — added `getAiMoveAction(state)` to the `GameEngine` interface (parallel to `getAutoTimeoutAction`; same null contract).
+  - `src/backend/engine/big2/ai-policy.ts` — new pure policy module: `chooseBig2Move(myHand, pub, playerId)` with `Big2PolicyView`. Strategy: first-play sheds lowest card in a pair/5-combo if possible; free-play leads cheapest combo of largest size, holding high singletons (never leads a `2`/`A` while lower cards exist); follow-play beats lastPlay when close to out, the beat is cheap (≤J), or it would win the trick — otherwise passes to conserve high cards. Combo-preservation guard prevents breaking pairs to lead a single when a true singleton is available.
+  - `src/backend/engine/big2/big2-engine.ts` — `Big2Engine.getAiMoveAction` builds `Big2PolicyView` from `Big2State`, delegates to `chooseBig2Move`, and falls back to `getAutoTimeoutAction` if the policy somehow returns an illegal action.
+  - `src/backend/engine/tonk/ai-policy.ts` — new pure policy module: `chooseTonkMove(myHand, pub, playerId)` with `TonkPolicyView` and `TONK_CALL_THRESHOLD = 10`. Discard phase: calls TONK when gate is open and `handValue ≤ 10`; otherwise discards the full same-rank group with the highest total value (dumping pairs removes more points). Draw phase: draws from discard only when the drawable card is strictly cheaper than the cheapest card held (never breaks a joker advantage); otherwise draws from stock.
+  - `src/backend/engine/tonk/tonk-engine.ts` — `TonkEngine.getAiMoveAction` builds `TonkPolicyView` from `TonkState`, delegates to `chooseTonkMove`.
+  - `src/backend/websocket/socketHandler.ts` — `autoPlayAbandoned` now branches on `isAiSeat`: AI seats call `engine.getAiMoveAction`, abandoned humans call `engine.getAutoTimeoutAction` (unchanged). `handleTimerExpired` is untouched.
+  - `tests/engine/big2/ai-policy.test.ts` — 14 unit tests: always-legal, does-not-always-pass (core bug fix), sheds-low-early, holds-high-cards, combo-preservation, passes-when-cannot-beat, information-hiding, null cases, full-game integration (4P seeded, asserts AI plays in follow position).
+  - `tests/engine/tonk/ai-policy.test.ts` — 18 unit tests: always-legal across all phases, discard-minimizes-value, TONK-calling thresholds, draw-from-discard logic, joker/stock-out edge cases, information-hiding, null cases, full-game integration (3P seeded, asserts AI called TONK or drew from discard).
+  - `tests/websocket/socketHandler.test.ts` — 2 new routing tests: AI seat invokes `getAiMoveAction` (not `getAutoTimeoutAction`); `handleTimerExpired` invokes `getAutoTimeoutAction` (never `getAiMoveAction`). Mock engine updated to include `getAiMoveAction`.
+
 ### Fixed
 
 - **LLD 126: Bug report / feedback button missing on the in-game screen (mobile)**
