@@ -1,0 +1,1338 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tonk — Own Score Visibility (Mockups)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700&family=Libre+Baskerville:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================
+         Tokens — copied verbatim from src/frontend/styles/game-variables.css
+         so the mockup reads exactly like the live board.
+         ========================================================== */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --tonk-cyan: #3fd0d8;
+        --tonk-phase-discard: #c97b3f;
+        --tonk-phase-draw: #3f9dc9;
+        --tonk-near-150: #e09a30;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #14100c;
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ---- Mockup scaffolding (not part of the product) ---- */
+      .doc {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 40px 24px 96px;
+      }
+
+      .doc__title {
+        font-family: var(--font-card);
+        font-size: 1.9rem;
+        margin: 0 0 6px;
+        color: var(--text-primary);
+      }
+
+      .doc__lede {
+        color: var(--text-muted);
+        max-width: 70ch;
+        line-height: 1.5;
+        margin: 0 0 8px;
+      }
+
+      .doc__note {
+        color: var(--gold-accent);
+        font-size: 0.85rem;
+        margin: 0 0 40px;
+      }
+
+      .opt {
+        margin: 0 0 64px;
+      }
+
+      .opt__tag {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #1a0f06;
+        background: var(--gold-accent);
+        padding: 4px 12px;
+        border-radius: 20px;
+        margin-bottom: 10px;
+      }
+
+      .opt__name {
+        font-family: var(--font-card);
+        font-size: 1.3rem;
+        margin: 0 0 4px;
+      }
+
+      .opt__desc {
+        color: var(--text-muted);
+        max-width: 74ch;
+        line-height: 1.55;
+        margin: 0 0 6px;
+      }
+
+      .opt__desc b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .stage-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        align-items: flex-start;
+        margin-top: 22px;
+      }
+
+      .stage {
+        position: relative;
+      }
+
+      .stage__cap {
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin: 0 0 8px;
+      }
+
+      /* Framed board previews */
+      .frame {
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+      }
+
+      .frame::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='rgba(0,0,0,0.08)'/%3E%3Ccircle cx='3' cy='3' r='0.3' fill='rgba(255,255,255,0.02)'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .frame--desktop {
+        width: 720px;
+        max-width: 100%;
+        height: 460px;
+        border: 8px solid;
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+      }
+
+      .frame--mobile {
+        width: 300px;
+        height: 560px;
+        border: 4px solid;
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+      }
+
+      /* ==========================================================
+         Shared board pieces (simplified but visually faithful)
+         ========================================================== */
+
+      /* --- Seat rail (opponents) --- */
+      .rail {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 12px;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+        position: relative;
+        z-index: 2;
+      }
+
+      .seat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 5px 9px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        position: relative;
+      }
+
+      .seat--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      .seat--self {
+        border-color: var(--tonk-cyan);
+        background: rgba(63, 208, 216, 0.08);
+      }
+
+      .seat__name {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .seat__meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .seat__count {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+      }
+
+      .seat__tally {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        background: rgba(0, 0, 0, 0.3);
+        padding: 1px 7px;
+        border-radius: 8px;
+      }
+
+      .seat--self .seat__tally {
+        background: rgba(63, 208, 216, 0.22);
+        color: #d7f7f9;
+      }
+
+      .seat__youtag {
+        font-size: 0.55rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #0c1416;
+        background: var(--tonk-cyan);
+        padding: 1px 5px;
+        border-radius: 5px;
+      }
+
+      .pulse {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        box-shadow: 0 0 8px var(--gold-accent);
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.3);
+        }
+      }
+
+      /* --- table / piles --- */
+      .table {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        position: relative;
+        z-index: 1;
+        min-height: 0;
+      }
+
+      .banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+
+      .banner__chip {
+        font-size: 0.62rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 3px 9px;
+        border-radius: 10px;
+        color: #1a0f06;
+        background: var(--tonk-phase-discard);
+      }
+
+      .banner__trick {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: var(--gold-accent);
+      }
+
+      .piles {
+        display: flex;
+        gap: 20px;
+      }
+
+      .pile-card {
+        width: 58px;
+        height: 82px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-size: 1.2rem;
+      }
+
+      .pile-card--back {
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1px solid var(--gold-accent);
+        color: rgba(255, 255, 255, 0.25);
+      }
+
+      .pile-card--face {
+        background: var(--card-face);
+        color: var(--red-suit);
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 10px var(--card-shadow);
+      }
+
+      .pile-card--drawable {
+        outline: 2px solid var(--tonk-cyan);
+        outline-offset: 2px;
+      }
+
+      .pile-lbl {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        text-align: center;
+        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      /* --- own hand --- */
+      .hand-zone {
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 8px 12px 10px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .hand-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+
+      .hand-lbl {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .hand {
+        display: flex;
+      }
+
+      .hand .hcard {
+        width: 46px;
+        height: 66px;
+        margin-left: -14px;
+        border-radius: 5px;
+        background: var(--card-face);
+        border: 1px solid rgba(0, 0, 0, 0.25);
+        box-shadow: 0 3px 8px var(--card-shadow);
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 4px;
+        font-family: var(--font-card);
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .hand .hcard:first-child {
+        margin-left: 0;
+      }
+      .hcard.red {
+        color: var(--red-suit);
+      }
+      .hcard.black {
+        color: var(--black-suit);
+      }
+
+      /* --- actions bar --- */
+      .actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 8px;
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+        position: relative;
+        z-index: 2;
+      }
+
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        font-weight: 700;
+        border-radius: 6px;
+        padding: 8px 18px;
+        border: none;
+        cursor: pointer;
+      }
+
+      .btn--gold {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--ghost {
+        background: transparent;
+        border: 1.5px solid var(--text-muted);
+        color: var(--text-primary);
+      }
+      .btn--danger {
+        background: transparent;
+        border: 1.5px solid var(--tonk-near-150);
+        color: var(--tonk-near-150);
+      }
+
+      /* ==========================================================
+         OPTION A — Self-seat chip in the rail
+         ========================================================== */
+      .boardA {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      /* ==========================================================
+         OPTION B — "Your score" pill fused to the hand label row
+         ========================================================== */
+      .score-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 3px 4px 3px 12px;
+        border-radius: 20px;
+        background: rgba(0, 0, 0, 0.32);
+        border: 1px solid var(--table-rim-light);
+      }
+
+      .score-pill__lbl {
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      .score-pill__val {
+        font-size: 0.95rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #1a0f06;
+        background: var(--tonk-cyan);
+        border-radius: 16px;
+        padding: 2px 12px;
+        line-height: 1.3;
+      }
+
+      .score-pill__val--near {
+        background: var(--tonk-near-150);
+      }
+
+      .score-pill__delta {
+        font-size: 0.62rem;
+        color: var(--text-muted);
+      }
+
+      /* ==========================================================
+         OPTION C — Corner HUD badge anchored to the hand corner
+         ========================================================== */
+      .hud {
+        position: absolute;
+        z-index: 5;
+      }
+
+      .hud--desktop {
+        left: 12px;
+        bottom: 84px; /* sits just above the hand zone */
+      }
+
+      .hud--mobile {
+        left: 8px;
+        bottom: 66px;
+      }
+
+      .hud__badge {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1px;
+        padding: 8px 14px 8px 12px;
+        border-radius: 12px;
+        background: var(--panel-bg);
+        border: 1.5px solid var(--tonk-cyan);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(6px);
+      }
+
+      .hud__lbl {
+        font-size: 0.55rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      .hud__row {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+
+      .hud__val {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        color: var(--tonk-cyan);
+      }
+
+      .hud__val--near {
+        color: var(--tonk-near-150);
+      }
+
+      .hud__of {
+        font-size: 0.62rem;
+        color: var(--text-muted);
+      }
+
+      .hud__bar {
+        width: 100%;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(0, 0, 0, 0.4);
+        margin-top: 3px;
+        overflow: hidden;
+      }
+
+      .hud__bar-fill {
+        height: 100%;
+        background: var(--tonk-cyan);
+        width: 58%;
+      }
+      .hud__bar-fill--near {
+        background: var(--tonk-near-150);
+        width: 84%;
+      }
+
+      /* legend swatch */
+      .swatch {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        border-radius: 3px;
+        vertical-align: -1px;
+        margin-right: 4px;
+      }
+
+      .callout {
+        border-left: 3px solid var(--tonk-cyan);
+        padding: 10px 14px;
+        background: rgba(63, 208, 216, 0.06);
+        border-radius: 0 8px 8px 0;
+        margin: 14px 0 0;
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        max-width: 74ch;
+        line-height: 1.5;
+      }
+
+      hr.sep {
+        border: none;
+        border-top: 1px solid var(--table-rim-light);
+        margin: 0 0 40px;
+      }
+
+      .rec {
+        display: inline-block;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        background: var(--tonk-cyan);
+        color: #0c1416;
+        border-radius: 5px;
+        padding: 2px 8px;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc">
+      <h1 class="doc__title">Tonk — Seeing your own score</h1>
+      <p class="doc__lede">
+        Today a Tonk player cannot see their own tally: the seat rail
+        deliberately excludes self, and on mobile the tally panel is hidden
+        entirely with no drawer. Since Tonk ends when anyone hits 150, knowing
+        your own standing is essential to deciding whether to play
+        conservatively or call TONK. Below are three distinct ways to surface
+        the local player's own tally, persistently, on both desktop and mobile.
+      </p>
+      <p class="doc__note">
+        All values are read from the same server-authoritative
+        <code>tonkState.tallies[myPlayerIndex]</code> the tally panel and seat
+        rail already use — no client-side score recomputation.
+      </p>
+
+      <hr class="sep" />
+
+      <!-- ============================================================
+           OPTION A
+           ============================================================ -->
+      <section class="opt">
+        <span class="opt__tag">Option A</span>
+        <span class="rec">Recommended</span>
+        <h2 class="opt__name">Self-seat chip in the rail</h2>
+        <p class="opt__desc">
+          Add the local player back into the seat rail as a distinct
+          <b>"You" chip</b> (cyan accent, always first). This puts your tally
+          right beside opponents' tallies, using the exact surface players
+          already scan for standings — one consistent comparison row. Because
+          the rail is the <b>only per-player UI shown on mobile</b>, this single
+          change fixes desktop and mobile at once. The card-back fan is dropped
+          for self (you see your real hand below), keeping the chip compact.
+        </p>
+        <div class="callout">
+          Why recommended: smallest surface-area change, reuses the rail that
+          already renders on every viewport, and keeps self/opponent tallies in
+          one glanceable row. The cyan "You" treatment doubles as the self-seat
+          affordance the rail lacks today.
+        </div>
+
+        <div class="stage-row">
+          <div class="stage">
+            <p class="stage__cap">Desktop · 1280px · your turn</p>
+            <div class="frame frame--desktop">
+              <div class="boardA">
+                <div class="rail">
+                  <div class="seat seat--self">
+                    <div class="seat__name">You</div>
+                    <div class="seat__meta">
+                      <span class="seat__youtag">you</span>
+                      <span class="seat__count">6</span>
+                      <span class="seat__tally">45</span>
+                    </div>
+                  </div>
+                  <div class="seat seat--active">
+                    <div class="pulse"></div>
+                    <div class="seat__name">Marcus</div>
+                    <div class="seat__meta">
+                      <span class="seat__count">7</span>
+                      <span class="seat__tally">88</span>
+                    </div>
+                  </div>
+                  <div class="seat">
+                    <div class="seat__name">Priya</div>
+                    <div class="seat__meta">
+                      <span class="seat__count">5</span>
+                      <span class="seat__tally">112</span>
+                    </div>
+                  </div>
+                  <div class="seat">
+                    <div class="seat__name">Dev</div>
+                    <div class="seat__meta">
+                      <span class="seat__count">9</span>
+                      <span class="seat__tally">31</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="table">
+                  <div class="banner">
+                    <span>Marcus's turn</span>
+                    <span class="banner__chip">discard phase</span>
+                    <span class="banner__trick">TRICK 4</span>
+                  </div>
+                  <div class="piles">
+                    <div>
+                      <div class="pile-card pile-card--back">42</div>
+                      <div class="pile-lbl">Stock</div>
+                    </div>
+                    <div>
+                      <div
+                        class="pile-card pile-card--face pile-card--drawable"
+                      >
+                        7♥
+                      </div>
+                      <div class="pile-lbl">Discard</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="hand-zone">
+                  <div class="hand-head">
+                    <span class="hand-lbl">Your hand (6)</span>
+                  </div>
+                  <div class="hand">
+                    <div class="hcard red">3♦</div>
+                    <div class="hcard black">5♣</div>
+                    <div class="hcard black">5♠</div>
+                    <div class="hcard red">9♥</div>
+                    <div class="hcard black">J♠</div>
+                    <div class="hcard red">Q♦</div>
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <button class="btn btn--gold">Discard</button>
+                  <button class="btn btn--danger">Call TONK</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage">
+            <p class="stage__cap">Mobile · 375px · your turn</p>
+            <div class="frame frame--mobile">
+              <div class="boardA">
+                <div class="rail" style="flex-wrap: wrap; gap: 6px">
+                  <div
+                    class="seat seat--self"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <span class="seat__youtag">you</span>
+                    <span class="seat__name">You</span>
+                    <span class="seat__tally">45</span>
+                  </div>
+                  <div
+                    class="seat seat--active"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <div class="pulse"></div>
+                    <span class="seat__name">Marcus</span>
+                    <span class="seat__tally">88</span>
+                  </div>
+                  <div
+                    class="seat"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <span class="seat__name">Priya</span>
+                    <span class="seat__tally">112</span>
+                  </div>
+                  <div
+                    class="seat"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <span class="seat__name">Dev</span>
+                    <span class="seat__tally">31</span>
+                  </div>
+                </div>
+
+                <div class="table">
+                  <div class="banner" style="font-size: 0.78rem">
+                    <span>Marcus's turn</span>
+                    <span class="banner__chip">disc.</span>
+                  </div>
+                  <div class="piles">
+                    <div>
+                      <div
+                        class="pile-card pile-card--back"
+                        style="width: 48px; height: 68px"
+                      >
+                        42
+                      </div>
+                      <div class="pile-lbl">Stock</div>
+                    </div>
+                    <div>
+                      <div
+                        class="pile-card pile-card--face pile-card--drawable"
+                        style="width: 48px; height: 68px"
+                      >
+                        7♥
+                      </div>
+                      <div class="pile-lbl">Discard</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="hand-zone">
+                  <div class="hand-head">
+                    <span class="hand-lbl">Your hand (6)</span>
+                  </div>
+                  <div class="hand">
+                    <div class="hcard red" style="width: 40px; height: 58px">
+                      3♦
+                    </div>
+                    <div class="hcard black" style="width: 40px; height: 58px">
+                      5♣
+                    </div>
+                    <div class="hcard black" style="width: 40px; height: 58px">
+                      5♠
+                    </div>
+                    <div class="hcard red" style="width: 40px; height: 58px">
+                      9♥
+                    </div>
+                    <div class="hcard black" style="width: 40px; height: 58px">
+                      J♠
+                    </div>
+                    <div class="hcard red" style="width: 40px; height: 58px">
+                      Q♦
+                    </div>
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <button class="btn btn--gold" style="padding: 8px 14px">
+                    Discard
+                  </button>
+                  <button class="btn btn--danger" style="padding: 8px 14px">
+                    TONK
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="sep" />
+
+      <!-- ============================================================
+           OPTION B
+           ============================================================ -->
+      <section class="opt">
+        <span class="opt__tag">Option B</span>
+        <h2 class="opt__name">"Your score" pill on the hand label row</h2>
+        <p class="opt__desc">
+          Keep the seat rail opponents-only, but enrich the existing
+          <b>"Your hand (n)"</b> label row with a right-aligned
+          <b>score pill</b>. Your tally lives directly above your cards — where
+          your eyes already are while deciding a move. The pill turns amber when
+          you cross the near-150 warning threshold (120+), mirroring the tally
+          panel's warning styling. Works identically on desktop and mobile since
+          the hand zone is always present on both.
+        </p>
+        <div class="callout">
+          Trade-off: puts the score in the most action-relevant spot (next to
+          your hand) but does <b>not</b> place it beside opponents' tallies, so
+          direct standings comparison still requires the rail/panel.
+        </div>
+
+        <div class="stage-row">
+          <div class="stage">
+            <p class="stage__cap">Desktop · safe standing (tally 45)</p>
+            <div class="frame frame--desktop">
+              <div class="boardA">
+                <div class="rail">
+                  <div class="seat seat--active">
+                    <div class="pulse"></div>
+                    <div class="seat__name">Marcus</div>
+                    <div class="seat__meta">
+                      <span class="seat__count">7</span>
+                      <span class="seat__tally">88</span>
+                    </div>
+                  </div>
+                  <div class="seat">
+                    <div class="seat__name">Priya</div>
+                    <div class="seat__meta">
+                      <span class="seat__count">5</span>
+                      <span class="seat__tally">112</span>
+                    </div>
+                  </div>
+                  <div class="seat">
+                    <div class="seat__name">Dev</div>
+                    <div class="seat__meta">
+                      <span class="seat__count">9</span>
+                      <span class="seat__tally">31</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="table">
+                  <div class="banner">
+                    <span>Marcus's turn</span>
+                    <span class="banner__chip">discard phase</span>
+                    <span class="banner__trick">TRICK 4</span>
+                  </div>
+                  <div class="piles">
+                    <div>
+                      <div class="pile-card pile-card--back">42</div>
+                      <div class="pile-lbl">Stock</div>
+                    </div>
+                    <div>
+                      <div
+                        class="pile-card pile-card--face pile-card--drawable"
+                      >
+                        7♥
+                      </div>
+                      <div class="pile-lbl">Discard</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="hand-zone">
+                  <div class="hand-head">
+                    <span class="hand-lbl">Your hand (6)</span>
+                    <span class="score-pill">
+                      <span class="score-pill__lbl">Your score</span>
+                      <span class="score-pill__val">45</span>
+                    </span>
+                  </div>
+                  <div class="hand">
+                    <div class="hcard red">3♦</div>
+                    <div class="hcard black">5♣</div>
+                    <div class="hcard black">5♠</div>
+                    <div class="hcard red">9♥</div>
+                    <div class="hcard black">J♠</div>
+                    <div class="hcard red">Q♦</div>
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <button class="btn btn--gold">Discard</button>
+                  <button class="btn btn--danger">Call TONK</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage">
+            <p class="stage__cap">Mobile · near-150 warning (tally 126)</p>
+            <div class="frame frame--mobile">
+              <div class="boardA">
+                <div class="rail" style="flex-wrap: wrap; gap: 6px">
+                  <div
+                    class="seat seat--active"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <div class="pulse"></div>
+                    <span class="seat__name">Marcus</span>
+                    <span class="seat__tally">88</span>
+                  </div>
+                  <div
+                    class="seat"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <span class="seat__name">Priya</span>
+                    <span class="seat__tally">112</span>
+                  </div>
+                  <div
+                    class="seat"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <span class="seat__name">Dev</span>
+                    <span class="seat__tally">31</span>
+                  </div>
+                </div>
+
+                <div class="table">
+                  <div class="banner" style="font-size: 0.78rem">
+                    <span>Marcus's turn</span>
+                    <span class="banner__chip">disc.</span>
+                  </div>
+                  <div class="piles">
+                    <div>
+                      <div
+                        class="pile-card pile-card--back"
+                        style="width: 48px; height: 68px"
+                      >
+                        42
+                      </div>
+                      <div class="pile-lbl">Stock</div>
+                    </div>
+                    <div>
+                      <div
+                        class="pile-card pile-card--face pile-card--drawable"
+                        style="width: 48px; height: 68px"
+                      >
+                        7♥
+                      </div>
+                      <div class="pile-lbl">Discard</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="hand-zone">
+                  <div class="hand-head">
+                    <span class="hand-lbl">Your hand (6)</span>
+                    <span class="score-pill" style="padding: 2px 3px 2px 9px">
+                      <span class="score-pill__lbl">Score</span>
+                      <span class="score-pill__val score-pill__val--near"
+                        >126</span
+                      >
+                    </span>
+                  </div>
+                  <div class="hand">
+                    <div class="hcard red" style="width: 40px; height: 58px">
+                      3♦
+                    </div>
+                    <div class="hcard black" style="width: 40px; height: 58px">
+                      5♣
+                    </div>
+                    <div class="hcard black" style="width: 40px; height: 58px">
+                      5♠
+                    </div>
+                    <div class="hcard red" style="width: 40px; height: 58px">
+                      9♥
+                    </div>
+                    <div class="hcard black" style="width: 40px; height: 58px">
+                      J♠
+                    </div>
+                    <div class="hcard red" style="width: 40px; height: 58px">
+                      Q♦
+                    </div>
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <button class="btn btn--gold" style="padding: 8px 14px">
+                    Discard
+                  </button>
+                  <button class="btn btn--danger" style="padding: 8px 14px">
+                    TONK
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="sep" />
+
+      <!-- ============================================================
+           OPTION C
+           ============================================================ -->
+      <section class="opt">
+        <span class="opt__tag">Option C</span>
+        <h2 class="opt__name">Floating corner HUD badge</h2>
+        <p class="opt__desc">
+          A small <b>floating badge</b> anchored to the lower-left corner of the
+          board, hovering just above the hand zone. It shows your tally large,
+          with a <b>"/ 150"</b> reference and a mini progress-to-loss-line bar —
+          the same gauge metaphor the tally panel uses. It is the most
+          prominent/glanceable of the three and never competes with the rail or
+          hand label, but it introduces a new floating element and overlaps the
+          felt (a bit more visual chrome).
+        </p>
+        <div class="callout">
+          Trade-off: highest prominence and richest self-context (bar + loss
+          line), but adds a floating overlay to a board that otherwise keeps
+          chrome minimal, and needs care so it never covers cards on the
+          smallest viewports.
+        </div>
+
+        <div class="stage-row">
+          <div class="stage">
+            <p class="stage__cap">Desktop · safe standing (tally 45)</p>
+            <div class="frame frame--desktop">
+              <div class="hud hud--desktop">
+                <div class="hud__badge">
+                  <span class="hud__lbl">Your score</span>
+                  <div class="hud__row">
+                    <span class="hud__val">45</span>
+                    <span class="hud__of">/ 150</span>
+                  </div>
+                  <div class="hud__bar"><div class="hud__bar-fill"></div></div>
+                </div>
+              </div>
+              <div class="boardA">
+                <div class="rail">
+                  <div class="seat seat--active">
+                    <div class="pulse"></div>
+                    <div class="seat__name">Marcus</div>
+                    <div class="seat__meta">
+                      <span class="seat__count">7</span>
+                      <span class="seat__tally">88</span>
+                    </div>
+                  </div>
+                  <div class="seat">
+                    <div class="seat__name">Priya</div>
+                    <div class="seat__meta">
+                      <span class="seat__count">5</span>
+                      <span class="seat__tally">112</span>
+                    </div>
+                  </div>
+                  <div class="seat">
+                    <div class="seat__name">Dev</div>
+                    <div class="seat__meta">
+                      <span class="seat__count">9</span>
+                      <span class="seat__tally">31</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="table">
+                  <div class="banner">
+                    <span>Marcus's turn</span>
+                    <span class="banner__chip">discard phase</span>
+                    <span class="banner__trick">TRICK 4</span>
+                  </div>
+                  <div class="piles">
+                    <div>
+                      <div class="pile-card pile-card--back">42</div>
+                      <div class="pile-lbl">Stock</div>
+                    </div>
+                    <div>
+                      <div
+                        class="pile-card pile-card--face pile-card--drawable"
+                      >
+                        7♥
+                      </div>
+                      <div class="pile-lbl">Discard</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="hand-zone">
+                  <div class="hand-head">
+                    <span class="hand-lbl">Your hand (6)</span>
+                  </div>
+                  <div class="hand">
+                    <div class="hcard red">3♦</div>
+                    <div class="hcard black">5♣</div>
+                    <div class="hcard black">5♠</div>
+                    <div class="hcard red">9♥</div>
+                    <div class="hcard black">J♠</div>
+                    <div class="hcard red">Q♦</div>
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <button class="btn btn--gold">Discard</button>
+                  <button class="btn btn--danger">Call TONK</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage">
+            <p class="stage__cap">Mobile · near-150 warning (tally 126)</p>
+            <div class="frame frame--mobile">
+              <div class="hud hud--mobile">
+                <div class="hud__badge" style="padding: 6px 12px 6px 10px">
+                  <span class="hud__lbl">Your score</span>
+                  <div class="hud__row">
+                    <span
+                      class="hud__val hud__val--near"
+                      style="font-size: 1.3rem"
+                      >126</span
+                    >
+                    <span class="hud__of">/ 150</span>
+                  </div>
+                  <div class="hud__bar">
+                    <div class="hud__bar-fill hud__bar-fill--near"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="boardA">
+                <div class="rail" style="flex-wrap: wrap; gap: 6px">
+                  <div
+                    class="seat seat--active"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <div class="pulse"></div>
+                    <span class="seat__name">Marcus</span>
+                    <span class="seat__tally">88</span>
+                  </div>
+                  <div
+                    class="seat"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <span class="seat__name">Priya</span>
+                    <span class="seat__tally">112</span>
+                  </div>
+                  <div
+                    class="seat"
+                    style="
+                      flex-direction: row;
+                      border-radius: 16px;
+                      padding: 4px 9px;
+                    "
+                  >
+                    <span class="seat__name">Dev</span>
+                    <span class="seat__tally">31</span>
+                  </div>
+                </div>
+
+                <div class="table">
+                  <div class="banner" style="font-size: 0.78rem">
+                    <span>Marcus's turn</span>
+                    <span class="banner__chip">disc.</span>
+                  </div>
+                  <div class="piles">
+                    <div>
+                      <div
+                        class="pile-card pile-card--back"
+                        style="width: 48px; height: 68px"
+                      >
+                        42
+                      </div>
+                      <div class="pile-lbl">Stock</div>
+                    </div>
+                    <div>
+                      <div
+                        class="pile-card pile-card--face pile-card--drawable"
+                        style="width: 48px; height: 68px"
+                      >
+                        7♥
+                      </div>
+                      <div class="pile-lbl">Discard</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="hand-zone">
+                  <div class="hand-head">
+                    <span class="hand-lbl">Your hand (6)</span>
+                  </div>
+                  <div class="hand">
+                    <div class="hcard red" style="width: 40px; height: 58px">
+                      3♦
+                    </div>
+                    <div class="hcard black" style="width: 40px; height: 58px">
+                      5♣
+                    </div>
+                    <div class="hcard black" style="width: 40px; height: 58px">
+                      5♠
+                    </div>
+                    <div class="hcard red" style="width: 40px; height: 58px">
+                      9♥
+                    </div>
+                    <div class="hcard black" style="width: 40px; height: 58px">
+                      J♠
+                    </div>
+                    <div class="hcard red" style="width: 40px; height: 58px">
+                      Q♦
+                    </div>
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <button class="btn btn--gold" style="padding: 8px 14px">
+                    Discard
+                  </button>
+                  <button class="btn btn--danger" style="padding: 8px 14px">
+                    TONK
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="sep" />
+      <p class="doc__lede">
+        <b>Legend.</b>
+        <span class="swatch" style="background: var(--tonk-cyan)"></span>cyan =
+        self / your-score accent (distinct from the gold active-turn glow and
+        the blue AI accent) ·
+        <span class="swatch" style="background: var(--tonk-near-150)"></span
+        >amber = near-150 loss-line warning (tally ≥ 120), matching the tally
+        panel.
+      </p>
+    </div>
+  </body>
+</html>
