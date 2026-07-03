@@ -86,6 +86,8 @@ function openFeedback(): void {
     class="help-cluster"
     :class="{
       'help-cluster--board': onBoard,
+      'help-cluster--board-tonk':
+        onBoard && !isNarrow && currentGameType === 'tonk',
       'help-cluster--board-mobile': onBoard && isNarrow,
     }"
   >
@@ -163,6 +165,14 @@ function openFeedback(): void {
    overlaps Play/Pass (Big2) or Discard/Draw/TONK (Tonk). */
 .help-cluster--board {
   bottom: calc(64px + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Live Tonk board (desktop >767px): the Tonk action panel is auto-height
+   (LLD 134) and can reach ~150px on the active player's turn (error + stepper
+   + buttons). Override the generic 64px offset with a value that clears even
+   the tallest three-line panel state. */
+.help-cluster--board-tonk {
+  bottom: calc(160px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Live board (mobile ≤767px): clear the mobile action row; both FABs shown,
