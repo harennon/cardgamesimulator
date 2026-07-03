@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tonk Game-Over · "Total Turns" fix — mockups</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* --- Tokens mirrored from src/frontend/styles/game-variables.css --- */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --error-text: #e05555;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        /* Felt table backdrop with a soft vignette so the panels float. */
+        background: radial-gradient(
+          ellipse 90% 70% at 50% 30%,
+          var(--felt-light) 0%,
+          var(--felt) 55%,
+          #123420 100%
+        );
+        min-height: 100vh;
+        padding: 48px 24px 96px;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 8px;
+      }
+
+      .page-head h1 {
+        font-family: var(--font-card);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0 0 6px;
+        letter-spacing: 0.01em;
+      }
+
+      .page-head p {
+        font-size: 0.9rem;
+        color: var(--text-primary);
+        max-width: 720px;
+        line-height: 1.55;
+        margin: 0 0 4px;
+        opacity: 0.9;
+      }
+
+      .page-head code {
+        font-family: "SFMono-Regular", ui-monospace, monospace;
+        font-size: 0.82em;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 4px;
+        padding: 1px 6px;
+        color: var(--gold-accent);
+      }
+
+      /* The offending baseline, shown for contrast. */
+      .bug-callout {
+        max-width: 1180px;
+        margin: 24px auto 40px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+
+      @media (max-width: 860px) {
+        .bug-callout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .note {
+        border-radius: 10px;
+        padding: 16px 18px;
+        font-size: 0.85rem;
+        line-height: 1.5;
+      }
+
+      .note--bug {
+        background: rgba(224, 85, 85, 0.08);
+        border: 1px solid rgba(224, 85, 85, 0.4);
+      }
+
+      .note--fix {
+        background: rgba(201, 168, 76, 0.08);
+        border: 1px solid rgba(201, 168, 76, 0.35);
+      }
+
+      .note strong {
+        color: var(--gold-accent);
+      }
+
+      .note--bug strong {
+        color: var(--error-text);
+      }
+
+      .note .kbd {
+        font-family: "SFMono-Regular", ui-monospace, monospace;
+        font-size: 0.9em;
+      }
+
+      /* --- Option gallery --- */
+      .gallery {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 32px;
+        align-items: start;
+      }
+
+      @media (max-width: 1080px) {
+        .gallery {
+          grid-template-columns: 1fr;
+          max-width: 520px;
+        }
+      }
+
+      .option {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .option__tag {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 8px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+      }
+
+      .option__tag span {
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: 0.02em;
+        color: var(--text-muted);
+      }
+
+      .option__blurb {
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: var(--text-primary);
+        opacity: 0.85;
+        min-height: 3.6em;
+      }
+
+      /* --- Faithful reproduction of GameOverView.vue panel --- */
+      .game-over__panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 32px 30px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        box-shadow:
+          0 24px 60px rgba(0, 0, 0, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      }
+
+      .game-over__winner {
+        font-family: var(--font-ui);
+        font-size: 1.7rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0;
+        text-shadow: 0 0 24px var(--gold-glow);
+        text-align: center;
+      }
+
+      .game-over__scores {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--font-ui);
+        font-size: 0.88rem;
+        color: var(--text-primary);
+      }
+
+      .game-over__scores th {
+        color: var(--gold-accent);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--table-rim-light);
+        text-align: left;
+      }
+
+      .game-over__scores td {
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+        color: var(--text-primary);
+      }
+
+      .game-over__player-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .game-over__badge {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .badge--gold {
+        background: #c9a84c;
+        box-shadow: 0 0 6px rgba(201, 168, 76, 0.5);
+      }
+      .badge--silver {
+        background: #a8a8a8;
+        box-shadow: 0 0 6px rgba(168, 168, 168, 0.4);
+      }
+      .badge--bronze {
+        background: #b87333;
+        box-shadow: 0 0 6px rgba(184, 115, 51, 0.4);
+      }
+      .badge--grey {
+        background: #5a5a5a;
+      }
+
+      /* Loser row emphasis — Tonk is loss-centric; the joker-drawer is the loser. */
+      .row--loser td {
+        color: #e0b0b0;
+      }
+      .row--loser .tag-loser {
+        margin-left: 6px;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--error-text);
+        border: 1px solid rgba(224, 85, 85, 0.5);
+        border-radius: 3px;
+        padding: 1px 5px;
+      }
+
+      /* ---- Baseline (buggy) metadata line ---- */
+      .game-over__metadata {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      .game-over__metadata--bug {
+        color: var(--error-text);
+      }
+
+      /* ---- Option B: relabelled single line (same DOM shape as today) ---- */
+      .game-over__metadata--relabel strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* ---- Option C: metadata chip strip ---- */
+      .meta-strip {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+      }
+
+      .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(201, 168, 76, 0.18);
+        font-size: 0.74rem;
+        color: var(--text-muted);
+        letter-spacing: 0.01em;
+      }
+
+      .meta-chip b {
+        font-weight: 700;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .meta-chip__dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        opacity: 0.75;
+      }
+
+      /* ---- shared stat grid (unchanged from prod, shown for context) ---- */
+      .game-over__stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        width: 100%;
+      }
+
+      .game-over__stat-card {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        padding: 13px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .game-over__stat-label {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .game-over__stat-value {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .game-over__actions {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .game-over__btn {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 9px 22px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease;
+      }
+
+      .btn--rematch {
+        background: transparent;
+        color: var(--gold-accent);
+        border: 1.5px solid var(--gold-accent);
+      }
+      .btn--rematch:hover {
+        background: var(--gold-glow);
+      }
+      .btn--home {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--home:hover {
+        background: #d4b45a;
+      }
+
+      /* Highlight ring around the metadata slot being demonstrated. */
+      .focus-slot {
+        position: relative;
+        width: 100%;
+        border-radius: 8px;
+        padding: 8px 6px;
+        outline: 1px dashed rgba(201, 168, 76, 0.35);
+        outline-offset: 4px;
+        animation: slotPulse 2.6s ease-in-out infinite;
+      }
+
+      @keyframes slotPulse {
+        0%,
+        100% {
+          outline-color: rgba(201, 168, 76, 0.2);
+        }
+        50% {
+          outline-color: rgba(201, 168, 76, 0.55);
+        }
+      }
+
+      .focus-slot__caption {
+        position: absolute;
+        top: -9px;
+        right: 8px;
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        background: var(--panel-bg);
+        padding: 0 6px;
+      }
+
+      /* Big2 comparison strip at the bottom */
+      .compare {
+        max-width: 1180px;
+        margin: 56px auto 0;
+      }
+
+      .compare h2 {
+        font-family: var(--font-card);
+        font-size: 1.15rem;
+        color: var(--gold-accent);
+        margin: 0 0 6px;
+      }
+
+      .compare p {
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        opacity: 0.85;
+        margin: 0 0 22px;
+        max-width: 720px;
+        line-height: 1.5;
+      }
+
+      .compare__grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+        max-width: 760px;
+      }
+
+      @media (max-width: 720px) {
+        .compare__grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .mini-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .focus-slot {
+          animation: none;
+          outline-color: rgba(201, 168, 76, 0.4);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-head">
+      <h1>Tonk game-over — fixing the confusing "Total Turns" value</h1>
+      <p>
+        On the Tonk results screen, <code>Total Turns</code> currently binds the
+        engine's internal <code>turnNumber</code>, which ticks on every discard
+        <em>and</em> every draw (two per real turn) and again on each round
+        reset — never resetting across the multi-round match. A four-player game
+        easily reaches the reported <strong>192</strong>. It is an internal
+        sequence number, not a figure a player can reason about.
+      </p>
+      <p>
+        Below are three distinct resolutions, each shown inside a faithful copy
+        of the real <code>GameOverView</code> panel. Big2 is untouched in all
+        three (see the comparison at the bottom).
+      </p>
+    </header>
+
+    <section class="bug-callout">
+      <div class="note note--bug">
+        <strong>Today (bug):</strong> Tonk shows
+        <span class="kbd">Total Turns: 192</span> — inflated, double-counted,
+        cumulative across rounds. No player intuition maps to it.
+      </div>
+      <div class="note note--fix">
+        <strong>The real, reasonable number:</strong> Tonk already counts rounds
+        in-game as <span class="kbd">TRICK 1 … TRICK N</span> (tally panel +
+        phase banner). The final <span class="kbd">trickNumber</span> is the
+        rounds-played figure a player has literally watched count up. In this
+        scenario that is <strong>4</strong>.
+      </div>
+    </section>
+
+    <main class="gallery">
+      <!-- ================= OPTION A: HIDE ================= -->
+      <div class="option">
+        <div class="option__tag">
+          Option A <span>· Hide the row for Tonk</span>
+        </div>
+        <div class="option__blurb">
+          Simplest, lowest-risk. The metadata line renders only for game types
+          with a meaningful turn count (Big2). Tonk shows nothing between the
+          score table and the stat grid — no wrong number, no new vocabulary.
+        </div>
+        <div class="game-over__panel">
+          <h1 class="game-over__winner">Alice wins!</h1>
+          <table class="game-over__scores">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Place</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--gold"></span>Alice
+                </td>
+                <td>1st</td>
+                <td>88</td>
+              </tr>
+              <tr>
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--silver"></span>Bo
+                </td>
+                <td>2nd</td>
+                <td>121</td>
+              </tr>
+              <tr>
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--bronze"></span>Cy
+                </td>
+                <td>3rd</td>
+                <td>139</td>
+              </tr>
+              <tr class="row--loser">
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--grey"></span>Dot
+                  <span class="tag-loser">Drew joker</span>
+                </td>
+                <td>4th</td>
+                <td>162</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- metadata slot intentionally absent -->
+          <div
+            class="focus-slot"
+            style="
+              border: 1px dashed transparent;
+              outline-offset: 2px;
+              min-height: 8px;
+            "
+          >
+            <span class="focus-slot__caption">no metadata row</span>
+          </div>
+
+          <div class="game-over__stats">
+            <div class="game-over__stat-card">
+              <span class="game-over__stat-label">Lowest Round</span>
+              <span class="game-over__stat-value">3</span>
+            </div>
+            <div class="game-over__stat-card">
+              <span class="game-over__stat-label">Times Called Tonk</span>
+              <span class="game-over__stat-value">1</span>
+            </div>
+          </div>
+
+          <div class="game-over__actions">
+            <button class="game-over__btn btn--rematch">Rematch</button>
+            <button class="game-over__btn btn--home">Back to Home</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= OPTION B: RELABEL ================= -->
+      <div class="option">
+        <div class="option__tag">
+          Option B <span>· Relabel to "Rounds Played"</span>
+        </div>
+        <div class="option__blurb">
+          Keeps the single metadata line but shows an accurate value: the final
+          <code>trickNumber</code> (rounds dealt), the same count the player
+          watched as "TRICK N" in-game. Big2 keeps saying "Total Turns". One
+          honest number, familiar shape.
+        </div>
+        <div class="game-over__panel">
+          <h1 class="game-over__winner">Alice wins!</h1>
+          <table class="game-over__scores">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Place</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--gold"></span>Alice
+                </td>
+                <td>1st</td>
+                <td>88</td>
+              </tr>
+              <tr>
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--silver"></span>Bo
+                </td>
+                <td>2nd</td>
+                <td>121</td>
+              </tr>
+              <tr>
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--bronze"></span>Cy
+                </td>
+                <td>3rd</td>
+                <td>139</td>
+              </tr>
+              <tr class="row--loser">
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--grey"></span>Dot
+                  <span class="tag-loser">Drew joker</span>
+                </td>
+                <td>4th</td>
+                <td>162</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="focus-slot">
+            <span class="focus-slot__caption">relabelled line</span>
+            <div class="game-over__metadata game-over__metadata--relabel">
+              Rounds Played: <strong>4</strong>
+            </div>
+          </div>
+
+          <div class="game-over__stats">
+            <div class="game-over__stat-card">
+              <span class="game-over__stat-label">Lowest Round</span>
+              <span class="game-over__stat-value">3</span>
+            </div>
+            <div class="game-over__stat-card">
+              <span class="game-over__stat-label">Times Called Tonk</span>
+              <span class="game-over__stat-value">1</span>
+            </div>
+          </div>
+
+          <div class="game-over__actions">
+            <button class="game-over__btn btn--rematch">Rematch</button>
+            <button class="game-over__btn btn--home">Back to Home</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= OPTION C: METADATA CHIP STRIP ================= -->
+      <div class="option">
+        <div class="option__tag">
+          Option C <span>· Per-game-type chip strip</span>
+        </div>
+        <div class="option__blurb">
+          Replaces the plain line with a small pill strip that each game type
+          fills with its own accurate facts. Tonk shows "4 rounds" and "150 to
+          lose"; Big2 shows "24 turns". Most expressive, and future-proof for
+          per-game metadata — but the largest visual change.
+        </div>
+        <div class="game-over__panel">
+          <h1 class="game-over__winner">Alice wins!</h1>
+          <table class="game-over__scores">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Place</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--gold"></span>Alice
+                </td>
+                <td>1st</td>
+                <td>88</td>
+              </tr>
+              <tr>
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--silver"></span>Bo
+                </td>
+                <td>2nd</td>
+                <td>121</td>
+              </tr>
+              <tr>
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--bronze"></span>Cy
+                </td>
+                <td>3rd</td>
+                <td>139</td>
+              </tr>
+              <tr class="row--loser">
+                <td class="game-over__player-cell">
+                  <span class="game-over__badge badge--grey"></span>Dot
+                  <span class="tag-loser">Drew joker</span>
+                </td>
+                <td>4th</td>
+                <td>162</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="focus-slot">
+            <span class="focus-slot__caption">chip strip</span>
+            <div class="meta-strip">
+              <span class="meta-chip"
+                ><span class="meta-chip__dot"></span>Rounds <b>4</b></span
+              >
+              <span class="meta-chip"
+                ><span class="meta-chip__dot"></span>Lose at <b>150</b></span
+              >
+            </div>
+          </div>
+
+          <div class="game-over__stats">
+            <div class="game-over__stat-card">
+              <span class="game-over__stat-label">Lowest Round</span>
+              <span class="game-over__stat-value">3</span>
+            </div>
+            <div class="game-over__stat-card">
+              <span class="game-over__stat-label">Times Called Tonk</span>
+              <span class="game-over__stat-value">1</span>
+            </div>
+          </div>
+
+          <div class="game-over__actions">
+            <button class="game-over__btn btn--rematch">Rematch</button>
+            <button class="game-over__btn btn--home">Back to Home</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ================= BIG2 UNCHANGED COMPARISON ================= -->
+    <section class="compare">
+      <h2>Big2 stays exactly as-is</h2>
+      <p>
+        Big2's <code>turnNumber</code> is one increment per play/pass, so its
+        value stays plausible. Whichever option is chosen must leave Big2's
+        "Total Turns: 24" untouched. The left card is Big2 today; the right is
+        how each option behaves for Big2 (A/B keep the line; C would express it
+        as a "24 turns" chip).
+      </p>
+      <div class="compare__grid">
+        <div>
+          <div class="mini-label">Big2 — today (correct)</div>
+          <div class="game-over__panel" style="gap: 16px; padding: 24px 24px">
+            <h1 class="game-over__winner" style="font-size: 1.3rem">
+              Alice wins!
+            </h1>
+            <div class="game-over__metadata">Total Turns: 24</div>
+          </div>
+        </div>
+        <div>
+          <div class="mini-label">Big2 — after fix (Option C chip form)</div>
+          <div class="game-over__panel" style="gap: 16px; padding: 24px 24px">
+            <h1 class="game-over__winner" style="font-size: 1.3rem">
+              Alice wins!
+            </h1>
+            <div class="meta-strip">
+              <span class="meta-chip"
+                ><span class="meta-chip__dot"></span>Turns <b>24</b></span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
