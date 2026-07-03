@@ -10,6 +10,11 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- **LLD 125: CPU/AI players incorrectly show as disconnected in game**
+  - `src/frontend/component/game-ui/OpponentRow.vue` — guarded the disconnected label: `v-if="!player.isConnected && !player.isAi"` so bots no longer display a false red "disconnected" badge while genuinely offline humans still do.
+  - `src/frontend/component/game-ui/TonkSeatRail.vue` — same guard applied: `v-if="!seat.isConnected && !seat.isAi"`.
+  - `tests/frontend/disconnectedLabel.test.ts` — 9 unit tests covering both components (AI offline, human offline, human offline with isAi=false, connected human, connected AI) via a pure-function transcription of the predicate.
+
 - **LLD 122: AI/CPU players hang for ~60s after a human wins**
   - `src/backend/websocket/socketHandler.ts` — fixed `autoPlayAbandoned` loop bound from `playerCount * 2` (too small for multi-seat play-out) to `playerCount * (MAX_HAND_SIZE + playerCount)`, a ceiling that comfortably covers driving all remaining AI seats to `COMPLETED` in a single synchronous pass without truncating any legitimate game play-out.
   - Added a version-progress check inside the loop: if `applyAction` succeeds but `state.version` does not advance, the divergence guard fires immediately (B3) without waiting for the absolute ceiling.

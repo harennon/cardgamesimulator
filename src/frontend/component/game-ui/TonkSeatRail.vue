@@ -35,7 +35,9 @@
             >{{ phaseTagText }}</span
           >
         </div>
-        <span v-if="!seat.isConnected" class="tonk-seat__disconnected"
+        <span
+          v-if="!seat.isConnected && !seat.isAi"
+          class="tonk-seat__disconnected"
           >disconnected</span
         >
         <OpponentTimer
