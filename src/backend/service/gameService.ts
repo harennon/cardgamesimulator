@@ -11,6 +11,7 @@ import type { GameRepository } from "@/database/database";
 import type { Game } from "@/database/entities/Game";
 import { SeededPRNG } from "@/engine/prng";
 import type { StatsService } from "@/service/statsService";
+import { aiNameForOrdinal } from "@shared/aiNames";
 
 // Per-engine minimum player counts. Centralised here so startGame can guard
 // correctly without hardcoding 2 everywhere (Tonk requires 3).
@@ -256,7 +257,7 @@ export class GameService {
     const existingAiCount = (game.gameConfig.aiPlayerIds ?? []).length;
     for (let i = 0; i < count; i++) {
       const aiId = crypto.randomUUID();
-      const displayName = `CPU ${existingAiCount + i + 1}`;
+      const displayName = aiNameForOrdinal(existingAiCount + i);
       game.playerIds.push(aiId);
       game.playerDisplayNames[aiId] = displayName;
       game.gameConfig = {
