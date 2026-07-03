@@ -1,0 +1,1251 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rematch with CPU opponents — mockups</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---- Tokens mirrored from src/frontend/styles/game-variables.css ---- */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --error-text: #e05555;
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        /* AI identity tokens (LLD 120/128) */
+        --ai-accent: #7fb2ff;
+        --ai-accent-line: rgba(127, 178, 255, 0.5);
+        --ai-accent-dim: rgba(127, 178, 255, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        background: var(--felt);
+        background-image: radial-gradient(
+          ellipse 90% 70% at 50% 30%,
+          var(--felt-light) 0%,
+          var(--felt) 60%,
+          #123420 100%
+        );
+        min-height: 100vh;
+      }
+
+      /* ---- Mockup harness chrome (NOT part of the shipped UI) ---- */
+      .harness {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 28px 20px 80px;
+      }
+
+      .harness__intro {
+        border: 1px dashed var(--table-rim-light);
+        border-radius: 10px;
+        padding: 18px 22px;
+        margin-bottom: 26px;
+        background: rgba(0, 0, 0, 0.25);
+      }
+
+      .harness__intro h1 {
+        font-family: var(--font-card);
+        font-size: 1.35rem;
+        margin: 0 0 8px;
+        color: var(--gold-accent);
+      }
+
+      .harness__intro p {
+        margin: 6px 0;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        color: var(--text-primary);
+        max-width: 78ch;
+      }
+
+      .harness__intro code {
+        background: rgba(127, 178, 255, 0.12);
+        border: 1px solid var(--ai-accent-line);
+        border-radius: 4px;
+        padding: 1px 5px;
+        font-size: 0.82em;
+        color: var(--ai-accent);
+      }
+
+      .harness__toggle {
+        display: inline-flex;
+        gap: 6px;
+        margin-top: 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 999px;
+        padding: 4px;
+      }
+
+      .harness__toggle button {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 600;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        padding: 8px 16px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
+      }
+
+      .harness__toggle button.is-active {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .option-block {
+        display: none;
+      }
+      .option-block.is-active {
+        display: block;
+      }
+
+      .option-header {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin: 30px 0 6px;
+        flex-wrap: wrap;
+      }
+      .option-header h2 {
+        font-family: var(--font-card);
+        color: var(--gold-accent);
+        font-size: 1.15rem;
+        margin: 0;
+      }
+      .option-header .rec {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ai-accent);
+        border: 1px solid var(--ai-accent-line);
+        border-radius: 999px;
+        padding: 2px 10px;
+      }
+      .option-desc {
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        line-height: 1.5;
+        margin: 0 0 20px;
+        max-width: 80ch;
+      }
+
+      .state-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 26px;
+      }
+
+      .state-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .state-cell__label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .state-cell__label b {
+        color: var(--text-primary);
+      }
+
+      /* ============================================================= */
+      /* ==== Faithful reproduction of GameOverView.vue below ======== */
+      /* ============================================================= */
+      .game-over {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px;
+      }
+
+      .game-over__panel {
+        background: var(--panel-bg);
+        border: 2px solid var(--table-rim-light);
+        border-radius: 12px;
+        padding: 28px 30px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        width: 100%;
+        max-width: 440px;
+      }
+
+      .game-over__winner {
+        font-family: var(--font-ui);
+        font-size: 1.7rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin: 0;
+        text-shadow: 0 0 24px var(--gold-glow);
+      }
+
+      .game-over__scores {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--font-ui);
+        font-size: 0.88rem;
+        color: var(--text-primary);
+      }
+      .game-over__scores th {
+        color: var(--gold-accent);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--table-rim-light);
+        text-align: left;
+      }
+      .game-over__scores td {
+        padding: 7px 10px;
+        border-bottom: 1px solid rgba(74, 44, 30, 0.4);
+      }
+      .game-over__player-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .game-over__badge {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .game-over__badge--gold {
+        background: #c9a84c;
+        box-shadow: 0 0 6px rgba(201, 168, 76, 0.5);
+      }
+      .game-over__badge--silver {
+        background: #a8a8a8;
+      }
+      .game-over__badge--bronze {
+        background: #b87333;
+      }
+      .game-over__badge--grey {
+        background: #5a5a5a;
+      }
+
+      /* CPU inline badge — mirrors AiBadge.vue */
+      .ai-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-family: var(--font-ui);
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ai-accent);
+        flex-shrink: 0;
+      }
+      .ai-badge__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 2px;
+        background: var(--ai-accent);
+        flex-shrink: 0;
+      }
+
+      .game-over__actions {
+        display: flex;
+        gap: 12px;
+      }
+
+      .game-over__btn {
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 10px 26px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease;
+      }
+      .game-over__btn--rematch {
+        background: transparent;
+        color: var(--gold-accent);
+        border: 1.5px solid var(--gold-accent);
+      }
+      .game-over__btn--rematch:hover:not(:disabled) {
+        background: var(--gold-glow);
+      }
+      .game-over__btn--rematch:disabled {
+        color: var(--text-muted);
+        border-color: var(--text-muted);
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      .game-over__btn--home {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .game-over__btn--home:hover {
+        background: #d4b45a;
+      }
+
+      .game-over__rematch-hint {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        text-align: center;
+        max-width: 34ch;
+      }
+      .game-over__rematch-error {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        color: var(--error-text);
+        text-align: center;
+      }
+
+      /* ---- NEW: practice-rematch summary line (Option A) ---- */
+      .rematch-roster {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--ai-accent-line);
+        border-radius: 8px;
+        background: rgba(127, 178, 255, 0.06);
+      }
+      .rematch-roster__title {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ai-accent);
+      }
+      .rematch-roster__chips {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 7px;
+      }
+      .roster-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 4px 12px 4px 5px;
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+      .roster-chip--human {
+        background: rgba(201, 168, 76, 0.1);
+        border: 1px solid rgba(201, 168, 76, 0.4);
+        color: var(--text-primary);
+      }
+      .roster-chip--cpu {
+        background: rgba(127, 178, 255, 0.08);
+        border: 1px solid var(--ai-accent-line);
+        color: var(--text-primary);
+      }
+      .roster-chip__you {
+        font-size: 0.62rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.05em;
+      }
+
+      /* Human/CPU avatar dots reused in chips */
+      .avatar {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 0.62rem;
+        font-weight: 700;
+      }
+      .avatar--human {
+        background: radial-gradient(circle at 35% 30%, #5a3d1e, #2d1810);
+        border: 1.5px solid rgba(201, 168, 76, 0.5);
+        color: var(--gold-accent);
+      }
+      .avatar--cpu {
+        background: radial-gradient(circle at 35% 30%, #12305c, #0a1a33);
+        border: 1.5px solid var(--ai-accent-line);
+        box-shadow: 0 0 0 2px var(--ai-accent-dim);
+        color: var(--ai-accent);
+      }
+      .avatar--cpu svg {
+        width: 62%;
+        height: 62%;
+      }
+
+      /* ---- NEW: CPU count stepper on the game-over panel (Option A, advanced variant) ---- */
+      .cpu-stepper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+      }
+      .cpu-stepper__label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .cpu-stepper__controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .stepper__btn {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        border: 1.5px solid var(--ai-accent-line);
+        background: transparent;
+        color: var(--ai-accent);
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .stepper__btn:not(:disabled):hover {
+        background: rgba(127, 178, 255, 0.15);
+        border-color: var(--ai-accent);
+      }
+      .stepper__btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+      .stepper__value {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--ai-accent);
+        min-width: 20px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---- Option B: human-only explanatory hint variants ---- */
+      .game-over__rematch-hint--cpu {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        max-width: 40ch;
+      }
+      .game-over__rematch-hint--cpu .hint-lead {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .game-over__practice-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--ai-accent);
+        border: 1px solid var(--ai-accent-line);
+        border-radius: 999px;
+        padding: 3px 10px;
+      }
+
+      .newlink {
+        color: var(--gold-accent);
+        text-decoration: underline;
+        cursor: pointer;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="harness">
+      <div class="harness__intro">
+        <h1>Rematch with CPU opponents — game-over screen</h1>
+        <p>
+          <b>Bug:</b> after a practice game (1 human + N CPUs), the host clicks
+          <b>Rematch</b>, the button looks enabled, but the backend rejects it
+          (<code>NOT_ENOUGH_PLAYERS</code>) because CPU seats hold no socket and
+          are filtered out of the rematch roster. The user only sees
+          <em>"Couldn't start rematch. Try again."</em> forever.
+        </p>
+        <p>
+          Both options below make the button's state honest. They differ on the
+          product decision: <b>does a practice rematch bring the CPUs back?</b>
+        </p>
+        <div class="harness__toggle" id="toggle">
+          <button data-opt="A" class="is-active">
+            Option A · Re-seat CPUs
+          </button>
+          <button data-opt="B">Option B · Human-only</button>
+        </div>
+      </div>
+
+      <!-- ===================== OPTION A ===================== -->
+      <section class="option-block is-active" data-opt="A">
+        <div class="option-header">
+          <h2>Option A — Rematch re-seats the same CPUs</h2>
+          <span class="rec">Recommended</span>
+        </div>
+        <p class="option-desc">
+          A practice rematch stays a practice game: it re-seats the same number
+          of CPU opponents so a solo human can replay instantly (the common
+          1-human + N-CPU case just works). The panel shows exactly who returns
+          to the table before the click, so there's no surprise. Requires a
+          backend change (createRematch re-seats AI). The two right-hand cells
+          show an optional advanced variant that lets the host retune the CPU
+          count, plus the mixed-table case.
+        </p>
+
+        <div class="state-grid">
+          <!-- A1: solo human + CPUs, ready -->
+          <div class="state-cell">
+            <div class="state-cell__label">
+              A1 · <b>1 human + 3 CPUs</b> — ready (default)
+            </div>
+            <div class="game-over">
+              <div class="game-over__panel">
+                <h1 class="game-over__winner">CPU Osprey wins!</h1>
+                <table class="game-over__scores">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Place</th>
+                      <th>Cards</th>
+                      <th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--gold"
+                        ></span>
+                        CPU Osprey
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>1st</td>
+                      <td>0</td>
+                      <td>5</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--silver"
+                        ></span>
+                        You
+                      </td>
+                      <td>2nd</td>
+                      <td>2</td>
+                      <td>3</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--bronze"
+                        ></span>
+                        CPU Marlin
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>3rd</td>
+                      <td>6</td>
+                      <td>1</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--grey"
+                        ></span>
+                        CPU Heron
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>4th</td>
+                      <td>11</td>
+                      <td>0</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="rematch-roster">
+                  <span class="rematch-roster__title">Rematch lineup</span>
+                  <div class="rematch-roster__chips">
+                    <span class="roster-chip roster-chip--human">
+                      <span class="avatar avatar--human">Y</span>
+                      You <span class="roster-chip__you">HOST</span>
+                    </span>
+                    <span class="roster-chip roster-chip--cpu">
+                      <span class="avatar avatar--cpu">
+                        <svg viewBox="0 0 24 24" fill="none">
+                          <rect
+                            x="5"
+                            y="7"
+                            width="14"
+                            height="11"
+                            rx="3"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                          />
+                          <circle
+                            cx="9.5"
+                            cy="12.5"
+                            r="1.4"
+                            fill="currentColor"
+                          />
+                          <circle
+                            cx="14.5"
+                            cy="12.5"
+                            r="1.4"
+                            fill="currentColor"
+                          />
+                          <line
+                            x1="12"
+                            y1="4"
+                            x2="12"
+                            y2="7"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                          />
+                          <circle cx="12" cy="3.5" r="1" fill="currentColor" />
+                        </svg>
+                      </span>
+                      3 CPUs
+                    </span>
+                  </div>
+                </div>
+
+                <div class="game-over__actions">
+                  <button class="game-over__btn game-over__btn--rematch">
+                    Rematch
+                  </button>
+                  <button class="game-over__btn game-over__btn--home">
+                    Back to Home
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- A2: pending -->
+          <div class="state-cell">
+            <div class="state-cell__label">
+              A2 · <b>Pending</b> — dealing a new hand
+            </div>
+            <div class="game-over">
+              <div class="game-over__panel">
+                <h1 class="game-over__winner">CPU Osprey wins!</h1>
+                <table class="game-over__scores">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Place</th>
+                      <th>Cards</th>
+                      <th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--gold"
+                        ></span>
+                        CPU Osprey
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>1st</td>
+                      <td>0</td>
+                      <td>5</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--silver"
+                        ></span>
+                        You
+                      </td>
+                      <td>2nd</td>
+                      <td>2</td>
+                      <td>3</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="rematch-roster">
+                  <span class="rematch-roster__title">Rematch lineup</span>
+                  <div class="rematch-roster__chips">
+                    <span class="roster-chip roster-chip--human">
+                      <span class="avatar avatar--human">Y</span>
+                      You <span class="roster-chip__you">HOST</span>
+                    </span>
+                    <span class="roster-chip roster-chip--cpu">
+                      <span class="avatar avatar--cpu">
+                        <svg viewBox="0 0 24 24" fill="none">
+                          <rect
+                            x="5"
+                            y="7"
+                            width="14"
+                            height="11"
+                            rx="3"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                          />
+                          <circle
+                            cx="9.5"
+                            cy="12.5"
+                            r="1.4"
+                            fill="currentColor"
+                          />
+                          <circle
+                            cx="14.5"
+                            cy="12.5"
+                            r="1.4"
+                            fill="currentColor"
+                          />
+                          <line
+                            x1="12"
+                            y1="4"
+                            x2="12"
+                            y2="7"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                          />
+                          <circle cx="12" cy="3.5" r="1" fill="currentColor" />
+                        </svg>
+                      </span>
+                      3 CPUs
+                    </span>
+                  </div>
+                </div>
+
+                <div class="game-over__actions">
+                  <button
+                    class="game-over__btn game-over__btn--rematch"
+                    disabled
+                  >
+                    Dealing a new hand…
+                  </button>
+                  <button class="game-over__btn game-over__btn--home">
+                    Back to Home
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- A3: advanced — CPU count stepper -->
+          <div class="state-cell">
+            <div class="state-cell__label">
+              A3 · <b>Advanced variant</b> — host retunes CPU count
+            </div>
+            <div class="game-over">
+              <div class="game-over__panel">
+                <h1 class="game-over__winner">CPU Osprey wins!</h1>
+                <table class="game-over__scores">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Place</th>
+                      <th>Cards</th>
+                      <th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--gold"
+                        ></span>
+                        CPU Osprey
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>1st</td>
+                      <td>0</td>
+                      <td>5</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--silver"
+                        ></span>
+                        You
+                      </td>
+                      <td>2nd</td>
+                      <td>2</td>
+                      <td>3</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="rematch-roster">
+                  <span class="rematch-roster__title">Rematch lineup</span>
+                  <div class="cpu-stepper">
+                    <span class="cpu-stepper__label">CPU opponents</span>
+                    <div class="cpu-stepper__controls">
+                      <button class="stepper__btn">−</button>
+                      <span class="stepper__value">3</span>
+                      <button class="stepper__btn" disabled>+</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="game-over__actions">
+                  <button class="game-over__btn game-over__btn--rematch">
+                    Rematch
+                  </button>
+                  <button class="game-over__btn game-over__btn--home">
+                    Back to Home
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- A4: mixed 2-human + CPU -->
+          <div class="state-cell">
+            <div class="state-cell__label">
+              A4 · <b>2 humans + 1 CPU</b> — mixed table
+            </div>
+            <div class="game-over">
+              <div class="game-over__panel">
+                <h1 class="game-over__winner">Priya wins!</h1>
+                <table class="game-over__scores">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Place</th>
+                      <th>Cards</th>
+                      <th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--gold"
+                        ></span>
+                        Priya
+                      </td>
+                      <td>1st</td>
+                      <td>0</td>
+                      <td>5</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--silver"
+                        ></span>
+                        You
+                      </td>
+                      <td>2nd</td>
+                      <td>3</td>
+                      <td>3</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--bronze"
+                        ></span>
+                        CPU Heron
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>3rd</td>
+                      <td>9</td>
+                      <td>1</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="rematch-roster">
+                  <span class="rematch-roster__title">Rematch lineup</span>
+                  <div class="rematch-roster__chips">
+                    <span class="roster-chip roster-chip--human">
+                      <span class="avatar avatar--human">Y</span>
+                      You <span class="roster-chip__you">HOST</span>
+                    </span>
+                    <span class="roster-chip roster-chip--human">
+                      <span class="avatar avatar--human">P</span>
+                      Priya
+                    </span>
+                    <span class="roster-chip roster-chip--cpu">
+                      <span class="avatar avatar--cpu">
+                        <svg viewBox="0 0 24 24" fill="none">
+                          <rect
+                            x="5"
+                            y="7"
+                            width="14"
+                            height="11"
+                            rx="3"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                          />
+                          <circle
+                            cx="9.5"
+                            cy="12.5"
+                            r="1.4"
+                            fill="currentColor"
+                          />
+                          <circle
+                            cx="14.5"
+                            cy="12.5"
+                            r="1.4"
+                            fill="currentColor"
+                          />
+                          <line
+                            x1="12"
+                            y1="4"
+                            x2="12"
+                            y2="7"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                          />
+                          <circle cx="12" cy="3.5" r="1" fill="currentColor" />
+                        </svg>
+                      </span>
+                      1 CPU
+                    </span>
+                  </div>
+                </div>
+
+                <div class="game-over__actions">
+                  <button class="game-over__btn game-over__btn--rematch">
+                    Rematch
+                  </button>
+                  <button class="game-over__btn game-over__btn--home">
+                    Back to Home
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== OPTION B ===================== -->
+      <section class="option-block" data-opt="B">
+        <div class="option-header">
+          <h2>Option B — Rematch stays human-only</h2>
+        </div>
+        <p class="option-desc">
+          The rematch never brings CPUs back (matches the current backend
+          intent: "a rematch is always a fresh human-only game"). Frontend-only
+          fix. The button is only enabled when the connected <b>human</b> roster
+          is ≥ 2 — otherwise it's disabled with a specific explanation instead
+          of a clickable-but-always-fails trap. B1 is the common broken case
+          (solo human) made honest; B2 is a mixed table where a real human-only
+          rematch is viable.
+        </p>
+
+        <div class="state-grid">
+          <!-- B1: solo human — disabled with explanation -->
+          <div class="state-cell">
+            <div class="state-cell__label">
+              B1 · <b>1 human + 3 CPUs</b> — Rematch disabled + explained
+            </div>
+            <div class="game-over">
+              <div class="game-over__panel">
+                <h1 class="game-over__winner">CPU Osprey wins!</h1>
+                <table class="game-over__scores">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Place</th>
+                      <th>Cards</th>
+                      <th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--gold"
+                        ></span>
+                        CPU Osprey
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>1st</td>
+                      <td>0</td>
+                      <td>5</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--silver"
+                        ></span>
+                        You
+                      </td>
+                      <td>2nd</td>
+                      <td>2</td>
+                      <td>3</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--bronze"
+                        ></span>
+                        CPU Marlin
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>3rd</td>
+                      <td>6</td>
+                      <td>1</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--grey"
+                        ></span>
+                        CPU Heron
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>4th</td>
+                      <td>11</td>
+                      <td>0</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="game-over__actions">
+                  <button
+                    class="game-over__btn game-over__btn--rematch"
+                    disabled
+                  >
+                    Rematch
+                  </button>
+                  <button class="game-over__btn game-over__btn--home">
+                    Back to Home
+                  </button>
+                </div>
+
+                <div
+                  class="game-over__rematch-hint game-over__rematch-hint--cpu"
+                >
+                  <span class="game-over__practice-tag">Practice game</span>
+                  <span class="hint-lead">Rematch needs another human.</span>
+                  <span
+                    >CPU opponents don't carry into a rematch. Invite a friend
+                    with the room code, or
+                    <span class="newlink">start a new practice game</span
+                    >.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- B2: mixed 2-human + CPU — enabled -->
+          <div class="state-cell">
+            <div class="state-cell__label">
+              B2 · <b>2 humans + 1 CPU</b> — Rematch enabled (humans only carry)
+            </div>
+            <div class="game-over">
+              <div class="game-over__panel">
+                <h1 class="game-over__winner">Priya wins!</h1>
+                <table class="game-over__scores">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Place</th>
+                      <th>Cards</th>
+                      <th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--gold"
+                        ></span>
+                        Priya
+                      </td>
+                      <td>1st</td>
+                      <td>0</td>
+                      <td>5</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--silver"
+                        ></span>
+                        You
+                      </td>
+                      <td>2nd</td>
+                      <td>3</td>
+                      <td>3</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--bronze"
+                        ></span>
+                        CPU Heron
+                        <span class="ai-badge"
+                          ><span class="ai-badge__dot"></span>CPU</span
+                        >
+                      </td>
+                      <td>3rd</td>
+                      <td>9</td>
+                      <td>1</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="game-over__actions">
+                  <button class="game-over__btn game-over__btn--rematch">
+                    Rematch
+                  </button>
+                  <button class="game-over__btn game-over__btn--home">
+                    Back to Home
+                  </button>
+                </div>
+
+                <div
+                  class="game-over__rematch-hint game-over__rematch-hint--cpu"
+                >
+                  <span class="game-over__practice-tag">Practice game</span>
+                  <span
+                    >The rematch continues with the humans still here. CPU
+                    opponents won't return.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- B3: error fallback (still possible on genuine server error) -->
+          <div class="state-cell">
+            <div class="state-cell__label">
+              B3 · <b>Genuine server error</b> — generic retry (unchanged)
+            </div>
+            <div class="game-over">
+              <div class="game-over__panel">
+                <h1 class="game-over__winner">Priya wins!</h1>
+                <table class="game-over__scores">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Place</th>
+                      <th>Cards</th>
+                      <th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--gold"
+                        ></span>
+                        Priya
+                      </td>
+                      <td>1st</td>
+                      <td>0</td>
+                      <td>5</td>
+                    </tr>
+                    <tr>
+                      <td class="game-over__player-cell">
+                        <span
+                          class="game-over__badge game-over__badge--silver"
+                        ></span>
+                        You
+                      </td>
+                      <td>2nd</td>
+                      <td>3</td>
+                      <td>3</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="game-over__actions">
+                  <button class="game-over__btn game-over__btn--rematch">
+                    Rematch
+                  </button>
+                  <button class="game-over__btn game-over__btn--home">
+                    Back to Home
+                  </button>
+                </div>
+
+                <div class="game-over__rematch-error">
+                  Couldn't start rematch. Try again.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const toggle = document.getElementById("toggle");
+      toggle.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-opt]");
+        if (!btn) return;
+        const opt = btn.dataset.opt;
+        toggle
+          .querySelectorAll("button")
+          .forEach((b) => b.classList.toggle("is-active", b === btn));
+        document
+          .querySelectorAll(".option-block")
+          .forEach((s) =>
+            s.classList.toggle("is-active", s.dataset.opt === opt),
+          );
+      });
+    </script>
+  </body>
+</html>
