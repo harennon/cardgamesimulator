@@ -281,7 +281,9 @@ watch(logDrawerOpen, (open) => {
 .game-board__hand {
   grid-area: hand;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
   background: var(--felt-light);
   border-top: 2px solid var(--table-rim-light);
 }
@@ -308,7 +310,9 @@ watch(logDrawerOpen, (open) => {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  padding-left: 12px;
+  text-align: center;
+  padding-left: 0;
+  padding-top: 10px;
   margin-bottom: 2px;
 }
 
@@ -354,6 +358,7 @@ watch(logDrawerOpen, (open) => {
   .game-board--mobile .game-board__hand {
     flex-direction: column;
     align-items: flex-start;
+    justify-content: flex-start; /* reset desktop justify-content:center — keep label+hand top-aligned in mobile cell */
     overflow: hidden; /* contain within grid cell */
   }
 }
