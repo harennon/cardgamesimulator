@@ -10,6 +10,11 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- **LLD 145: "Total Turns" value on the Tonk game-over screen looks wrong/confusing**
+  - `src/frontend/component/game/GameOverView.vue` — adds optional `gameType?: GameType` prop (imported from `@shared/engine-types`); introduces `showTotalTurns` computed (`gameType === 'big2' && totalTurns > 0`); replaces the `v-if="totalTurns > 0"` guard on the `.game-over__metadata` row with `v-if="showTotalTurns"`. The row is now hidden for Tonk at all turn counts; Big2 behaviour (label, value, fade-in animation, `> 0` secondary guard) is unchanged.
+  - `src/frontend/component/game/GameView.vue` — passes `:game-type="gameState.gameType"` to `<GameOverView>` alongside the existing `:total-turns` binding.
+  - `tests/frontend/gameOverTotalTurns.test.ts` — 7 unit tests covering all edge cases: Tonk hides for any value (incl. the reported 192), Big2 shows when positive, Big2 hides at 0, undefined `gameType` hides (fail-safe), undefined `totalTurns` hides (defaults to 0).
+
 - **LLD 141: Player cannot see their own score during a Tonk game**
   - `src/frontend/component/game-ui/tonkDisplay.ts` — `SeatRow` gains a required `isSelf: boolean` field. `railSeats()` now includes the local player (previously filtered out), marks the local row `isSelf: true`, and sorts it first; non-self rows retain ascending seat order. Spectator render (`myPlayerIndex === -1`) is unchanged: no row matches self.
   - `src/frontend/component/game-ui/TonkSeatRail.vue` — renders the self chip with `tonk-seat--self` accent class; fan suppressed for self (`!compact && !seat.isSelf`); name displays "You"; tally pill gains `tonk-seat__tally--near` modifier via `isNearLine(seat.tally)`; AiAvatar and AiBadge gated with `!seat.isSelf`; disconnected label gated with `!seat.isSelf`. Imports `isNearLine` from `tonkDisplay`.

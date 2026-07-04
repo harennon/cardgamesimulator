@@ -115,6 +115,7 @@
     :play-history="gameOverPlayHistory"
     :current-player-id="gameState.you.playerId"
     :total-turns="gameState.turnNumber"
+    :game-type="gameState.gameType"
     :final-play="finalPlay"
     @rematch="onRematch"
   />
