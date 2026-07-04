@@ -146,10 +146,16 @@ describe("Migration 010 game_history table + RPC", () => {
     }
   });
 
-  it("the 010 post-condition passes after applying 010 and RAISEs when the table is absent", async () => {
+  it("the 010 post-condition passes after applying 010+011 and RAISEs when the table is absent", async () => {
+    // LLD 011 backfill: the 010 post-condition now asserts the CUMULATIVE post-011
+    // state (RLS enabled + SELECT policy), so 011 must be applied too — every
+    // post-condition runs against a DB where all migrations are applied.
     const present = await createProdShapedFixture({ baseline: "fresh" });
     try {
-      await present.applyMigrations(["010_create_game_history.sql"]);
+      await present.applyMigrations([
+        "010_create_game_history.sql",
+        "011_lock_down_game_history.sql",
+      ]);
       await expect(
         present.runPostcondition("010_create_game_history.postcondition.sql"),
       ).resolves.toBeUndefined();
@@ -173,6 +179,8 @@ describe("Migration 010 game_history table + RPC", () => {
     try {
       await fixture.applyMigrations(["010_create_game_history.sql"]);
       await fixture.applyMigrations(["010_create_game_history.sql"]);
+      // 011 applied too so the (cumulative) 010 post-condition's RLS assertion holds.
+      await fixture.applyMigrations(["011_lock_down_game_history.sql"]);
       await expect(
         fixture.runPostcondition("010_create_game_history.postcondition.sql"),
       ).resolves.toBeUndefined();

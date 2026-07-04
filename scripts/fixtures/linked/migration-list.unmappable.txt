@@ -1,0 +1,7 @@
+Connecting to remote database...
+
+
+   Local | Remote | Time (UTC)
+  -------|--------|------------
+   `001` | `001`  | `001`
+   `999` | ` `    | `999`
