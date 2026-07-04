@@ -1,41 +1,11 @@
 {
-  "$comment": "RECONCILED to the committed post-010 capture (scripts/fixtures/captures/prod-migration-list-posto10.txt): 010 is APPLIED to prod (Remote=010), so the pending migration is now 011_lock_down_game_history.sql. The six game_history stray write grants (G6) are the live TypeORM-era anon/authenticated INSERT/UPDATE/DELETE (direction:add residual, per prod-db-diff-posto10.txt) that 011 REVOKEs; acknowledged TRANSIENTLY (issue #176) ONLY so the run that applies 011 clears the gate. They MUST be removed in the Phase-2 cleanup PR once 011 is applied. 011's own ENABLE RLS + CREATE POLICY are NOT acknowledged here: under LLD 77b they self-attribute to pending 011 and are dropped as benign (they never appear as residual). increment_player_stats stays acknowledged (#91).",
-  "expectedPending": ["011_lock_down_game_history.sql"],
+  "$comment": "Phase 2 (post-011-applied): migration 011_lock_down_game_history.sql has been applied to prod (verified by the successful Prod Migrate run 2026-07-04), so it is no longer pending and expectedPending is empty. The six game_history stray write grants (G6) that 011 REVOKEd no longer exist on prod, so their transient acknowledgedResidual entries (#176) were removed — leaving them would fail the gate's unusedAcknowledged guard. Only increment_player_stats remains acknowledged (#91): cosmetic diff-engine re-emission noise that is functionally unchanged.",
+  "expectedPending": [],
   "acknowledgedResidual": [
     {
       "object": "function:public:increment_player_stats",
-      "reason": "Cosmetic diff-engine re-emission noise (unchanged). See prod-db-diff-posto10.txt.",
+      "reason": "Cosmetic diff-engine re-emission noise (unchanged).",
       "issue": "#91"
-    },
-    {
-      "object": "grant:anon:game_history:DELETE",
-      "reason": "Live TypeORM-era stray write grant on prod that 011 REVOKEs; transient, remove after 011 applies.",
-      "issue": "#176"
-    },
-    {
-      "object": "grant:anon:game_history:INSERT",
-      "reason": "Live TypeORM-era stray write grant on prod that 011 REVOKEs; transient, remove after 011 applies.",
-      "issue": "#176"
-    },
-    {
-      "object": "grant:anon:game_history:UPDATE",
-      "reason": "Live TypeORM-era stray write grant on prod that 011 REVOKEs; transient, remove after 011 applies.",
-      "issue": "#176"
-    },
-    {
-      "object": "grant:authenticated:game_history:DELETE",
-      "reason": "Live TypeORM-era stray write grant on prod that 011 REVOKEs; transient, remove after 011 applies.",
-      "issue": "#176"
-    },
-    {
-      "object": "grant:authenticated:game_history:INSERT",
-      "reason": "Live TypeORM-era stray write grant on prod that 011 REVOKEs; transient, remove after 011 applies.",
-      "issue": "#176"
-    },
-    {
-      "object": "grant:authenticated:game_history:UPDATE",
-      "reason": "Live TypeORM-era stray write grant on prod that 011 REVOKEs; transient, remove after 011 applies.",
-      "issue": "#176"
     }
   ]
 }

@@ -271,19 +271,17 @@ describe("evaluateDriftGate — 011 game_history lockdown pending (LLD 011)", ()
     });
   }
 
-  it("the in-tree fixture lists 011 as pending and the allowlist expects it (010 now applied)", () => {
-    expect(fixture.pending).toContain("011_lock_down_game_history.sql");
-    expect(allowlist.expectedPending).toContain(
-      "011_lock_down_game_history.sql",
-    );
-    // 010 is applied to prod → NOT pending, NOT expected-pending.
+  it("Phase 2 (011 applied): nothing pending, allowlist expects nothing, G6 removed", () => {
+    // 011 has been applied to prod (Prod Migrate run 2026-07-04), so it is no
+    // longer pending; 010 was applied earlier. Both are absent from pending and
+    // expectedPending.
+    expect(fixture.pending).toEqual([]);
+    expect(allowlist.expectedPending).toEqual([]);
+    expect(fixture.pending).not.toContain("011_lock_down_game_history.sql");
     expect(fixture.pending).not.toContain("010_create_game_history.sql");
-    expect(allowlist.expectedPending).not.toContain(
-      "010_create_game_history.sql",
-    );
   });
 
-  it("the six G6 stray grants are in the fixture's objects AND acknowledged in the allowlist", () => {
+  it("the six G6 stray grants are GONE from both objects and the allowlist (011 revoked them on prod)", () => {
     const objects = (fixture.objects as { object: string }[]).map(
       (o) => o.object,
     );
@@ -291,15 +289,14 @@ describe("evaluateDriftGate — 011 game_history lockdown pending (LLD 011)", ()
       (a) => a.object,
     );
     for (const g of G6) {
-      expect(objects).toContain(g);
-      expect(acked).toContain(g);
+      expect(objects).not.toContain(g);
+      expect(acked).not.toContain(g);
     }
-    // RLS/policy self-attribute to pending 011 (LLD 77b) → NOT in objects and
-    // NOT acknowledged (acknowledging them would fire unusedAcknowledged).
+    // increment_player_stats stays acknowledged (#91) — cosmetic re-emission.
+    expect(acked).toContain("function:public:increment_player_stats");
+    // RLS/policy never appear (self-attribute to their migration, drop as benign).
     expect(objects).not.toContain("rls:public:game_history");
     expect(objects).not.toContain("policy:public:game_history:ALL");
-    expect(acked).not.toContain("rls:public:game_history");
-    expect(acked).not.toContain("policy:public:game_history:ALL");
   });
 
   it("passes against the real fixture + allowlist as shipped (residual ∅, no unusedAcknowledged)", () => {
@@ -310,20 +307,8 @@ describe("evaluateDriftGate — 011 game_history lockdown pending (LLD 011)", ()
     expect(result.reasons).toEqual([]);
   });
 
-  it("fails staleExpected when 011 is dropped from the fixture's pending (documents the coupling)", () => {
-    // 011 stays in expectedPending but is dropped from the actually-pending set
-    // — the stale-allowlist trap that reddened PR #107 (Edge Case 10).
-    const result = gateWith([]);
-    expect(result.ok).toBe(false);
-    expect(result.staleExpected).toContain("011_lock_down_game_history.sql");
-    expect(result.reasons.join(" ")).toMatch(/Stale expectedPending/);
-  });
-
   it("fails missingExpected when an un-allowlisted migration becomes pending", () => {
-    const result = gateWith([
-      "011_lock_down_game_history.sql",
-      "012_hypothetical.sql",
-    ]);
+    const result = gateWith(["012_hypothetical.sql"]);
     expect(result.ok).toBe(false);
     expect(result.missingExpected).toContain("012_hypothetical.sql");
     expect(result.reasons.join(" ")).toMatch(/missing from expectedPending/);
