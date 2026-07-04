@@ -145,13 +145,13 @@ guard the automated prod `db push` (#91):
    `SELECT prune_game_history();` and `SELECT` is not banned, so the file's total
    destructive-op set is exactly `{DELETE}` (one op, from the body). Add an entry
    to `supabase/migrations/destructive-ddl.allowlist.json`:
-   `"011_prune_game_history.sql": ["DELETE"]`, with a `$comment`-style rationale
+   `"012_prune_game_history.sql": ["DELETE"]`, with a `$comment`-style rationale
    noting it is the retention prune, bounded to rows > 13 months old, and never
    touches `player_stats`. Do **not** loosen the gate globally, and do **not**
    inline the DELETE into the cron command (it would then be flagged inside the
    `$cron$` block too — the block is not a safe harbor).
 2. **Drift gate** (`scripts/verify-drift.mjs` + `scripts/lib/drift-gate.mjs`).
-   Add `011_prune_game_history.sql` to **both** `expected-diff.allowlist.json`
+   Add `012_prune_game_history.sql` to **both** `expected-diff.allowlist.json`
    `expectedPending` **and** `scripts/fixtures/clean-diff.json` `pending`, in the
    **same PR**. Updating one without the other fails the gate with
    `Stale expectedPending` / `Pending migration(s) missing from expectedPending`
@@ -174,10 +174,10 @@ There is no backend to deploy for this LLD, so step 3 (deploy) is a no-op.
 No TypeScript interfaces change. The entire change is SQL. Shapes below are the
 implementable spec.
 
-### Migration `011_prune_game_history.sql` (shape, name-agnostic)
+### Migration `012_prune_game_history.sql` (shape, name-agnostic)
 
 ```sql
--- 011: retention prune for game_history (LLD 149). game_history (010) is
+-- 012: retention prune for game_history (LLD 149). game_history (010) is
 -- append-only and unbounded; windowed stats never read past YTD, so rows older
 -- than the longest window + margin are dead weight against the 500 MB free-tier
 -- cap. This DELETEs rows older than 13 months (YTD max reach ~12 months + 1
@@ -250,13 +250,13 @@ END $$;
 ### Migration-safety files (same PR)
 
 - `supabase/migrations/destructive-ddl.allowlist.json` — add
-  `"011_prune_game_history.sql": ["DELETE"]`.
+  `"012_prune_game_history.sql": ["DELETE"]`.
 - `supabase/migrations/expected-diff.allowlist.json` — append
-  `"011_prune_game_history.sql"` to `expectedPending`.
-- `scripts/fixtures/clean-diff.json` — append `"011_prune_game_history.sql"` to
+  `"012_prune_game_history.sql"` to `expectedPending`.
+- `scripts/fixtures/clean-diff.json` — append `"012_prune_game_history.sql"` to
   `pending` (must mirror `expectedPending`).
 
-### Post-condition `postconditions/011_prune_game_history.postcondition.sql` (shape)
+### Post-condition `postconditions/012_prune_game_history.postcondition.sql` (shape)
 
 Shape-based and idempotent. Assertions 1–2 are pure reads. Assertion 3 *invokes*
 the prune but is written to be **non-mutating on every target** (see the
@@ -349,7 +349,7 @@ transaction-wrapping requirement below). Asserts:
 |---|------|----------|
 | E1 | **Prune must never affect `player_stats`.** | `prune_game_history()` references only `game_history`. The post-condition invokes it and asserts `player_stats` aggregates are byte-for-byte unchanged (machine-checkable acceptance criterion). Hard constraint. |
 | E2 | **Prune must never delete a row a live window still reads.** | Floor is 13 months; YTD's max reach is ~12 months (Dec 31), 30d is 1 month. Deleted rows (`played_at < now() − 13 months`) are strictly older than anything any window reads. 1-month margin covers year-boundary/clock edge. |
-| E3 | **Re-running / running multiple times a day (idempotency).** | DELETE-by-age is naturally idempotent — the second run in the same window finds no rows past the floor. `cron.schedule` by stable job name updates in place, so re-applying migration 011 never creates a duplicate job. |
+| E3 | **Re-running / running multiple times a day (idempotency).** | DELETE-by-age is naturally idempotent — the second run in the same window finds no rows past the floor. `cron.schedule` by stable job name updates in place, so re-applying migration 012 never creates a duplicate job. |
 | E4 | **`pg_cron` not available on the target (e.g. bare `supabase start`, or a project without Supabase Cron enabled).** | The `cron.schedule` call is guarded by `IF EXISTS (SELECT 1 FROM pg_extension WHERE extname='pg_cron')`; when absent, the migration still creates the function and only skips scheduling (`RAISE NOTICE`). The post-condition's cron-job assertion is likewise conditional, using the **same guard mechanism**: the runner has no per-statement skip, so the assertion must be self-contained in SQL — a plpgsql `DO` block gated on `IF EXISTS (SELECT 1 FROM pg_extension WHERE extname='pg_cron')` with the `SELECT … FROM cron.job` placed *inside* that branch. A bare top-level `SELECT … FROM cron.job` is forbidden: it raises `schema "cron" does not exist` on a bare `supabase start` and fails coverage. With the guard, CI coverage passes locally; scheduling is enforced against prod, where Supabase Cron is enabled. **Human release step:** confirm Supabase Cron is enabled on the prod project before/at `db push`; if the platform requires `CREATE EXTENSION pg_cron` via the dashboard, that is a one-time human action documented in the release notes. |
 | E5 | **`getTrackingSince` after steady-state pruning.** | Returns the earliest *retained* `played_at` (~13 months ago) rather than the user's true first game. This is acceptable and honest: `trackingSince` labels how far back windowed data reaches, and no window reads past 13 months anyway. Lifetime stats (from `player_stats`) are unaffected, so all-time totals still reflect the user's full record. |
 | E6 | **A single prune run's delete set is unexpectedly large (e.g. first run after enabling on a table that grew for >13 months without pruning).** | Not a concern now (table is <13 months old, so the first steady-state runs delete ~0). If pruning is enabled late on a large table, the first DELETE is still atomic and bounded by the DB; if it ever caused lock/vacuum pressure, batching the delete (LIMIT + loop) is a follow-up — not built speculatively. |
@@ -422,7 +422,7 @@ code changes); testing is integration + gate + post-condition.
   <ytd cutoff>)` and `get_windowed_stats(user, <30d cutoff>)` return the same
   counts before and after — the prune never removes a row any window reads.
 - **Idempotency (E3).** Run the prune twice back-to-back; second run deletes 0
-  rows and the table state is identical. Re-apply migration 011 (re-run
+  rows and the table state is identical. Re-apply migration 012 (re-run
   `cron.schedule`) and assert exactly one `prune-game-history` job exists in
   `cron.job` (no duplicate).
 - **`player_stats` untouched (E1) — the headline check.** Seed `player_stats`
@@ -444,7 +444,7 @@ code changes); testing is integration + gate + post-condition.
 ### Gate
 
 - **Destructive-DDL gate.** `npm run verify:no-destructive-ddl` passes with the
-  `"011_prune_game_history.sql": ["DELETE"]` allowlist entry present, and **fails**
+  `"012_prune_game_history.sql": ["DELETE"]` allowlist entry present, and **fails**
   if the entry is removed (proves the single in-body `DELETE` is genuinely gated
   and the allowlist is load-bearing). Assert exactly one `DELETE` op is reported
   for the file — not because the `$cron$` block is neutralized (it is scanned as

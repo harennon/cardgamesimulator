@@ -19,17 +19,47 @@
  * ... ], "pending": [ "<migration filename>", ... ] }. The pure verdict logic
  * lives in scripts/lib/drift-gate.mjs and is unit-tested against fixtures.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { evaluateDriftGate } from "./lib/drift-gate.mjs";
+import {
+  adaptLinkedDiff,
+  LinkedDiffError,
+} from "./lib/linked-diff-adapter.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ALLOWLIST_PATH = resolve(
-  __dirname,
-  "../supabase/migrations/expected-diff.allowlist.json",
-);
+const MIGRATIONS_DIR = resolve(__dirname, "../supabase/migrations");
+const ALLOWLIST_PATH = resolve(MIGRATIONS_DIR, "expected-diff.allowlist.json");
+
+/**
+ * Read every in-tree migration (`supabase/migrations/NNN_*.sql`) as
+ * { file: basename, sql: contents }, sorted. The adapter needs the SQL text to
+ * attribute db-diff drops/revokes to the pending migration that declares them
+ * (LLD 77a §4.3/§4.4). Non-`.sql` allowlist files are excluded.
+ * @returns {{file:string, sql:string}[]}
+ */
+function listMigrations() {
+  return readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .map((f) => ({
+      file: f,
+      sql: readFileSync(resolve(MIGRATIONS_DIR, f), "utf8"),
+    }));
+}
+
+/**
+ * Run a CLI command capturing stdout. Fail-closed (F2): a non-zero exit throws
+ * (execFileSync default), which the --linked branch turns into a hard block.
+ * @param {string} cmd
+ * @param {string[]} cmdArgs
+ * @returns {string}
+ */
+function runCli(cmd, cmdArgs) {
+  return execFileSync(cmd, cmdArgs, { encoding: "utf8" });
+}
 
 const args = process.argv.slice(2);
 const diffFileIdx = args.indexOf("--diff-file");
@@ -38,8 +68,9 @@ const useLinked = args.includes("--linked");
 /**
  * Load the structured diff. In --diff-file mode (default for CI / local /
  * placeholder targets) read it from disk. In --linked mode (human-owned) invoke
- * the Supabase CLI. The CLI's raw output is normalized by an adapter the
- * operator supplies at wiring time; here we keep the contract explicit.
+ * the Supabase CLI and normalize its raw stdout via the pure linked-diff adapter
+ * (LLD 77a). All parse/attribution risk lives in that adapter, which fails closed
+ * on any ambiguity; this branch stays thin (run the CLI, hand stdout over).
  */
 function loadStructuredDiff() {
   if (diffFileIdx !== -1) {
@@ -52,20 +83,48 @@ function loadStructuredDiff() {
   }
   if (useLinked) {
     // HUMAN-OWNED wiring point (§9). The operator must have run
-    // `supabase link --project-ref <prod>` and stored the secret. The raw diff
-    // is captured here; normalizing it into { objects, pending } is the
-    // operator's adapter step at wiring time. We invoke the CLI so the
-    // structure is real, but this branch is not exercised by autonomous CI.
-    const raw = execFileSync(
-      "supabase",
-      ["db", "diff", "--linked", "--schema", "public"],
-      { encoding: "utf8" },
-    );
-    console.error(
-      "--linked produced a raw diff; supply a normalizer adapter to map it to { objects, pending } before the gate can evaluate it. Raw length:",
-      raw.length,
-    );
-    process.exit(2);
+    // `supabase link --project-ref <prod>` (with SUPABASE_ACCESS_TOKEN) before
+    // this. Two independent sources: db diff (residual) + migration list
+    // (pending). F2: a non-zero CLI exit throws below → caught → exit(2).
+    let dbDiffStdout;
+    let migrationListStdout;
+    try {
+      dbDiffStdout = runCli("supabase", [
+        "db",
+        "diff",
+        "--linked",
+        "--schema",
+        "public",
+      ]);
+      migrationListStdout = runCli("supabase", [
+        "migration",
+        "list",
+        "--linked",
+      ]);
+    } catch (err) {
+      console.error(
+        "Drift gate FAILED — a `supabase --linked` command exited non-zero (F2). A failed command is NEVER treated as 'no drift'.\n",
+      );
+      console.error(`  ${err.stderr ?? err.message ?? err}`);
+      process.exit(2);
+    }
+    try {
+      return adaptLinkedDiff(
+        { dbDiffStdout, migrationListStdout },
+        listMigrations(),
+      );
+    } catch (err) {
+      // Fail-closed: any unclassifiable statement / unmappable key / malformed
+      // table (F3–F7, Gap-A) blocks the release. exit(2) = "could not evaluate".
+      if (err instanceof LinkedDiffError) {
+        console.error(
+          "Drift gate FAILED — the linked-prod diff could not be normalized (fail-closed).\n",
+        );
+        console.error(`  ${err.message}`);
+        process.exit(2);
+      }
+      throw err;
+    }
   }
   console.error(
     "verify-drift.mjs: provide --diff-file <path> (autonomous/local) or --linked (human-owned, needs prod link).",

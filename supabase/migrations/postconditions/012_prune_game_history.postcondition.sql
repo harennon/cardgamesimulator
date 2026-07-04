@@ -1,4 +1,4 @@
--- Post-condition for 011 (LLD 149): prune_game_history() exists, is SECURITY
+-- Post-condition for 012 (LLD 149): prune_game_history() exists, is SECURITY
 -- DEFINER, EXECUTE is granted to service_role and REVOKEd from anon/authenticated/
 -- PUBLIC; the cron job is registered (when pg_cron is present); and a prune run
 -- does NOT change player_stats aggregates (acceptance criterion, machine-checked).
@@ -31,7 +31,7 @@ BEGIN
 
   IF fn_count <> 1 THEN
     RAISE EXCEPTION
-      'POSTCONDITION FAILED (011): expected exactly 1 visible prune_game_history function, found %.',
+      'POSTCONDITION FAILED (012): expected exactly 1 visible prune_game_history function, found %.',
       fn_count;
   END IF;
 
@@ -42,7 +42,7 @@ BEGIN
   -- 1a. Must be SECURITY DEFINER.
   IF NOT is_secdef THEN
     RAISE EXCEPTION
-      'POSTCONDITION FAILED (011): prune_game_history must be SECURITY DEFINER.';
+      'POSTCONDITION FAILED (012): prune_game_history must be SECURITY DEFINER.';
   END IF;
 
   -- 1b. Grant set: service_role EXECUTE; anon/authenticated/PUBLIC REVOKEd.
@@ -53,12 +53,12 @@ BEGIN
 
   IF NOT service_can THEN
     RAISE EXCEPTION
-      'POSTCONDITION FAILED (011): service_role must have EXECUTE on prune_game_history.';
+      'POSTCONDITION FAILED (012): service_role must have EXECUTE on prune_game_history.';
   END IF;
 
   IF anon_can OR authd_can OR public_can THEN
     RAISE EXCEPTION
-      'POSTCONDITION FAILED (011): EXECUTE on prune_game_history must be REVOKED from anon/authenticated/PUBLIC (anon=%, authenticated=%, public=%).',
+      'POSTCONDITION FAILED (012): EXECUTE on prune_game_history must be REVOKED from anon/authenticated/PUBLIC (anon=%, authenticated=%, public=%).',
       anon_can, authd_can, public_can;
   END IF;
 END $$;
@@ -75,7 +75,7 @@ BEGIN
       SELECT 1 FROM cron.job WHERE jobname = 'prune-game-history'
     ) THEN
       RAISE EXCEPTION
-        'POSTCONDITION FAILED (011): cron job "prune-game-history" is not registered in cron.job.';
+        'POSTCONDITION FAILED (012): cron job "prune-game-history" is not registered in cron.job.';
     END IF;
   END IF;
 END $$;
@@ -109,7 +109,7 @@ BEGIN
 
   IF before_count <> after_count OR before_hash IS DISTINCT FROM after_hash THEN
     RAISE EXCEPTION
-      'POSTCONDITION FAILED (011): prune_game_history() changed player_stats — this must never happen. rows before=%, after=%; hash before=%, after=%',
+      'POSTCONDITION FAILED (012): prune_game_history() changed player_stats — this must never happen. rows before=%, after=%; hash before=%, after=%',
       before_count, after_count, before_hash, after_hash;
   END IF;
 END $$;

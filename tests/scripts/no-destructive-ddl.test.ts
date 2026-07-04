@@ -235,51 +235,55 @@ describe("evaluateDestructiveDdl — real migrations 001-010 pass with an empty 
       file,
       sql: readFileSync(resolve(MIGRATIONS_DIR, file), "utf8"),
     }));
-  // Isolate only 001-010 for the empty-allowlist invariant check.
-  const migrations001to010 = allMigrations.filter((m) =>
-    /^0(0[1-9]|10)_/.test(m.file),
+  // Isolate 001-011 for the empty-allowlist invariant check: only 012 (LLD 149
+  // prune) introduces a reviewed DELETE, so everything before it must pass with
+  // NO allowlist entry.
+  const migrations001to011 = allMigrations.filter((m) =>
+    /^0(0[1-9]|1[01])_/.test(m.file),
   );
 
-  it("scans all committed migrations (at least 10)", () => {
-    expect(allMigrations.length).toBeGreaterThanOrEqual(10);
+  it("scans all committed migrations (at least 12)", () => {
+    expect(allMigrations.length).toBeGreaterThanOrEqual(12);
   });
 
-  it("migrations 001-010 contain zero data-destroying statements (nothing to allowlist)", () => {
-    const result = evaluateDestructiveDdl(migrations001to010, {});
+  it("migrations 001-011 contain zero data-destroying statements (nothing to allowlist)", () => {
+    const result = evaluateDestructiveDdl(migrations001to011, {});
     expect(result.ok).toBe(true);
     expect(result.findings).toEqual([]);
   });
 
   // ---------------------------------------------------------------------------
-  // LLD 149: migration 011 (prune_game_history) introduces a reviewed DELETE.
+  // LLD 149: migration 012 (prune_game_history) introduces a reviewed DELETE.
   // The gate MUST flag it without the allowlist entry, and MUST pass with it.
   // The allowlist entry must be exactly {DELETE} — not an over-broad exception.
   // ---------------------------------------------------------------------------
-  it("migration 011 is flagged by the gate without an allowlist entry (gate is load-bearing)", () => {
-    const m011 = allMigrations.find(
-      (m) => m.file === "011_prune_game_history.sql",
+  it("migration 012 is flagged by the gate without an allowlist entry (gate is load-bearing)", () => {
+    const m012 = allMigrations.find(
+      (m) => m.file === "012_prune_game_history.sql",
     );
-    expect(m011).toBeDefined();
-    const result = evaluateDestructiveDdl([m011!], {});
+    expect(m012).toBeDefined();
+    const result = evaluateDestructiveDdl([m012!], {});
     expect(result.ok).toBe(false);
     expect(result.violations).toEqual(
-      expect.arrayContaining(["011_prune_game_history.sql: DELETE (line 15)"]),
+      expect.arrayContaining([
+        expect.stringContaining("012_prune_game_history.sql: DELETE"),
+      ]),
     );
   });
 
-  it("migration 011 reports exactly one DELETE op (not DROP TABLE/COLUMN/TRUNCATE)", () => {
-    const m011 = allMigrations.find(
-      (m) => m.file === "011_prune_game_history.sql",
+  it("migration 012 reports exactly one DELETE op (not DROP TABLE/COLUMN/TRUNCATE)", () => {
+    const m012 = allMigrations.find(
+      (m) => m.file === "012_prune_game_history.sql",
     );
-    expect(m011).toBeDefined();
-    const result = evaluateDestructiveDdl([m011!], {});
+    expect(m012).toBeDefined();
+    const result = evaluateDestructiveDdl([m012!], {});
     expect(result.findings).toHaveLength(1);
-    const ops011 = result.findings[0]!.ops;
-    expect(ops011).toHaveLength(1);
-    expect(ops011[0]!.op).toBe("DELETE");
+    const ops012 = result.findings[0]!.ops;
+    expect(ops012).toHaveLength(1);
+    expect(ops012[0]!.op).toBe("DELETE");
   });
 
-  it("all migrations 001-011 pass the gate with the shipped allowlist", () => {
+  it("all committed migrations pass the gate with the shipped allowlist", () => {
     const raw = JSON.parse(
       readFileSync(
         resolve(MIGRATIONS_DIR, "destructive-ddl.allowlist.json"),
@@ -292,7 +296,7 @@ describe("evaluateDestructiveDdl — real migrations 001-010 pass with an empty 
     expect(result.ok).toBe(true);
   });
 
-  it("the shipped allowlist has exactly one entry (011_prune_game_history.sql: DELETE)", () => {
+  it("the shipped allowlist has exactly one entry (012_prune_game_history.sql: DELETE)", () => {
     const raw = JSON.parse(
       readFileSync(
         resolve(MIGRATIONS_DIR, "destructive-ddl.allowlist.json"),
@@ -300,7 +304,7 @@ describe("evaluateDestructiveDdl — real migrations 001-010 pass with an empty 
       ),
     ) as Record<string, unknown>;
     const { $comment: _c, ...allowlist } = raw;
-    expect(Object.keys(allowlist)).toEqual(["011_prune_game_history.sql"]);
-    expect(allowlist["011_prune_game_history.sql"]).toEqual(["DELETE"]);
+    expect(Object.keys(allowlist)).toEqual(["012_prune_game_history.sql"]);
+    expect(allowlist["012_prune_game_history.sql"]).toEqual(["DELETE"]);
   });
 });

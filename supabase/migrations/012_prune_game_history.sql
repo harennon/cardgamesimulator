@@ -1,4 +1,4 @@
--- 011: retention prune for game_history (LLD 149). game_history (010) is
+-- 012: retention prune for game_history (LLD 149). game_history (010) is
 -- append-only and unbounded; windowed stats never read past YTD, so rows older
 -- than the longest window + margin are dead weight against the 500 MB free-tier
 -- cap. This DELETEs rows older than 13 months (YTD max reach ~12 months + 1

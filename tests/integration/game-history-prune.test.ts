@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createProdShapedFixture } from "./helpers/prodShapedFixture.js";
 
 // ---------------------------------------------------------------------------
-// LLD 149: migration 011 (prune_game_history) retention policy.
+// LLD 149: migration 012 (prune_game_history) retention policy.
 // Self-materializes a prod-shaped baseline in a throwaway schema, applies the
 // real 010 + 011 SQL, and asserts the prune contract:
 //   - Only aged rows (> 13 months) are deleted; rows inside the floor are kept.
@@ -118,7 +118,7 @@ describe("Migration 011 — prune_game_history function + grant set", () => {
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
 
       const { rows } = await fixture.client.query<{
@@ -157,10 +157,10 @@ describe("Migration 011 — prune_game_history function + grant set", () => {
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
       await expect(
-        fixture.runPostcondition("011_prune_game_history.postcondition.sql"),
+        fixture.runPostcondition("012_prune_game_history.postcondition.sql"),
       ).resolves.toBeUndefined();
     } finally {
       await fixture.teardown();
@@ -173,7 +173,7 @@ describe("Migration 011 — prune_game_history function + grant set", () => {
       // Apply 010 only — prune_game_history is not defined.
       await fixture.applyMigrations(["010_create_game_history.sql"]);
       await expect(
-        fixture.runPostcondition("011_prune_game_history.postcondition.sql"),
+        fixture.runPostcondition("012_prune_game_history.postcondition.sql"),
       ).rejects.toThrow(/POSTCONDITION FAILED \(011/);
     } finally {
       await fixture.teardown();
@@ -185,8 +185,8 @@ describe("Migration 011 — prune_game_history function + grant set", () => {
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
       const { rows } = await fixture.client.query<{ n: string }>(
         `SELECT count(*)::text AS n FROM pg_proc
@@ -205,7 +205,7 @@ describe("prune_game_history — age-based deletion (retention floor = 13 months
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
 
       // Aged rows (> 13 months old) — should be pruned.
@@ -266,7 +266,7 @@ describe("prune_game_history — age-based deletion (retention floor = 13 months
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
 
       // Seed a row at exactly (now() - 13 months + 1 day) using DB-side arithmetic
@@ -295,7 +295,7 @@ describe("prune_game_history — age-based deletion (retention floor = 13 months
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
 
       // No rows seeded — prune should be a no-op.
@@ -314,7 +314,7 @@ describe("prune_game_history — window-safety invariant (E2)", () => {
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
 
       // Jan 1 of the current UTC year — the oldest row a YTD window can read.
@@ -355,7 +355,7 @@ describe("prune_game_history — window-safety invariant (E2)", () => {
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
 
       const thirtyDaysAgo = tsOffset(1); // ~30 days ago
@@ -392,7 +392,7 @@ describe("prune_game_history — idempotency (E3)", () => {
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
 
       // Seed one aged row.
@@ -446,7 +446,7 @@ describe("prune_game_history — player_stats is untouched (E1, headline check)"
         "008_revoke_anon_writes.sql",
         "009_add_game_config.sql",
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
 
       // Seed player_stats rows (lifetime aggregate — never touched by the prune).
@@ -523,7 +523,7 @@ describe("post-condition assertion 3 — ROLLBACK makes prune invoke non-mutatin
     try {
       await fixture.applyMigrations([
         "010_create_game_history.sql",
-        "011_prune_game_history.sql",
+        "012_prune_game_history.sql",
       ]);
 
       // Seed a row that is older than 13 months using DB-side arithmetic to avoid
@@ -542,7 +542,7 @@ describe("post-condition assertion 3 — ROLLBACK makes prune invoke non-mutatin
       // Run the real post-condition file (the one that has the ROLLBACK).
       // If the ROLLBACK is absent the row would be deleted; if present it survives.
       await expect(
-        fixture.runPostcondition("011_prune_game_history.postcondition.sql"),
+        fixture.runPostcondition("012_prune_game_history.postcondition.sql"),
       ).resolves.toBeUndefined();
 
       // The aged row must still be present — the post-condition's ROLLBACK
@@ -571,7 +571,7 @@ describe("drift-gate coupling — 011 in both expectedPending and fixture pendin
       ),
     ) as { expectedPending: string[] };
 
-    expect(fixture.pending).toContain("011_prune_game_history.sql");
-    expect(allowlist.expectedPending).toContain("011_prune_game_history.sql");
+    expect(fixture.pending).toContain("012_prune_game_history.sql");
+    expect(allowlist.expectedPending).toContain("012_prune_game_history.sql");
   });
 });
