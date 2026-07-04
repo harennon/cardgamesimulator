@@ -63,7 +63,7 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
   // post-condition failing — that case is covered by the drift-toggle test in
   // prod-shaped-fixture.test.ts. This test proves the migrations + 006 together
   // satisfy every post-condition on a prod-shaped (name-drifted) baseline.
-  it("all post-conditions pass against a name-drifted prod-shaped fixture migrated 001..010", async () => {
+  it("all post-conditions pass against a name-drifted prod-shaped fixture migrated 001..011", async () => {
     const fixture = await createProdShapedFixture({
       baseline: "typeorm-era",
       drift: { pkey1ConstraintNames: true, strayAnonWriteGrants: false },
@@ -80,6 +80,7 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
         "008_revoke_anon_writes.sql",
         "009_add_game_config.sql",
         "010_create_game_history.sql",
+        "011_prune_game_history.sql",
       ]);
 
       const result = await runPostconditions(fixture.client);
@@ -90,7 +91,7 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
     }
   });
 
-  it("all post-conditions pass against a fresh baseline migrated 001..010 (same .sql, two contexts)", async () => {
+  it("all post-conditions pass against a fresh baseline migrated 001..011 (same .sql, two contexts)", async () => {
     const fixture = await createProdShapedFixture({ baseline: "fresh" });
     try {
       await fixture.applyMigrations([
@@ -104,6 +105,7 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
         "008_revoke_anon_writes.sql",
         "009_add_game_config.sql",
         "010_create_game_history.sql",
+        "011_prune_game_history.sql",
       ]);
 
       const result = await runPostconditions(fixture.client);

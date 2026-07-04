@@ -258,3 +258,54 @@ describe("evaluateDriftGate — 010 game_history pending (LLD 101)", () => {
     expect(result.reasons.join(" ")).toMatch(/Stale expectedPending/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// LLD 149: 011_prune_game_history.sql is pending against prod. Same fixture
+// <-> allowlist coupling rule as 009/010: 011 must be in BOTH the fixture's
+// pending array AND the allowlist's expectedPending, else the gate fails
+// staleExpected (the PR #107 footgun).
+// ---------------------------------------------------------------------------
+describe("evaluateDriftGate — 011 prune_game_history pending (LLD 149)", () => {
+  const fixture = readJson("scripts/fixtures/clean-diff.json");
+  const allowlist = readJson(
+    "supabase/migrations/expected-diff.allowlist.json",
+  );
+
+  function gateWith(actualPending: string[]) {
+    return evaluateDriftGate({
+      observed: (fixture.objects as { object: string }[]) ?? [],
+      expectedFromPending:
+        (fixture.expectedFromPending as { object: string }[]) ?? [],
+      allowlist: {
+        expectedPending: (allowlist.expectedPending as string[]) ?? [],
+        acknowledgedResidual:
+          (allowlist.acknowledgedResidual as unknown[]) ?? [],
+      },
+      actualPending,
+    });
+  }
+
+  it("the in-tree fixture lists 011 as pending and the allowlist expects it", () => {
+    expect(fixture.pending).toContain("011_prune_game_history.sql");
+    expect(allowlist.expectedPending).toContain("011_prune_game_history.sql");
+  });
+
+  it("passes against the real fixture + allowlist as shipped", () => {
+    const result = gateWith(fixture.pending as string[]);
+    expect(result.ok).toBe(true);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it("fails staleExpected when 011 is dropped from the fixture's pending (documents the coupling)", () => {
+    // 011 stays in expectedPending but is dropped from the actually-pending set
+    // — the stale-allowlist trap that reddened PR #107 (the fixture<->allowlist
+    // coupling footgun documented in project memory).
+    const result = gateWith([
+      "009_add_game_config.sql",
+      "010_create_game_history.sql",
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.staleExpected).toContain("011_prune_game_history.sql");
+    expect(result.reasons.join(" ")).toMatch(/Stale expectedPending/);
+  });
+});

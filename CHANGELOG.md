@@ -8,6 +8,22 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Added
+
+- **LLD 149: game_history retention policy — prune unbounded append-only table**
+  - `supabase/migrations/011_prune_game_history.sql` — migration 011: defines `prune_game_history()` (`SECURITY DEFINER`, `RETURNS bigint`) that deletes `game_history` rows with `played_at < now() - INTERVAL '13 months'` (YTD max reach ~12 months + 1 month margin; no live window can ever read a pruned row). Registers a daily Supabase Cron (pg_cron) job `prune-game-history` at 04:05 UTC via `cron.schedule` (idempotent by stable job name); the scheduling step is guarded so the migration still applies cleanly where pg_cron is absent (E4). REVOKE/GRANT discipline mirrors `increment_player_stats`/`get_windowed_stats`: service_role only, PUBLIC/anon/authenticated revoked.
+  - `supabase/migrations/postconditions/011_prune_game_history.postcondition.sql` — post-condition: asserts function exists, is SECURITY DEFINER, grant set is service_role-only; conditionally asserts cron job is registered (pg_cron guard); invokes the prune and verifies `player_stats` row count + aggregate hash are unchanged (the function never touches `player_stats`).
+  - `supabase/migrations/destructive-ddl.allowlist.json` — new file: allowlists `011_prune_game_history.sql: ["DELETE"]` (the single in-body `DELETE FROM game_history`); exactly one entry, reviewed and intentional.
+  - `supabase/migrations/expected-diff.allowlist.json` — appends `011_prune_game_history.sql` to `expectedPending`.
+  - `scripts/fixtures/clean-diff.json` — appends `011_prune_game_history.sql` to `pending` (mirrors `expectedPending` to satisfy drift-gate coupling invariant from PR #107).
+  - `scripts/lib/destructive-ddl.mjs` — destructive-DDL scanner (pure, I/O-free), ported from `guardrail/destructive-ddl-migration-gate` branch (commit e85f957).
+  - `scripts/verify-no-destructive-ddl.mjs` — CLI runner for the destructive-DDL gate.
+  - `package.json` — adds `verify:no-destructive-ddl` npm script.
+  - `tests/scripts/no-destructive-ddl.test.ts` — unit tests for the destructive-DDL gate: existing 001-010 invariants updated for the new 011 allowlist entry; new tests prove 011 is flagged without the allowlist entry, reports exactly one DELETE op, and passes with the shipped allowlist.
+  - `tests/scripts/drift-gate.test.ts` — adds 011 coupling section mirroring the 009/010 pattern; proves staleExpected fails when 011 is missing from the fixture's pending.
+  - `tests/integration/game-history-prune.test.ts` — integration tests: function + grant set, post-condition coverage, idempotency, age-based deletion (aged rows deleted; floor-adjacent rows retained; empty table; strict < boundary), window-safety invariant (YTD-edge and 30d-edge rows survive prune), idempotency (second run deletes 0), player_stats E1 invariant (real committed prune leaves lifetime aggregate unchanged).
+  - `tests/integration/postcondition-runner.test.ts` — updated `001..010` migration lists to `001..011` so the full-chain post-condition runner tests cover 011.
+
 ### Fixed
 
 - **LLD 143: Round/score tallies clipped off the side of the game screen**
