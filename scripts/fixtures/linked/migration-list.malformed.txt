@@ -1,0 +1,4 @@
+Connecting to remote database...
+Skipping migration expected-diff.allowlist.json... (file name must match pattern "<timestamp>_name.sql")
+
+An unexpected error occurred while listing migrations.

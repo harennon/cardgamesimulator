@@ -166,12 +166,13 @@ describe("evaluateDriftGate — stale-allowlist detection (§5.3 rule 5)", () =>
 });
 
 // ---------------------------------------------------------------------------
-// LLD 95: 009_add_game_config.sql is pending against prod. The drift gate must
-// pass against the in-tree fixture + allowlist, and the fixture<->allowlist
-// coupling (Edge Case 8) is enforced: 009 must be in BOTH the fixture's pending
-// array AND the allowlist's expectedPending, else the gate fails staleExpected.
+// LLD 95 / 77a: 009_add_game_config.sql is APPLIED to prod. The real capture
+// (2026-07-04, scripts/fixtures/captures/prod-migration-list.txt) shows Remote=009
+// — so 009 is NOT pending and must NOT be in expectedPending / clean-diff.json's
+// pending, or the gate correctly fails staleExpected. This is the reconciled state
+// (was pending pre-capture; LLD 77a §8.2 required reconciling fixtures to reality).
 // ---------------------------------------------------------------------------
-describe("evaluateDriftGate — 009 game_config pending (LLD 95 §Edge Case 8)", () => {
+describe("evaluateDriftGate — 009 game_config APPLIED (LLD 77a reconciliation)", () => {
   const fixture = readJson("scripts/fixtures/clean-diff.json");
   const allowlist = readJson(
     "supabase/migrations/expected-diff.allowlist.json",
@@ -191,24 +192,43 @@ describe("evaluateDriftGate — 009 game_config pending (LLD 95 §Edge Case 8)",
     });
   }
 
-  it("the in-tree fixture lists 009 as pending and the allowlist expects it", () => {
-    expect(fixture.pending).toContain("009_add_game_config.sql");
-    expect(allowlist.expectedPending).toContain("009_add_game_config.sql");
+  it("009 is applied to prod, so it is NOT in the fixture's pending nor the allowlist", () => {
+    expect(fixture.pending).not.toContain("009_add_game_config.sql");
+    expect(allowlist.expectedPending).not.toContain("009_add_game_config.sql");
   });
 
-  it("passes against the real fixture + allowlist as shipped", () => {
-    const result = gateWith(fixture.pending as string[]);
-    expect(result.ok).toBe(true);
-    expect(result.reasons).toEqual([]);
-  });
-
-  it("fails staleExpected when 009 is dropped from the fixture's pending (documents the coupling)", () => {
-    // Simulate forgetting to add 009 to clean-diff.json's pending array while it
-    // remains in the allowlist's expectedPending — the exact CI trap (Edge Case 8).
-    const result = gateWith(["010_create_game_history.sql"]);
+  it("fails staleExpected if 009 (already applied) is falsely still expected-pending", () => {
+    // Simulate the stale-allowlist trap: 009 remains in expectedPending after it
+    // was applied to prod. The gate must catch it (Edge Case 8 / PR #107 footgun).
+    const result = evaluateDriftGate({
+      observed: (fixture.objects as { object: string }[]) ?? [],
+      expectedFromPending:
+        (fixture.expectedFromPending as { object: string }[]) ?? [],
+      allowlist: {
+        expectedPending: [
+          "009_add_game_config.sql",
+          ...((allowlist.expectedPending as string[]) ?? []),
+        ],
+        acknowledgedResidual:
+          (allowlist.acknowledgedResidual as unknown[]) ?? [],
+      },
+      actualPending: fixture.pending as string[],
+    });
     expect(result.ok).toBe(false);
     expect(result.staleExpected).toContain("009_add_game_config.sql");
     expect(result.reasons.join(" ")).toMatch(/Stale expectedPending/);
+  });
+
+  it("fails missingExpected if 009 becomes actually-pending again but is not allowlisted", () => {
+    // The mirror trap: a rollback makes 009 pending on prod again; the allowlist
+    // must be updated or the gate blocks (the #156 property).
+    const result = gateWith([
+      "009_add_game_config.sql",
+      ...(fixture.pending as string[]),
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.missingExpected).toContain("009_add_game_config.sql");
+    expect(result.reasons.join(" ")).toMatch(/missing from expectedPending/);
   });
 });
 

@@ -1,0 +1,4 @@
+Diffing schemas: public
+Finished supabase db diff on branch main.
+
+alter table "public"."player_stats" enable row level security;
