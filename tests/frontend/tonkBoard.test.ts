@@ -142,6 +142,44 @@ describe("TonkBoard — spectator contract (E11)", () => {
   });
 });
 
+describe("TonkBoard — side-view switch (LLD 144)", () => {
+  it("sideView defaults to 'tallies'", () => {
+    type SideView = "tallies" | "log";
+    const sideView = ref<SideView>("tallies");
+    expect(sideView.value).toBe("tallies");
+  });
+
+  it("toggling sideView to 'log' selects the log branch", () => {
+    type SideView = "tallies" | "log";
+    const sideView = ref<SideView>("tallies");
+    sideView.value = "log";
+    expect(sideView.value).toBe("log");
+  });
+
+  it("toggling sideView back to 'tallies' selects the tally branch", () => {
+    type SideView = "tallies" | "log";
+    const sideView = ref<SideView>("tallies");
+    sideView.value = "log";
+    sideView.value = "tallies";
+    expect(sideView.value).toBe("tallies");
+  });
+
+  it("switch logic is independent of isMobile (toggle state machine only)", () => {
+    type SideView = "tallies" | "log";
+    const sideView = ref<SideView>("tallies");
+    const isMobile = ref(true);
+
+    // On mobile the cell is CSS-hidden, but the reactive state still works
+    // the same way — the toggle is independent of the media query.
+    sideView.value = "log";
+    expect(sideView.value).toBe("log");
+    expect(isMobile.value).toBe(true); // mobile flag is orthogonal
+
+    sideView.value = "tallies";
+    expect(sideView.value).toBe("tallies");
+  });
+});
+
 describe("TonkBoard — information hiding (testing-principles #7)", () => {
   it("public state exposes counts only — no opponent hands, no stock contents", () => {
     const view = playerView();

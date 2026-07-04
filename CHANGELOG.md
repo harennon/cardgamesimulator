@@ -8,6 +8,16 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Added
+
+- **LLD 144: Show card/move history in Tonk (like Big2), including the final move**
+  - `src/frontend/component/game/TonkBoard.vue` — desktop side rail gains a `Tallies / Game Log` segmented toggle (`sideView` ref, default `"tallies"`). The `.tonk-board__log` cell becomes a column flexbox with a fixed-height `tonk-side-switch` at the top and a `tonk-board__log-body` flex-1 region holding whichever panel is active. `TonkTallyPanel` renders when `sideView === "tallies"`, `TonkLog` renders otherwise. Toggle is desktop-only (the cell is `display:none` on mobile; the existing hamburger drawer is unchanged). Added CSS for `tonk-side-switch`, `tonk-side-switch__btn`, `tonk-side-switch__btn--active`, and `tonk-board__log-body`.
+  - `src/frontend/component/game/GameOverView.vue` — new optional `tonkFinalMove?: TonkFinalMove | null` prop. Adds `hasTonkFinalMove`, `tonkFinalMoveAction`, `tonkFinalMoveBy`, and `tonkFinalMoveOutcome` computeds (reusing `logActionText` and `trickResultSummary` from `tonkDisplay.ts`). Template gains a "Final Move" block (`data-testid="game-over-tonk-final-move"`) gated by `hasTonkFinalMove`, reusing `game-over__final-play*` styles. The Big2 "Final Play" block is unchanged and mutually exclusive by game type.
+  - `src/frontend/component/game/GameView.vue` — adds `TonkFinalMove` interface and `tonkFinalMove` computed (derives from last `TonkPublicState.log` entry; returns `null` if gameType is not tonk, log is empty, or the last entry has no `trickResult`). Passes `:tonk-final-move="tonkFinalMove"` to `GameOverView`. Also adds `TonkLogEntry` and `PlayerPublicInfo` to existing type imports.
+  - `tests/frontend/tonkFinalMove.test.ts` — new test file: 5 tests covering `tonkFinalMove` derivation: null for Big2, null for empty log, null for no trickResult, correct entry for valid last entry, picks newest entry (not an earlier one).
+  - `tests/frontend/gameOverFinalPlay.test.ts` — extended with 10 new Tonk Final Move tests: `hasTonkFinalMove` gating (present/null/undefined), `tonkFinalMoveAction` for callTonk and draw entries, `tonkFinalMoveBy` displayName, `tonkFinalMoveOutcome` correctness and null-coalescing, mutual exclusivity with Big2 `finalPlay`.
+  - `tests/frontend/tonkBoard.test.ts` — extended with 4 new side-view switch tests: default `"tallies"`, toggle to `"log"`, toggle back to `"tallies"`, independence from `isMobile`.
+
 ### Fixed
 
 - **LLD 141: Player cannot see their own score during a Tonk game**
