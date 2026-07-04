@@ -1,4 +1,4 @@
 Diffing schemas: public
 Finished supabase db diff on branch main.
 
-alter table "public"."player_stats" enable row level security;
+create trigger set_updated_at before update on "public"."player_stats" for each row execute function moddatetime();

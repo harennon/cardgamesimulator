@@ -123,12 +123,73 @@ describe("classifyStatement — the residual object-id grammar", () => {
     expect(classifyStatement("set check_function_bodies = off")).toEqual([]);
   });
 
-  it("THROWS on an unclassifiable statement (F3)", () => {
+  // --- LLD 77b: RLS + policy classification (v1: enable + create policy only) ---
+
+  it("classifies ENABLE ROW LEVEL SECURITY into rls:<schema>:<table> with drop direction", () => {
+    const [c] = classifyStatement(
+      'alter table "public"."game_history" enable row level security',
+    );
+    expect(c.object).toBe("rls:public:game_history");
+    expect(c.direction).toBe("drop");
+    expect(c.table).toBe("game_history");
+  });
+
+  it("classifies CREATE POLICY into policy:<schema>:<table>:SELECT (drop) and DROPS the policy name (grammar B)", () => {
+    const [c] = classifyStatement(
+      'create policy "game_history_select_own" on "public"."game_history" for select using ((auth.uid() = user_id))',
+    );
+    expect(c.object).toBe("policy:public:game_history:SELECT");
+    expect(c.direction).toBe("drop");
+    expect(c.table).toBe("game_history");
+    // Grammar-B guard: the human-readable policy name must NOT leak into the id.
+    expect(c.object).not.toContain("game_history_select_own");
+  });
+
+  it("defaults a CREATE POLICY with no FOR clause to :ALL (Postgres default)", () => {
+    const [c] = classifyStatement('create policy "p" on "public"."feedback"');
+    expect(c.object).toBe("policy:public:feedback:ALL");
+  });
+
+  it("classifies the ONLY keyword + whitespace/case variance to the same rls id", () => {
+    const [c] = classifyStatement(
+      'ALTER  TABLE  ONLY "public"."game_history"  ENABLE   ROW  LEVEL SECURITY',
+    );
+    expect(c.object).toBe("rls:public:game_history");
+    expect(c.direction).toBe("drop");
+  });
+
+  it("DEFERRED verbs THROW (F3) — disable RLS / drop policy / alter policy stay behind the fail-closed net", () => {
     expect(() =>
       classifyStatement(
-        'alter table "public"."player_stats" enable row level security',
+        'alter table "public"."game_history" disable row level security',
       ),
     ).toThrow(LinkedDiffError);
+    expect(() =>
+      classifyStatement('drop policy "p" on "public"."game_history"'),
+    ).toThrow(LinkedDiffError);
+    expect(() =>
+      classifyStatement('alter policy "p" on "public"."game_history"'),
+    ).toThrow(LinkedDiffError);
+  });
+
+  it("THROWS (F3) on genuinely-unrecognized statements (the preserved fail-closed set)", () => {
+    expect(() =>
+      classifyStatement(
+        'create trigger set_updated_at before update on "public"."game_history" for each row execute function moddatetime()',
+      ),
+    ).toThrow(LinkedDiffError);
+    expect(() =>
+      classifyStatement('comment on table "public"."game_history" is \'x\''),
+    ).toThrow(LinkedDiffError);
+    expect(() =>
+      classifyStatement(
+        'alter sequence "public"."games_id_seq" owned by "public"."games"."id"',
+      ),
+    ).toThrow(LinkedDiffError);
+    // A bare `create policy` with no `on <table>` (malformed) → no match → throw.
+    expect(() => classifyStatement('create policy "p"')).toThrow(
+      LinkedDiffError,
+    );
   });
 });
 
@@ -223,6 +284,49 @@ describe("pendingDeclaredObjects — what a pending migration declares (Gap A/B 
     expect(tables.has("game_history")).toBe(true);
     expect(functions.has("get_windowed_stats")).toBe(true);
     expect(byName.get("game_history")).toBe("010_create_game_history.sql");
+  });
+
+  // --- LLD 77b: the rlsTables RAW-TEXT scan (Gap 2) ---
+
+  it("collects rlsTables from a BARE enable/create-policy on an already-created table (no CREATE TABLE)", () => {
+    const mig = {
+      file: "011_lock_down.sql",
+      sql:
+        "ALTER TABLE game_history ENABLE ROW LEVEL SECURITY;\n" +
+        "CREATE POLICY p ON game_history FOR SELECT USING (auth.uid() = user_id);",
+    };
+    const { rlsTables, rlsByName, tables } = pendingDeclaredObjects([mig]);
+    expect(rlsTables.has("game_history")).toBe(true);
+    expect(rlsByName.get("game_history")).toBe("011_lock_down.sql");
+    // The migration does NOT create the table, so it is not in `tables`.
+    expect(tables.has("game_history")).toBe(false);
+  });
+
+  // THE single most important test (LLD 77b §Test Requirements 8a): the CREATE
+  // POLICY is buried in a `DO $$ ... END $$;` guard block that splitDdlStatements
+  // treats as OPAQUE. Only the RAW-TEXT scan reads inside it. If this passed with
+  // a statement-level scan, the scan would be implemented wrong (Gap 2).
+  it("collects rlsTables from a CREATE POLICY inside a DO $$ ... END $$; guard block (011's exact shape)", () => {
+    const mig = {
+      file: "011_lock_down.sql",
+      sql: [
+        "ALTER TABLE game_history ENABLE ROW LEVEL SECURITY;",
+        "",
+        "DO $$",
+        "BEGIN",
+        "  IF NOT EXISTS (",
+        "    SELECT 1 FROM pg_policies",
+        "    WHERE tablename = 'game_history' AND policyname = 'game_history_select_own'",
+        "  ) THEN",
+        "    CREATE POLICY game_history_select_own",
+        "      ON game_history FOR SELECT",
+        "      USING (auth.uid() = user_id);",
+        "  END IF;",
+        "END $$;",
+      ].join("\n"),
+    };
+    const { rlsTables } = pendingDeclaredObjects([mig]);
+    expect(rlsTables.has("game_history")).toBe(true);
   });
 });
 
@@ -439,6 +543,127 @@ describe("adaptLinkedDiff — index attribution rejects coincidental substrings"
 });
 
 // ---------------------------------------------------------------------------
+// LLD 77b: RLS/policy attribution end-to-end through adaptLinkedDiff. Self-
+// contained synthetic migrations (testing-principles §3). The 011 scenario:
+// `game_history` created by APPLIED 010, RLS/policy added by PENDING 011 inside a
+// `DO $$` guard block → both statements attribute via pending.rlsTables (the raw-
+// text scan) and drop as benign; nothing surfaces as residual.
+// ---------------------------------------------------------------------------
+describe("adaptLinkedDiff — RLS/policy attribution (LLD 77b)", () => {
+  // 010 (applied) CREATEs game_history; 011 (pending) enables RLS + creates the
+  // SELECT policy INSIDE a DO $$ block — 011's real shape.
+  const rlsMigrations = [
+    {
+      file: "010_create_game_history.sql",
+      sql: "CREATE TABLE game_history (id uuid, user_id uuid);",
+    },
+    {
+      file: "011_lock_down_game_history.sql",
+      sql: [
+        "ALTER TABLE game_history ENABLE ROW LEVEL SECURITY;",
+        "DO $$",
+        "BEGIN",
+        "  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'game_history_select_own') THEN",
+        "    CREATE POLICY game_history_select_own",
+        "      ON game_history FOR SELECT",
+        "      USING (auth.uid() = user_id);",
+        "  END IF;",
+        "END $$;",
+      ].join("\n"),
+    },
+  ];
+  // 010 applied (Remote set), 011 pending (blank Remote).
+  const list011Pending = [
+    "   Local | Remote | Time (UTC)",
+    "  -------|--------|------------",
+    "   `010` | `010`  | `010`",
+    "   `011` | ` `    | `011`",
+  ].join("\n");
+
+  it("011-scenario: RLS enable + create policy self-attribute to pending 011 (dropped as benign, no residual)", () => {
+    const adapted = adaptLinkedDiff(
+      {
+        dbDiffStdout: readFixture("db-diff.rls-pending-attributed.txt"),
+        migrationListStdout: list011Pending,
+      },
+      rlsMigrations,
+    ) as Adapted;
+    expect(adapted.pending).toEqual(["011_lock_down_game_history.sql"]);
+    // Neither the RLS nor the policy object survives as residual — both attributed
+    // via pending.rlsTables (game_history seen by the raw-text scan inside DO $$).
+    expect(ids(adapted)).not.toContain("rls:public:game_history");
+    expect(ids(adapted)).not.toContain("policy:public:game_history:SELECT");
+    expect(adapted.objects).toEqual([]);
+  });
+
+  it("(b) cross-migration: A enables RLS, B adds the policy on the same table → BOTH drop as benign", () => {
+    // Two SEPARATE pending migrations touch the same applied table `t`.
+    const migrations = [
+      {
+        file: "001_applied.sql",
+        sql: "CREATE TABLE t (id uuid, user_id uuid);",
+      },
+      {
+        file: "002_pending_enable.sql",
+        sql: "ALTER TABLE t ENABLE ROW LEVEL SECURITY;",
+      },
+      {
+        file: "003_pending_policy.sql",
+        sql: "CREATE POLICY p ON t FOR SELECT USING (auth.uid() = user_id);",
+      },
+    ];
+    const listBothPending = [
+      "   Local | Remote | Time (UTC)",
+      "  -------|--------|------------",
+      "   `001` | `001`  | `001`",
+      "   `002` | ` `    | `002`",
+      "   `003` | ` `    | `003`",
+    ].join("\n");
+    const dbDiffStdout = [
+      "Diffing schemas: public",
+      "",
+      'alter table "public"."t" enable row level security;',
+      "",
+      'create policy "p" on "public"."t" for select using ((auth.uid() = user_id));',
+      "",
+    ].join("\n");
+    const adapted = adaptLinkedDiff(
+      { dbDiffStdout, migrationListStdout: listBothPending },
+      migrations,
+    ) as Adapted;
+    // Each attributes via pending.rlsTables to *a* pending migration (possibly
+    // different files) — both drop as benign.
+    expect(ids(adapted)).not.toContain("rls:public:t");
+    expect(ids(adapted)).not.toContain("policy:public:t:SELECT");
+    expect(adapted.objects).toEqual([]);
+  });
+
+  it("unattributed ENABLE surfaces as residual rls:<schema>:<table> (Edge Case 2)", () => {
+    // `player_stats` is neither pending-created nor pending-RLS'd here (nothing
+    // pending), so a prod-missing RLS is REAL drift and must surface.
+    const adapted = adaptLinkedDiff(
+      {
+        dbDiffStdout: readFixture("db-diff.rls-residual.txt"),
+        migrationListStdout: readFixture("migration-list.all-applied.txt"),
+      },
+      inTreeMigrations(),
+    ) as Adapted;
+    expect(ids(adapted)).toContain("rls:public:player_stats");
+  });
+
+  it("unattributed CREATE POLICY surfaces as residual policy:<schema>:<table>:<CMD> (Edge Case 4)", () => {
+    const adapted = adaptLinkedDiff(
+      {
+        dbDiffStdout: readFixture("db-diff.rls-residual.txt"),
+        migrationListStdout: readFixture("migration-list.all-applied.txt"),
+      },
+      inTreeMigrations(),
+    ) as Adapted;
+    expect(ids(adapted)).toContain("policy:public:player_stats:SELECT");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // End-to-end: raw CLI text → adapter → the REAL evaluateDriftGate + the shipped
 // allowlist. Still credential-free. Proves the raw→structured→verdict chain.
 // ---------------------------------------------------------------------------
@@ -488,5 +713,54 @@ describe("adaptLinkedDiff → evaluateDriftGate (end-to-end, credential-free)", 
     );
     expect(result.residual).toContain("grant:anon:player_stats:INSERT");
     expect(result.reasons.join(" ")).toMatch(/Unexpected drift/);
+  });
+
+  // LLD 77b test 13: the 011 scenario passes the gate with the RLS/policy objects
+  // absent from residual and NO RLS acknowledgment needed (they self-attribute to
+  // pending 011). Self-contained synthetic migrations + inline allowlist.
+  it("LLD 77b 011-scenario PASSES evaluateDriftGate with no RLS acknowledgment", () => {
+    const rlsMigrations = [
+      {
+        file: "010_create_game_history.sql",
+        sql: "CREATE TABLE game_history (id uuid, user_id uuid);",
+      },
+      {
+        file: "011_lock_down_game_history.sql",
+        sql: [
+          "ALTER TABLE game_history ENABLE ROW LEVEL SECURITY;",
+          "DO $$ BEGIN",
+          "  CREATE POLICY game_history_select_own",
+          "    ON game_history FOR SELECT USING (auth.uid() = user_id);",
+          "END $$;",
+        ].join("\n"),
+      },
+    ];
+    const list011Pending = [
+      "   Local | Remote | Time (UTC)",
+      "  -------|--------|------------",
+      "   `010` | `010`  | `010`",
+      "   `011` | ` `    | `011`",
+    ].join("\n");
+    const adapted = adaptLinkedDiff(
+      {
+        dbDiffStdout: readFixture("db-diff.rls-pending-attributed.txt"),
+        migrationListStdout: list011Pending,
+      },
+      rlsMigrations,
+    ) as Adapted;
+    const result = evaluateDriftGate({
+      observed: adapted.objects,
+      expectedFromPending: adapted.expectedFromPending,
+      allowlist: {
+        // Only the pending migration is declared; NO RLS/policy acknowledgment.
+        expectedPending: ["011_lock_down_game_history.sql"],
+        acknowledgedResidual: [],
+      },
+      actualPending: adapted.pending,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.reasons).toEqual([]);
+    expect(result.residual).not.toContain("rls:public:game_history");
+    expect(result.residual).not.toContain("policy:public:game_history:SELECT");
   });
 });

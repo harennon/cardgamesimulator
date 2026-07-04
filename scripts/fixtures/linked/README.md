@@ -26,8 +26,17 @@ object the migrations don't (residual).
   `player_stats_pkey1` constraint + stray `anon` INSERT grant on `player_stats`
   (the T1 class, raw form of `drifted-diff.json`). Not attributable to any pending
   migration, not acknowledged → gate FAILS.
-- `db-diff.unclassifiable.txt` — a statement the narrow v1 classifier does not
-  recognize (`... enable row level security`) → THROW (F3).
+- `db-diff.unclassifiable.txt` — a statement the classifier does not (and should
+  not) recognize (`create trigger ... execute function moddatetime()`) → THROW
+  (F3). (Was `... enable row level security`, now CLASSIFIED per LLD 77b, so the
+  fixture was repurposed to a genuinely-unclassifiable statement.)
+- `db-diff.rls-pending-attributed.txt` **(LLD 77b)** — `enable row level security`
+  + `create policy ... for select` on `game_history`. In the 011 scenario
+  (`game_history` created by applied 010, RLS/policy added by pending 011) both
+  attribute to pending 011 via `pending.rlsTables` → dropped as benign, no residual.
+- `db-diff.rls-residual.txt` **(LLD 77b)** — `enable row level security` +
+  `create policy ...` on a table NO pending migration touches → unattributed →
+  surface as residual `rls:*` / `policy:*` (real drift, Edge Cases 2 & 4).
 - `db-diff.empty-not-sentinel.txt` — zero DDL but NOT the sentinel → THROW (F4).
 
 ## migration list (`supabase migration list --linked`)
