@@ -23,8 +23,8 @@ The user approved **Option C (Centered tray)** from the mockup (`docs/mockups/ce
 
 **Why `margin-inline: auto` and NOT `justify-content: center`:** With a flex container that has `overflow-x: auto`, `justify-content: center` clips the leftmost overflowing children past the left edge and they become unreachable by scrolling (a well-known flexbox + overflow bug). That was mockup **Option B, explicitly rejected**. `margin-inline: auto` centers a *fits* strip but collapses to zero margin when the content is wider than the cell, so the overflow-scroll fallback for a full 13-card hand is preserved and no card clips off the left.
 
-**Desktop-only scoping:** Both new rules live in the default (non-media-query) blocks, which the existing `@media (max-width: 767px)` blocks already override for mobile:
-- `GameBoard.vue` mobile block sets `.game-board--mobile .game-board__hand { flex-direction: column; align-items: flex-start; }` — this continues to override the new desktop `align-items: stretch; justify-content: center;`. The new `flex-direction: column` now *matches* mobile's, which is harmless (mobile re-declares it).
+**Desktop-only scoping:** Both new rules live in the default (non-media-query) blocks. The existing `@media (max-width: 767px)` blocks override the mobile-relevant properties — but *only the ones they explicitly declare*, so every new desktop property that would otherwise leak into mobile must be explicitly reset in the mobile block:
+- `GameBoard.vue` mobile block currently sets `.game-board--mobile .game-board__hand { flex-direction: column; align-items: flex-start; overflow: hidden; }`. It overrides the new desktop `align-items: stretch` (mobile keeps `flex-start`), and the new desktop `flex-direction: column` merely *matches* mobile's. **But the mobile block does NOT declare `justify-content`, so the new desktop `justify-content: center` would cascade into mobile** and vertically-center the label+hand stack in the fixed 160px hand cell (a mobile regression). The mobile block **must therefore add `justify-content: flex-start`** to pin the current top-aligned behavior (see the required delta below).
 - `PlayerHand.vue` mobile block sets `.player-hand { width: 100% }`. A full-width strip with `margin-inline: auto` yields zero side margin (nothing to center), so mobile is visually unaffected. To eliminate any ambiguity, the mobile block will also explicitly reset `margin-inline: 0` (matching the mockup) so the intent is self-documenting and future-proof against padding/width changes.
 
 ## Interfaces / Types
@@ -109,6 +109,18 @@ Full-hand / narrow-window overflow case (leftmost cards remain reachable, no cli
 }
 ```
 
+`GameBoard.vue`, mobile block `@media (max-width: 767px) .game-board--mobile .game-board__hand` — **REQUIRED** reset. The new desktop `justify-content: center` (on the base `.game-board__hand` rule) would otherwise cascade into mobile, because the existing mobile override declares only `flex-direction`, `align-items`, and `overflow` — it does **not** declare `justify-content`. Left unreset, the label+hand stack inside the fixed `--mobile-hand-height` (160px) cell would shift from top-aligned to vertically centered, silently changing mobile. Add an explicit `flex-start` to pin the current top-aligned behavior:
+```css
+@media (max-width: 767px) {
+  .game-board--mobile .game-board__hand {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start; /* ADDED: reset the new desktop justify-content:center — keep label+hand top-aligned in the 160px mobile cell */
+    overflow: hidden; /* contain within grid cell */
+  }
+}
+```
+
 **Constraints (must hold):**
 - Card selection, hover-lift (`@media (hover: hover)`), and click/tap (`@click` / `@touchstart`) behavior is unchanged — none of those selectors or handlers are touched.
 - The `--card-overlap` negative-margin fan and `player-hand__card--first` reset are unchanged.
@@ -121,7 +133,7 @@ Full-hand / narrow-window overflow case (leftmost cards remain reachable, no cli
 3. **Boundary width exactly 768px.** `>= 768px` uses desktop rules (centered); `<= 767px` uses mobile rules. The `matchMedia("(max-width: 767px)")` driver for `isMobile` and the CSS `@media (max-width: 767px)` breakpoints agree, so no gap or overlap at the boundary.
 4. **`isFinished` state ("Finished — waiting for others.").** The label still renders above; `.game-board__finished` replaces `PlayerHand`. It has its own `padding: 0 24px`; under the new column/stretch parent it renders below the centered label. Acceptable — it is a transient end-of-round message, and the change does not regress it (verify it is not clipped).
 5. **Zero cards in hand (momentary, between deal and render / after emptying).** `PlayerHand` renders an empty flex container; `margin-inline: auto` on an empty strip is a no-op. No layout break.
-6. **Mobile column layout collision.** Mobile block already sets `flex-direction: column; align-items: flex-start`. The new desktop `flex-direction: column` is identical in axis; mobile re-declaring `align-items: flex-start` and `justify-content` (via the mobile `.game-board__hand` rule) still wins by source order / specificity. Confirm mobile label stays left-aligned and cards left-aligned.
+6. **Mobile column layout collision / `justify-content` leak.** The mobile block sets `flex-direction: column; align-items: flex-start; overflow: hidden`. The new desktop `flex-direction: column` is identical in axis, and mobile's `align-items: flex-start` overrides the desktop `align-items: stretch` by source order / specificity. **However, the mobile block declares no `justify-content`**, so the new desktop `justify-content: center` would otherwise cascade in and vertically-center the label+hand stack in the 160px hand cell. The required mobile-block delta (see "Frontend Design") adds `justify-content: flex-start` to reset this. Confirm mobile label stays top- and left-aligned and cards left-aligned, unchanged from current.
 
 ## Dependencies
 
@@ -142,8 +154,8 @@ Per `docs/testing-principles.md` §"Decision Heuristics" #6, layout/responsivene
 | M1 | Desktop, small hand (~5 cards) | Label "Your hand (n)" centered above; card tray horizontally centered in the strip; no large right-side gap. |
 | M2 | Desktop wide, full 13-card hand | Cards lay out without clipping; if they fit, tray is centered; if not, tray hugs left and scrolls. |
 | M3 | Desktop **narrow** window, full 13-card hand | Leftmost cards NOT clipped off the left edge; every card reachable via horizontal scroll (the Option B failure must not occur). |
-| M4 | Mobile viewport (`< 768px`) | Layout visually **unchanged** from current: label left-aligned, cards left-aligned and horizontally scrollable. |
+| M4 | Mobile viewport (`< 768px`) | Layout visually **unchanged** from current: label top- and left-aligned in the 160px hand cell (NOT vertically centered), cards left-aligned and horizontally scrollable. |
 | M5 | Card interactions (desktop) | Click/tap toggles selection; selected cards lift; hover lift works on hover-capable devices — all unchanged. |
 | M6 | `isFinished` state (desktop) | "Finished — waiting for others." renders below the centered label without clipping. |
 
-**Regression guard:** Diff must contain only CSS inside the two named files; zero changes to `<template>` or `<script>` blocks. Confirm the `@media (max-width: 767px)` blocks in both files are unchanged except for the single explicit `margin-inline: 0` addition in `PlayerHand.vue`.
+**Regression guard:** Diff must contain only CSS inside the two named files; zero changes to `<template>` or `<script>` blocks. Confirm the `@media (max-width: 767px)` blocks in both files are unchanged except for the two explicit resets required to prevent desktop properties leaking into mobile: `margin-inline: 0` on `.player-hand` in `PlayerHand.vue`, and `justify-content: flex-start` on `.game-board--mobile .game-board__hand` in `GameBoard.vue`. No other mobile-block lines may change.
