@@ -1,5 +1,5 @@
 <template>
-  <div class="player-hand">
+  <div class="player-hand" :class="{ dealing }">
     <GameCard
       v-for="(card, index) in cards"
       :key="`${card.rank}-${card.suit}`"
@@ -12,6 +12,7 @@
         'player-hand__card--first': index === 0,
         'player-hand__card--interactive': interactive,
       }"
+      :style="{ '--i': index }"
       @click="onCardClick(index)"
       @touchstart="onCardTouch(index)"
     />
@@ -26,6 +27,7 @@ const props = defineProps<{
   cards: readonly Card[];
   selectedIndices: Set<number>;
   interactive: boolean;
+  dealing?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -83,6 +85,31 @@ function onCardTouch(index: number) {
       .card--selected
     ):hover {
     transform: translateY(var(--card-selected-hover-lift));
+  }
+}
+
+/* Deal-in animation (variant A: slide-up). The .dealing class is set by the
+   parent board for one animation window at round start, then cleared. */
+.player-hand.dealing .player-hand__card {
+  transform-origin: bottom center;
+  animation: dealSlide var(--deal-duration) var(--deal-easing) both;
+  animation-delay: calc(var(--i) * var(--deal-stagger));
+}
+
+@keyframes dealSlide {
+  from {
+    opacity: 0;
+    transform: translateY(46px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-hand.dealing .player-hand__card {
+    animation: none;
   }
 }
 

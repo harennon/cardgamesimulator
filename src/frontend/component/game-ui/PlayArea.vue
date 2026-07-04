@@ -19,7 +19,7 @@
         <div class="play-area__hand-label">
           {{ handTypeLabel }}
         </div>
-        <div class="play-area__card-row">
+        <div :key="currentPlayKey" class="play-area__card-row landing">
           <GameCard
             v-for="card in lastPlay.cards"
             :key="`${card.rank}-${card.suit}`"
@@ -44,6 +44,7 @@ import type { Big2PublicState, Big2HistoryEntry } from "@shared/big2-types";
 import GameCard from "./GameCard.vue";
 import TurnTimer from "./TurnTimer.vue";
 import TrickPile from "./TrickPile.vue";
+import { playKey } from "@/composables/useCardAnimations";
 
 const HAND_TYPE_LABELS: Record<string, string> = {
   single: "Single",
@@ -76,6 +77,10 @@ const handTypeLabel = computed(() => {
     props.lastPlay.handType.kind
   );
 });
+
+// Key that changes only on a genuinely new play; the play row re-enters on
+// each key change, triggering the .landing drop animation automatically.
+const currentPlayKey = computed(() => playKey(props.lastPlay));
 
 const lastPlayDisplayName = computed(() => {
   if (!props.lastPlay) return "";
@@ -135,6 +140,30 @@ const lastPlayDisplayName = computed(() => {
 .play-area__card-row {
   display: flex;
   gap: 4px;
+}
+
+/* Play-to-center animation (variant 1: drop). The .landing class is static on
+   the row; the :key change on each new play re-creates the element so the
+   keyframe fires automatically per play (no boolean toggle needed). */
+.play-area__card-row.landing {
+  animation: playDrop var(--play-duration) var(--play-easing) both;
+}
+
+@keyframes playDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-28px) scale(1.14);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-area__card-row.landing {
+    animation: none;
+  }
 }
 
 .play-area__played-by {

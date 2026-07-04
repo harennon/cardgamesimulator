@@ -56,6 +56,7 @@
         :selected-indices="selectedIndices"
         :dimmed-indices="dimmedIndices"
         :bad-select="badSelect"
+        :dealing="dealing"
         @toggle="(index) => emit('toggleCard', index)"
       />
     </div>
@@ -147,6 +148,7 @@
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import type { EnrichedPlayerView } from "@shared/socket-events";
 import type { TonkCard, TonkPublicState } from "@shared/tonk-types";
+import { isFreshDeal } from "@/composables/useCardAnimations";
 import RoomCodeChip from "@/component/game-ui/RoomCodeChip.vue";
 import TonkSeatRail from "@/component/game-ui/TonkSeatRail.vue";
 import TonkPhaseBanner from "@/component/game-ui/TonkPhaseBanner.vue";
@@ -264,7 +266,38 @@ onMounted(() => {
 
 onUnmounted(() => {
   mql.removeEventListener("change", handleMediaChange);
+  if (dealTimer !== null) {
+    clearTimeout(dealTimer);
+    dealTimer = null;
+  }
 });
+
+// --- Deal-in animation state (LLD 152) ---
+// True for one animation window at round start; auto-cleared by timer.
+// Tonk re-arms on each new deck-round (the hand goes empty→full per round).
+const dealing = ref(false);
+let dealTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Max animation window: (maxCards-1) * stagger + duration + slack
+// Tonk deals up to 7 cards: 6 * 45ms + 260ms + 100ms = 630ms
+const DEAL_CLEAR_MS = 700;
+
+watch(
+  () => myHand.value.length,
+  (nextLen, prevLen) => {
+    if (isFreshDeal(prevLen ?? 0, nextLen)) {
+      if (dealTimer !== null) {
+        clearTimeout(dealTimer);
+      }
+      dealing.value = true;
+      dealTimer = setTimeout(() => {
+        dealing.value = false;
+        dealTimer = null;
+      }, DEAL_CLEAR_MS);
+    }
+  },
+  { immediate: true },
+);
 
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === "Escape") logDrawerOpen.value = false;
