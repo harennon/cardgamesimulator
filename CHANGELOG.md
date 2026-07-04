@@ -10,6 +10,14 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Added
 
+- **Destructive-DDL CI gate (issue #91): block data-destroying SQL in migrations, allowlist-overridable**
+  - Scope is DATA safety. Banned = `DROP TABLE`, `ALTER TABLE ... DROP COLUMN`, `DELETE (FROM)`, `TRUNCATE`. `DROP FUNCTION` / `DROP INDEX` are intentionally NOT banned — they remove code / derived objects and destroy no data.
+  - `scripts/lib/destructive-ddl.mjs` — pure, I/O-free scanner. `stripCommentsAndStrings` neutralizes `--`/`/* */` comments and `'...'` string literals (incl. `''` escapes) with equal-length blanks (offsets preserved for line numbers) so a banned keyword inside a comment/string can never false-positive; `findDestructiveOps` matches `DROP TABLE`, `ALTER TABLE ... DROP COLUMN`, `DELETE FROM`, `TRUNCATE` case-insensitively and whitespace/newline-tolerantly (IF EXISTS covered for free); `evaluateDestructiveDdl` gates each op against a per-file allowlist, fail-closed. `DELETE` is matched only as `DELETE FROM` so the `DELETE` privilege token in `GRANT/REVOKE` lists is not flagged; `REVOKE`, `ALTER ... DROP DEFAULT`/`DROP CONSTRAINT`, and `DROP FUNCTION`/`DROP INDEX` are intentionally not gated.
+  - `scripts/verify-no-destructive-ddl.mjs` — CLI mirroring `verify-drift.mjs`: scans `supabase/migrations/*.sql`, loads the sibling allowlist, exits 1 with a per-file/per-op message (and how to allowlist) on any un-allowlisted data-destroying statement.
+  - `supabase/migrations/destructive-ddl.allowlist.json` — new sibling allowlist (shape: `{ "<migration>.sql": ["DELETE", ...] }` plus a `$comment` policy note), keyed per-file + per-operation for auditability. Ships EMPTY (only `$comment`): migrations 001-010 contain no data-destroying statement, so no entry is needed.
+  - `.github/workflows/ci.yml` — new fail-closed `Destructive-DDL gate` step in `unit-tests`, alongside the drift gate. `package.json` — new `verify:no-destructive-ddl` script.
+  - Tests: `tests/scripts/no-destructive-ddl.test.ts` — clean pass; each data-destroying type incl. IF EXISTS + whitespace/case variants; `DROP FUNCTION`/`DROP INDEX` now pass (not gated); comment/string non-triggers; non-destructive DROP/REVOKE forms ignored; per-file + per-op allowlist gating; and the real 001-010 migrations pass clean with an empty allowlist (zero data-destroying statements in the tree).
+
 - **LLD 120: Create-game + lobby/board UI — AI seats and human/AI labels**
   - `src/shared/engine-types.ts` — added `isAi?: boolean` to `PlayerPublicInfo` and `PlayerInfo`; derived server-side only, never trusted from client.
   - `src/shared/model.ts` — extended `CreateGameRequest` with `numAiSeats?: number` (0..maxPlayers-1; omitted/0 → human-only game unchanged).
