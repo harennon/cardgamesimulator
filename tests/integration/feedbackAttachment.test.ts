@@ -12,10 +12,7 @@ import { createTestUser } from "./helpers/supabaseUser.js";
 import { createTestGuest } from "./helpers/guestUser.js";
 import { SupabaseDB } from "../../src/backend/database/supabaseDb.js";
 import { FeedbackAttachmentService } from "../../src/backend/service/feedbackAttachmentService.js";
-import {
-  SupabaseAttachmentStorage,
-  type AttachmentStorage,
-} from "../../src/backend/service/attachmentStorage.js";
+import { SupabaseAttachmentStorage } from "../../src/backend/service/attachmentStorage.js";
 import { ATTACHMENT_LIMITS } from "../../src/backend/service/feedbackAttachmentService.js";
 
 // ---------------------------------------------------------------------------
@@ -377,62 +374,69 @@ describe("Feedback attachment integration (LLD 150)", () => {
     expect(attachRes.status).toBe(201);
     const key = (attachRes.body as SubmitAttachmentResponse).key;
 
-    // Inject a storage double that fails once then succeeds.
-    // We do this by replacing the attachmentService's storage dependency
-    // on the FeedbackHandler singleton's attachmentService.
-    // Since we can't inject at request time, we stub the SupabaseDB storage
-    // client's storage API for the first call.
-    const realStorage = new SupabaseAttachmentStorage(
-      () => SupabaseDB.INSTANCE.storageClient,
-    );
+    // Spy on SupabaseAttachmentStorage.prototype.removeByPrefix so the
+    // FeedbackHandler singleton's internal storage instance is intercepted.
+    // First call throws (simulates a transient Storage error); second call
+    // delegates to the real implementation.
+    const realRemoveByPrefix =
+      SupabaseAttachmentStorage.prototype.removeByPrefix;
+    let removeCallCount = 0;
+    const removeByPrefixSpy = vi
+      .spyOn(SupabaseAttachmentStorage.prototype, "removeByPrefix")
+      .mockImplementation(async function (
+        this: SupabaseAttachmentStorage,
+        prefix: string,
+      ) {
+        removeCallCount++;
+        if (removeCallCount === 1)
+          throw new Error("transient storage error (test)");
+        return realRemoveByPrefix.call(this, prefix);
+      });
 
-    let callCount = 0;
-    const stubbedStorage: AttachmentStorage = {
-      upload: vi.fn(),
-      createSignedUrl: (...args) => realStorage.createSignedUrl(...args),
-      remove: (...args) => realStorage.remove(...args),
-      removeByPrefix: async (prefix: string) => {
-        callCount++;
-        if (callCount === 1) throw new Error("transient storage error");
-        return realStorage.removeByPrefix(prefix);
-      },
-    };
-
-    // Temporarily override the FeedbackAttachmentService's storage via
-    // the service created inside FeedbackHandler. We need to test at the
-    // HTTP level, so instead we test the FeedbackAttachmentService layer
-    // directly (the service IS the reordered-delete logic; the handler just
-    // calls it).
-    const svc = new FeedbackAttachmentService(
-      SupabaseDB.INSTANCE,
-      stubbedStorage,
-    );
-
-    // First call: removeByPrefix throws → should propagate as error
-    await expect(svc.removeStoragePrefix(feedbackId)).rejects.toThrow(
-      "transient storage error",
-    );
-
-    // Row must still exist (handler would not have deleted it)
-    const rowAfterFailure =
-      await SupabaseDB.INSTANCE.getFeedbackById(feedbackId);
-    expect(rowAfterFailure).not.toBeNull();
-
-    // Second call: succeeds
-    await svc.removeStoragePrefix(feedbackId);
-
-    // Object is now gone
-    const realStorageSvc = new SupabaseAttachmentStorage(
-      () => SupabaseDB.INSTANCE.storageClient,
-    );
-    let signedUrl: string;
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
     try {
-      signedUrl = await realStorageSvc.createSignedUrl(key, 10);
-    } catch {
-      return; // object gone — test passes
+      // First DELETE: removeByPrefix throws → handler must return 500 and
+      // leave the row intact so the retry can re-attempt cleanup.
+      const firstDel = await request(ctx.app)
+        .delete(`/feedback/${feedbackId}`)
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(firstDel.status).toBe(500);
+
+      // Row must still be present — the handler must NOT have deleted it.
+      const rowAfterFailure =
+        await SupabaseDB.INSTANCE.getFeedbackById(feedbackId);
+      expect(rowAfterFailure).not.toBeNull();
+
+      // Restore real implementation so the retry can succeed.
+      removeByPrefixSpy.mockRestore();
+
+      // Retry DELETE: removeByPrefix now succeeds → handler returns 200.
+      const retryDel = await request(ctx.app)
+        .delete(`/feedback/${feedbackId}`)
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(retryDel.status).toBe(200);
+
+      // Row is now gone.
+      const rowAfterRetry =
+        await SupabaseDB.INSTANCE.getFeedbackById(feedbackId);
+      expect(rowAfterRetry).toBeNull();
+
+      // Object is gone from Storage — signed URL download must fail.
+      const storageSvc = new SupabaseAttachmentStorage(
+        () => SupabaseDB.INSTANCE.storageClient,
+      );
+      let signedUrl: string;
+      try {
+        signedUrl = await storageSvc.createSignedUrl(key, 10);
+      } catch {
+        return; // object already gone
+      }
+      const fetched = await fetch(signedUrl);
+      expect(fetched.ok).toBe(false);
+    } finally {
+      removeByPrefixSpy.mockRestore();
+      delete process.env.FEEDBACK_ADMIN_IDS;
     }
-    const fetched = await fetch(signedUrl);
-    expect(fetched.ok).toBe(false);
   });
 
   // -------------------------------------------------------------------------

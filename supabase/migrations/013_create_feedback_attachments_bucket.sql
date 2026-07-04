@@ -55,3 +55,10 @@ AS $$
    WHERE id = p_feedback_id
    RETURNING attachment_keys;
 $$;
+
+-- Same grant discipline as increment_player_stats (003) and get_windowed_stats (010):
+-- only the backend (service_role) may call this SECURITY DEFINER function.
+-- Postgres grants EXECUTE to PUBLIC by default; revoke it explicitly.
+REVOKE EXECUTE ON FUNCTION append_feedback_attachment_key FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION append_feedback_attachment_key FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION append_feedback_attachment_key TO service_role;

@@ -223,6 +223,38 @@ describe("Security: increment_player_stats RPC restricted to service_role", () =
 });
 
 // ---------------------------------------------------------------------------
+// Security test 2b: append_feedback_attachment_key RPC restricted to service_role
+// ---------------------------------------------------------------------------
+
+describe("Security: append_feedback_attachment_key RPC restricted to service_role", () => {
+  it("anon client cannot call append_feedback_attachment_key RPC directly", async () => {
+    const anonClient = makeAnonClient();
+    // Do NOT sign in — this client is unauthenticated (anon role).
+
+    const { error } = await anonClient.rpc("append_feedback_attachment_key", {
+      p_feedback_id: "00000000-0000-0000-0000-000000000000",
+      p_key: "feedback-attachments/ATTACKER-INJECTED/evil.png",
+    });
+
+    // REVOKE EXECUTE from PUBLIC/anon blocks the call — PostgREST returns an error
+    // (function not visible in schema cache, or permission denied).
+    expect(error).not.toBeNull();
+  });
+
+  it("authenticated (non-service-role) user cannot call append_feedback_attachment_key RPC directly", async () => {
+    const { client, userId: _userId } = await makeAuthenticatedClient();
+
+    const { error } = await client.rpc("append_feedback_attachment_key", {
+      p_feedback_id: "00000000-0000-0000-0000-000000000000",
+      p_key: "feedback-attachments/ATTACKER-INJECTED/evil.png",
+    });
+
+    // REVOKE EXECUTE from authenticated blocks the call.
+    expect(error).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Security test 3: authenticated user cannot UPDATE another user's game
 // ---------------------------------------------------------------------------
 

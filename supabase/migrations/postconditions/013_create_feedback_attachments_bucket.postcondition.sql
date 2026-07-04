@@ -1,8 +1,10 @@
 -- Post-condition for 013 (LLD 150): private feedback-attachments bucket
 -- exists in storage.buckets, is NOT public (security assertion), RLS is
 -- enabled on storage.objects, at least two bucket-scoped deny policies exist
--- (by shape, not name), and feedback.attachment_keys column is present and
--- is an array type. Accumulates bad[] and RAISEs once (011 idiom).
+-- (by shape, not name), feedback.attachment_keys column is present and
+-- is an array type, and append_feedback_attachment_key RPC is restricted to
+-- service_role only (EXECUTE revoked from PUBLIC/anon/authenticated).
+-- Accumulates bad[] and RAISEs once (011 idiom).
 -- Read-only; idempotent; name-agnostic where possible.
 DO $$
 DECLARE
@@ -11,6 +13,11 @@ DECLARE
   rls_on boolean;
   pol_count int;
   col_type text;
+  fn_oid oid;
+  service_can boolean;
+  anon_can boolean;
+  authd_can boolean;
+  public_can boolean;
 BEGIN
   -- 1. Bucket exists.
   IF NOT EXISTS (
@@ -64,9 +71,32 @@ BEGIN
     bad := array_append(bad, 'feedback.attachment_keys:expected array type, got ' || col_type);
   END IF;
 
+  -- 6. append_feedback_attachment_key RPC exists, is SECURITY DEFINER, and
+  --    EXECUTE is restricted to service_role only (mirrors 003 postcondition).
+  SELECT oid INTO fn_oid
+    FROM pg_proc
+   WHERE proname = 'append_feedback_attachment_key'
+     AND pg_function_is_visible(oid);
+  IF fn_oid IS NULL THEN
+    bad := array_append(bad, 'append_feedback_attachment_key:function missing');
+  ELSE
+    service_can := has_function_privilege('service_role', fn_oid, 'EXECUTE');
+    anon_can    := has_function_privilege('anon',         fn_oid, 'EXECUTE');
+    authd_can   := has_function_privilege('authenticated', fn_oid, 'EXECUTE');
+    public_can  := has_function_privilege('public',       fn_oid, 'EXECUTE');
+    IF NOT service_can THEN
+      bad := array_append(bad, 'append_feedback_attachment_key:service_role must have EXECUTE');
+    END IF;
+    IF anon_can OR authd_can OR public_can THEN
+      bad := array_append(bad,
+        'append_feedback_attachment_key:EXECUTE must be revoked from anon/authenticated/PUBLIC (anon=' ||
+        anon_can::text || ', authenticated=' || authd_can::text || ', public=' || public_can::text || ')');
+    END IF;
+  END IF;
+
   IF array_length(bad, 1) IS NOT NULL THEN
     RAISE EXCEPTION
-      'POSTCONDITION FAILED (013): feedback-attachments bucket setup is incomplete: %. Expected private bucket, RLS enabled on storage.objects, 2+ bucket-scoped deny policies, and feedback.attachment_keys as an array column.',
+      'POSTCONDITION FAILED (013): feedback-attachments bucket setup is incomplete: %. Expected private bucket, RLS enabled on storage.objects, 2+ bucket-scoped deny policies, feedback.attachment_keys as an array column, and append_feedback_attachment_key restricted to service_role.',
       bad;
   END IF;
 END $$;
