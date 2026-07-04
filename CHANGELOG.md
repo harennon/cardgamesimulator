@@ -8,6 +8,77 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Fixed
+
+- **LLD 141: Player cannot see their own score during a Tonk game**
+  - `src/frontend/component/game-ui/tonkDisplay.ts` — `SeatRow` gains a required `isSelf: boolean` field. `railSeats()` now includes the local player (previously filtered out), marks the local row `isSelf: true`, and sorts it first; non-self rows retain ascending seat order. Spectator render (`myPlayerIndex === -1`) is unchanged: no row matches self.
+  - `src/frontend/component/game-ui/TonkSeatRail.vue` — renders the self chip with `tonk-seat--self` accent class; fan suppressed for self (`!compact && !seat.isSelf`); name displays "You"; tally pill gains `tonk-seat__tally--near` modifier via `isNearLine(seat.tally)`; AiAvatar and AiBadge gated with `!seat.isSelf`; disconnected label gated with `!seat.isSelf`. Imports `isNearLine` from `tonkDisplay`.
+  - `src/frontend/styles/game-variables.css` — adds `--tonk-self: #9b7fe8` self-identity accent token (distinct from `--tonk-cyan` drawable-discard ring and gold active-turn border).
+  - `tests/frontend/tonkDisplay.test.ts` — updated `railSeats` tests to reflect new contract (self included, sorted first, 8-player returns 8 rows, spectator has no self).
+  - `tests/frontend/aiBadgeRendering.test.ts` — replaced "railSeats filters out myPlayerIndex" with the new contract assertion (self present and `isSelf: true`).
+  - `tests/frontend/aiAvatarRendering.test.ts` — updated source-inspection assertions for `AiAvatar`/`AiBadge` v-if to match new `seat.isAi && !seat.isSelf` guard.
+  - `tests/frontend/tonkSeatRailSelf.test.ts` — new test file: 27 tests covering `railSeats` self-chip contract, AI/disconnected suppression invariants, near-150 warning on self, and TonkSeatRail source wiring.
+
+- **LLD 134: Tonk action/discard buttons clipped at bottom of desktop game screen**
+  - `src/frontend/component/game/TonkBoard.vue` — changed the desktop grid's `actions` row from a fixed `64px` to `auto`, so `TonkActionPanel` always has enough room for its one-line (not-your-turn pill), two-line (phase-stepper + buttons), or three-line (error + stepper + buttons) states without being clipped by `overflow: hidden`. Added `min-height: 0` to `.tonk-board__table` (desktop) so the `1fr` table row can yield space to the `auto` actions row at short viewports (768px). `GameBoard.vue` (Big2) and the mobile grid (`--mobile-actions-height`) are untouched.
+
+### Added
+
+- **LLD 137: AI/CPU move pacing delay (configurable, injectable)**
+  - `src/backend/websocket/delayer.ts` — new `Delayer` interface with `RealDelayer` (production, `setTimeout`-backed with fast-path for `ms <= 0`) and `ImmediateDelayer` (tests, zero wall-clock).
+  - `src/shared/model.ts` — `GameConfig.aiMoveDelayMs?: number` added; persisted in `games.game_config` JSONB; absent → default 1000ms; 0 → instant opt-out; clamped to [0, 3000].
+  - `src/backend/websocket/socketHandler.ts` — `autoPlayAbandoned` gains a `Delayer` parameter; after each successful `broadcastGameState` inside the loop it `await delayer.delay(delayMs)` (paced gap between successive auto-driven moves). Delay is skipped on COMPLETED, B1/B2/B3 guard exits, and on human-only games (never enters the delay branch). Named constants `DEFAULT_AI_MOVE_DELAY_MS = 1000` and `MAX_AI_MOVE_DELAY_MS = 3000` exported. `handleGameJoin`, `handleGameStart`, `handleGameAction`, `handleTimerExpired`, and `registerSocketHandlers` all gain a `delayer` parameter threaded to every `autoPlayAbandoned` call.
+  - `src/backend/server.ts` — constructs `new RealDelayer()` and threads it into `handleTimerExpired` and `registerSocketHandlers`.
+  - `tests/integration/helpers/testServer.ts` — injects `new ImmediateDelayer()` so all integration tests run at zero delay and remain fast.
+  - `tests/websocket/socketHandler.test.ts` — all `setupHandlers*` helpers and the `handleTimerExpired` call updated to pass `new ImmediateDelayer()`.
+  - `tests/websocket/delayer.test.ts` — 14 new tests: `RealDelayer` fast-path and timer-based; `ImmediateDelayer`; pacing insertion verified via `RecordingDelayer` (delay count + value for default, config-override 500ms, 0ms opt-out, absurd clamped to MAX); no-delay on completion/B1/B2; abandoned-human pacing matches AI pacing; human-only game never triggers delay.
+
+- **LLD 128: Polish — AI opponent naming and avatars**
+  - `src/shared/aiNames.ts` — new pure shared module: `AI_NAME_POOL` (7 names: Ace, Bishop, Cortex, Domino, Echo, Fable, Gambit) and `aiNameForOrdinal(ordinal)`, a deterministic helper that assigns names by ordinal with a cycling suffix fallback for tables larger than the pool.
+  - `src/backend/service/gameService.ts` — `addAiSeats` now calls `aiNameForOrdinal(existingAiCount + i)` instead of `"CPU N"`. No signature change; `practice`/`aiPlayerIds` wiring unchanged.
+  - `src/frontend/component/game-ui/AiAvatar.vue` — new presentational atom: Direction B geometric bot glyph (rounded-rect head, two eye dots, antenna) inside a dark disc with `--ai-accent` ring and halo. Props: `size?: "sm" | "md"` (default `md`). `aria-hidden="true"`, `data-testid="ai-avatar"`, `flex-shrink: 0`. Asset-free inline SVG + CSS only.
+  - `src/frontend/styles/game-variables.css` — two new AI tokens: `--ai-accent-line` (ring/border) and `--ai-accent-dim` (halo), both cool-blue variants of `--ai-accent`.
+  - `src/frontend/component/game/GameLobbyView.vue` — renders `<AiAvatar size="sm" />` before the name on AI player rows; `AiBadge` still present after the name.
+  - `src/frontend/component/game-ui/OpponentRow.vue` — renders `<AiAvatar size="sm" />` in `opponent__info` beside the name; `AiBadge` still present.
+  - `src/frontend/component/game-ui/TonkSeatRail.vue` — renders `<AiAvatar size="sm" />` in `tonk-seat__info` beside the name; `AiBadge` still present.
+  - `src/frontend/component/CreateGameView.vue` — adds "Fill remaining seats" button (`data-testid="ai-seats-fill"`, disabled at max), `fillAiSeats()` helper, `aiPreviewNames` computed (uses shared `aiNameForOrdinal`), and a live name-preview block (`data-testid="ai-seats-preview"`) with `<AiAvatar />` md chips rendered when `numAiSeats >= 1`.
+  - `tests/util/aiNames.test.ts` — 13 unit tests: pool size, all 7 ordinal names, cycle boundary (ordinals 7/13/14), determinism, uniqueness within a 7-seat table.
+  - `tests/service/aiNaming.test.ts` — 4 unit tests: first 3 seats get Ace/Bishop/Cortex, no "CPU " string produced, ordinal offset for incremental adds, regression (practice + aiPlayerIds unchanged).
+  - `tests/frontend/aiAvatar.test.ts` — 13 structural tests: SVG glyph present, `aria-hidden`, `data-testid`, no emoji, `flex-shrink: 0`, token usage, size classes, SVG shape elements.
+  - `tests/frontend/aiAvatarRendering.test.ts` — 23 tests: AiAvatar wired into lobby/OpponentRow/TonkSeatRail/CreateGameView; Fill button logic; preview list logic; `aiPreviewNames` computed; `fillAiSeats` logic; `isAi` gate on all surfaces.
+
+- **LLD 127: AI opponent move policy — smarter play beyond auto-timeout heuristic**
+  - `src/backend/engine/game-engine.ts` — added `getAiMoveAction(state)` to the `GameEngine` interface (parallel to `getAutoTimeoutAction`; same null contract).
+  - `src/backend/engine/big2/ai-policy.ts` — new pure policy module: `chooseBig2Move(myHand, pub, playerId)` with `Big2PolicyView`. Strategy: first-play sheds lowest card in a pair/5-combo if possible; free-play leads cheapest combo of largest size, holding high singletons (never leads a `2`/`A` while lower cards exist); follow-play beats lastPlay when close to out, the beat is cheap (≤J), or it would win the trick — otherwise passes to conserve high cards. Combo-preservation guard prevents breaking pairs to lead a single when a true singleton is available.
+  - `src/backend/engine/big2/big2-engine.ts` — `Big2Engine.getAiMoveAction` builds `Big2PolicyView` from `Big2State`, delegates to `chooseBig2Move`, and falls back to `getAutoTimeoutAction` if the policy somehow returns an illegal action.
+  - `src/backend/engine/tonk/ai-policy.ts` — new pure policy module: `chooseTonkMove(myHand, pub, playerId)` with `TonkPolicyView` and `TONK_CALL_THRESHOLD = 10`. Discard phase: calls TONK when gate is open and `handValue ≤ 10`; otherwise discards the full same-rank group with the highest total value (dumping pairs removes more points). Draw phase: draws from discard only when the drawable card is strictly cheaper than the cheapest card held (never breaks a joker advantage); otherwise draws from stock.
+  - `src/backend/engine/tonk/tonk-engine.ts` — `TonkEngine.getAiMoveAction` builds `TonkPolicyView` from `TonkState`, delegates to `chooseTonkMove`.
+  - `src/backend/websocket/socketHandler.ts` — `autoPlayAbandoned` now branches on `isAiSeat`: AI seats call `engine.getAiMoveAction`, abandoned humans call `engine.getAutoTimeoutAction` (unchanged). `handleTimerExpired` is untouched.
+  - `tests/engine/big2/ai-policy.test.ts` — 14 unit tests: always-legal, does-not-always-pass (core bug fix), sheds-low-early, holds-high-cards, combo-preservation, passes-when-cannot-beat, information-hiding, null cases, full-game integration (4P seeded, asserts AI plays in follow position).
+  - `tests/engine/tonk/ai-policy.test.ts` — 18 unit tests: always-legal across all phases, discard-minimizes-value, TONK-calling thresholds, draw-from-discard logic, joker/stock-out edge cases, information-hiding, null cases, full-game integration (3P seeded, asserts AI called TONK or drew from discard).
+  - `tests/websocket/socketHandler.test.ts` — 2 new routing tests: AI seat invokes `getAiMoveAction` (not `getAutoTimeoutAction`); `handleTimerExpired` invokes `getAutoTimeoutAction` (never `getAiMoveAction`). Mock engine updated to include `getAiMoveAction`.
+
+### Fixed
+
+- **LLD 126: Bug report / feedback button missing on the in-game screen (mobile)**
+  - `src/frontend/component/howto/clusterPlacement.ts` — retired `collapseBug` and the `isNarrow` parameter (LLD 126 shape A); `clusterPlacement(path)` now returns `{ onBoard }` only. The bug icon shows on the board at every width.
+  - `src/frontend/component/howto/HelpCluster.vue` — removed `v-if="!collapseBug"` from the bug FAB so it always renders; `isNarrow` now drives the compact CSS class only. Added compact mobile-board sizing under `.help-cluster--board-mobile` (42/32px FABs, 9px gap) so the restored second FAB fits above the action row without crowding.
+  - `tests/frontend/walkthroughs.test.ts` — updated `clusterPlacement` describe block to match the new single-argument signature; removed collapsed-bug expectations.
+  - `e2e/howto-walkthrough.spec.ts` — inverted the mobile-board collapse test to assert both FABs visible, both disjoint from action row and hand cards; added a new test asserting the feedback modal opens when the bug icon is tapped from the mobile board.
+
+- **LLD 125: CPU/AI players incorrectly show as disconnected in game**
+  - `src/frontend/component/game-ui/OpponentRow.vue` — guarded the disconnected label: `v-if="!player.isConnected && !player.isAi"` so bots no longer display a false red "disconnected" badge while genuinely offline humans still do.
+  - `src/frontend/component/game-ui/TonkSeatRail.vue` — same guard applied: `v-if="!seat.isConnected && !seat.isAi"`.
+  - `tests/frontend/disconnectedLabel.test.ts` — 9 unit tests covering both components (AI offline, human offline, human offline with isAi=false, connected human, connected AI) via a pure-function transcription of the predicate.
+
+- **LLD 122: AI/CPU players hang for ~60s after a human wins**
+  - `src/backend/websocket/socketHandler.ts` — fixed `autoPlayAbandoned` loop bound from `playerCount * 2` (too small for multi-seat play-out) to `playerCount * (MAX_HAND_SIZE + playerCount)`, a ceiling that comfortably covers driving all remaining AI seats to `COMPLETED` in a single synchronous pass without truncating any legitimate game play-out.
+  - Added a version-progress check inside the loop: if `applyAction` succeeds but `state.version` does not advance, the divergence guard fires immediately (B3) without waiting for the absolute ceiling.
+  - Added `armFallbackTimer` helper: arms a 1× turn timer on every exit that stops on a still-driven seat while the game is `IN_PROGRESS` (B1 — null auto-action, B2 — engine rejects action, B3 — divergence guard). Previously these three branches armed no timer, leaving the game silently stalled. No-op when the game has no timer configured.
+  - B2 branch now logs via `console.warn` with the caught error (was: silent swallow).
+  - `MAX_AUTO_ACTIONS_PER_SEAT` constant removed; replaced by `MAX_HAND_SIZE = 13` used in the completion-sized ceiling.
+  - Tests: 5 new unit tests in `tests/websocket/socketHandler.test.ts` (B1, B2, B3, happy-path arm, completion path) + 2 new integration tests in `tests/integration/ai-completion.test.ts` (4-player seeded near-end reproduction; 2-player last-two-players path) — both assert game reaches `COMPLETED` synchronously with `timerProvider.pendingCount === 0` and zero `game:timerExpired` events.
+
 ### Added
 
 - **Destructive-DDL CI gate (issue #91): block data-destroying SQL in migrations, allowlist-overridable**

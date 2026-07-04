@@ -110,15 +110,33 @@ describe("tonkDisplay — piles name derivation (A1)", () => {
 });
 
 describe("tonkDisplay — seats (3–8, compact/wrap)", () => {
-  it("railSeats omits the local player and carries seat index + tally", () => {
+  it("railSeats includes the local player, marks it isSelf, and sorts it first", () => {
     const seats = railSeats(players(3), [10, 20, 30], 0);
-    expect(seats.map((s) => s.seatIndex)).toEqual([1, 2]);
-    expect(seats.map((s) => s.tally)).toEqual([20, 30]);
+    expect(seats.map((s) => s.seatIndex)).toEqual([0, 1, 2]);
+    expect(seats.map((s) => s.tally)).toEqual([10, 20, 30]);
+    expect(seats[0]!.isSelf).toBe(true);
+    expect(seats[1]!.isSelf).toBe(false);
+    expect(seats[2]!.isSelf).toBe(false);
+  });
+
+  it("railSeats carries the own tally value for the self row", () => {
+    const seats = railSeats(players(3), [10, 20, 30], 0);
+    const selfSeat = seats.find((s) => s.isSelf);
+    expect(selfSeat?.tally).toBe(10);
+  });
+
+  it("non-self rows retain ascending seatIndex order", () => {
+    const seats = railSeats(players(4), [10, 20, 30, 40], 1);
+    // self is seat 1 (first), then seats 0, 2, 3 in ascending order
+    expect(seats[0]!.seatIndex).toBe(1);
+    expect(seats[0]!.isSelf).toBe(true);
+    expect(seats.slice(1).map((s) => s.seatIndex)).toEqual([0, 2, 3]);
   });
 
   it("railSeats renders ALL players for spectator-style render (myPlayerIndex === -1, E11)", () => {
     const seats = railSeats(players(3), [10, 20, 30], -1);
     expect(seats).toHaveLength(3);
+    expect(seats.every((s) => !s.isSelf)).toBe(true);
   });
 
   it("3 players → not compact (fan shown), not wrapping (E6)", () => {
@@ -136,8 +154,13 @@ describe("tonkDisplay — seats (3–8, compact/wrap)", () => {
     expect(isWrappingRail(7)).toBe(true);
     expect(isCompactRail(8)).toBe(true);
     expect(isWrappingRail(8)).toBe(true);
-    // 8-player rail still renders every opponent seat.
-    expect(railSeats(players(8), new Array(8).fill(0), 0)).toHaveLength(7);
+    // 8-player rail now renders all 8 seats (self included).
+    expect(railSeats(players(8), new Array(8).fill(0), 0)).toHaveLength(8);
+  });
+
+  it("tallies shorter than players → self row tally falls back to 0 (defensive E6)", () => {
+    const seats = railSeats(players(3), [], 0);
+    expect(seats.find((s) => s.isSelf)?.tally).toBe(0);
   });
 
   it("seat carries the disconnected flag for the disconnected affordance (E9)", () => {

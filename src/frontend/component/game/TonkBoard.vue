@@ -253,7 +253,7 @@ watch(logDrawerOpen, (open) => {
   position: fixed;
   inset: 0;
   display: grid;
-  grid-template-rows: 80px 1fr 220px 64px;
+  grid-template-rows: 80px 1fr 220px auto;
   grid-template-columns: 1fr 280px;
   grid-template-areas:
     "opponents opponents"
@@ -319,6 +319,7 @@ watch(logDrawerOpen, (open) => {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-height: 0;
 }
 
 .tonk-board__hand {

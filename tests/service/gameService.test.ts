@@ -1120,7 +1120,9 @@ describe("GameService", () => {
       for (const aiId of aiIds) {
         expect(aiId).toMatch(uuidPattern);
         expect(result.playerIds).toContain(aiId);
-        expect(result.playerDisplayNames[aiId]).toMatch(/^CPU \d+$/);
+        // LLD 128: names now come from the AI_NAME_POOL, not "CPU N".
+        expect(result.playerDisplayNames[aiId]).toBeTruthy();
+        expect(result.playerDisplayNames[aiId]).not.toMatch(/^CPU \d+$/);
       }
       expect(result.gameConfig.practice).toBe(true);
       expect(repo.saveGame).toHaveBeenCalled();

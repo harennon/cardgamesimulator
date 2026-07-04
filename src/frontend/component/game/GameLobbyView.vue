@@ -42,6 +42,7 @@
           :key="player.playerId"
           class="lobby__player"
         >
+          <AiAvatar v-if="player.isAi" size="sm" />
           {{ player.displayName }}
           <AiBadge v-if="player.isAi" data-testid="ai-badge" />
         </div>
@@ -99,6 +100,7 @@ import { ref, computed } from "vue";
 import type { PlayerInfo, GameType } from "@shared/engine-types";
 import { gameTypeLabel } from "@/component/statsView";
 import AiBadge from "@/component/game-ui/AiBadge.vue";
+import AiAvatar from "@/component/game-ui/AiAvatar.vue";
 
 const props = defineProps<{
   gameId: string;

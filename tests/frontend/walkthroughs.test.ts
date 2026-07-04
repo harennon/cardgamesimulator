@@ -254,44 +254,25 @@ describe("step-nav reducer (E1)", () => {
   });
 });
 
-describe("clusterPlacement — surface-aware placement (LLD 117 §7.1)", () => {
-  it("board path + narrow → onBoard && collapseBug (single-FAB collapse)", () => {
-    expect(clusterPlacement("/game/abc123", true)).toEqual({
-      onBoard: true,
-      collapseBug: true,
-    });
+describe("clusterPlacement — surface-aware placement (LLD 126)", () => {
+  it("board path → onBoard (bug icon visible at every width)", () => {
+    expect(clusterPlacement("/game/abc123")).toEqual({ onBoard: true });
   });
 
-  it("board path + wide → onBoard && !collapseBug (both buttons)", () => {
-    expect(clusterPlacement("/game/abc123", false)).toEqual({
-      onBoard: true,
-      collapseBug: false,
-    });
-  });
-
-  it("non-board path → !onBoard && !collapseBug at any width", () => {
-    expect(clusterPlacement("/", false)).toEqual({
-      onBoard: false,
-      collapseBug: false,
-    });
-    expect(clusterPlacement("/create-game", true)).toEqual({
-      onBoard: false,
-      collapseBug: false,
-    });
-    expect(clusterPlacement("/stats", true)).toEqual({
-      onBoard: false,
-      collapseBug: false,
-    });
+  it("non-board paths → !onBoard", () => {
+    expect(clusterPlacement("/")).toEqual({ onBoard: false });
+    expect(clusterPlacement("/create-game")).toEqual({ onBoard: false });
+    expect(clusterPlacement("/stats")).toEqual({ onBoard: false });
   });
 
   it("a nested /game/<id>/<sub> path is NOT the board (only /game/<id> matches)", () => {
     // Mirrors App.vue showNav: the board is the sole /game/<id> route.
-    expect(clusterPlacement("/game/abc/extra", false).onBoard).toBe(false);
+    expect(clusterPlacement("/game/abc/extra").onBoard).toBe(false);
   });
 
   it("rematch: both /game/abc and /game/xyz resolve to onBoard (E10)", () => {
-    expect(clusterPlacement("/game/abc", false).onBoard).toBe(true);
-    expect(clusterPlacement("/game/xyz", false).onBoard).toBe(true);
+    expect(clusterPlacement("/game/abc").onBoard).toBe(true);
+    expect(clusterPlacement("/game/xyz").onBoard).toBe(true);
   });
 });
 

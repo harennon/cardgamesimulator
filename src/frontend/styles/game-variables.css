@@ -74,9 +74,12 @@
   --tonk-phase-discard: #c97b3f; /* warm/amber — discard phase */
   --tonk-phase-draw: #3f9dc9; /* cool/blue — draw phase */
   --tonk-near-150: #e09a30; /* near-loss-line warning tint */
+  --tonk-self: #9b7fe8; /* self-identity accent (LLD 141) — distinct from cyan (discard ring) and gold (active turn) */
 
-  /* AI identity token (LLD 120) — steel/cool blue; never collides with --gold-accent turn glow */
+  /* AI identity tokens (LLD 120/128) — steel/cool blue; never collides with --gold-accent turn glow */
   --ai-accent: #7fb2ff;
+  --ai-accent-line: rgba(127, 178, 255, 0.5);
+  --ai-accent-dim: rgba(127, 178, 255, 0.16);
 }
 
 @media (max-width: 767px) {

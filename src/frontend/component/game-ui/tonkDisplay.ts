@@ -114,29 +114,34 @@ export interface SeatRow {
   readonly isAi?: boolean;
   readonly seatIndex: number;
   readonly tally: number;
+  readonly isSelf: boolean;
 }
 
 /**
- * Seats rendered by the rail: every player except myPlayerIndex (or all when
- * myPlayerIndex === -1, the spectator-style contract — E11). Each carries its
- * seat index and tally for the chip.
+ * Seats rendered by the rail: EVERY player, including the local player.
+ * The local player's row is marked isSelf and sorted first; all others keep
+ * ascending seat order. Spectator render (myPlayerIndex === -1) => no isSelf row.
  */
 export function railSeats(
   players: readonly PlayerPublicInfo[],
   tallies: readonly number[],
   myPlayerIndex: number,
 ): SeatRow[] {
-  return players
-    .map((p, seatIndex) => ({
-      playerId: p.playerId,
-      displayName: p.displayName,
-      cardCount: p.cardCount,
-      isConnected: p.isConnected,
-      isAi: p.isAi,
-      seatIndex,
-      tally: tallies[seatIndex] ?? 0,
-    }))
-    .filter((s) => s.seatIndex !== myPlayerIndex);
+  const rows = players.map((p, seatIndex) => ({
+    playerId: p.playerId,
+    displayName: p.displayName,
+    cardCount: p.cardCount,
+    isConnected: p.isConnected,
+    isAi: p.isAi,
+    seatIndex,
+    tally: tallies[seatIndex] ?? 0,
+    isSelf: seatIndex === myPlayerIndex,
+  }));
+  return rows.sort((a, b) => {
+    if (a.isSelf && !b.isSelf) return -1;
+    if (!a.isSelf && b.isSelf) return 1;
+    return a.seatIndex - b.seatIndex;
+  });
 }
 
 const SUIT_SYMBOLS: Record<string, string> = {

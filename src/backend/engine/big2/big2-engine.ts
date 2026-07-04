@@ -22,6 +22,8 @@ import { buildDeck } from "./deck.js";
 import { isValidPlay, computeValidActions } from "./valid-actions.js";
 import { computeScores } from "./scoring.js";
 import { compareCards } from "./constants.js";
+import { chooseBig2Move } from "./ai-policy.js";
+import type { Big2PolicyView } from "./ai-policy.js";
 
 export class Big2Engine implements GameEngine {
   readonly gameType = "big2" as const;
@@ -197,6 +199,40 @@ export class Big2Engine implements GameEngine {
       cards: [lowestCard],
     };
     return playAction;
+  }
+
+  getAiMoveAction(state: InternalGameState): GameAction | null {
+    if (state.status !== "IN_PROGRESS") return null;
+    if (state.currentPlayerIndex < 0) return null;
+
+    const playerId = state.players[state.currentPlayerIndex]!.playerId;
+    const big2State = state.gameSpecificState as Big2State;
+    const myHand = big2State.hands[state.currentPlayerIndex] ?? [];
+
+    if (myHand.length === 0) return null;
+
+    const lowestCard = this.getLowestCard(big2State, state.players.length);
+    const activePlayerCount =
+      state.players.length - big2State.finishedPlayerIndices.length;
+
+    const pub: Big2PolicyView = {
+      lastPlay: big2State.lastPlay,
+      isFreePlay: big2State.isFreePlay,
+      isFirstPlayOfGame: big2State.isFirstPlayOfGame,
+      lowestCard,
+      consecutivePasses: big2State.consecutivePasses,
+      activePlayerCount,
+    };
+
+    const action = chooseBig2Move(myHand, pub, playerId);
+
+    // Legality fallback: if policy returned an invalid action (should not
+    // happen), fall back to the timeout action for safety.
+    if (!this.validateAction(state, action)) {
+      return this.getAutoTimeoutAction(state);
+    }
+
+    return action;
   }
 
   getSpectatorView(
