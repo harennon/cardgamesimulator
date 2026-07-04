@@ -233,12 +233,25 @@ describe("evaluateDriftGate — 009 game_config APPLIED (LLD 77a reconciliation)
 });
 
 // ---------------------------------------------------------------------------
-// LLD 101: 010_create_game_history.sql is pending against prod. Same fixture
-// <-> allowlist coupling rule as 009 (drift-gate stale-allowlist, the PR #107
-// footgun): 010 must be in BOTH the fixture's pending array AND the allowlist's
-// expectedPending, else the gate fails staleExpected.
+// LLD 011: 010 is now APPLIED to prod (post-010 capture, Remote=010) and
+// 011_lock_down_game_history.sql is pending. The Phase-0 allowlist acknowledges
+// the six game_history stray write grants (G6) that 011 REVOKEs; 011's own
+// ENABLE RLS + CREATE POLICY are self-attributed to pending 011 by the adapter
+// (LLD 77b) and never reach the fixture's objects. Same fixture <-> allowlist
+// coupling rule as 009/010 (the PR #107 footgun): 011 must be in BOTH the
+// fixture's pending array AND the allowlist's expectedPending, else the gate
+// fails staleExpected.
 // ---------------------------------------------------------------------------
-describe("evaluateDriftGate — 010 game_history pending (LLD 101)", () => {
+const G6 = [
+  "grant:anon:game_history:DELETE",
+  "grant:anon:game_history:INSERT",
+  "grant:anon:game_history:UPDATE",
+  "grant:authenticated:game_history:DELETE",
+  "grant:authenticated:game_history:INSERT",
+  "grant:authenticated:game_history:UPDATE",
+];
+
+describe("evaluateDriftGate — 011 game_history lockdown pending (LLD 011)", () => {
   const fixture = readJson("scripts/fixtures/clean-diff.json");
   const allowlist = readJson(
     "supabase/migrations/expected-diff.allowlist.json",
@@ -258,23 +271,126 @@ describe("evaluateDriftGate — 010 game_history pending (LLD 101)", () => {
     });
   }
 
-  it("the in-tree fixture lists 010 as pending and the allowlist expects it", () => {
-    expect(fixture.pending).toContain("010_create_game_history.sql");
-    expect(allowlist.expectedPending).toContain("010_create_game_history.sql");
+  it("the in-tree fixture lists 011 as pending and the allowlist expects it (010 now applied)", () => {
+    expect(fixture.pending).toContain("011_lock_down_game_history.sql");
+    expect(allowlist.expectedPending).toContain(
+      "011_lock_down_game_history.sql",
+    );
+    // 010 is applied to prod → NOT pending, NOT expected-pending.
+    expect(fixture.pending).not.toContain("010_create_game_history.sql");
+    expect(allowlist.expectedPending).not.toContain(
+      "010_create_game_history.sql",
+    );
   });
 
-  it("passes against the real fixture + allowlist as shipped", () => {
+  it("the six G6 stray grants are in the fixture's objects AND acknowledged in the allowlist", () => {
+    const objects = (fixture.objects as { object: string }[]).map(
+      (o) => o.object,
+    );
+    const acked = (allowlist.acknowledgedResidual as { object: string }[]).map(
+      (a) => a.object,
+    );
+    for (const g of G6) {
+      expect(objects).toContain(g);
+      expect(acked).toContain(g);
+    }
+    // RLS/policy self-attribute to pending 011 (LLD 77b) → NOT in objects and
+    // NOT acknowledged (acknowledging them would fire unusedAcknowledged).
+    expect(objects).not.toContain("rls:public:game_history");
+    expect(objects).not.toContain("policy:public:game_history:ALL");
+    expect(acked).not.toContain("rls:public:game_history");
+    expect(acked).not.toContain("policy:public:game_history:ALL");
+  });
+
+  it("passes against the real fixture + allowlist as shipped (residual ∅, no unusedAcknowledged)", () => {
     const result = gateWith(fixture.pending as string[]);
     expect(result.ok).toBe(true);
+    expect(result.residual).toEqual([]);
+    expect(result.unusedAcknowledged).toEqual([]);
     expect(result.reasons).toEqual([]);
   });
 
-  it("fails staleExpected when 010 is dropped from the fixture's pending (documents the coupling)", () => {
-    // 010 stays in expectedPending but is dropped from the actually-pending set
-    // — the stale-allowlist trap that reddened PR #107 (Edge Case 8).
-    const result = gateWith(["009_add_game_config.sql"]);
+  it("fails staleExpected when 011 is dropped from the fixture's pending (documents the coupling)", () => {
+    // 011 stays in expectedPending but is dropped from the actually-pending set
+    // — the stale-allowlist trap that reddened PR #107 (Edge Case 10).
+    const result = gateWith([]);
     expect(result.ok).toBe(false);
-    expect(result.staleExpected).toContain("010_create_game_history.sql");
+    expect(result.staleExpected).toContain("011_lock_down_game_history.sql");
     expect(result.reasons.join(" ")).toMatch(/Stale expectedPending/);
+  });
+
+  it("fails missingExpected when an un-allowlisted migration becomes pending", () => {
+    const result = gateWith([
+      "011_lock_down_game_history.sql",
+      "012_hypothetical.sql",
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.missingExpected).toContain("012_hypothetical.sql");
+    expect(result.reasons.join(" ")).toMatch(/missing from expectedPending/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LLD 011: acknowledgedResidual subtracts EXACTLY the six G6 grants — proving
+// the transient ack is fail-closed. Removing one ack surfaces that one grant as
+// residual; an ack matching no observed drift is flagged unusedAcknowledged
+// (the Phase-2 self-enforcement mechanism, Edge Case 11).
+// ---------------------------------------------------------------------------
+describe("evaluateDriftGate — G6 acknowledgedResidual is fail-closed (LLD 011)", () => {
+  const observed = G6.map((object) => ({ object }));
+  const acknowledgedResidual = G6.map((object) => ({
+    object,
+    reason: "Live TypeORM-era stray write grant that 011 REVOKEs; transient.",
+    issue: "#176",
+  }));
+
+  it("subtracts exactly G6 → residual ∅, no unusedAcknowledged", () => {
+    const result = evaluateDriftGate({
+      observed,
+      expectedFromPending: [],
+      allowlist: {
+        expectedPending: ["011_lock_down_game_history.sql"],
+        acknowledgedResidual,
+      },
+      actualPending: ["011_lock_down_game_history.sql"],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.residual).toEqual([]);
+    expect(result.unusedAcknowledged).toEqual([]);
+  });
+
+  it("removing one ack surfaces exactly that grant as residual (fail-closed)", () => {
+    const result = evaluateDriftGate({
+      observed,
+      expectedFromPending: [],
+      allowlist: {
+        expectedPending: ["011_lock_down_game_history.sql"],
+        // drop the ack for grant:anon:game_history:INSERT
+        acknowledgedResidual: acknowledgedResidual.filter(
+          (a) => a.object !== "grant:anon:game_history:INSERT",
+        ),
+      },
+      actualPending: ["011_lock_down_game_history.sql"],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.residual).toEqual(["grant:anon:game_history:INSERT"]);
+  });
+
+  it("flags an ack that matches no observed drift as unusedAcknowledged (Phase-2 self-enforcement)", () => {
+    // Simulate the post-011-applied world: the grants are gone from prod
+    // (observed empty) but the six acks are still present → the gate FAILS,
+    // forcing the Phase-2 cleanup.
+    const result = evaluateDriftGate({
+      observed: [],
+      expectedFromPending: [],
+      allowlist: {
+        expectedPending: [],
+        acknowledgedResidual,
+      },
+      actualPending: [],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.unusedAcknowledged).toEqual([...G6].sort());
+    expect(result.reasons.join(" ")).toMatch(/matched no observed drift/);
   });
 });

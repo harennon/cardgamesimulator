@@ -15,12 +15,26 @@ Direction (confirmed by the capture): shadow-DB(from migrations) → prod. A
 `drop`/`revoke` = prod is MISSING that object; a `create`/`grant` = prod has an
 object the migrations don't (residual).
 
-- `db-diff.pending-010.txt` **(REAL)** — the whole `game_history` cluster (table
-  + 2 indexes + pkey constraint + 15 revokes + `get_windowed_stats`) as
-  drops/revokes because migration `010` is pending, plus `increment_player_stats`
+- `db-diff.pending-010.txt` **(REAL, PRE-010 world)** — the whole `game_history`
+  cluster (table + 2 indexes + pkey constraint + 15 revokes + `get_windowed_stats`)
+  as drops/revokes because migration `010` is pending, plus `increment_player_stats`
   re-emitted as `CREATE OR REPLACE` (the lone genuine residual — cosmetic
-  diff-engine noise, acknowledged in the allowlist). NB: `009` (game_config) does
-  NOT appear — it is applied to prod, so only `010` is pending.
+  diff-engine noise). NB: `009` (game_config) does NOT appear — it is applied to
+  prod, so only `010` is pending. NOTE: this pairs with an inline 010-pending
+  allowlist, NOT the shipped one (which is reconciled to the POST-010 world below).
+- `db-diff.posto10-pending-011.txt` **(REAL, POST-010 world — LLD 011)** — derived
+  from `scripts/fixtures/captures/prod-db-diff-posto10.txt`: `010` applied, `011`
+  pending. The six `game_history` stray write grants (G6:
+  `grant {insert,update,delete} on game_history to {anon,authenticated}`) as
+  `direction:add` residual (the TypeORM-era default-privilege drift `011` REVOKEs,
+  acknowledged #176), plus the cosmetic `increment_player_stats` re-emission (#91).
+  Also carries the combined 011-run reality: `alter table … enable row level
+  security` + `create policy … as permissive for select …` (shadow-from-migrations
+  has RLS, prod doesn't yet). Those two `direction:"drop"` lines self-attribute to
+  pending `011` (77b raw-text scan) and drop as benign — the `as permissive` clause
+  makes the classifier default the policy cmd to `ALL` (`policy:public:game_history:ALL`),
+  so they never reach the residual and the verdict is unchanged (residual = G6 +
+  `increment_player_stats`). Pairs with the SHIPPED allowlist.
 - `db-diff.clean.txt` — the exact `No schema changes found` sentinel amid noise.
 - `db-diff.residual-drift.txt` — SYNTHETIC "genuine unexpected drift": a
   `player_stats_pkey1` constraint + stray `anon` INSERT grant on `player_stats`
@@ -45,8 +59,10 @@ Version key = the numeric prefix (`001`..`010`) the CLI prints in the
 `Local | Remote | Time` table. Blank Remote = pending. "Skipping migration ..."
 warnings for the `.json` allowlist files are ignored.
 
-- `migration-list.pending-010.txt` **(REAL)** — `001`-`009` applied; `010`
-  pending (blank Remote).
+- `migration-list.pending-010.txt` **(REAL, PRE-010 world)** — `001`-`009`
+  applied; `010` pending (blank Remote).
+- `migration-list.posto10-pending-011.txt` **(REAL, POST-010 world — LLD 011)** —
+  `001`-`010` applied; `011` pending (blank Remote).
 - `migration-list.all-applied.txt` — every migration in both columns → no pending.
 - `migration-list.unmappable.txt` — a pending key (`999`) with no in-tree file
   → THROW (F5).
