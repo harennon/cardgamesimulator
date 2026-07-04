@@ -271,14 +271,19 @@ describe("evaluateDriftGate — 011 game_history lockdown pending (LLD 011)", ()
     });
   }
 
-  it("Phase 2 (011 applied): nothing pending, allowlist expects nothing, G6 removed", () => {
+  it("Phase 2 (011 applied): 010 and 011 are no longer pending, G6 removed", () => {
     // 011 has been applied to prod (Prod Migrate run 2026-07-04), so it is no
     // longer pending; 010 was applied earlier. Both are absent from pending and
-    // expectedPending.
-    expect(fixture.pending).toEqual([]);
-    expect(allowlist.expectedPending).toEqual([]);
+    // expectedPending. (012_prune, LLD 149, is the new pending migration — see
+    // the dedicated "012 prune_game_history pending" describe below.)
     expect(fixture.pending).not.toContain("011_lock_down_game_history.sql");
     expect(fixture.pending).not.toContain("010_create_game_history.sql");
+    expect(allowlist.expectedPending).not.toContain(
+      "011_lock_down_game_history.sql",
+    );
+    expect(allowlist.expectedPending).not.toContain(
+      "010_create_game_history.sql",
+    );
   });
 
   it("the six G6 stray grants are GONE from both objects and the allowlist (011 revoked them on prod)", () => {
@@ -377,5 +382,53 @@ describe("evaluateDriftGate — G6 acknowledgedResidual is fail-closed (LLD 011)
     expect(result.ok).toBe(false);
     expect(result.unusedAcknowledged).toEqual([...G6].sort());
     expect(result.reasons.join(" ")).toMatch(/matched no observed drift/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LLD 149: 012_prune_game_history.sql is pending against prod. Same fixture
+// <-> allowlist coupling rule as before: 012 must be in BOTH the fixture's
+// pending array AND the allowlist's expectedPending, else the gate fails
+// staleExpected (the PR #107 footgun).
+// ---------------------------------------------------------------------------
+describe("evaluateDriftGate — 012 prune_game_history pending (LLD 149)", () => {
+  const fixture = readJson("scripts/fixtures/clean-diff.json");
+  const allowlist = readJson(
+    "supabase/migrations/expected-diff.allowlist.json",
+  );
+
+  function gateWith(actualPending: string[]) {
+    return evaluateDriftGate({
+      observed: (fixture.objects as { object: string }[]) ?? [],
+      expectedFromPending:
+        (fixture.expectedFromPending as { object: string }[]) ?? [],
+      allowlist: {
+        expectedPending: (allowlist.expectedPending as string[]) ?? [],
+        acknowledgedResidual:
+          (allowlist.acknowledgedResidual as unknown[]) ?? [],
+      },
+      actualPending,
+    });
+  }
+
+  it("the in-tree fixture lists 012 as pending and the allowlist expects it", () => {
+    expect(fixture.pending).toContain("012_prune_game_history.sql");
+    expect(allowlist.expectedPending).toContain("012_prune_game_history.sql");
+  });
+
+  it("passes against the real fixture + allowlist as shipped", () => {
+    const result = gateWith(fixture.pending as string[]);
+    expect(result.ok).toBe(true);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it("fails staleExpected when 012 is dropped from the fixture's pending (documents the coupling)", () => {
+    // 012 stays in expectedPending but is dropped from the actually-pending set
+    // — the stale-allowlist trap that reddened PR #107 (the fixture<->allowlist
+    // coupling footgun documented in project memory).
+    const result = gateWith([]);
+    expect(result.ok).toBe(false);
+    expect(result.staleExpected).toContain("012_prune_game_history.sql");
+    expect(result.reasons.join(" ")).toMatch(/Stale expectedPending/);
   });
 });

@@ -1,6 +1,6 @@
 {
-  "$comment": "Phase 2 (post-011-applied): 011 has been applied to prod, so pending is empty and the six game_history stray grants (G6) that 011 REVOKEd are gone from prod — removed from both objects and the allowlist in lockstep. objects now mirrors the linked observed residual: only increment_player_stats (#91), the cosmetic re-emission that stays acknowledged. RLS/policy never appear (self-attribute to their migration and drop as benign).",
+  "$comment": "Base is Phase 2 post-011 (010 + 011 applied to prod). 012_prune_game_history.sql (LLD 149) is pending (not yet applied), so it is listed in pending here AND in expected-diff.allowlist.json's expectedPending (fixture coupling). 012's prune_game_history function self-attributes to pending 012 and drops as benign, so it never appears as residual — objects still mirrors only increment_player_stats (#91), the cosmetic re-emission that stays acknowledged. After 012 is applied to prod, remove it from pending here + expectedPending.",
   "objects": [{ "object": "function:public:increment_player_stats" }],
   "expectedFromPending": [],
-  "pending": []
+  "pending": ["012_prune_game_history.sql"]
 }
