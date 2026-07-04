@@ -80,6 +80,10 @@
   --ai-accent: #7fb2ff;
   --ai-accent-line: rgba(127, 178, 255, 0.5);
   --ai-accent-dim: rgba(127, 178, 255, 0.16);
+
+  /* Board rim inset (LLD 143) — matches the desktop ::after border width so grid
+     content clears the wood-rim overlay on all four edges */
+  --board-rim-inset: 12px;
 }
 
 @media (max-width: 767px) {
