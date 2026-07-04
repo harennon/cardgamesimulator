@@ -23,6 +23,14 @@ jobs:
       # no prod access. The `--linked` wiring against live prod is human-owned.
       - name: Drift gate (fixture diff)
         run: npm run verify:drift -- --diff-file scripts/fixtures/clean-diff.json
+      # Destructive-DDL gate (issue #91) — scans supabase/migrations/*.sql and
+      # fails the build if any migration DROPs a table/column/index/function,
+      # DELETEs, or TRUNCATEs without an explicit per-file + per-operation entry
+      # in destructive-ddl.allowlist.json. Fail-closed, no prod access: this is
+      # the review-layer enforcement of "migrations may add but never destroy",
+      # since Postgres role privileges cannot express "alter but not drop".
+      - name: Destructive-DDL gate
+        run: npm run verify:no-destructive-ddl
 
   integration-tests:
     runs-on: ubuntu-latest

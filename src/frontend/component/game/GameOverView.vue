@@ -4,6 +4,18 @@
       <h1 class="game-over__winner">{{ winner }} wins!</h1>
 
       <div
+        v-if="hasTonkFinalMove"
+        class="game-over__final-play"
+        data-testid="game-over-tonk-final-move"
+      >
+        <div class="game-over__final-play-label">Final Move</div>
+        <div class="game-over__final-play-meta">
+          {{ tonkFinalMoveBy }} {{ tonkFinalMoveAction }}
+        </div>
+        <div class="game-over__final-play-meta">{{ tonkFinalMoveOutcome }}</div>
+      </div>
+
+      <div
         v-if="hasFinalPlay"
         class="game-over__final-play"
         data-testid="game-over-final-play"
@@ -125,12 +137,22 @@ import type {
   GameType,
 } from "@shared/engine-types";
 import type { Big2HistoryEntry, Big2Play } from "@shared/big2-types";
+import type { TonkLogEntry } from "@shared/tonk-types";
 import GameCard from "@/component/game-ui/GameCard.vue";
 import {
   deriveBig2Stats,
   getBadgeForPosition,
   getBadgeClass,
 } from "./gameOverStats";
+import {
+  logActionText,
+  trickResultSummary,
+} from "@/component/game-ui/tonkDisplay";
+
+interface TonkFinalMove {
+  entry: TonkLogEntry;
+  players: readonly PlayerPublicInfo[];
+}
 
 const HAND_TYPE_LABELS: Record<string, string> = {
   single: "Single",
@@ -155,6 +177,7 @@ const props = defineProps<{
   totalTurns?: number;
   gameType?: GameType;
   finalPlay?: Big2Play | null;
+  tonkFinalMove?: TonkFinalMove | null;
 }>();
 
 const emit = defineEmits<{
@@ -214,6 +237,25 @@ const finalPlayByName = computed(() => {
   );
   return player?.displayName ?? props.finalPlay.playerId;
 });
+
+const hasTonkFinalMove = computed(() => !!props.tonkFinalMove);
+
+const tonkFinalMoveAction = computed(() =>
+  props.tonkFinalMove ? logActionText(props.tonkFinalMove.entry) : "",
+);
+
+const tonkFinalMoveBy = computed(
+  () => props.tonkFinalMove?.entry.displayName ?? "",
+);
+
+const tonkFinalMoveOutcome = computed(() =>
+  props.tonkFinalMove
+    ? (trickResultSummary(
+        props.tonkFinalMove.entry,
+        props.tonkFinalMove.players,
+      ) ?? "")
+    : "",
+);
 
 function goHome(): void {
   router.push("/");
