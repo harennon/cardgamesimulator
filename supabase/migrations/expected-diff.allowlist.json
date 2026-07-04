@@ -1,5 +1,11 @@
 {
-  "$comment": "LLD 77 §5.3 — drift-gate expected-diff allowlist. expectedPending lists the in-tree migration filenames NOT YET applied to prod on this branch (the diff hunks they produce are benign and subtracted by the gate). acknowledgedResidual lists reviewed, issue-linked residual diffs that are not yet cleaned up; it MUST stay empty after #83 — a non-empty entry is a deliberate, auditable exception, never a default. 009_add_game_config.sql (LLD 95) and 010_create_game_history.sql (LLD 101) are pending against prod; each must also appear in scripts/fixtures/clean-diff.json's pending array or the gate fails 'Stale expectedPending'.",
-  "expectedPending": ["009_add_game_config.sql", "010_create_game_history.sql"],
-  "acknowledgedResidual": []
+  "$comment": "LLD 77 §5.3 / 77a — drift-gate expected-diff allowlist. expectedPending lists the in-tree migration filenames NOT YET applied to prod (the diff hunks they produce are benign and subtracted by the gate). Each MUST also appear in scripts/fixtures/clean-diff.json's pending array or the gate fails 'Stale expectedPending'. RECONCILED to the real prod capture (2026-07-04, scripts/fixtures/captures/prod-migration-list.txt): 009_add_game_config.sql is APPLIED to prod (Remote=009), so ONLY 010_create_game_history.sql is pending. acknowledgedResidual lists reviewed, issue-linked residual diffs not yet cleaned up; it MUST stay minimal — a non-empty entry is a deliberate, auditable exception, never a default.",
+  "expectedPending": ["010_create_game_history.sql"],
+  "acknowledgedResidual": [
+    {
+      "object": "function:public:increment_player_stats",
+      "reason": "Cosmetic diff-engine re-emission noise. The real `supabase db diff --linked` capture (2026-07-04, scripts/fixtures/captures/prod-db-diff.txt) re-emits increment_player_stats as CREATE OR REPLACE FUNCTION with NO functional change (it is from long-applied migrations 003/005 and lifetime stats work in prod). It is a residual object not attributable to any pending migration, so the linked gate would otherwise fail-closed on it. Acknowledged (not silently suppressed) pending a normalizer that recognizes semantically-identical function re-emission.",
+      "issue": "#91"
+    }
+  ]
 }

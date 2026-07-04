@@ -17,6 +17,7 @@
 #
 # HUMAN-OWNED WIRING (§9), none of which is present in the repo:
 #   - secrets.SUPABASE_PROJECT_REF   prod project ref for `supabase link`
+#   - secrets.SUPABASE_ACCESS_TOKEN  non-interactive `supabase link` auth (LLD 77a §6)
 #   - secrets.SUPABASE_DB_PASSWORD   prod DB password for `db push`
 #   - secrets.RAILWAY_TOKEN          to promote the backend deploy
 # Until these are set, this workflow only runs on manual dispatch and the
@@ -60,6 +61,7 @@ jobs:
         env:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       # 2. APPLY pending migrations to prod (idempotent — only pending ones, §8.4).
       #    Guarded: no-op until the prod link secret is wired.
@@ -68,6 +70,7 @@ jobs:
         run: supabase db push
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       # 3. POST-CONDITION VERIFICATION (§6) — fail the release if any RAISEs.
       #    Against prod when wired; otherwise against the local supabase stack so

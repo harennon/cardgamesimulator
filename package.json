@@ -25,6 +25,7 @@
     "lint:check": "eslint src --ext ts --ext vue",
     "lint:fix": "eslint --fix src --ext ts --ext vue",
     "verify:drift": "node scripts/verify-drift.mjs",
+    "verify:no-destructive-ddl": "node scripts/verify-no-destructive-ddl.mjs",
     "verify:postconditions": "node scripts/verify-postconditions.mjs",
     "feedback": "node scripts/feedback.mjs",
     "postinstall": "git config core.hooksPath .githooks"
