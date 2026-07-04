@@ -156,9 +156,12 @@ describe("railSeats — isAi propagation into SeatRow", () => {
     expect(humanSeat?.isAi).toBeFalsy();
   });
 
-  it("railSeats filters out myPlayerIndex seat as before", () => {
+  it("railSeats includes the local player's seat, marked isSelf, sorted first", () => {
     const seats = railSeats(players, tallies, myPlayerIndex);
-    expect(seats.some((s) => s.seatIndex === myPlayerIndex)).toBe(false);
+    const selfSeat = seats.find((s) => s.seatIndex === myPlayerIndex);
+    expect(selfSeat).toBeDefined();
+    expect(selfSeat?.isSelf).toBe(true);
+    expect(seats[0]!.seatIndex).toBe(myPlayerIndex);
   });
 
   it("no AI players → all SeatRow.isAi are undefined/falsy", () => {

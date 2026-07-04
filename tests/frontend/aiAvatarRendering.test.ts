@@ -78,12 +78,16 @@ describe("TonkSeatRail — AiAvatar wiring", () => {
     expect(tonkRailSource).toContain("AiAvatar");
   });
 
-  it('renders <AiAvatar v-if="seat.isAi" size="sm" /> in tonk-seat__info', () => {
-    expect(tonkRailSource).toMatch(/AiAvatar[^>]*v-if="seat\.isAi"/);
+  it('renders <AiAvatar v-if="seat.isAi && !seat.isSelf" size="sm" /> in tonk-seat__info (self chip never shows AI avatar)', () => {
+    expect(tonkRailSource).toMatch(
+      /AiAvatar[^>]*v-if="seat\.isAi && !seat\.isSelf"/,
+    );
   });
 
-  it('still renders <AiBadge v-if="seat.isAi" /> alongside the avatar', () => {
-    expect(tonkRailSource).toMatch(/AiBadge[^>]*v-if="seat\.isAi"/);
+  it('still renders <AiBadge v-if="seat.isAi && !seat.isSelf" /> alongside the avatar (self chip never shows AI badge)', () => {
+    expect(tonkRailSource).toMatch(
+      /AiBadge[^>]*v-if="seat\.isAi && !seat\.isSelf"/,
+    );
   });
 });
 

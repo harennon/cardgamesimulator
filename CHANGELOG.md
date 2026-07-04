@@ -8,6 +8,20 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Fixed
+
+- **LLD 141: Player cannot see their own score during a Tonk game**
+  - `src/frontend/component/game-ui/tonkDisplay.ts` — `SeatRow` gains a required `isSelf: boolean` field. `railSeats()` now includes the local player (previously filtered out), marks the local row `isSelf: true`, and sorts it first; non-self rows retain ascending seat order. Spectator render (`myPlayerIndex === -1`) is unchanged: no row matches self.
+  - `src/frontend/component/game-ui/TonkSeatRail.vue` — renders the self chip with `tonk-seat--self` accent class; fan suppressed for self (`!compact && !seat.isSelf`); name displays "You"; tally pill gains `tonk-seat__tally--near` modifier via `isNearLine(seat.tally)`; AiAvatar and AiBadge gated with `!seat.isSelf`; disconnected label gated with `!seat.isSelf`. Imports `isNearLine` from `tonkDisplay`.
+  - `src/frontend/styles/game-variables.css` — adds `--tonk-self: #9b7fe8` self-identity accent token (distinct from `--tonk-cyan` drawable-discard ring and gold active-turn border).
+  - `tests/frontend/tonkDisplay.test.ts` — updated `railSeats` tests to reflect new contract (self included, sorted first, 8-player returns 8 rows, spectator has no self).
+  - `tests/frontend/aiBadgeRendering.test.ts` — replaced "railSeats filters out myPlayerIndex" with the new contract assertion (self present and `isSelf: true`).
+  - `tests/frontend/aiAvatarRendering.test.ts` — updated source-inspection assertions for `AiAvatar`/`AiBadge` v-if to match new `seat.isAi && !seat.isSelf` guard.
+  - `tests/frontend/tonkSeatRailSelf.test.ts` — new test file: 27 tests covering `railSeats` self-chip contract, AI/disconnected suppression invariants, near-150 warning on self, and TonkSeatRail source wiring.
+
+- **LLD 134: Tonk action/discard buttons clipped at bottom of desktop game screen**
+  - `src/frontend/component/game/TonkBoard.vue` — changed the desktop grid's `actions` row from a fixed `64px` to `auto`, so `TonkActionPanel` always has enough room for its one-line (not-your-turn pill), two-line (phase-stepper + buttons), or three-line (error + stepper + buttons) states without being clipped by `overflow: hidden`. Added `min-height: 0` to `.tonk-board__table` (desktop) so the `1fr` table row can yield space to the `auto` actions row at short viewports (768px). `GameBoard.vue` (Big2) and the mobile grid (`--mobile-actions-height`) are untouched.
+
 ### Added
 
 - **LLD 137: AI/CPU move pacing delay (configurable, injectable)**
