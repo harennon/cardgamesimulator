@@ -123,50 +123,71 @@ describe("classifyStatement — the residual object-id grammar", () => {
     expect(classifyStatement("set check_function_bodies = off")).toEqual([]);
   });
 
-  // --- LLD 77b: RLS + policy classification (v1: enable + create policy only) ---
+  // --- LLD 77b: RLS + policy classification ---
+  // Direction is per the CONFIRMED shadow→prod diff (run 28702353546): a pending
+  // migration that ADDs RLS/policy makes the shadow have it and prod lack it, so
+  // `db diff` emits the UNDO verb (disable rls / drop policy) = prod-missing =
+  // direction:"drop" (pending-attributable). The opposite verbs (enable / create
+  // policy) mean prod has RLS/policy the migrations don't declare = prod-extra =
+  // direction:"add" (residual).
 
-  it("classifies ENABLE ROW LEVEL SECURITY into rls:<schema>:<table> with drop direction", () => {
+  it("classifies DISABLE ROW LEVEL SECURITY into rls:<schema>:<table> with drop direction (prod-missing)", () => {
     const [c] = classifyStatement(
-      'alter table "public"."game_history" enable row level security',
+      'alter table "public"."game_history" disable row level security',
     );
     expect(c.object).toBe("rls:public:game_history");
     expect(c.direction).toBe("drop");
     expect(c.table).toBe("game_history");
   });
 
-  it("classifies CREATE POLICY into policy:<schema>:<table>:SELECT (drop) and DROPS the policy name (grammar B)", () => {
+  it("classifies ENABLE ROW LEVEL SECURITY into the same rls id with add direction (prod-extra)", () => {
     const [c] = classifyStatement(
-      'create policy "game_history_select_own" on "public"."game_history" for select using ((auth.uid() = user_id))',
+      'alter table "public"."game_history" enable row level security',
     );
-    expect(c.object).toBe("policy:public:game_history:SELECT");
+    expect(c.object).toBe("rls:public:game_history");
+    expect(c.direction).toBe("add");
+    expect(c.table).toBe("game_history");
+  });
+
+  it("classifies DROP POLICY into policy:<schema>:<table>:ALL (drop) and DROPS the policy name (grammar B)", () => {
+    const [c] = classifyStatement(
+      'drop policy "game_history_select_own" on "public"."game_history"',
+    );
+    expect(c.object).toBe("policy:public:game_history:ALL");
     expect(c.direction).toBe("drop");
     expect(c.table).toBe("game_history");
     // Grammar-B guard: the human-readable policy name must NOT leak into the id.
     expect(c.object).not.toContain("game_history_select_own");
   });
 
-  it("defaults a CREATE POLICY with no FOR clause to :ALL (Postgres default)", () => {
-    const [c] = classifyStatement('create policy "p" on "public"."feedback"');
-    expect(c.object).toBe("policy:public:feedback:ALL");
+  it("classifies DROP POLICY IF EXISTS the same way", () => {
+    const [c] = classifyStatement(
+      'drop policy if exists "p" on "public"."game_history"',
+    );
+    expect(c.object).toBe("policy:public:game_history:ALL");
+    expect(c.direction).toBe("drop");
+  });
+
+  it("classifies CREATE POLICY into policy id with add direction (prod-extra); FOR clause captured, else :ALL", () => {
+    const [c] = classifyStatement(
+      'create policy "p" on "public"."feedback" for select using ((auth.uid() = user_id))',
+    );
+    expect(c.object).toBe("policy:public:feedback:SELECT");
+    expect(c.direction).toBe("add");
+    const [d] = classifyStatement('create policy "p" on "public"."feedback"');
+    expect(d.object).toBe("policy:public:feedback:ALL");
+    expect(d.direction).toBe("add");
   });
 
   it("classifies the ONLY keyword + whitespace/case variance to the same rls id", () => {
     const [c] = classifyStatement(
-      'ALTER  TABLE  ONLY "public"."game_history"  ENABLE   ROW  LEVEL SECURITY',
+      'ALTER  TABLE  ONLY "public"."game_history"  DISABLE   ROW  LEVEL SECURITY',
     );
     expect(c.object).toBe("rls:public:game_history");
     expect(c.direction).toBe("drop");
   });
 
-  it("DEFERRED verbs THROW (F3) — disable RLS / drop policy / alter policy stay behind the fail-closed net", () => {
-    expect(() =>
-      classifyStatement(
-        'alter table "public"."game_history" disable row level security',
-      ),
-    ).toThrow(LinkedDiffError);
-    expect(() =>
-      classifyStatement('drop policy "p" on "public"."game_history"'),
-    ).toThrow(LinkedDiffError);
+  it("DEFERRED verb THROWS (F3) — alter policy stays behind the fail-closed net", () => {
     expect(() =>
       classifyStatement('alter policy "p" on "public"."game_history"'),
     ).toThrow(LinkedDiffError);
@@ -580,7 +601,7 @@ describe("adaptLinkedDiff — RLS/policy attribution (LLD 77b)", () => {
     "   `011` | ` `    | `011`",
   ].join("\n");
 
-  it("011-scenario: RLS enable + create policy self-attribute to pending 011 (dropped as benign, no residual)", () => {
+  it("011-scenario: the drop-policy + disable-rls diff self-attributes to pending 011 (dropped as benign, no residual)", () => {
     const adapted = adaptLinkedDiff(
       {
         dbDiffStdout: readFixture("db-diff.rls-pending-attributed.txt"),
@@ -589,15 +610,18 @@ describe("adaptLinkedDiff — RLS/policy attribution (LLD 77b)", () => {
       rlsMigrations,
     ) as Adapted;
     expect(adapted.pending).toEqual(["011_lock_down_game_history.sql"]);
-    // Neither the RLS nor the policy object survives as residual — both attributed
-    // via pending.rlsTables (game_history seen by the raw-text scan inside DO $$).
+    // The real diff for a pending RLS-ADDING migration emits the UNDO verbs
+    // (drop policy / disable rls) because prod lacks what 011 adds. Both are
+    // direction:"drop" and attribute via pending.rlsTables (game_history seen by
+    // the raw-text scan inside 011's DO $$ block) → dropped as benign.
     expect(ids(adapted)).not.toContain("rls:public:game_history");
-    expect(ids(adapted)).not.toContain("policy:public:game_history:SELECT");
+    expect(ids(adapted)).not.toContain("policy:public:game_history:ALL");
     expect(adapted.objects).toEqual([]);
   });
 
-  it("(b) cross-migration: A enables RLS, B adds the policy on the same table → BOTH drop as benign", () => {
-    // Two SEPARATE pending migrations touch the same applied table `t`.
+  it("(b) cross-migration: A adds RLS, B adds the policy on the same table → BOTH drop as benign", () => {
+    // Two SEPARATE pending migrations touch the same applied table `t`. The diff
+    // emits the UNDO verbs (prod lacks what the pending migrations add).
     const migrations = [
       {
         file: "001_applied.sql",
@@ -622,9 +646,9 @@ describe("adaptLinkedDiff — RLS/policy attribution (LLD 77b)", () => {
     const dbDiffStdout = [
       "Diffing schemas: public",
       "",
-      'alter table "public"."t" enable row level security;',
+      'drop policy "p" on "public"."t";',
       "",
-      'create policy "p" on "public"."t" for select using ((auth.uid() = user_id));',
+      'alter table "public"."t" disable row level security;',
       "",
     ].join("\n");
     const adapted = adaptLinkedDiff(
@@ -634,13 +658,13 @@ describe("adaptLinkedDiff — RLS/policy attribution (LLD 77b)", () => {
     // Each attributes via pending.rlsTables to *a* pending migration (possibly
     // different files) — both drop as benign.
     expect(ids(adapted)).not.toContain("rls:public:t");
-    expect(ids(adapted)).not.toContain("policy:public:t:SELECT");
+    expect(ids(adapted)).not.toContain("policy:public:t:ALL");
     expect(adapted.objects).toEqual([]);
   });
 
-  it("unattributed ENABLE surfaces as residual rls:<schema>:<table> (Edge Case 2)", () => {
+  it("prod-extra ENABLE surfaces as residual rls:<schema>:<table> (Edge Case 2)", () => {
     // `player_stats` is neither pending-created nor pending-RLS'd here (nothing
-    // pending), so a prod-missing RLS is REAL drift and must surface.
+    // pending), so a prod-EXTRA RLS (direction:"add") is REAL drift and must surface.
     const adapted = adaptLinkedDiff(
       {
         dbDiffStdout: readFixture("db-diff.rls-residual.txt"),
@@ -651,7 +675,7 @@ describe("adaptLinkedDiff — RLS/policy attribution (LLD 77b)", () => {
     expect(ids(adapted)).toContain("rls:public:player_stats");
   });
 
-  it("unattributed CREATE POLICY surfaces as residual policy:<schema>:<table>:<CMD> (Edge Case 4)", () => {
+  it("prod-extra CREATE POLICY surfaces as residual policy:<schema>:<table>:<CMD> (Edge Case 4)", () => {
     const adapted = adaptLinkedDiff(
       {
         dbDiffStdout: readFixture("db-diff.rls-residual.txt"),

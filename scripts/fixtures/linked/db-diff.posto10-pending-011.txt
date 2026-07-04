@@ -13,6 +13,10 @@ Applying migration 011_lock_down_game_history.sql...
 Diffing schemas: public
 Finished supabase db diff on branch main.
 
+drop policy "game_history_select_own" on "public"."game_history";
+
+alter table "public"."game_history" disable row level security;
+
 set check_function_bodies = off;
 
 CREATE OR REPLACE FUNCTION public.increment_player_stats(p_user_id uuid, p_game_type character varying, p_games_played integer, p_games_won integer, p_games_lost integer, p_total_score integer)
@@ -44,7 +48,3 @@ grant delete on table "public"."game_history" to "authenticated";
 grant insert on table "public"."game_history" to "authenticated";
 
 grant update on table "public"."game_history" to "authenticated";
-
-alter table "public"."game_history" enable row level security;
-
-create policy "game_history_select_own" on "public"."game_history" as permissive for select to public using ((auth.uid() = user_id));
