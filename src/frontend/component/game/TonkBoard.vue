@@ -61,11 +61,41 @@
     </div>
 
     <div class="tonk-board__log">
-      <TonkTallyPanel
-        :players="gameState.players"
-        :tallies="tonkState.tallies"
-        :trick-number="tonkState.trickNumber"
-      />
+      <div
+        class="tonk-side-switch"
+        role="tablist"
+        data-testid="tonk-side-switch"
+      >
+        <button
+          role="tab"
+          :aria-selected="sideView === 'tallies'"
+          :class="{ 'tonk-side-switch__btn--active': sideView === 'tallies' }"
+          class="tonk-side-switch__btn"
+          data-testid="tonk-side-switch-tallies"
+          @click="sideView = 'tallies'"
+        >
+          Tallies
+        </button>
+        <button
+          role="tab"
+          :aria-selected="sideView === 'log'"
+          :class="{ 'tonk-side-switch__btn--active': sideView === 'log' }"
+          class="tonk-side-switch__btn"
+          data-testid="tonk-side-switch-log"
+          @click="sideView = 'log'"
+        >
+          Game Log
+        </button>
+      </div>
+      <div class="tonk-board__log-body">
+        <TonkTallyPanel
+          v-if="sideView === 'tallies'"
+          :players="gameState.players"
+          :tallies="tonkState.tallies"
+          :trick-number="tonkState.trickNumber"
+        />
+        <TonkLog v-else :entries="tonkState.log" :players="gameState.players" />
+      </div>
     </div>
 
     <div class="tonk-board__actions">
@@ -216,6 +246,9 @@ const turnDeadline = computed<number | null>(
 
 const totalSeconds = computed<number>(() => props.turnTimerSeconds ?? 0);
 
+type SideView = "tallies" | "log";
+const sideView = ref<SideView>("tallies");
+
 const isMobile = ref(false);
 const logDrawerOpen = ref(false);
 
@@ -334,6 +367,41 @@ watch(logDrawerOpen, (open) => {
 
 .tonk-board__log {
   grid-area: log;
+  display: flex;
+  flex-direction: column;
+}
+
+.tonk-side-switch {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--table-rim-light);
+}
+
+.tonk-side-switch__btn {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 8px 4px;
+  border: none;
+  background: var(--panel-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: color 0.15s ease;
+}
+
+.tonk-side-switch__btn--active {
+  color: var(--gold-accent);
+  border-bottom: 2px solid var(--gold-accent);
+}
+
+.tonk-board__log-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tonk-board__actions {

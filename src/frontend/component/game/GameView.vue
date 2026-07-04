@@ -134,6 +134,7 @@
     :current-player-id="gameState.you.playerId"
     :total-turns="gameState.turnNumber"
     :final-play="finalPlay"
+    :tonk-final-move="tonkFinalMove"
     @rematch="onRematch"
   />
 </template>
@@ -141,15 +142,21 @@
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import type { PlayerInfo, GameType } from "@shared/engine-types";
+import type {
+  PlayerInfo,
+  GameType,
+  PlayerPublicInfo,
+} from "@shared/engine-types";
 import { GAME_TYPE_UI_BOUNDS } from "@/component/statsView";
 import type { Big2PublicState, Big2Play } from "@shared/big2-types";
 import type {
   TonkPublicState,
+  TonkLogEntry,
   TonkDrawSource,
   TonkCard,
   TonkTrickResult,
 } from "@shared/tonk-types";
+
 import { axiosInstance } from "@/service/http";
 import type { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
 import type { AxiosResponse } from "axios";
@@ -177,6 +184,11 @@ type DisplayPhase =
   | "SHOW_FINAL_PLAY"
   | "SHOW_TRICK_RESULT"
   | "COMPLETED";
+
+interface TonkFinalMove {
+  entry: TonkLogEntry;
+  players: readonly PlayerPublicInfo[];
+}
 
 const props = defineProps<{
   gameId: string;
@@ -377,6 +389,18 @@ const finalPlay = computed<Big2Play | null>(() => {
     | Big2PublicState
     | undefined;
   return publicState?.lastPlay ?? null;
+});
+
+const tonkFinalMove = computed<TonkFinalMove | null>(() => {
+  if (gameState.value?.gameType !== "tonk") return null;
+  const publicState = gameState.value.gameSpecificPublicState as
+    | TonkPublicState
+    | undefined;
+  const log = publicState?.log;
+  if (!log || log.length === 0) return null;
+  const entry = log[log.length - 1];
+  if (!entry.trickResult) return null;
+  return { entry, players: gameState.value.players };
 });
 
 const HAND_TYPE_LABELS: Record<string, string> = {
