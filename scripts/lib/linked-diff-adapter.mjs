@@ -348,44 +348,56 @@ export function classifyStatement(stmt) {
     }
   }
 
-  // --- RLS enable (LLD 77b v1): ALTER TABLE [ONLY] <t> ENABLE ROW LEVEL SECURITY
-  //     Anchored to `enable ... security$` so `disable ... security` (deferred
-  //     verb) does NOT match and falls through to the F3 throw. Prod-missing the
-  //     shadow-declared RLS ⇒ direction:"drop" (pending-attributable — §Approach).
+  // --- RLS enable/disable (LLD 77b): ALTER TABLE [ONLY] <t> {ENABLE|DISABLE} ROW LEVEL SECURITY
+  //     Direction follows the CONFIRMED shadow→prod diff (empirically: run
+  //     28702353546). A pending migration that ADDs RLS makes the shadow have it
+  //     and prod lack it, so `db diff` emits `disable row level security`
+  //     (prod-missing ⇒ direction:"drop", pending-attributable). `enable` would
+  //     mean prod has RLS the migrations don't declare (prod-extra ⇒
+  //     direction:"add", residual). Both verbs are handled so the mapping can't
+  //     be inverted again.
   {
     const re = new RegExp(
-      `^alter\\s+table\\s+(?:only\\s+)?(?:${ID}\\.)?${ID}\\s+enable\\s+row\\s+level\\s+security$`,
+      `^alter\\s+table\\s+(?:only\\s+)?(?:${ID}\\.)?${ID}\\s+(enable|disable)\\s+row\\s+level\\s+security$`,
       "i",
     );
     const m = s.match(re);
     if (m) {
-      // groups: [schema?, table]
+      // groups: [schema?, table, verb]
       const schema = m[2] ? m[1] : "public";
       const table = m[2] ?? m[1];
-      return [{ object: `rls:${schema}:${table}`, direction: "drop", table }];
+      const direction = /^disable$/i.test(m[3]) ? "drop" : "add";
+      return [{ object: `rls:${schema}:${table}`, direction, table }];
     }
   }
 
-  // --- create policy (LLD 77b v1): CREATE POLICY <name> ON <t> [FOR <cmd>] ...
-  //     Anchored to `^create policy`; `drop policy` / `alter policy` (deferred
-  //     verbs) do NOT match and fall through to F3. Name-agnostic id (grammar B):
-  //     the policy name is captured but discarded from the id; the `FOR <cmd>`
-  //     clause defaults to ALL (Postgres default). direction:"drop" (prod-missing).
+  // --- create/drop policy (LLD 77b): {CREATE POLICY <name> ON <t> [...] |
+  //     DROP POLICY [IF EXISTS] <name> ON <t>}. Direction per the confirmed
+  //     shadow→prod diff: a pending migration that ADDs a policy makes the shadow
+  //     have it and prod lack it, so `db diff` emits `drop policy <name> on <t>`
+  //     (prod-missing ⇒ direction:"drop", pending-attributable). `create policy`
+  //     would mean prod has a policy the migrations don't declare (prod-extra ⇒
+  //     direction:"add", residual). Name-agnostic id (grammar B): the policy name
+  //     is discarded; cmd defaults to ALL (the `as permissive`/no-FOR forms the
+  //     differ emits carry no matchable FOR clause, and `drop policy` never does).
+  //     `alter policy` is NOT handled and falls through to the F3 throw (deferred —
+  //     modify semantics unresolved; it does not occur for this milestone).
   {
     const re = new RegExp(
-      `^create\\s+policy\\s+(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?:${ID}\\.)?${ID}(?:\\s+for\\s+(select|insert|update|delete|all))?`,
+      `^(create|drop)\\s+policy\\s+(?:if\\s+exists\\s+)?(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?:${ID}\\.)?${ID}(?:\\s+for\\s+(select|insert|update|delete|all))?`,
       "i",
     );
     const m = s.match(re);
     if (m) {
-      // groups: [schema?, table, for-cmd?]
-      const schema = m[2] ? m[1] : "public";
-      const table = m[2] ?? m[1];
-      const cmd = (m[3] ?? "ALL").toUpperCase();
+      // groups: [verb, schema?, table, for-cmd?]
+      const schema = m[3] ? m[2] : "public";
+      const table = m[3] ?? m[2];
+      const cmd = (m[4] ?? "ALL").toUpperCase();
+      const direction = /^drop$/i.test(m[1]) ? "drop" : "add";
       return [
         {
           object: `policy:${schema}:${table}:${cmd}`,
-          direction: "drop",
+          direction,
           table,
         },
       ];
