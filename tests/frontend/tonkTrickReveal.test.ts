@@ -89,17 +89,23 @@ const REVEAL_DURATION_MS = 6000;
 /**
  * Replicates the trick-reveal detection logic from GameView.vue.
  * Returns reactive state and control functions for testing transitions.
+ *
+ * Mirrors the fixed implementation: seeding happens when `initialized` fires
+ * (immediate watcher), not on the first latestTrickResult change.
  */
 function createRevealLogic(initialStatus: string) {
   const effectiveStatus = ref(initialStatus);
   const displayPhase = ref<DisplayPhase>("IN_PROGRESS");
   const lastRevealedTrickNumber = ref<number | null>(null);
-  let trickRevealInitialized = false;
   let revealTimer: ReturnType<typeof setTimeout> | null = null;
 
   // The latest trick-result is injected via latestTrickResult ref (simulates the
   // computed that scans tonkState.log in the real component).
   const latestTrickResult = ref<TonkTrickResult | null>(null);
+
+  // `initialized` mirrors the useGameState flag: set to true once the first
+  // game:state has been received.
+  const initialized = ref(false);
 
   function enterTrickReveal(): void {
     if (revealTimer !== null) {
@@ -135,13 +141,23 @@ function createRevealLogic(initialStatus: string) {
     }
   });
 
-  // trick-result detection watcher — mirrors GameView latestTrickResult watcher
+  // E4 seeding: when the first game:state arrives, seed lastRevealedTrickNumber
+  // from the current latestTrickResult so that a round already completed before
+  // this client joined does NOT trigger a spurious reveal. Immediate so the seed
+  // runs synchronously before any latestTrickResult change can fire.
+  watch(
+    initialized,
+    (isReady) => {
+      if (isReady) {
+        lastRevealedTrickNumber.value =
+          latestTrickResult.value?.trickNumber ?? null;
+      }
+    },
+    { immediate: true },
+  );
+
+  // After the initial seed, any change to latestTrickResult is a new round end.
   watch(latestTrickResult, (newResult) => {
-    if (!trickRevealInitialized) {
-      trickRevealInitialized = true;
-      lastRevealedTrickNumber.value = newResult?.trickNumber ?? null;
-      return;
-    }
     if (
       shouldEnterTrickReveal(
         newResult?.trickNumber ?? null,
@@ -166,6 +182,7 @@ function createRevealLogic(initialStatus: string) {
     displayPhase,
     latestTrickResult,
     lastRevealedTrickNumber,
+    initialized,
     enterTrickReveal,
     dismissTrickReveal,
     unmount,
@@ -184,13 +201,16 @@ describe("GameView trick-reveal phase wiring (LLD 146)", () => {
   it("a new Tonk trickResult while IN_PROGRESS sets displayPhase to SHOW_TRICK_RESULT", async () => {
     const logic = createRevealLogic("IN_PROGRESS");
 
-    // First state received — seeds lastRevealedTrickNumber (no reveal)
-    logic.latestTrickResult.value = makeTrickResult(1);
+    // First game:state arrives — fresh game, no trick has ended yet.
+    // initialized fires (immediate watcher already ran with isReady=false;
+    // now we flip it to true to simulate the first game:state).
+    logic.initialized.value = true;
     await nextTick();
+    expect(logic.lastRevealedTrickNumber.value).toBeNull();
     expect(logic.displayPhase.value).toBe("IN_PROGRESS");
 
-    // Second state with a NEW trickNumber — triggers reveal
-    logic.latestTrickResult.value = makeTrickResult(2);
+    // Round 1 ends — first real trickResult arrives while IN_PROGRESS → triggers reveal.
+    logic.latestTrickResult.value = makeTrickResult(1);
     await nextTick();
     expect(logic.displayPhase.value).toBe("SHOW_TRICK_RESULT");
   });
@@ -198,9 +218,12 @@ describe("GameView trick-reveal phase wiring (LLD 146)", () => {
   it("Continue tap (dismissTrickReveal) returns to IN_PROGRESS and clears the timer", async () => {
     const logic = createRevealLogic("IN_PROGRESS");
 
-    logic.latestTrickResult.value = makeTrickResult(1);
+    // Seed via initialized (fresh game)
+    logic.initialized.value = true;
     await nextTick();
-    logic.latestTrickResult.value = makeTrickResult(2);
+
+    // Round 1 ends — enters reveal
+    logic.latestTrickResult.value = makeTrickResult(1);
     await nextTick();
     expect(logic.displayPhase.value).toBe("SHOW_TRICK_RESULT");
 
@@ -215,9 +238,12 @@ describe("GameView trick-reveal phase wiring (LLD 146)", () => {
   it("auto-dismiss: after REVEAL_DURATION_MS the phase returns to IN_PROGRESS", async () => {
     const logic = createRevealLogic("IN_PROGRESS");
 
-    logic.latestTrickResult.value = makeTrickResult(1);
+    // Seed via initialized (fresh game)
+    logic.initialized.value = true;
     await nextTick();
-    logic.latestTrickResult.value = makeTrickResult(2);
+
+    // Round 1 ends — enters reveal
+    logic.latestTrickResult.value = makeTrickResult(1);
     await nextTick();
     expect(logic.displayPhase.value).toBe("SHOW_TRICK_RESULT");
 
@@ -228,13 +254,13 @@ describe("GameView trick-reveal phase wiring (LLD 146)", () => {
   it("status COMPLETED with trickResult present routes to COMPLETED, never SHOW_TRICK_RESULT (E5)", async () => {
     const logic = createRevealLogic("IN_PROGRESS");
 
-    // Seed first state
-    logic.latestTrickResult.value = makeTrickResult(1);
+    // Seed via initialized (fresh game, no prior trick yet)
+    logic.initialized.value = true;
     await nextTick();
 
-    // Match-ending update: status goes COMPLETED with a new trickResult in the same tick
+    // Match-ending update: status goes COMPLETED with the first trickResult in the same tick
     logic.effectiveStatus.value = "COMPLETED";
-    logic.latestTrickResult.value = makeTrickResult(2);
+    logic.latestTrickResult.value = makeTrickResult(1);
     await nextTick();
 
     expect(logic.displayPhase.value).toBe("COMPLETED");
@@ -257,7 +283,14 @@ describe("GameView trick-reveal phase wiring (LLD 146)", () => {
   it("first state after join seeds lastRevealedTrickNumber, no spurious reveal (E4)", async () => {
     const logic = createRevealLogic("IN_PROGRESS");
 
-    // First state: trick 3 already in log (rejoining mid-game)
+    // Simulate reconnect/late join: the first game:state arrives carrying trick 3
+    // already in the log. In the real component, initialized and the latestTrickResult
+    // computed both update in the same reactive flush when the first game:state arrives.
+    // Vue processes watchers in registration order: the initialized watcher fires first
+    // (seeds lastRevealedTrickNumber=3), then the latestTrickResult watcher fires
+    // (shouldEnterTrickReveal(3, 3, …) → false, no reveal).
+    // Replicate by setting both synchronously before awaiting the tick.
+    logic.initialized.value = true;
     logic.latestTrickResult.value = makeTrickResult(3);
     await nextTick();
 
@@ -269,17 +302,18 @@ describe("GameView trick-reveal phase wiring (LLD 146)", () => {
   it("same trickNumber arriving again does not re-enter reveal (E6 idempotent)", async () => {
     const logic = createRevealLogic("IN_PROGRESS");
 
-    logic.latestTrickResult.value = makeTrickResult(1);
+    // Fresh game: initialize, then round 1 ends
+    logic.initialized.value = true;
     await nextTick();
-    logic.latestTrickResult.value = makeTrickResult(2);
+    logic.latestTrickResult.value = makeTrickResult(1);
     await nextTick();
     expect(logic.displayPhase.value).toBe("SHOW_TRICK_RESULT");
 
-    // Dismiss, then same trickNumber arrives again
+    // Dismiss, then same trickNumber arrives again (duplicate state event)
     logic.dismissTrickReveal();
     expect(logic.displayPhase.value).toBe("IN_PROGRESS");
 
-    logic.latestTrickResult.value = makeTrickResult(2);
+    logic.latestTrickResult.value = makeTrickResult(1);
     await nextTick();
     expect(logic.displayPhase.value).toBe("IN_PROGRESS");
   });
@@ -287,25 +321,27 @@ describe("GameView trick-reveal phase wiring (LLD 146)", () => {
   it("newer trickNumber while already revealing re-arms for the newest (E7)", async () => {
     const logic = createRevealLogic("IN_PROGRESS");
 
-    logic.latestTrickResult.value = makeTrickResult(1);
+    // Fresh game: initialize, then round 1 ends — enters reveal
+    logic.initialized.value = true;
     await nextTick();
-    logic.latestTrickResult.value = makeTrickResult(2);
+    logic.latestTrickResult.value = makeTrickResult(1);
     await nextTick();
     expect(logic.displayPhase.value).toBe("SHOW_TRICK_RESULT");
 
     // Another round passes while this client is still revealing
-    logic.latestTrickResult.value = makeTrickResult(3);
+    logic.latestTrickResult.value = makeTrickResult(2);
     await nextTick();
     expect(logic.displayPhase.value).toBe("SHOW_TRICK_RESULT");
-    expect(logic.lastRevealedTrickNumber.value).toBe(3);
+    expect(logic.lastRevealedTrickNumber.value).toBe(2);
   });
 
   it("onUnmounted clears revealTimer — no callback fires after unmount", async () => {
     const logic = createRevealLogic("IN_PROGRESS");
 
-    logic.latestTrickResult.value = makeTrickResult(1);
+    // Fresh game: initialize, then round 1 ends — enters reveal
+    logic.initialized.value = true;
     await nextTick();
-    logic.latestTrickResult.value = makeTrickResult(2);
+    logic.latestTrickResult.value = makeTrickResult(1);
     await nextTick();
     expect(logic.displayPhase.value).toBe("SHOW_TRICK_RESULT");
 

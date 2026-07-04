@@ -257,8 +257,6 @@ const REVEAL_DURATION_MS = 6000;
 
 /** Client-local: which trick number has already been shown to this client. */
 const lastRevealedTrickNumber = ref<number | null>(null);
-/** Whether we have received the first game:state (guards against spurious E4 reveal). */
-let trickRevealInitialized = false;
 let revealTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Newest trick-result entry in the Tonk log, or null. */
@@ -591,16 +589,26 @@ watch(
 );
 
 // LLD 146: detect new trick-result arrivals and enter the reveal phase.
-// On the FIRST state received (trickRevealInitialized is false), we seed
-// lastRevealedTrickNumber to avoid a spurious reveal for a round that already
-// completed before this client joined (E4).
-watch(latestTrickResult, (newResult) => {
-  if (!trickRevealInitialized) {
-    trickRevealInitialized = true;
-    lastRevealedTrickNumber.value = newResult?.trickNumber ?? null;
-    return;
-  }
+//
+// E4 seeding: when the first game:state arrives (initialized flips true), seed
+// lastRevealedTrickNumber from the current latestTrickResult so that a round
+// already completed before this client joined does NOT trigger a spurious reveal.
+// This must happen before the latestTrickResult watcher can fire, so we use an
+// immediate watcher on `initialized` that runs once on the initial bind.
+watch(
+  initialized,
+  (isReady) => {
+    if (isReady) {
+      lastRevealedTrickNumber.value =
+        latestTrickResult.value?.trickNumber ?? null;
+    }
+  },
+  { immediate: true },
+);
 
+// After the initial seed above, any subsequent change to latestTrickResult is a
+// genuine new round ending. Check the guard and enter the reveal.
+watch(latestTrickResult, (newResult) => {
   if (
     shouldEnterTrickReveal(
       newResult?.trickNumber ?? null,
