@@ -16,6 +16,11 @@ Format: each entry has a date, short description, and category. Most recent firs
   - `src/frontend/component/game/GameView.vue` — extends `DisplayPhase` with `SHOW_TRICK_RESULT`; adds `latestTrickResult` computed, `tonkTallies`, `myTonkPlayerIndex`, `lastRevealedTrickNumber` ref, `revealTimer`, `enterTrickReveal()`, `dismissTrickReveal()`; watches `latestTrickResult` to detect new trick ends (first-state seeding guards against spurious E4 reconnect reveal); `--revealing` modifier extended to cover Tonk `SHOW_TRICK_RESULT`; adds `:deep(.tonk-board)` blur rule for the fixed-position Tonk board; `toFeedbackPhase` handles `SHOW_TRICK_RESULT → "in-progress"`; `onUnmounted` clears `revealTimer`.
   - `tests/frontend/tonkDisplay.test.ts` — 40+ new tests covering `trickRevealRows`, `trickReasonLabel`, `trickVerdictHeadline`, and `shouldEnterTrickReveal` (all edge cases E1–E13 from LLD).
   - `tests/frontend/tonkTrickReveal.test.ts` — NEW test file: 26 tests covering trick-reveal detection watcher, auto-dismiss timer, Continue skip, E4 seeded-join no-spurious-reveal, E5 match-end supersedes, E6 idempotent, E7 re-arm, E12 unmount timer cleanup, and `toFeedbackPhase` mapping for `SHOW_TRICK_RESULT`.
+### Changed
+
+- **LLD 147: Center the player's card hand on desktop instead of left-aligning it**
+  - `src/frontend/component/game/GameBoard.vue` — `.game-board__hand` switches to `flex-direction: column; align-items: stretch; justify-content: center` so the label stacks above and both are vertically centered in the hand strip on desktop (`>= 768px`). `.game-board__hand-label` gains `text-align: center; padding-left: 0; padding-top: 10px` so the label appears centered above the tray. Mobile override block adds `justify-content: flex-start` to prevent the new desktop rule from cascading into the 160px mobile cell and shifting the label+hand stack away from the top.
+  - `src/frontend/component/game-ui/PlayerHand.vue` — `.player-hand` gains `justify-content: flex-start` (explicit, preserves prior default) and `margin-inline: auto` (centers the tray when cards fit; collapses to zero when content overflows so horizontal scroll remains fully reachable). Mobile override block adds `margin-inline: 0` to make the intent self-documenting and prevent any centering on full-width mobile.
 
 ### Fixed
 
