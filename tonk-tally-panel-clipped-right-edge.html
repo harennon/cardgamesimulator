@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tonk Tally Panel — Right-Edge Clipping Fix</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===== Real design tokens (src/frontend/styles/game-variables.css) ===== */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --gold-accent: #c9a84c;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --tonk-near-150: #e09a30;
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        /* PROPOSED FIX TOKEN — the inset that keeps content clear of the 12px rim */
+        --board-rim-inset: 12px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0c;
+        color: var(--text-primary);
+        line-height: 1.4;
+        padding: 32px 24px 96px;
+      }
+
+      /* ===== Page chrome (mockup-only, not part of the app) ===== */
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 28px;
+      }
+      .page-head h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        margin-bottom: 8px;
+      }
+      .page-head p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        max-width: 780px;
+      }
+      .page-head .issue {
+        display: inline-block;
+        margin-top: 12px;
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--gold-accent);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 999px;
+        padding: 4px 12px;
+      }
+
+      .controls {
+        max-width: 1180px;
+        margin: 0 auto 24px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 20px;
+        align-items: center;
+        padding: 14px 18px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+      }
+      .controls fieldset {
+        border: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .controls legend {
+        display: none;
+      }
+      .controls label {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      .controls .group-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-muted);
+        margin-right: 4px;
+      }
+      .controls button {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--text-primary);
+        background: transparent;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        padding: 5px 12px;
+        cursor: pointer;
+      }
+      .controls button.active {
+        background: rgba(201, 168, 76, 0.18);
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+      .controls input[type="checkbox"] {
+        accent-color: var(--gold-accent);
+      }
+
+      .cases {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        gap: 40px;
+      }
+
+      .case__title {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .case__title h2 {
+        font-size: 1.05rem;
+        font-weight: 700;
+      }
+      .case__title .tag {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+      }
+      .tag--bug {
+        background: rgba(224, 85, 85, 0.18);
+        color: #f08a8a;
+        border: 1px solid rgba(224, 85, 85, 0.4);
+      }
+      .tag--fix {
+        background: rgba(63, 208, 120, 0.15);
+        color: #7fd89a;
+        border: 1px solid rgba(63, 208, 120, 0.35);
+      }
+      .case__desc {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        margin-bottom: 14px;
+        max-width: 900px;
+      }
+      .case__desc code {
+        font-family: ui-monospace, monospace;
+        font-size: 0.8em;
+        background: rgba(255, 255, 255, 0.06);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--text-primary);
+      }
+
+      /* ===== Board frame — mimics .tonk-board fixed layout, scaled into a card ===== */
+      .board-wrap {
+        /* The board fills the width the reviewer selects (viewport simulator). */
+        margin: 0 auto;
+        transition: max-width 0.25s ease;
+      }
+      .board-wrap[data-w="1024"] {
+        max-width: 1024px;
+      }
+      .board-wrap[data-w="1280"] {
+        max-width: 1180px;
+      } /* clamped to page width; label still 1280 */
+      .board-wrap[data-w="1440"] {
+        max-width: 1180px;
+      }
+
+      .board {
+        position: relative;
+        height: 460px;
+        display: grid;
+        grid-template-rows: 64px 1fr 140px auto;
+        grid-template-columns: 1fr 280px;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        overflow: hidden;
+        border-radius: 6px;
+      }
+
+      /* Wood rim border — EXACT copy of the app's ::after (12px, z-index 100) */
+      .board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        pointer-events: none;
+        z-index: 100;
+        border-radius: 6px;
+        transition: opacity 0.2s ease;
+      }
+      .board.rim-hidden::after {
+        opacity: 0.12;
+      }
+
+      .board > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .board__opponents {
+        grid-area: opponents;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 20px;
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .seat {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--table-rim-light);
+        background: rgba(0, 0, 0, 0.25);
+        font-size: 0.7rem;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--text-primary);
+      }
+      .seat b {
+        font-variant-numeric: tabular-nums;
+        color: var(--gold-accent);
+      }
+
+      .board__table {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: var(--text-muted);
+        min-height: 0;
+      }
+      .pile {
+        width: 58px;
+        height: 82px;
+        border-radius: 6px;
+        background: linear-gradient(145deg, #3a2116, #24140c);
+        border: 1px solid var(--table-rim-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        color: var(--text-muted);
+        font-size: 0.7rem;
+      }
+      .piles {
+        display: flex;
+        gap: 16px;
+      }
+      .table-note {
+        font-size: 0.72rem;
+      }
+
+      .board__hand {
+        grid-area: hand;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 20px;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+      }
+      .hand-card {
+        width: 46px;
+        height: 66px;
+        border-radius: 5px;
+        background: #faf3e8;
+        color: #1a1a1a;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 4px 5px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        margin-right: -14px;
+      }
+      .hand-card.red {
+        color: #8b1a1a;
+      }
+
+      .board__log {
+        grid-area: log;
+      }
+
+      .board__actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 12px 20px;
+      }
+      .action-pill {
+        font-family: var(--font-ui);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 999px;
+        padding: 8px 18px;
+      }
+
+      /* ===== TonkTallyPanel — EXACT copy of the component's scoped CSS ===== */
+      .tonk-tally-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: var(--panel-bg);
+        border-left: 2px solid var(--table-rim-light);
+        overflow: hidden;
+      }
+      .tonk-tally-panel__header {
+        font-family: var(--font-ui);
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 10px 12px 4px;
+      }
+      .tonk-tally-panel__trick {
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        padding: 0 12px 8px;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+      .tonk-tally-panel__rows {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .tonk-tally-row {
+        display: grid;
+        grid-template-columns: 18px 1fr auto;
+        grid-template-areas:
+          "rank name score"
+          "bar  bar  bar";
+        align-items: center;
+        gap: 2px 6px;
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        color: var(--text-primary);
+      }
+      .tonk-tally-row__rank {
+        grid-area: rank;
+        color: var(--text-muted);
+        font-size: 0.7rem;
+      }
+      .tonk-tally-row__name {
+        grid-area: name;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tonk-tally-row__score {
+        grid-area: score;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        /* Visual marker so reviewers can spot exactly which pixels get clipped */
+        outline: 1px dashed rgba(201, 168, 76, 0);
+      }
+      .board.mark-score .tonk-tally-row__score {
+        outline: 1px dashed rgba(201, 168, 76, 0.9);
+        outline-offset: 1px;
+      }
+      .tonk-tally-row__bar {
+        grid-area: bar;
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(0, 0, 0, 0.35);
+        overflow: hidden;
+      }
+      .tonk-tally-row__bar-fill {
+        height: 100%;
+        background: var(--gold-accent);
+        transition: width 0.3s ease;
+      }
+      .tonk-tally-row--near .tonk-tally-row__bar-fill {
+        background: var(--tonk-near-150);
+      }
+      .tonk-tally-row--near .tonk-tally-row__score {
+        color: var(--tonk-near-150);
+      }
+      .tonk-tally-panel__footer {
+        font-family: var(--font-ui);
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        padding: 6px 12px 10px;
+        border-top: 1px solid var(--table-rim-light);
+      }
+
+      /* =========================================================================
+     FIX VARIANTS — toggled by class on .board
+     ========================================================================= */
+
+      /* OPTION A — inset only the right (log) column.
+     Adds right padding to the log grid area equal to the rim width, so panel
+     content clears the rim. Surgical: touches one grid area. Big2 needs the
+     same one-line change on .game-board__log. */
+      .board.fix-a .board__log {
+        padding-right: var(--board-rim-inset);
+        /* the panel's own left border still hugs the table; only right edge insets */
+      }
+
+      /* OPTION B — inset ALL board content from the rim (recommended).
+     A single padding on the grid container keeps every child clear of the
+     12px rim on all four sides. One rule fixes tally (Tonk) AND log (Big2),
+     and also stops the hand/opponents/actions from touching the rim.
+     grid gap unaffected; the felt background still bleeds under the rim. */
+      .board.fix-b {
+        padding: var(--board-rim-inset);
+      }
+      /* Keep the felt-light hand band and its top border reading correctly when
+     the grid is padded (cosmetic parity with the real board). */
+      .board.fix-b .board__hand {
+        border-radius: 0;
+      }
+
+      .legend {
+        max-width: 1180px;
+        margin: 8px auto 0;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .swatch {
+        width: 22px;
+        height: 10px;
+        border-radius: 2px;
+        display: inline-block;
+      }
+      .swatch--rim {
+        background: var(--table-rim);
+      }
+      .swatch--mark {
+        border: 1px dashed rgba(201, 168, 76, 0.9);
+        height: 12px;
+      }
+
+      .rec {
+        max-width: 1180px;
+        margin: 40px auto 0;
+        padding: 20px 22px;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        background: rgba(201, 168, 76, 0.05);
+      }
+      .rec h3 {
+        font-size: 0.95rem;
+        color: var(--gold-accent);
+        margin-bottom: 8px;
+      }
+      .rec ul {
+        margin: 8px 0 0 18px;
+        font-size: 0.86rem;
+        color: var(--text-primary);
+      }
+      .rec li {
+        margin-bottom: 6px;
+      }
+      .rec code {
+        font-family: ui-monospace, monospace;
+        font-size: 0.82em;
+        background: rgba(255, 255, 255, 0.06);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-head">
+      <h1>Tonk Tally Panel — Right-Edge Clipping Fix</h1>
+      <p>
+        On the desktop Tonk board, the running-tally side panel is drawn flush
+        against the viewport edge, so the right-pinned score digits sit
+        underneath the 12px wood-rim
+        <code>::after</code> overlay. Below: the current bug, then two fix
+        options, side by side on the real board layout with the real
+        <code>TonkTallyPanel</code> markup and design tokens. Use the controls
+        to change simulated width, toggle the rim, and outline the score cells.
+      </p>
+      <span class="issue"
+        >Issue #151 · branch lld-142-tonk-tally-panel-clipped-right-edge</span
+      >
+    </header>
+
+    <div class="controls" role="group" aria-label="Mockup controls">
+      <fieldset>
+        <span class="group-label">Width</span>
+        <button data-width="1024">1024px</button>
+        <button data-width="1280" class="active">1280px</button>
+        <button data-width="1440">1440px</button>
+      </fieldset>
+      <label
+        ><input type="checkbox" id="toggle-rim" checked /> Wood rim
+        overlay</label
+      >
+      <label
+        ><input type="checkbox" id="toggle-mark" checked /> Outline score
+        cells</label
+      >
+    </div>
+
+    <div class="legend">
+      <span
+        ><span class="swatch swatch--rim"></span> 12px wood rim (z-index 100,
+        drawn over content)</span
+      >
+      <span
+        ><span class="swatch swatch--mark"></span> right-pinned score cell
+        (<code>.tonk-tally-row__score</code>)</span
+      >
+    </div>
+
+    <main class="cases">
+      <!-- ============ CURRENT (BUG) ============ -->
+      <section class="case">
+        <div class="case__title">
+          <h2>Current behavior</h2>
+          <span class="tag tag--bug">Bug</span>
+        </div>
+        <p class="case__desc">
+          The <code>log</code> grid column reaches the viewport's right edge
+          with no inset. Its outer ~12px — where the score value is pinned
+          (<code>grid-template-columns: 18px 1fr auto</code>, only 8px row
+          padding) — is rendered beneath the rim. Watch the last digit of
+          <strong>149</strong> disappear under the wood.
+        </p>
+        <div class="board-wrap" data-w="1280">
+          <div
+            class="board rim-hidden-target mark-target"
+            data-case="bug"
+          ></div>
+        </div>
+      </section>
+
+      <!-- ============ OPTION A ============ -->
+      <section class="case">
+        <div class="case__title">
+          <h2>Option A — inset the right column only</h2>
+          <span class="tag tag--fix">Fix</span>
+        </div>
+        <p class="case__desc">
+          Add <code>padding-right: 12px</code> to
+          <code>.tonk-board__log</code> (and the same one-liner to
+          <code>.game-board__log</code> for Big2). Surgical — touches only the
+          right column. The panel's left border still hugs the table; only the
+          score side pulls in to clear the rim.
+        </p>
+        <div class="board-wrap" data-w="1280">
+          <div
+            class="board fix-a rim-hidden-target mark-target"
+            data-case="a"
+          ></div>
+        </div>
+      </section>
+
+      <!-- ============ OPTION B (recommended) ============ -->
+      <section class="case">
+        <div class="case__title">
+          <h2>
+            Option B — inset all board content from the rim
+            <span style="color: var(--gold-accent); font-weight: 700"
+              >(recommended)</span
+            >
+          </h2>
+          <span class="tag tag--fix">Fix</span>
+        </div>
+        <p class="case__desc">
+          Add a single <code>padding: 12px</code> to the
+          <code>.tonk-board</code> / <code>.game-board</code> grid container
+          (behind a <code>--board-rim-inset</code> token). Every grid child
+          clears the rim on all four sides in one rule — fixes Tonk tallies AND
+          the Big2 log identically, and also keeps the hand, opponents and
+          actions off the rim. The felt background still bleeds under the rim,
+          so the table look is preserved. Mobile override resets padding to 0
+          (or to the 4px mobile rim).
+        </p>
+        <div class="board-wrap" data-w="1280">
+          <div
+            class="board fix-b rim-hidden-target mark-target"
+            data-case="b"
+          ></div>
+        </div>
+      </section>
+    </main>
+
+    <section class="rec">
+      <h3>Recommendation & notes</h3>
+      <ul>
+        <li>
+          <strong>Option B is recommended.</strong> It is one rule per board,
+          expressed as a shared <code>--board-rim-inset: 12px</code> token, and
+          it fixes both games' right panels plus the previously-unnoticed edges
+          (hand/opponents brushing the rim). It matches the acceptance criterion
+          "inset the board grid content from the rim … apply consistently so
+          Big2's right log panel is not clipped either."
+        </li>
+        <li>
+          <strong>Option A</strong> is the minimal change if we want to touch
+          only the reported symptom. It leaves the left/top/bottom edges hugging
+          the rim (unchanged from today), so it is lower-blast-radius but does
+          not address the same latent issue on the other three sides.
+        </li>
+        <li>
+          <strong>Mobile is untouched.</strong> At ≤767px the side panel is
+          <code>display: none</code> and the rim shrinks to 4px; both options
+          are scoped to the desktop grid, and the mobile media query keeps the
+          board content edge-to-edge (padding reset to 0 / 4px).
+        </li>
+        <li>
+          <strong>Prior PR relevance:</strong> the earlier attempt conflicted
+          with PR #159 (LLD 134), which changed the desktop actions row from
+          <code>64px</code> to <code>auto</code>. That is a vertical/row change;
+          this fix is on the horizontal (column/rim-inset) axis and remains
+          fully relevant — it re-bases cleanly onto the
+          <code>auto</code> actions row shown above.
+        </li>
+        <li>
+          Verified readable at 1024 / 1280 / 1440: toggle "Outline score cells"
+          — the dashed box around <strong>149</strong> stays fully inside the
+          felt, clear of the rim, in both fix options.
+        </li>
+      </ul>
+    </section>
+
+    <script>
+      // ---- Real Tonk tally data (lower wins; 149 is near the 150 loss line) ----
+      const TALLIES = [
+        { rank: 1, name: "Alice", score: 34, near: false },
+        { rank: 2, name: "Bao-Nguyen", score: 71, near: false },
+        { rank: 3, name: "Charlie", score: 118, near: false },
+        { rank: 4, name: "Dave", score: 149, near: true },
+      ];
+
+      function tallyPanelHTML() {
+        const rows = TALLIES.map(
+          (t) => `
+      <div class="tonk-tally-row ${t.near ? "tonk-tally-row--near" : ""}">
+        <span class="tonk-tally-row__rank">${t.rank}</span>
+        <span class="tonk-tally-row__name">${t.name}</span>
+        <span class="tonk-tally-row__score">${t.score}</span>
+        <div class="tonk-tally-row__bar">
+          <div class="tonk-tally-row__bar-fill" style="width:${Math.min(100, (t.score / 150) * 100)}%"></div>
+        </div>
+      </div>`,
+        ).join("");
+        return `
+      <div class="tonk-tally-panel">
+        <div class="tonk-tally-panel__header">Tallies — lower wins</div>
+        <div class="tonk-tally-panel__trick">TRICK 3</div>
+        <div class="tonk-tally-panel__rows">${rows}</div>
+        <div class="tonk-tally-panel__footer">Game ends when anyone reaches 150</div>
+      </div>`;
+      }
+
+      const OPP = `
+    <span class="seat">Alice <b>34</b></span>
+    <span class="seat">Bao <b>71</b></span>
+    <span class="seat">Charlie <b>118</b></span>
+    <span class="seat" style="border-color:var(--tonk-near-150)">Dave <b style="color:var(--tonk-near-150)">149</b></span>`;
+
+      const HAND = `
+    <div class="hand-card">7♣</div>
+    <div class="hand-card red">Q♥</div>
+    <div class="hand-card">9♠</div>
+    <div class="hand-card red">4♦</div>
+    <div class="hand-card">K♣</div>`;
+
+      function boardInnerHTML() {
+        return `
+      <div class="board__opponents">${OPP}</div>
+      <div class="board__table">
+        <div class="piles">
+          <div class="pile">Stock 21</div>
+          <div class="pile">6♠</div>
+        </div>
+        <div class="table-note">Discard · Charlie's turn</div>
+      </div>
+      <div class="board__hand">${HAND}</div>
+      <div class="board__log">${tallyPanelHTML()}</div>
+      <div class="board__actions">
+        <span class="action-pill">Waiting for Charlie…</span>
+      </div>`;
+      }
+
+      // Populate every board frame
+      document.querySelectorAll(".board").forEach((b) => {
+        b.innerHTML = boardInnerHTML();
+      });
+
+      // ---- Controls ----
+      const rimToggle = document.getElementById("toggle-rim");
+      const markToggle = document.getElementById("toggle-mark");
+      const widthBtns = document.querySelectorAll(".controls [data-width]");
+
+      function applyRim() {
+        document
+          .querySelectorAll(".board")
+          .forEach((b) => b.classList.toggle("rim-hidden", !rimToggle.checked));
+      }
+      function applyMark() {
+        document
+          .querySelectorAll(".board")
+          .forEach((b) => b.classList.toggle("mark-score", markToggle.checked));
+      }
+      function applyWidth(w) {
+        document
+          .querySelectorAll(".board-wrap")
+          .forEach((w2) => w2.setAttribute("data-w", w));
+        widthBtns.forEach((btn) =>
+          btn.classList.toggle("active", btn.dataset.width === w),
+        );
+      }
+
+      rimToggle.addEventListener("change", applyRim);
+      markToggle.addEventListener("change", applyMark);
+      widthBtns.forEach((btn) =>
+        btn.addEventListener("click", () => applyWidth(btn.dataset.width)),
+      );
+
+      applyRim();
+      applyMark();
+    </script>
+  </body>
+</html>
