@@ -1,6 +1,11 @@
 {
-  "$comment": "Base is Phase 2 post-011 (010 + 011 applied to prod). 012_prune_game_history.sql (LLD 149) is pending (not yet applied), so it is listed in pending here AND in expected-diff.allowlist.json's expectedPending (fixture coupling). 012's prune_game_history function self-attributes to pending 012 and drops as benign, so it never appears as residual — objects still mirrors only increment_player_stats (#91), the cosmetic re-emission that stays acknowledged. After 012 is applied to prod, remove it from pending here + expectedPending.",
+  "$comment": "Base is Phase 2 post-011 (010 + 011 applied to prod). 012_prune_game_history.sql (LLD 149) and 013_create_feedback_attachments_bucket.sql (LLD 153) are pending (not yet applied), so they are listed in pending here AND in expected-diff.allowlist.json's expectedPending (fixture coupling). 013's attachment_keys column add is a public-schema change supabase db diff sees → recorded in objects + expectedFromPending. The storage-schema bucket/policies are NOT emitted by db diff (managed schema); the postcondition is their authoritative check. After each migration is applied to prod, remove it from pending here + expectedPending.",
   "objects": [{ "object": "function:public:increment_player_stats" }],
-  "expectedFromPending": [],
-  "pending": ["012_prune_game_history.sql"]
+  "expectedFromPending": [
+    { "object": "column:public:feedback:attachment_keys" }
+  ],
+  "pending": [
+    "012_prune_game_history.sql",
+    "013_create_feedback_attachments_bucket.sql"
+  ]
 }
