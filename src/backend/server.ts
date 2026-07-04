@@ -41,6 +41,7 @@ import { FeedbackHandler } from "@/api/feedback/submitFeedback";
 import { RealTimerProvider } from "@/timer/realTimerProvider";
 import { TurnTimerService } from "@/timer/turnTimerService";
 import { createResolveJoinCodeRouter } from "@/api/game/resolveJoinCode";
+import { RealDelayer } from "@/websocket/delayer";
 
 export class Server {
   private readonly app: Express;
@@ -149,6 +150,7 @@ export class Server {
 
     const connectionManager = new ConnectionManager();
     this.timerProvider = new RealTimerProvider();
+    const delayer = new RealDelayer();
     const turnTimerService = new TurnTimerService(
       this.timerProvider,
       (gameId) => {
@@ -158,6 +160,7 @@ export class Server {
           gameService,
           connectionManager,
           turnTimerService,
+          delayer,
         ).catch((err: unknown) => console.error("Timer expired error", err));
       },
     );
@@ -166,6 +169,7 @@ export class Server {
       gameService,
       connectionManager,
       turnTimerService,
+      delayer,
     );
 
     // Seed endpoint — only loaded in test environments

@@ -7,6 +7,7 @@ import type { ConnectionManager } from "../../src/backend/websocket/connectionMa
 import type { GameService } from "../../src/backend/service/gameService.js";
 import type { TurnTimerService } from "../../src/backend/timer/turnTimerService.js";
 import { registerSocketHandlers } from "../../src/backend/websocket/socketHandler.js";
+import { ImmediateDelayer } from "../../src/backend/websocket/delayer.js";
 import { Game } from "../../src/backend/database/entities/Game.js";
 import type {
   LobbyStatePayload,
@@ -249,7 +250,13 @@ function setupHandlers(
     to: vi.fn().mockReturnValue({ emit: vi.fn() }),
   } as unknown as TypedServer;
 
-  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
+  registerSocketHandlers(
+    io,
+    gameService,
+    connectionManager,
+    turnTimerService,
+    new ImmediateDelayer(),
+  );
 
   const fireGameJoin = (
     socket: TypedSocket,
@@ -709,7 +716,13 @@ function setupHandlersWithStart(
     to: vi.fn().mockReturnValue({ emit: vi.fn() }),
   } as unknown as TypedServer;
 
-  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
+  registerSocketHandlers(
+    io,
+    gameService,
+    connectionManager,
+    turnTimerService,
+    new ImmediateDelayer(),
+  );
 
   const fireGameStart = (
     socket: TypedSocket,
@@ -1010,7 +1023,13 @@ function setupHandlersWithAction(
     to: vi.fn().mockReturnValue({ emit: vi.fn() }),
   } as unknown as TypedServer;
 
-  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
+  registerSocketHandlers(
+    io,
+    gameService,
+    connectionManager,
+    turnTimerService,
+    new ImmediateDelayer(),
+  );
 
   const fireGameAction = (
     socket: TypedSocket,
@@ -1642,6 +1661,7 @@ describe("socketHandler — AI vs abandoned-human routing in autoPlayAbandoned",
       gameService,
       makeConnectionManager(),
       makeTurnTimerService(),
+      new ImmediateDelayer(),
     );
 
     // handleTimerExpired fires for a human seat and must use getAutoTimeoutAction
