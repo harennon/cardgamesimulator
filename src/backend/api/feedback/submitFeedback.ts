@@ -150,7 +150,11 @@ export class FeedbackHandler extends Handler {
     const { id } = request.params;
     const body = request.body as SubmitAttachmentRequest;
 
-    // Decode base64 (E5: malformed or empty).
+    // Decode base64 (E5: missing, non-string, or zero-length decode).
+    // Note: Buffer.from(str, 'base64') never throws — it silently drops
+    // invalid characters. The empty-length guard below catches the
+    // fully-invalid input case. Truly malformed (non-empty) base64 passes
+    // here and is rejected downstream by the magic-byte check (E4).
     let imageBuffer: Buffer;
     try {
       if (!body.image || typeof body.image !== "string") {

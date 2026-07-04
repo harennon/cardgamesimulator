@@ -127,29 +127,33 @@ describe("Migration 013 — public-schema parts (prodShapedFixture)", () => {
   });
 
   it("append_feedback_attachment_key actually appends a key and returns the updated array", async () => {
-    const fixture = await createProdShapedFixture({ baseline: "fresh" });
+    // The RPC has SET search_path = public (SECURITY DEFINER), so it always
+    // resolves feedback to public.feedback regardless of the caller's
+    // search_path. This test therefore runs against the real live public schema
+    // (not a throwaway fixture) and cleans up in finally.
+    const pg = makePgClient();
+    await pg.connect();
+    let feedbackId: string | undefined;
     try {
-      await fixture.applyMigrations([
-        "013_create_feedback_attachments_bucket.sql",
-      ]);
-
-      // Insert a feedback row.
-      const { rows: ins } = await fixture.client.query<{ id: string }>(
-        `INSERT INTO feedback (category, description)
-         VALUES ('bug', 'test')
+      const { rows: ins } = await pg.query<{ id: string }>(
+        `INSERT INTO public.feedback (category, description)
+         VALUES ('bug', 'rpc-append-test')
          RETURNING id;`,
       );
-      const feedbackId = ins[0]!.id;
+      feedbackId = ins[0]!.id;
 
-      const { rows } = await fixture.client.query<{
-        attachment_keys: string[];
-      }>(
+      const { rows } = await pg.query<{ attachment_keys: string[] }>(
         `SELECT append_feedback_attachment_key($1::uuid, $2) AS attachment_keys;`,
         [feedbackId, "some-prefix/uuid.png"],
       );
       expect(rows[0]!.attachment_keys).toEqual(["some-prefix/uuid.png"]);
     } finally {
-      await fixture.teardown();
+      if (feedbackId) {
+        await pg
+          .query(`DELETE FROM public.feedback WHERE id = $1;`, [feedbackId])
+          .catch(() => undefined);
+      }
+      await pg.end();
     }
   });
 });

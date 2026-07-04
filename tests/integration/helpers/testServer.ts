@@ -77,7 +77,15 @@ export async function createTestServer(
   }
 
   const app = express();
-  app.use(express.json());
+  // Skip the global 100 kB JSON parser for the feedback attachment route so
+  // the route-level 7 MB parser can handle large base64 image bodies (LLD 153
+  // key decision 3). Mirrors the production Server wiring.
+  app.use((req, res, next) => {
+    if (/^\/feedback\/[^/]+\/attachments(\/|$)/i.test(req.path)) {
+      return next();
+    }
+    express.json()(req, res, next);
+  });
   app.use(helmet());
   app.use(cors({ origin: "*" }));
 

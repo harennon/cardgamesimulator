@@ -137,6 +137,29 @@ describe("Feedback attachment integration", () => {
     expect(res.status).toBe(400);
   });
 
+  it(">100 kB body reaches the route handler (body-parser ordering regression guard)", async () => {
+    // Proves that the global express.json() 100 kB limit does NOT block the
+    // attachment route (LLD 153 key decision 3). Sends a ~200 kB decoded image
+    // with valid PNG magic bytes — well above the 100 kB global limit but below
+    // the 5 MB per-file cap. Expects 201, not 413.
+    const user = await createTestUser("AttachBodyOver100k");
+    const feedbackId = await createFeedback(ctx.app, user.accessToken);
+
+    const over100k = Buffer.alloc(200 * 1024);
+    over100k[0] = 0x89; // PNG magic bytes
+    over100k[1] = 0x50;
+    over100k[2] = 0x4e;
+    over100k[3] = 0x47;
+
+    const res = await request(ctx.app)
+      .post(`/feedback/${feedbackId}/attachments`)
+      .set("Authorization", `Bearer ${user.accessToken}`)
+      .send({ image: over100k.toString("base64"), mimeType: "image/png" });
+
+    // Must be 201 — 413 would mean the global parser rejected it before our route.
+    expect(res.status).toBe(201);
+  });
+
   it("returns 413 for raw body exceeding the route limit (E1 — proves errorHandler mapping)", async () => {
     const user = await createTestUser("AttachBodyLimit");
     const feedbackId = await createFeedback(ctx.app, user.accessToken);
