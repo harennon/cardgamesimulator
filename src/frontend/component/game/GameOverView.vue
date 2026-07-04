@@ -62,7 +62,7 @@
       </table>
 
       <div
-        v-if="totalTurns > 0"
+        v-if="showTotalTurns"
         class="game-over__metadata game-over__fade-in game-over__fade-in--delay-1"
       >
         Total Turns: {{ totalTurns }}
@@ -131,7 +131,11 @@
 <script lang="ts" setup>
 import { computed } from "vue";
 import { useRouter } from "vue-router";
-import type { PlayerScore, PlayerPublicInfo } from "@shared/engine-types";
+import type {
+  PlayerScore,
+  PlayerPublicInfo,
+  GameType,
+} from "@shared/engine-types";
 import type { Big2HistoryEntry, Big2Play } from "@shared/big2-types";
 import type { TonkLogEntry } from "@shared/tonk-types";
 import GameCard from "@/component/game-ui/GameCard.vue";
@@ -171,6 +175,7 @@ const props = defineProps<{
   playHistory?: readonly Big2HistoryEntry[];
   currentPlayerId?: string;
   totalTurns?: number;
+  gameType?: GameType;
   finalPlay?: Big2Play | null;
   tonkFinalMove?: TonkFinalMove | null;
 }>();
@@ -209,6 +214,9 @@ const stats = computed(() => {
 });
 
 const totalTurns = computed(() => props.totalTurns ?? 0);
+const showTotalTurns = computed(
+  () => props.gameType === "big2" && totalTurns.value > 0,
+);
 
 const hasFinalPlay = computed(
   () => !!props.finalPlay && props.finalPlay.cards.length > 0,
