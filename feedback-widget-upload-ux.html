@@ -1,0 +1,1304 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FeedbackWidget Upload UX — Mockup (LLD 151)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+     Design tokens — copied verbatim from
+     src/frontend/styles/game-variables.css so the mockup renders
+     against the app's real palette / typography.
+     ============================================================ */
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --bg-dark: #0d0d0d;
+        --bg-card: #1a1008;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        --input-bg: rgba(45, 24, 16, 0.5);
+        --error-text: #e05555;
+        --success-text: #6fce8a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            circle at 20% 10%,
+            rgba(37, 107, 66, 0.1),
+            transparent 45%
+          ),
+          radial-gradient(
+            circle at 85% 90%,
+            rgba(201, 168, 76, 0.06),
+            transparent 40%
+          ),
+          var(--bg-dark);
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        -webkit-font-smoothing: antialiased;
+        padding: 40px 24px 80px;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 12px;
+      }
+      .page-head h1 {
+        font-size: 1.35rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.02em;
+        margin: 0 0 6px;
+      }
+      .page-head p {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        margin: 0;
+        max-width: 720px;
+        line-height: 1.5;
+      }
+      .legend {
+        max-width: 1180px;
+        margin: 18px auto 32px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 18px;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        border-top: 1px solid var(--table-rim-light);
+        border-bottom: 1px solid var(--table-rim-light);
+        padding: 12px 0;
+      }
+      .legend b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* ---- state grid: each card frames one modal state ------------- */
+      .grid {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 28px;
+      }
+      .state {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .state__caption {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+      .state__caption .tag {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--gold-accent);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 4px;
+        padding: 2px 7px;
+        margin-right: 8px;
+      }
+
+      /* ============================================================
+     The modal itself — mirrors FeedbackWidget.vue's existing
+     structure (title / category / description / actions) and adds
+     the new attachment block between description and actions.
+     ============================================================ */
+      .modal {
+        background: var(--bg-card);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        padding: 22px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      }
+      .modal__title {
+        font-family: var(--font-ui);
+        font-size: 1.1rem;
+        color: var(--gold-accent);
+        margin: 0;
+      }
+      .field {
+        font-size: 0.82rem;
+        color: var(--text-primary);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .select,
+      .textarea {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 4px;
+        color: var(--text-primary);
+        padding: 8px;
+        resize: vertical;
+      }
+      .textarea {
+        min-height: 62px;
+      }
+      .charcount {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-align: right;
+      }
+
+      /* ---- Attachment section header (label + counter) ------------- */
+      .attach {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .attach__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .attach__label {
+        font-size: 0.82rem;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .attach__label svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.75;
+      }
+      .attach__count {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .attach__count.is-max {
+        color: var(--gold-accent);
+      }
+
+      /* ---- Drop zone ------------------------------------------------ */
+      .dropzone {
+        position: relative;
+        border: 1.5px dashed var(--table-rim-light);
+        border-radius: 6px;
+        background: linear-gradient(
+          rgba(37, 107, 66, 0.04),
+          rgba(37, 107, 66, 0.04)
+        );
+        padding: 18px 14px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        text-align: center;
+        cursor: pointer;
+        transition:
+          border-color 0.15s ease,
+          background 0.15s ease,
+          transform 0.15s ease;
+      }
+      .dropzone:hover {
+        border-color: var(--text-muted);
+      }
+      .dropzone__icon {
+        width: 26px;
+        height: 26px;
+        color: var(--text-muted);
+        transition:
+          color 0.15s ease,
+          transform 0.2s ease;
+      }
+      .dropzone:hover .dropzone__icon {
+        color: var(--gold-accent);
+        transform: translateY(-2px);
+      }
+      .dropzone__primary {
+        font-size: 0.85rem;
+        color: var(--text-primary);
+      }
+      .dropzone__primary b {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+      .dropzone__hint {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+      }
+      kbd {
+        font-family: var(--font-ui);
+        font-size: 0.7rem;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--table-rim-light);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        padding: 1px 5px;
+        color: var(--text-primary);
+      }
+
+      /* dragging-over state (highlight) */
+      .dropzone.is-dragover {
+        border-color: var(--gold-accent);
+        border-style: solid;
+        background: var(--gold-glow);
+        transform: scale(1.01);
+      }
+      .dropzone.is-dragover .dropzone__icon {
+        color: var(--gold-accent);
+      }
+      .dropzone.is-dragover .dropzone__primary {
+        color: var(--gold-accent);
+      }
+
+      /* disabled state (max reached) */
+      .dropzone.is-disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+        border-style: dotted;
+      }
+      .dropzone.is-disabled:hover {
+        border-color: var(--table-rim-light);
+      }
+      .dropzone.is-disabled:hover .dropzone__icon {
+        color: var(--text-muted);
+        transform: none;
+      }
+
+      /* ---- Thumbnail strip ----------------------------------------- */
+      .thumbs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .thumb {
+        position: relative;
+        width: 74px;
+        height: 74px;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid var(--table-rim-light);
+        background: #000;
+        flex: 0 0 auto;
+      }
+      .thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      /* remove control */
+      .thumb__remove {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(13, 13, 13, 0.82);
+        color: var(--text-primary);
+        font-size: 0.8rem;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
+      }
+      .thumb__remove:hover {
+        background: var(--error-text);
+        color: #fff;
+      }
+
+      /* per-thumb overlays: uploading / success / error */
+      .thumb__overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.66rem;
+        text-align: center;
+        padding: 4px;
+      }
+      .thumb__overlay--uploading {
+        background: rgba(13, 13, 13, 0.55);
+        color: var(--text-primary);
+      }
+      .thumb__overlay--error {
+        background: rgba(74, 12, 12, 0.72);
+        color: #ffd9d9;
+      }
+
+      /* upload progress ring / bar */
+      .thumb__bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.15);
+      }
+      .thumb__bar > span {
+        display: block;
+        height: 100%;
+        background: var(--gold-accent);
+        width: 60%;
+        transition: width 0.3s ease;
+      }
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(201, 168, 76, 0.25);
+        border-top-color: var(--gold-accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* success check badge (fades out; here shown static) */
+      .thumb__check {
+        position: absolute;
+        bottom: 4px;
+        left: 4px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--success-text);
+        color: #06280f;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+      }
+      .thumb.has-error {
+        border-color: var(--error-text);
+      }
+
+      /* downscale note under a thumb row */
+      .attach__meta {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      .attach__meta b {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      /* ---- inline errors (attachment-level, non-fatal) ------------- */
+      .attach__error {
+        font-size: 0.78rem;
+        color: var(--error-text);
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        background: rgba(224, 85, 85, 0.08);
+        border: 1px solid rgba(224, 85, 85, 0.35);
+        border-radius: 4px;
+        padding: 7px 9px;
+      }
+      .attach__error svg {
+        width: 14px;
+        height: 14px;
+        flex: 0 0 auto;
+        margin-top: 1px;
+      }
+
+      /* form-level error (matches existing .feedback-widget__error) */
+      .form-error {
+        font-size: 0.85rem;
+        color: var(--error-text);
+      }
+
+      /* ---- actions row (unchanged from existing widget) ------------ */
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 2px;
+      }
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.85rem;
+        border-radius: 4px;
+        padding: 8px 18px;
+        cursor: pointer;
+        transition:
+          opacity 0.15s ease,
+          background 0.15s ease;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn--cancel {
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-muted);
+      }
+      .btn--submit {
+        background: var(--gold-accent);
+        border: 1px solid var(--gold-accent);
+        color: var(--bg-dark);
+        font-weight: 600;
+      }
+      .btn--submit .mini-spinner {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        border: 2px solid rgba(26, 15, 6, 0.35);
+        border-top-color: #1a0f06;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        vertical-align: -1px;
+        margin-right: 6px;
+      }
+
+      .interactive-note {
+        max-width: 1180px;
+        margin: 40px auto 0;
+        padding: 18px 20px;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        background: var(--panel-bg);
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      .interactive-note h2 {
+        color: var(--gold-accent);
+        font-size: 0.95rem;
+        margin: 0 0 8px;
+      }
+      .interactive-note b {
+        color: var(--text-primary);
+      }
+
+      /* Live demo modal reuses .modal */
+      .live {
+        max-width: 460px;
+        margin: 20px auto 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>FeedbackWidget — Image Attachment Upload UX</h1>
+      <p>
+        Slice 2 of #97. Adds file picker, drag-and-drop, and clipboard paste to
+        the existing Send Feedback modal, with thumbnail previews, per-file
+        upload state, client-side downscale, and inline errors. Backend contract
+        (LLD 150):
+        <b>max 3 images</b>, <b>PNG / JPEG / WebP</b>, <b>5&nbsp;MB</b> per file
+        after downscale, uploaded via
+        <code>POST /api/feedback/:id/attachments</code> after the feedback row
+        is created. Every state below uses the app's real palette and
+        DM&nbsp;Sans typography. The last card is <b>fully interactive</b>.
+      </p>
+    </div>
+
+    <div class="legend">
+      <span
+        ><b>Reuses</b> existing modal shell (title / category / description /
+        actions)</span
+      >
+      <span
+        ><b>New</b> attachment block sits between Description and the action
+        buttons</span
+      >
+      <span
+        ><b>Optional</b> — submitting with zero attachments works exactly as
+        today</span
+      >
+    </div>
+
+    <div class="grid">
+      <!-- ============ STATE 1: EMPTY / DEFAULT ============ -->
+      <div class="state">
+        <div class="state__caption">
+          <span class="tag">1 · Default</span>
+          Empty drop zone. The paste hint is always visible — this is the
+          primary "screenshot &rarr; Ctrl+V" flow. Clicking the zone opens the
+          native file picker.
+        </div>
+        <div class="modal">
+          <h3 class="modal__title">Send Feedback</h3>
+          <label class="field">
+            Category
+            <select class="select">
+              <option>Bug</option>
+            </select>
+          </label>
+          <label class="field">
+            Description
+            <textarea class="textarea" placeholder="Describe what happened...">
+The discard pile ring stops glowing on my second turn.</textarea
+            >
+            <span class="charcount">51/500</span>
+          </label>
+
+          <div class="attach">
+            <div class="attach__head">
+              <span class="attach__label">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle
+                    cx="8.5"
+                    cy="8.5"
+                    r="1.5"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Screenshots
+                <span style="color: var(--text-muted); font-weight: 400"
+                  >(optional)</span
+                >
+              </span>
+              <span class="attach__count">0 / 3</span>
+            </div>
+            <div class="dropzone">
+              <svg
+                class="dropzone__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M12 16V4m0 0L8 8m4-4l4 4" />
+                <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+              </svg>
+              <div class="dropzone__primary">
+                <b>Click to upload</b> or drag &amp; drop
+              </div>
+              <div class="dropzone__hint">
+                …or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd> · PNG, JPG, WebP ·
+                up to 3
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn--cancel">Cancel</button>
+            <button class="btn btn--submit">Submit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ STATE 2: DRAG OVER ============ -->
+      <div class="state">
+        <div class="state__caption">
+          <span class="tag">2 · Drag over</span>
+          While a file is dragged over the modal, the whole drop zone lights up
+          gold (border solidifies, felt-gold wash, subtle scale). Unambiguous
+          drop target.
+        </div>
+        <div class="modal">
+          <h3 class="modal__title">Send Feedback</h3>
+          <label class="field">
+            Description
+            <textarea class="textarea">
+The discard pile ring stops glowing on my second turn.</textarea
+            >
+          </label>
+          <div class="attach">
+            <div class="attach__head">
+              <span class="attach__label">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle
+                    cx="8.5"
+                    cy="8.5"
+                    r="1.5"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Screenshots
+              </span>
+              <span class="attach__count">0 / 3</span>
+            </div>
+            <div class="dropzone is-dragover">
+              <svg
+                class="dropzone__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M12 16V4m0 0L8 8m4-4l4 4" />
+                <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+              </svg>
+              <div class="dropzone__primary"><b>Drop to attach</b></div>
+              <div class="dropzone__hint">Release anywhere in this box</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn--cancel">Cancel</button>
+            <button class="btn btn--submit">Submit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ STATE 3: THUMBS + UPLOADING + SUCCESS ============ -->
+      <div class="state">
+        <div class="state__caption">
+          <span class="tag">3 · Previews &amp; upload</span>
+          Attached images become thumbnails with a remove (&times;) control. On
+          Submit each uploads independently: spinner + progress bar while in
+          flight, a green check on success. Downscale metadata shown below the
+          row.
+        </div>
+        <div class="modal">
+          <h3 class="modal__title">Send Feedback</h3>
+          <label class="field">
+            Description
+            <textarea class="textarea">
+Timer overlaps the fold button on iPhone SE.</textarea
+            >
+          </label>
+          <div class="attach">
+            <div class="attach__head">
+              <span class="attach__label">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle
+                    cx="8.5"
+                    cy="8.5"
+                    r="1.5"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Screenshots
+              </span>
+              <span class="attach__count">3 / 3</span>
+            </div>
+            <div class="thumbs">
+              <!-- success -->
+              <div class="thumb">
+                <img
+                  alt=""
+                  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='74' height='74'><rect width='74' height='74' fill='%231a4a2e'/><rect x='10' y='14' width='54' height='8' rx='2' fill='%23c9a84c'/><rect x='10' y='30' width='40' height='6' rx='2' fill='%23e8dcc8'/><rect x='10' y='44' width='48' height='6' rx='2' fill='%238a7e6e'/></svg>"
+                />
+                <button class="thumb__remove" title="Remove">&times;</button>
+                <div class="thumb__check">✓</div>
+              </div>
+              <!-- uploading -->
+              <div class="thumb">
+                <img
+                  alt=""
+                  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='74' height='74'><rect width='74' height='74' fill='%232d1810'/><circle cx='37' cy='30' r='12' fill='%23c9a84c'/><rect x='8' y='50' width='58' height='16' fill='%234a2c1e'/></svg>"
+                />
+                <div class="thumb__overlay thumb__overlay--uploading">
+                  <div class="spinner"></div>
+                </div>
+                <div class="thumb__bar"><span style="width: 64%"></span></div>
+              </div>
+              <!-- queued (pre-submit) -->
+              <div class="thumb">
+                <img
+                  alt=""
+                  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='74' height='74'><rect width='74' height='74' fill='%230d0d0d'/><path d='M0 74 L37 34 L54 50 L74 30 L74 74Z' fill='%23256b42'/><circle cx='20' cy='20' r='8' fill='%23c9a84c'/></svg>"
+                />
+                <button class="thumb__remove" title="Remove">&times;</button>
+              </div>
+            </div>
+            <div class="attach__meta">
+              Auto-resized to <b>1600px</b> max ·
+              <b>2.1 MB &rarr; 0.4 MB</b> before upload
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn--cancel" disabled>Cancel</button>
+            <button class="btn btn--submit" disabled>
+              <span class="mini-spinner"></span>Sending…
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ STATE 4: REJECTION / ERROR ============ -->
+      <div class="state">
+        <div class="state__caption">
+          <span class="tag">4 · Rejection &amp; error</span>
+          A rejected file (wrong type / too big / over count) shows an inline
+          message and is <b>not</b> added. A file that failed to upload keeps
+          its thumbnail with a retry affordance. The typed description is never
+          lost.
+        </div>
+        <div class="modal">
+          <h3 class="modal__title">Send Feedback</h3>
+          <label class="field">
+            Description
+            <textarea class="textarea">
+Attaching a recording of the bug.</textarea
+            >
+          </label>
+          <div class="attach">
+            <div class="attach__head">
+              <span class="attach__label">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle
+                    cx="8.5"
+                    cy="8.5"
+                    r="1.5"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Screenshots
+              </span>
+              <span class="attach__count is-max">1 / 3</span>
+            </div>
+            <div class="thumbs">
+              <div class="thumb has-error">
+                <img
+                  alt=""
+                  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='74' height='74'><rect width='74' height='74' fill='%232d1810'/><circle cx='37' cy='30' r='12' fill='%238b1a1a'/></svg>"
+                />
+                <button class="thumb__remove" title="Remove">&times;</button>
+                <div class="thumb__overlay thumb__overlay--error">
+                  <span>Upload failed</span>
+                  <span style="text-decoration: underline; cursor: pointer"
+                    >Retry</span
+                  >
+                </div>
+              </div>
+            </div>
+            <div class="attach__error">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v5M12 16.5v.5" />
+              </svg>
+              <span
+                ><b>bug-clip.mp4</b> — only PNG, JPG and WebP images can be
+                attached.</span
+              >
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn--cancel">Cancel</button>
+            <button class="btn btn--submit">Submit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ STATE 5: MAX REACHED ============ -->
+      <div class="state">
+        <div class="state__caption">
+          <span class="tag">5 · Max reached</span>
+          At 3 images the drop zone dims and disables (client-side UX guard;
+          server still enforces authoritatively). Counter turns gold. Removing
+          any thumbnail re-enables it.
+        </div>
+        <div class="modal">
+          <h3 class="modal__title">Send Feedback</h3>
+          <label class="field">
+            Description
+            <textarea class="textarea">
+Three screenshots of the mis-deal sequence.</textarea
+            >
+          </label>
+          <div class="attach">
+            <div class="attach__head">
+              <span class="attach__label">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle
+                    cx="8.5"
+                    cy="8.5"
+                    r="1.5"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Screenshots
+              </span>
+              <span class="attach__count is-max">3 / 3</span>
+            </div>
+            <div class="thumbs">
+              <div class="thumb">
+                <img
+                  alt=""
+                  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='74' height='74'><rect width='74' height='74' fill='%231a4a2e'/><rect x='10' y='16' width='54' height='42' rx='3' fill='%23faf3e8'/><rect x='16' y='22' width='16' height='24' rx='2' fill='%238b1a1a'/></svg>"
+                />
+                <button class="thumb__remove">&times;</button>
+                <div class="thumb__check">✓</div>
+              </div>
+              <div class="thumb">
+                <img
+                  alt=""
+                  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='74' height='74'><rect width='74' height='74' fill='%23256b42'/><rect x='10' y='16' width='54' height='42' rx='3' fill='%23faf3e8'/><rect x='16' y='22' width='16' height='24' rx='2' fill='%231a1a1a'/></svg>"
+                />
+                <button class="thumb__remove">&times;</button>
+                <div class="thumb__check">✓</div>
+              </div>
+              <div class="thumb">
+                <img
+                  alt=""
+                  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='74' height='74'><rect width='74' height='74' fill='%231a4a2e'/><rect x='10' y='16' width='54' height='42' rx='3' fill='%23faf3e8'/><rect x='16' y='22' width='16' height='24' rx='2' fill='%238b1a1a'/></svg>"
+                />
+                <button class="thumb__remove">&times;</button>
+                <div class="thumb__check">✓</div>
+              </div>
+            </div>
+            <div class="dropzone is-disabled">
+              <svg
+                class="dropzone__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M12 16V4m0 0L8 8m4-4l4 4" />
+                <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+              </svg>
+              <div class="dropzone__hint">
+                Maximum of 3 images reached — remove one to add another
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn--cancel">Cancel</button>
+            <button class="btn btn--submit">Submit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ STATE 6: LIVE INTERACTIVE ============ -->
+      <div class="state">
+        <div class="state__caption">
+          <span class="tag">6 · Live</span>
+          Interactive: click / drag-drop / paste a real image, remove
+          thumbnails, exceed the count, drop a non-image. Downscale + fake
+          upload progress run for real. (Everything else on the page is a static
+          reference frame.)
+        </div>
+        <div class="modal" id="live-modal">
+          <h3 class="modal__title">Send Feedback</h3>
+          <label class="field">
+            Description
+            <textarea
+              class="textarea"
+              id="live-desc"
+              placeholder="Describe what happened..."
+            >
+Try pasting a screenshot here (Ctrl+V).</textarea
+            >
+          </label>
+          <div class="attach">
+            <div class="attach__head">
+              <span class="attach__label">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle
+                    cx="8.5"
+                    cy="8.5"
+                    r="1.5"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Screenshots
+                <span style="color: var(--text-muted); font-weight: 400"
+                  >(optional)</span
+                >
+              </span>
+              <span class="attach__count" id="live-count">0 / 3</span>
+            </div>
+            <div class="thumbs" id="live-thumbs"></div>
+            <div class="dropzone" id="live-dropzone">
+              <svg
+                class="dropzone__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M12 16V4m0 0L8 8m4-4l4 4" />
+                <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+              </svg>
+              <div class="dropzone__primary">
+                <b>Click to upload</b> or drag &amp; drop
+              </div>
+              <div class="dropzone__hint">
+                …or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd> · PNG, JPG, WebP ·
+                up to 3
+              </div>
+            </div>
+            <input
+              type="file"
+              id="live-input"
+              accept="image/png,image/jpeg,image/webp"
+              multiple
+              hidden
+            />
+            <div
+              class="attach__meta"
+              id="live-meta"
+              style="display: none"
+            ></div>
+            <div class="attach__error" id="live-error" style="display: none">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v5M12 16.5v.5" />
+              </svg>
+              <span id="live-error-text"></span>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn--cancel">Cancel</button>
+            <button class="btn btn--submit" id="live-submit">Submit</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="interactive-note">
+      <h2>Interaction model &amp; downscale (summary)</h2>
+      <b>Three entry points, one pipeline.</b> File picker (click zone or open
+      native dialog), drag-and-drop onto the modal, and clipboard paste all feed
+      the same <code>addFiles(FileList)</code> handler → validate type/count →
+      downscale via an offscreen <code>&lt;canvas&gt;</code> (longest edge
+      capped, e.g. 1600px, re-encoded at ~0.8 quality) → push a preview object
+      with an object-URL thumbnail.<br />
+      <b>Deferred upload.</b> Files are held in memory until Submit. On Submit
+      the modal first POSTs the feedback row, then uploads each downscaled blob
+      to <code>/api/feedback/:id/attachments</code> as base64 (the LLD-150
+      contract), tracking per-file
+      <code>queued → uploading → done | error</code>. A description-only submit
+      skips the attachment step entirely.<br />
+      <b>Errors never lose text.</b> Type / size / count rejections and per-file
+      upload failures render inline; the description textarea and other
+      thumbnails are preserved, and the user can retry or remove and resubmit.
+    </div>
+
+    <script>
+      /* Live demo — the pipeline described above, self-contained. */
+      (function () {
+        const MAX = 3;
+        const OK_TYPES = ["image/png", "image/jpeg", "image/webp"];
+        const MAX_EDGE = 1600;
+        const files = []; // { id, name, url, origBytes, scaledBytes, status }
+
+        const dz = document.getElementById("live-dropzone");
+        const input = document.getElementById("live-input");
+        const thumbs = document.getElementById("live-thumbs");
+        const countEl = document.getElementById("live-count");
+        const meta = document.getElementById("live-meta");
+        const errBox = document.getElementById("live-error");
+        const errText = document.getElementById("live-error-text");
+        const modal = document.getElementById("live-modal");
+        const submit = document.getElementById("live-submit");
+
+        function fmt(b) {
+          return b < 1024 * 1024
+            ? (b / 1024).toFixed(0) + " KB"
+            : (b / 1048576).toFixed(1) + " MB";
+        }
+
+        function showError(msg) {
+          errText.textContent = msg;
+          errBox.style.display = "flex";
+          clearTimeout(showError._t);
+          showError._t = setTimeout(
+            () => (errBox.style.display = "none"),
+            4000,
+          );
+        }
+
+        function render() {
+          thumbs.innerHTML = "";
+          files.forEach((f) => {
+            const t = document.createElement("div");
+            t.className = "thumb" + (f.status === "error" ? " has-error" : "");
+            t.innerHTML =
+              '<img alt="" src="' +
+              f.url +
+              '" />' +
+              '<button class="thumb__remove" title="Remove">&times;</button>' +
+              (f.status === "uploading"
+                ? '<div class="thumb__overlay thumb__overlay--uploading"><div class="spinner"></div></div><div class="thumb__bar"><span style="width:' +
+                  f.pct +
+                  '%"></span></div>'
+                : "") +
+              (f.status === "done" ? '<div class="thumb__check">✓</div>' : "");
+            t.querySelector(".thumb__remove").addEventListener("click", (e) => {
+              e.stopPropagation();
+              const i = files.findIndex((x) => x.id === f.id);
+              if (i >= 0) {
+                URL.revokeObjectURL(files[i].url);
+                files.splice(i, 1);
+                render();
+              }
+            });
+            thumbs.appendChild(t);
+          });
+
+          countEl.textContent = files.length + " / " + MAX;
+          countEl.classList.toggle("is-max", files.length >= MAX);
+
+          if (files.length >= MAX) {
+            dz.classList.add("is-disabled");
+            dz.innerHTML =
+              '<div class="dropzone__hint">Maximum of ' +
+              MAX +
+              " images reached — remove one to add another</div>";
+          } else {
+            dz.classList.remove("is-disabled");
+            dz.innerHTML =
+              '<svg class="dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4m0 0L8 8m4-4l4 4"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>' +
+              '<div class="dropzone__primary"><b>Click to upload</b> or drag &amp; drop</div>' +
+              '<div class="dropzone__hint">…or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd> · PNG, JPG, WebP · up to 3</div>';
+          }
+
+          const scaled = files.filter((f) => f.scaledBytes != null);
+          if (scaled.length) {
+            const o = scaled.reduce((s, f) => s + f.origBytes, 0);
+            const s = scaled.reduce((s, f) => s + f.scaledBytes, 0);
+            meta.style.display = "block";
+            meta.innerHTML =
+              "Auto-resized to <b>" +
+              MAX_EDGE +
+              "px</b> max · <b>" +
+              fmt(o) +
+              " &rarr; " +
+              fmt(s) +
+              "</b> before upload";
+          } else {
+            meta.style.display = "none";
+          }
+        }
+
+        function downscale(file) {
+          return new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+              let { width: w, height: h } = img;
+              const scale = Math.min(1, MAX_EDGE / Math.max(w, h));
+              w = Math.round(w * scale);
+              h = Math.round(h * scale);
+              const c = document.createElement("canvas");
+              c.width = w;
+              c.height = h;
+              c.getContext("2d").drawImage(img, 0, 0, w, h);
+              c.toBlob(
+                (blob) => {
+                  URL.revokeObjectURL(url);
+                  resolve({
+                    url: URL.createObjectURL(blob),
+                    scaledBytes: blob.size,
+                  });
+                },
+                "image/jpeg",
+                0.8,
+              );
+            };
+            img.onerror = () => {
+              URL.revokeObjectURL(url);
+              resolve(null);
+            };
+            img.src = url;
+          });
+        }
+
+        async function addFiles(list) {
+          for (const file of list) {
+            if (files.length >= MAX) {
+              showError("You can attach at most " + MAX + " images.");
+              break;
+            }
+            if (!OK_TYPES.includes(file.type)) {
+              showError(
+                file.name + " — only PNG, JPG and WebP images can be attached.",
+              );
+              continue;
+            }
+            const scaled = await downscale(file);
+            if (!scaled) {
+              showError(file.name + " — could not read this image.");
+              continue;
+            }
+            files.push({
+              id: Math.random().toString(36).slice(2),
+              name: file.name,
+              url: scaled.url,
+              origBytes: file.size,
+              scaledBytes: scaled.scaledBytes,
+              status: "queued",
+            });
+            render();
+          }
+        }
+
+        dz.addEventListener("click", () => {
+          if (files.length < MAX) input.click();
+        });
+        input.addEventListener("change", (e) => {
+          addFiles(e.target.files);
+          input.value = "";
+        });
+
+        ["dragenter", "dragover"].forEach((ev) =>
+          modal.addEventListener(ev, (e) => {
+            e.preventDefault();
+            if (files.length < MAX) dz.classList.add("is-dragover");
+          }),
+        );
+        ["dragleave", "drop"].forEach((ev) =>
+          modal.addEventListener(ev, (e) => {
+            e.preventDefault();
+            if (e.type === "dragleave" && modal.contains(e.relatedTarget))
+              return;
+            dz.classList.remove("is-dragover");
+          }),
+        );
+        modal.addEventListener("drop", (e) => {
+          if (e.dataTransfer && e.dataTransfer.files.length)
+            addFiles(e.dataTransfer.files);
+        });
+
+        window.addEventListener("paste", (e) => {
+          if (!e.clipboardData) return;
+          const imgs = [...e.clipboardData.items]
+            .filter((i) => i.type.startsWith("image/"))
+            .map((i) => i.getAsFile())
+            .filter(Boolean);
+          if (imgs.length) {
+            e.preventDefault();
+            addFiles(imgs);
+          }
+        });
+
+        submit.addEventListener("click", () => {
+          const queued = files.filter((f) => f.status === "queued");
+          if (!queued.length) {
+            showError(
+              "Nothing queued — attach an image first, or this would submit description-only.",
+            );
+            return;
+          }
+          submit.disabled = true;
+          submit.innerHTML = '<span class="mini-spinner"></span>Sending…';
+          let done = 0;
+          queued.forEach((f, idx) => {
+            f.status = "uploading";
+            f.pct = 0;
+            render();
+            const timer = setInterval(() => {
+              f.pct = Math.min(100, f.pct + 12 + Math.random() * 20);
+              if (f.pct >= 100) {
+                clearInterval(timer);
+                // one file fails on purpose to demo the error path if 3 queued
+                if (queued.length >= 3 && idx === 1) {
+                  f.status = "error";
+                } else {
+                  f.status = "done";
+                }
+                done++;
+                render();
+                if (done === queued.length) {
+                  submit.disabled = false;
+                  submit.innerHTML = "Submit";
+                }
+              } else render();
+            }, 260);
+          });
+        });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>
