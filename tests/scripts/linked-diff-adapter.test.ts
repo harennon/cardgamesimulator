@@ -709,12 +709,15 @@ describe("adaptLinkedDiff → evaluateDriftGate (end-to-end, credential-free)", 
     });
   }
 
-  it("REAL post-010 capture PASSES against the shipped allowlist (LLD 011: 010 applied, 011 pending, G6 acknowledged)", () => {
-    // Post-010-applied prod: the six game_history stray write grants (G6) are the
-    // direction:add residual that 011 REVOKEs, acknowledged transiently (#176);
-    // increment_player_stats is the cosmetic re-emission (#91). RLS/policy do NOT
-    // appear (prod has no RLS yet). Pairs the shipped Phase-0 allowlist with the
-    // reality it was reconciled to.
+  it("REAL post-010 capture parses to 011-pending + G6 residual, and PASSED under the Phase-0 allowlist (the choreography that shipped 011)", () => {
+    // The pre-011-applied reality (Capture 2): 010 applied, 011 pending. The diff
+    // emits the six game_history stray write grants (G6, direction:add residual
+    // that 011 REVOKEs) + the drop-policy/disable-rls that self-attribute to
+    // pending 011 (LLD 77b, dropped as benign) + increment_player_stats. This
+    // proves the adapter parse AND that the transient Phase-0 allowlist (011 in
+    // expectedPending, G6 acknowledged #176) cleared the gate for the run that
+    // applied 011. The SHIPPED allowlist is now Phase-2 (011 applied, G6 removed),
+    // so this pairs the capture with an inline Phase-0 allowlist, not the shipped one.
     const adapted = adaptLinkedDiff(
       {
         dbDiffStdout: readFixture("db-diff.posto10-pending-011.txt"),
@@ -725,7 +728,8 @@ describe("adaptLinkedDiff → evaluateDriftGate (end-to-end, credential-free)", 
       inTreeMigrations(),
     ) as Adapted;
     expect(adapted.pending).toEqual(["011_lock_down_game_history.sql"]);
-    // Residual is exactly G6 + increment_player_stats — no RLS/policy objects.
+    // Residual is exactly G6 + increment_player_stats — no RLS/policy objects
+    // (drop-policy/disable-rls self-attribute to pending 011 and drop as benign).
     expect(ids(adapted)).toEqual(
       [
         "function:public:increment_player_stats",
@@ -737,7 +741,24 @@ describe("adaptLinkedDiff → evaluateDriftGate (end-to-end, credential-free)", 
         "grant:authenticated:game_history:UPDATE",
       ].sort(),
     );
-    const result = gate(adapted);
+    const phase0Allowlist = {
+      expectedPending: ["011_lock_down_game_history.sql"],
+      acknowledgedResidual: [
+        { object: "function:public:increment_player_stats", issue: "#91" },
+        { object: "grant:anon:game_history:DELETE", issue: "#176" },
+        { object: "grant:anon:game_history:INSERT", issue: "#176" },
+        { object: "grant:anon:game_history:UPDATE", issue: "#176" },
+        { object: "grant:authenticated:game_history:DELETE", issue: "#176" },
+        { object: "grant:authenticated:game_history:INSERT", issue: "#176" },
+        { object: "grant:authenticated:game_history:UPDATE", issue: "#176" },
+      ],
+    };
+    const result = evaluateDriftGate({
+      observed: adapted.objects,
+      expectedFromPending: adapted.expectedFromPending,
+      allowlist: phase0Allowlist,
+      actualPending: adapted.pending,
+    });
     expect(result.ok).toBe(true);
     expect(result.reasons).toEqual([]);
   });
