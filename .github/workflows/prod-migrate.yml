@@ -17,7 +17,11 @@
 #
 # HUMAN-OWNED WIRING (§9), none of which is present in the repo:
 #   - secrets.SUPABASE_PROJECT_REF   prod project ref for `supabase link`
+#   - secrets.SUPABASE_ACCESS_TOKEN  non-interactive `supabase link` auth (LLD 77a §6)
 #   - secrets.SUPABASE_DB_PASSWORD   prod DB password for `db push`
+#   - secrets.SUPABASE_DB_URL        prod POOLER connection string for the post-condition
+#                                    verify step (IPv4 runners must use the pooler, SSL on);
+#                                    empty → verify falls back to the local Supabase Postgres
 #   - secrets.RAILWAY_TOKEN          to promote the backend deploy
 # Until these are set, this workflow only runs on manual dispatch and the
 # prod-touching steps no-op (they are guarded on the secret being non-empty).
@@ -60,6 +64,7 @@ jobs:
         env:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       # 2. APPLY pending migrations to prod (idempotent — only pending ones, §8.4).
       #    Guarded: no-op until the prod link secret is wired.
@@ -68,6 +73,7 @@ jobs:
         run: supabase db push
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       # 3. POST-CONDITION VERIFICATION (§6) — fail the release if any RAISEs.
       #    Against prod when wired; otherwise against the local supabase stack so
@@ -83,8 +89,19 @@ jobs:
           echo "DB_USER=postgres" >> $GITHUB_ENV
           echo "DB_PASSWORD=postgres" >> $GITHUB_ENV
           echo "DB_NAME=postgres" >> $GITHUB_ENV
+      # Runs for BOTH paths. PROD_LINKED is the single source of truth for target
+      # selection: the prod URL is injected ONLY when PROD_LINKED == 'true', so the
+      # runner connects to the prod pooler (SSL on) in the prod path. In the local
+      # path the guard forces SUPABASE_DB_URL to an empty string — even if the
+      # secret exists repo-wide — so the runner falls back to the DB_* localhost
+      # vars exported above. This guard ENFORCES the "local target has no prod
+      # access" invariant rather than leaving it to operator discipline: a split
+      # secret state (SUPABASE_DB_URL set but SUPABASE_PROJECT_REF empty) can no
+      # longer silently point the local path at live prod.
       - name: Verify post-conditions (fail-closed)
         run: node scripts/verify-postconditions.mjs
+        env:
+          SUPABASE_DB_URL: ${{ env.PROD_LINKED == 'true' && secrets.SUPABASE_DB_URL || '' }}
 
   # 4. DEPLOY the consuming backend — DOWNSTREAM of migrate-and-verify (§8.3).
   #    `needs:` enforces the ordering invariant: this job cannot start until the

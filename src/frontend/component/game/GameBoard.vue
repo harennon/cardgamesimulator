@@ -235,6 +235,7 @@ watch(logDrawerOpen, (open) => {
     #0f2e1c 100%
   );
   overflow: hidden;
+  padding: var(--board-rim-inset);
 }
 
 /* Felt texture overlay */
@@ -337,6 +338,7 @@ watch(logDrawerOpen, (open) => {
     /* clip prevents scroll context creation; hidden is fallback */
     overflow: hidden;
     overflow: clip;
+    padding: var(--mobile-rim-width);
   }
 
   .game-board--mobile .game-board__table {

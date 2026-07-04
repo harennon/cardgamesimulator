@@ -1,0 +1,50 @@
+Seeding globals from roles.sql...
+Applying migration 001_create_tables.sql...
+Applying migration 002_enable_rls.sql...
+Applying migration 003_increment_stats_rpc.sql...
+Applying migration 004_player_stats_game_type.sql...
+Applying migration 005_increment_stats_rpc_game_type.sql...
+Applying migration 006_fix_player_stats_composite_pk.sql...
+Applying migration 007_normalize_pk_names.sql...
+Applying migration 008_revoke_anon_writes.sql...
+Applying migration 009_add_game_config.sql...
+Applying migration 010_create_game_history.sql...
+Applying migration 011_lock_down_game_history.sql...
+Diffing schemas: public
+Finished supabase db diff on branch main.
+
+drop policy "game_history_select_own" on "public"."game_history";
+
+alter table "public"."game_history" disable row level security;
+
+set check_function_bodies = off;
+
+CREATE OR REPLACE FUNCTION public.increment_player_stats(p_user_id uuid, p_game_type character varying, p_games_played integer, p_games_won integer, p_games_lost integer, p_total_score integer)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  INSERT INTO player_stats (user_id, game_type, games_played, games_won, games_lost, total_score, last_played_at)
+  VALUES (p_user_id, p_game_type, p_games_played, p_games_won, p_games_lost, p_total_score, NOW())
+  ON CONFLICT (user_id, game_type) DO UPDATE SET
+    games_played   = player_stats.games_played + p_games_played,
+    games_won      = player_stats.games_won    + p_games_won,
+    games_lost     = player_stats.games_lost   + p_games_lost,
+    total_score    = player_stats.total_score  + p_total_score,
+    last_played_at = NOW();
+END;
+$function$
+;
+
+grant delete on table "public"."game_history" to "anon";
+
+grant insert on table "public"."game_history" to "anon";
+
+grant update on table "public"."game_history" to "anon";
+
+grant delete on table "public"."game_history" to "authenticated";
+
+grant insert on table "public"."game_history" to "authenticated";
+
+grant update on table "public"."game_history" to "authenticated";
