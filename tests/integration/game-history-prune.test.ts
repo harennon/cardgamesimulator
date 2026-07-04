@@ -4,14 +4,14 @@ import { createProdShapedFixture } from "./helpers/prodShapedFixture.js";
 // ---------------------------------------------------------------------------
 // LLD 149: migration 012 (prune_game_history) retention policy.
 // Self-materializes a prod-shaped baseline in a throwaway schema, applies the
-// real 010 + 011 SQL, and asserts the prune contract:
+// real 010 + 012 SQL, and asserts the prune contract:
 //   - Only aged rows (> 13 months) are deleted; rows inside the floor are kept.
 //   - The strict < boundary: a row exactly at the floor is retained.
 //   - Window-safety invariant (E2): get_windowed_stats returns the same counts
 //     before and after a prune for YTD-edge and 30d-edge rows.
 //   - Idempotency (E3): second prune deletes 0 rows; table state is unchanged.
 //   - player_stats is byte-for-byte unchanged after a real (committed) prune (E1).
-//   - The 011 post-condition passes and RAISEs when the function is absent.
+//   - The 012 post-condition passes and RAISEs when the function is absent.
 // Seeds rows directly at known played_at — no replayed games (testing-principles §3/§4).
 // ---------------------------------------------------------------------------
 
@@ -112,7 +112,7 @@ function tsOffset(months: number): string {
   return d.toISOString();
 }
 
-describe("Migration 011 — prune_game_history function + grant set", () => {
+describe("Migration 012 — prune_game_history function + grant set", () => {
   it("creates prune_game_history as SECURITY DEFINER callable by service_role only", async () => {
     const fixture = await createProdShapedFixture({ baseline: "fresh" });
     try {
@@ -152,7 +152,7 @@ describe("Migration 011 — prune_game_history function + grant set", () => {
     }
   });
 
-  it("the 011 post-condition passes after applying 010 + 011", async () => {
+  it("the 012 post-condition passes after applying 010 + 012", async () => {
     const fixture = await createProdShapedFixture({ baseline: "fresh" });
     try {
       await fixture.applyMigrations([
@@ -167,20 +167,20 @@ describe("Migration 011 — prune_game_history function + grant set", () => {
     }
   });
 
-  it("the 011 post-condition RAISEs when prune_game_history is absent", async () => {
+  it("the 012 post-condition RAISEs when prune_game_history is absent", async () => {
     const fixture = await createProdShapedFixture({ baseline: "fresh" });
     try {
       // Apply 010 only — prune_game_history is not defined.
       await fixture.applyMigrations(["010_create_game_history.sql"]);
       await expect(
         fixture.runPostcondition("012_prune_game_history.postcondition.sql"),
-      ).rejects.toThrow(/POSTCONDITION FAILED \(011/);
+      ).rejects.toThrow(/POSTCONDITION FAILED \(012/);
     } finally {
       await fixture.teardown();
     }
   });
 
-  it("is idempotent: applying 011 twice does not create a second function overload", async () => {
+  it("is idempotent: applying 012 twice does not create a second function overload", async () => {
     const fixture = await createProdShapedFixture({ baseline: "fresh" });
     try {
       await fixture.applyMigrations([
@@ -430,7 +430,7 @@ describe("prune_game_history — idempotency (E3)", () => {
 
 describe("prune_game_history — player_stats is untouched (E1, headline check)", () => {
   it("a real (committed) prune of aged game_history rows leaves player_stats byte-for-byte unchanged", async () => {
-    // Apply the full 001-011 chain so player_stats has the game_type column
+    // Apply the full 001-012 chain so player_stats has the game_type column
     // (added by 004) and the composite PK (006). The prune only touches
     // game_history; player_stats must remain byte-for-byte unchanged.
     const fixture = await createProdShapedFixture({ baseline: "fresh" });
@@ -555,8 +555,8 @@ describe("post-condition assertion 3 — ROLLBACK makes prune invoke non-mutatin
   });
 });
 
-describe("drift-gate coupling — 011 in both expectedPending and fixture pending", () => {
-  it("the in-tree fixture lists 011 as pending and the allowlist expects it", async () => {
+describe("drift-gate coupling — 012 in both expectedPending and fixture pending", () => {
+  it("the in-tree fixture lists 012 as pending and the allowlist expects it", async () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const ROOT = resolve(__dirname, "../..");
