@@ -10,6 +10,11 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ### Fixed
 
+- **LLD 143: Round/score tallies clipped off the side of the game screen**
+  - `src/frontend/styles/game-variables.css` — adds `--board-rim-inset: 12px` design token documenting the desktop wood-rim thickness and providing the single source of truth for the grid inset value.
+  - `src/frontend/component/game/TonkBoard.vue` — adds `padding: var(--board-rim-inset)` to `.tonk-board` so all grid children (including the tally panel) clear the 12px wood-rim `::after` overlay on all four edges; resets to `padding: var(--mobile-rim-width)` on `.tonk-board--mobile` at `≤767px`. The `::before`/`::after` pseudo-elements remain at `inset: 0` so the felt background still bleeds edge-to-edge under the rim.
+  - `src/frontend/component/game/GameBoard.vue` — same treatment for `.game-board` / `.game-board--mobile`: adds `padding: var(--board-rim-inset)` desktop, resets to `var(--mobile-rim-width)` on mobile. Fixes the structural right-edge gap on the Big2 `GameLog` column.
+
 - **LLD 141: Player cannot see their own score during a Tonk game**
   - `src/frontend/component/game-ui/tonkDisplay.ts` — `SeatRow` gains a required `isSelf: boolean` field. `railSeats()` now includes the local player (previously filtered out), marks the local row `isSelf: true`, and sorts it first; non-self rows retain ascending seat order. Spectator render (`myPlayerIndex === -1`) is unchanged: no row matches self.
   - `src/frontend/component/game-ui/TonkSeatRail.vue` — renders the self chip with `tonk-seat--self` accent class; fan suppressed for self (`!compact && !seat.isSelf`); name displays "You"; tally pill gains `tonk-seat__tally--near` modifier via `isNearLine(seat.tally)`; AiAvatar and AiBadge gated with `!seat.isSelf`; disconnected label gated with `!seat.isSelf`. Imports `isNearLine` from `tonkDisplay`.
