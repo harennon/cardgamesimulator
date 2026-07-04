@@ -300,6 +300,7 @@ watch(logDrawerOpen, (open) => {
     #0f2e1c 100%
   );
   overflow: hidden;
+  padding: var(--board-rim-inset);
 }
 
 .tonk-board--loading {
@@ -439,6 +440,7 @@ watch(logDrawerOpen, (open) => {
 
     overflow: hidden;
     overflow: clip;
+    padding: var(--mobile-rim-width);
   }
 
   .tonk-board--mobile .tonk-board__table {

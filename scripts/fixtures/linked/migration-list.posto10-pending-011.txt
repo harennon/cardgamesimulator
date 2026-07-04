@@ -1,0 +1,18 @@
+Connecting to remote database...
+Skipping migration destructive-ddl.allowlist.json... (file name must match pattern "<timestamp>_name.sql")
+Skipping migration expected-diff.allowlist.json... (file name must match pattern "<timestamp>_name.sql")
+
+
+   Local | Remote | Time (UTC)
+  -------|--------|------------
+   `001` | `001`  | `001`
+   `002` | `002`  | `002`
+   `003` | `003`  | `003`
+   `004` | `004`  | `004`
+   `005` | `005`  | `005`
+   `006` | `006`  | `006`
+   `007` | `007`  | `007`
+   `008` | `008`  | `008`
+   `009` | `009`  | `009`
+   `010` | `010`  | `010`
+   `011` | ` `    | `011`
