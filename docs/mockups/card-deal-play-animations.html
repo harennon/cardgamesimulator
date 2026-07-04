@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Card Deal &amp; Play Animations — Card Game UI Mockup</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        /* Production tokens (from src/frontend/styles/game-variables.css) */
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --card-shadow: rgba(0, 0, 0, 0.5);
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --tonk-cyan: #3fd0d8;
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        --card-hand-width: 64px;
+        --card-hand-height: 90px;
+        --card-overlap: -20px;
+        --card-selected-lift: -20px;
+
+        /* --- NEW animation tokens proposed by this mockup --- */
+        --deal-duration: 260ms;
+        --deal-stagger: 45ms;
+        --deal-easing: cubic-bezier(0.22, 1, 0.36, 1); /* easeOutQuint-ish */
+        --play-duration: 240ms;
+        --play-easing: cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1.55rem;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+
+      .subtitle {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-top: 6px;
+        max-width: 760px;
+        line-height: 1.5;
+      }
+
+      /* ---------- Global control bar ---------- */
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin: 22px 0 8px;
+        padding: 14px 16px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 12px;
+      }
+
+      .controls .group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-right: 14px;
+        border-right: 1px solid rgba(138, 126, 110, 0.25);
+      }
+      .controls .group:last-child {
+        border-right: none;
+      }
+      .controls label.tag {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+      }
+
+      button.btn {
+        font-family: var(--font-ui);
+        font-weight: 600;
+        font-size: 0.85rem;
+        padding: 8px 16px;
+        border-radius: 6px;
+        border: 1px solid var(--gold-accent);
+        background: var(--gold-accent);
+        color: #1a0f06;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          transform 0.1s ease;
+      }
+      button.btn:hover {
+        background: #d4b45a;
+      }
+      button.btn:active {
+        transform: translateY(1px);
+      }
+      button.btn.secondary {
+        background: transparent;
+        color: var(--text-primary);
+        border-color: var(--text-muted);
+      }
+      button.btn.secondary:hover {
+        border-color: var(--gold-accent);
+        color: var(--gold-accent);
+      }
+
+      /* Segmented variant selector */
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--table-rim-light);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .seg button {
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 500;
+        padding: 7px 12px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
+      }
+      .seg button + button {
+        border-left: 1px solid var(--table-rim-light);
+      }
+      .seg button.active {
+        background: var(--gold-accent);
+        color: #1a0f06;
+        font-weight: 600;
+      }
+
+      /* toggle switch */
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+        font-size: 0.82rem;
+      }
+      .switch input {
+        appearance: none;
+        width: 38px;
+        height: 20px;
+        background: var(--table-rim-light);
+        border-radius: 20px;
+        position: relative;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      .switch input::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--text-primary);
+        transition: transform 0.2s ease;
+      }
+      .switch input:checked {
+        background: var(--tonk-cyan);
+      }
+      .switch input:checked::after {
+        transform: translateX(18px);
+      }
+
+      /* ---------- The board (compressed from GameBoard.vue grid) ---------- */
+      .board {
+        position: relative;
+        margin-top: 16px;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 3px solid var(--table-rim);
+        background: radial-gradient(
+          ellipse 80% 70% at 50% 42%,
+          var(--felt-light) 0%,
+          var(--felt) 55%,
+          #123c24 100%
+        );
+        display: grid;
+        grid-template-rows: 64px 1fr auto;
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand";
+        min-height: 560px;
+      }
+
+      .board__opponents {
+        grid-area: opponents;
+        display: flex;
+        justify-content: center;
+        gap: 46px;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+      }
+      .opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+      }
+      .opp .mini {
+        display: flex;
+      }
+      .opp .mini .cb {
+        width: 16px;
+        height: 24px;
+        border-radius: 3px;
+        margin-left: -8px;
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1px solid #c9a84c;
+      }
+      .opp .mini .cb:first-child {
+        margin-left: 0;
+      }
+
+      .board__table {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 20px;
+      }
+
+      .turn-pill {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--gold-accent);
+        padding: 4px 16px;
+        border-radius: 20px;
+        background: var(--panel-bg);
+        border: 1px solid var(--gold-accent);
+      }
+
+      .board__hand-wrap {
+        grid-area: hand;
+        border-top: 1px solid rgba(0, 0, 0, 0.25);
+        background: rgba(0, 0, 0, 0.15);
+      }
+      .board__hand-label {
+        text-align: center;
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        padding-top: 10px;
+      }
+
+      /* ---------- Card (mirror of GameCard.vue) ---------- */
+      .card {
+        position: relative;
+        width: var(--card-hand-width);
+        height: var(--card-hand-height);
+        border-radius: 6px;
+        border: 1.5px solid #c8b89a;
+        background: var(--card-face);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1rem;
+        user-select: none;
+        box-shadow: 2px 4px 8px var(--card-shadow);
+        flex-shrink: 0;
+      }
+      .card .corner {
+        position: absolute;
+        top: 4px;
+        left: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+      }
+      .card .corner .r {
+        font-size: 11px;
+      }
+      .card .corner .s {
+        font-size: 10px;
+        margin-top: -2px;
+      }
+      .card .rank {
+        line-height: 1;
+      }
+      .card .suit {
+        font-size: 1.2em;
+        line-height: 1;
+      }
+      .card.red {
+        color: var(--red-suit);
+      }
+      .card.black {
+        color: var(--black-suit);
+      }
+
+      /* ---------- Player hand (mirror of PlayerHand.vue) ---------- */
+      .hand {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 24px 16px 14px;
+        overflow-x: auto;
+        min-height: 128px;
+      }
+      .hand .card {
+        margin-left: var(--card-overlap);
+        cursor: pointer;
+        transform-origin: bottom center;
+        transition:
+          transform 150ms ease,
+          box-shadow 150ms ease,
+          border-color 150ms ease;
+      }
+      .hand .card:first-child {
+        margin-left: 0;
+      }
+      @media (hover: hover) {
+        .hand .card:hover {
+          transform: translateY(-8px);
+        }
+      }
+      .hand .card.selected {
+        transform: translateY(var(--card-selected-lift));
+        box-shadow:
+          0 8px 24px var(--gold-glow),
+          3px 6px 16px var(--card-shadow);
+        border-color: var(--gold-accent);
+      }
+
+      /* ============================================================
+         DEAL-IN animations (own hand at round start)
+         The .dealing class is toggled on .hand; each card gets an
+         inline --i index used to compute animation-delay stagger.
+         ============================================================ */
+      .hand.dealing .card {
+        animation-duration: var(--deal-duration);
+        animation-timing-function: var(--deal-easing);
+        animation-fill-mode: both;
+        animation-delay: calc(var(--i) * var(--deal-stagger));
+      }
+
+      /* Variant A — "Slide up + fade": cards rise from below the felt edge. */
+      .hand.dealing.deal-slide .card {
+        animation-name: dealSlide;
+      }
+      @keyframes dealSlide {
+        from {
+          opacity: 0;
+          transform: translateY(46px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Variant B — "Deal from deck": cards fly in from a fixed deck point
+         (top-right of the hand), rotating flat as they land. */
+      .hand.dealing.deal-fly .card {
+        animation-name: dealFly;
+      }
+      @keyframes dealFly {
+        from {
+          opacity: 0;
+          transform: translate(180px, -220px) rotate(14deg) scale(0.85);
+        }
+        60% {
+          opacity: 1;
+        }
+        to {
+          opacity: 1;
+          transform: translate(0, 0) rotate(0) scale(1);
+        }
+      }
+
+      /* Variant C — "Pop / scale": cards scale up in place with a slight
+         overshoot. Cheapest / most subtle. */
+      .hand.dealing.deal-pop .card {
+        animation-name: dealPop;
+      }
+      @keyframes dealPop {
+        from {
+          opacity: 0;
+          transform: scale(0.6) translateY(12px);
+        }
+        70% {
+          transform: scale(1.04) translateY(0);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+
+      /* ============================================================
+         PLAY-TO-CENTER animation (a play landing in the play area)
+         The .landing class is toggled on the played card row.
+         ============================================================ */
+      .play-cards {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+      }
+      .play-label {
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        text-align: center;
+        margin-bottom: 6px;
+      }
+      .play-by {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-align: center;
+        margin-top: 6px;
+      }
+
+      /* Variant 1 — "Drop in": scale down + fade from slightly above, as if
+         the cards were laid onto the table. Whole row animates as one. */
+      .play-cards.landing.play-drop {
+        animation: playDrop var(--play-duration) var(--play-easing) both;
+      }
+      @keyframes playDrop {
+        from {
+          opacity: 0;
+          transform: translateY(-28px) scale(1.14);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      /* Variant 2 — "Slide from player": row slides up from the hand region
+         (bottom) into the center, fading in. Reinforces the source→center
+         mental model (cards came from your hand). */
+      .play-cards.landing.play-slide {
+        animation: playSlide var(--play-duration) var(--play-easing) both;
+      }
+      @keyframes playSlide {
+        from {
+          opacity: 0;
+          transform: translateY(90px) scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      /* Variant 3 — "Per-card stagger": each played card drops individually,
+         quick 40ms stagger, for a "fanned onto the table" feel. */
+      .play-cards.landing.play-stagger .card {
+        animation: playCardDrop var(--play-duration) var(--play-easing) both;
+        animation-delay: calc(var(--i) * 40ms);
+      }
+      @keyframes playCardDrop {
+        from {
+          opacity: 0;
+          transform: translateY(-22px) scale(1.1) rotate(var(--rot, 0deg));
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1) rotate(0);
+        }
+      }
+
+      /* ---------- reduced motion: kill all card motion ---------- */
+      body.reduced-motion .hand.dealing .card,
+      body.reduced-motion .play-cards.landing,
+      body.reduced-motion .play-cards.landing .card {
+        animation: none !important;
+      }
+
+      /* ---------- section framing ---------- */
+      .section-note {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.55;
+        margin: 10px 2px 0;
+      }
+      .section-note strong {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .rec {
+        display: inline-block;
+        margin-top: 14px;
+        padding: 12px 16px;
+        border-radius: 10px;
+        border-left: 3px solid var(--tonk-cyan);
+        background: rgba(63, 208, 216, 0.08);
+        font-size: 0.82rem;
+        line-height: 1.6;
+      }
+      .rec b {
+        color: var(--tonk-cyan);
+      }
+      code {
+        font-family: ui-monospace, monospace;
+        background: rgba(0, 0, 0, 0.35);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        color: var(--gold-accent);
+      }
+      .card-back-demo {
+        width: var(--card-hand-width);
+        height: var(--card-hand-height);
+        border-radius: 6px;
+        background: linear-gradient(135deg, #8b1a1a 0%, #5c1010 100%);
+        border: 1.5px solid #c9a84c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>Card Deal &amp; Play Animations</h1>
+      <p class="subtitle">
+        Presentation-only motion for two moments in the core loop: dealing your
+        hand at round start, and a play landing in the center. Timings are brief
+        (240–260&nbsp;ms) and GPU-composited (<code>transform</code> /
+        <code>opacity</code> only). Use the controls to trigger each moment and
+        compare variants. Same tokens as the live board (felt, gold, serif card
+        faces). Works identically for Big2 and Tonk hands/piles.
+      </p>
+
+      <div class="controls">
+        <div class="group">
+          <button class="btn" id="dealBtn">Deal hand ▸</button>
+          <label class="tag">Deal variant</label>
+          <div class="seg" id="dealSeg">
+            <button data-v="deal-slide" class="active">A · Slide up</button>
+            <button data-v="deal-fly">B · From deck</button>
+            <button data-v="deal-pop">C · Pop</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <button class="btn" id="playBtn">Play cards ▸</button>
+          <label class="tag">Play variant</label>
+          <div class="seg" id="playSeg">
+            <button data-v="play-drop" class="active">1 · Drop</button>
+            <button data-v="play-slide">2 · Slide up</button>
+            <button data-v="play-stagger">3 · Stagger</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <label class="switch">
+            <input type="checkbox" id="rmToggle" />
+            <span>prefers-reduced-motion</span>
+          </label>
+        </div>
+
+        <div class="group">
+          <label class="tag">Speed</label>
+          <div class="seg" id="speedSeg">
+            <button data-mult="1.6">0.6×</button>
+            <button data-mult="1" class="active">1×</button>
+            <button data-mult="0.4">2.5× (slow-mo)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== THE BOARD ===================== -->
+      <div class="board" id="board">
+        <div class="board__opponents">
+          <div class="opp">
+            <div class="mini">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span>
+            </div>
+            <span>Bob · 9</span>
+          </div>
+          <div class="opp">
+            <div class="mini">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span>
+            </div>
+            <span>Charlie · 11</span>
+          </div>
+          <div class="opp">
+            <div class="mini">
+              <span class="cb"></span><span class="cb"></span
+              ><span class="cb"></span><span class="cb"></span>
+            </div>
+            <span>Dave · 8</span>
+          </div>
+        </div>
+
+        <div class="board__table">
+          <div class="turn-pill">◄ Your turn ►</div>
+          <div
+            id="playSlot"
+            style="min-height: 130px; display: flex; align-items: center"
+          >
+            <div
+              style="
+                color: var(--text-muted);
+                font-style: italic;
+                font-size: 0.9rem;
+              "
+            >
+              New Trick — play any combination
+            </div>
+          </div>
+        </div>
+
+        <div class="board__hand-wrap">
+          <div class="board__hand-label">Your hand (13)</div>
+          <div class="hand" id="hand"></div>
+        </div>
+      </div>
+
+      <div class="rec">
+        <b>Recommended default:</b> Deal <b>A (Slide up)</b> + Play
+        <b>1 (Drop)</b>. Slide-up reads clearly on mobile with no horizontal
+        overflow risk, and Drop is the most legible "a play just landed" cue
+        without implying a specific source position. Variant B (deck fly) is the
+        most characterful but assumes a fixed deck anchor and can look off on
+        the Tonk board where cards come from stock/discard piles, not a single
+        deck.
+      </div>
+
+      <p class="section-note">
+        <strong>What animates (scoped intentionally):</strong> only your own
+        hand's deal-in and the play area's landing row. Opponent card-backs,
+        counts, the game log, and the turn timer are unchanged — animating every
+        state change would be noisy and heavier. On the Tonk board the same
+        deal-in applies to <code>TonkHand</code>; the play landing maps to the
+        discard pile top in <code>TonkPiles</code>.
+      </p>
+      <p class="section-note">
+        <strong>Reduced motion:</strong> toggling the switch above adds
+        <code>body.reduced-motion</code>, which sets
+        <code>animation: none</code> — cards render instantly, exactly as today.
+        In production this is driven by the
+        <code>@media (prefers-reduced-motion: reduce)</code> query (same pattern
+        as <code>TurnTimer.vue</code>).
+      </p>
+    </div>
+
+    <script>
+      // --- data: a 13-card Big2 hand + a sample play ---
+      const HAND = [
+        ["3", "♣", "black"],
+        ["4", "♦", "red"],
+        ["5", "♥", "red"],
+        ["5", "♠", "black"],
+        ["7", "♦", "red"],
+        ["9", "♣", "black"],
+        ["J", "♥", "red"],
+        ["Q", "♠", "black"],
+        ["K", "♦", "red"],
+        ["K", "♠", "black"],
+        ["A", "♣", "black"],
+        ["A", "♥", "red"],
+        ["2", "♠", "black"],
+      ];
+      const PLAY = [
+        ["7", "♠", "black"],
+        ["7", "♥", "red"],
+      ];
+
+      function cardHTML([r, s, color], i, rot) {
+        const rotVar = rot != null ? `--rot:${rot}deg;` : "";
+        return `<div class="card ${color}" style="--i:${i};${rotVar}">
+          <div class="corner"><span class="r">${r}</span><span class="s">${s}</span></div>
+          <span class="rank">${r}</span><span class="suit">${s}</span>
+        </div>`;
+      }
+
+      const hand = document.getElementById("hand");
+      const playSlot = document.getElementById("playSlot");
+      let dealVariant = "deal-slide";
+      let playVariant = "play-drop";
+
+      function renderHand() {
+        hand.innerHTML = HAND.map((c, i) => cardHTML(c, i)).join("");
+        // demo: pre-select the two 7s? keep it simple — no selection.
+      }
+      renderHand();
+
+      function deal() {
+        renderHand();
+        // force reflow so re-adding the class restarts the animation
+        void hand.offsetWidth;
+        hand.classList.remove("deal-slide", "deal-fly", "deal-pop", "dealing");
+        void hand.offsetWidth;
+        hand.classList.add("dealing", dealVariant);
+      }
+
+      function play() {
+        const rots = [-4, 4, -3, 3, -2]; // slight fan for stagger variant
+        const cards = PLAY.map((c, i) => cardHTML(c, i, rots[i] ?? 0)).join("");
+        playSlot.innerHTML = `
+          <div style="text-align:center">
+            <div class="play-label">Pair</div>
+            <div class="play-cards landing ${playVariant}">${cards}</div>
+            <div class="play-by">played by You</div>
+          </div>`;
+      }
+
+      document.getElementById("dealBtn").addEventListener("click", deal);
+      document.getElementById("playBtn").addEventListener("click", play);
+
+      function wireSeg(id, cb) {
+        const seg = document.getElementById(id);
+        seg.addEventListener("click", (e) => {
+          const b = e.target.closest("button");
+          if (!b) return;
+          [...seg.children].forEach((c) => c.classList.remove("active"));
+          b.classList.add("active");
+          cb(b);
+        });
+      }
+      wireSeg("dealSeg", (b) => {
+        dealVariant = b.dataset.v;
+        deal();
+      });
+      wireSeg("playSeg", (b) => {
+        playVariant = b.dataset.v;
+        play();
+      });
+
+      const root = document.documentElement;
+      const BASE = { deal: 260, stagger: 45, play: 240 };
+      wireSeg("speedSeg", (b) => {
+        const m = parseFloat(b.dataset.mult);
+        root.style.setProperty("--deal-duration", BASE.deal * m + "ms");
+        root.style.setProperty("--deal-stagger", BASE.stagger * m + "ms");
+        root.style.setProperty("--play-duration", BASE.play * m + "ms");
+      });
+
+      document.getElementById("rmToggle").addEventListener("change", (e) => {
+        document.body.classList.toggle("reduced-motion", e.target.checked);
+      });
+
+      // auto-play once on load so the page isn't static
+      setTimeout(deal, 350);
+      setTimeout(play, 900);
+    </script>
+  </body>
+</html>
