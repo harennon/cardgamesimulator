@@ -55,6 +55,8 @@ function onCardTouch(index: number) {
 .player-hand {
   display: flex;
   align-items: flex-end;
+  justify-content: flex-start;
+  margin-inline: auto;
   padding: 24px 16px 8px;
   overflow-x: auto;
 }
@@ -87,6 +89,7 @@ function onCardTouch(index: number) {
 @media (max-width: 767px) {
   .player-hand {
     width: 100%;
+    margin-inline: 0;
     padding: 20px 12px 4px;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;

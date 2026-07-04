@@ -8,6 +8,12 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Changed
+
+- **LLD 147: Center the player's card hand on desktop instead of left-aligning it**
+  - `src/frontend/component/game/GameBoard.vue` — `.game-board__hand` switches to `flex-direction: column; align-items: stretch; justify-content: center` so the label stacks above and both are vertically centered in the hand strip on desktop (`>= 768px`). `.game-board__hand-label` gains `text-align: center; padding-left: 0; padding-top: 10px` so the label appears centered above the tray. Mobile override block adds `justify-content: flex-start` to prevent the new desktop rule from cascading into the 160px mobile cell and shifting the label+hand stack away from the top.
+  - `src/frontend/component/game-ui/PlayerHand.vue` — `.player-hand` gains `justify-content: flex-start` (explicit, preserves prior default) and `margin-inline: auto` (centers the tray when cards fit; collapses to zero when content overflows so horizontal scroll remains fully reachable). Mobile override block adds `margin-inline: 0` to make the intent self-documenting and prevent any centering on full-width mobile.
+
 ### Fixed
 
 - **LLD 011: Lock down `game_history` on prod (SECURITY: revoke stray anon/authenticated writes + enable RLS) and unblock the drift gate**
