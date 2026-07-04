@@ -1,7 +1,18 @@
 -- Post-condition for 010 (LLD 77 §6, LLD 101): game_history exists with the
 -- expected columns + types, the cleaned grant set (anon SELECT-only, no write
--- DML; service_role full), and get_windowed_stats is the single 2-arg overload
--- callable by service_role only.
+-- DML; service_role full), get_windowed_stats is the single 2-arg overload
+-- callable by service_role only, and (LLD 011 backfill) RLS is ENABLED with a
+-- SELECT-own-rows policy.
+--
+-- CUMULATIVE-STATE CAVEAT (LLD 011): 010 itself does NOT enable RLS -- 011 does.
+-- The RLS assertion below is a BACKFILL landed in the SAME PR as 011. Every
+-- post-condition runs against a DB where ALL migrations (including 011) have been
+-- applied (the runner runs post-conditions after db push / supabase start), so
+-- 011's RLS is present when 010's post-condition runs. This asserts the
+-- CUMULATIVE post-011 end state, not something 010 alone produces. The reason this
+-- exposure shipped is precisely that 010's post-condition asserted the grant set
+-- but not RLS-enabled, so the missing RLS slipped through the gate; the backfill
+-- means the class cannot silently regress even if 011 is ever reverted.
 --
 -- Shape-based / name-agnostic (LLD 77 §6.2 #2): asserts column presence + type
 -- and the effective privilege set, NEVER a constraint/PK/index name. game_history
@@ -126,5 +137,27 @@ BEGIN
         'EXECUTE') THEN
     RAISE EXCEPTION
       'POSTCONDITION FAILED (010): get_windowed_stats is executable by anon/authenticated; expected service_role-only.';
+  END IF;
+
+  -- 6. RLS backfill (LLD 011, cumulative post-011 state): RLS is ENABLED and a
+  --    SELECT-own-rows policy exists. Asserts the class 010's post-condition
+  --    originally missed. Shape-based (relrowsecurity + cmd='SELECT'), name-agnostic.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_class
+    WHERE oid = to_regclass('game_history') AND relrowsecurity
+  ) THEN
+    RAISE EXCEPTION
+      'POSTCONDITION FAILED (010): RLS is not enabled on game_history (expected after 011).';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = current_schema()
+      AND tablename = 'game_history'
+      AND cmd = 'SELECT'
+      AND qual ILIKE '%user_id%'
+  ) THEN
+    RAISE EXCEPTION
+      'POSTCONDITION FAILED (010): game_history has no SELECT-own-rows policy (cmd=SELECT, qual references user_id; expected after 011).';
   END IF;
 END $$;

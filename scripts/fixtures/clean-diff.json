@@ -1,6 +1,14 @@
 {
-  "$comment": "LLD 77 §5.5 / 77a — captured/fixture diff modeling the REAL prod baseline (reconciled to the 2026-07-04 capture in scripts/fixtures/captures/). It is the autonomous-safe stand-in for the linked gate, so it mirrors live prod: (1) the lone residual is function:public:increment_player_stats, which `supabase db diff --linked` re-emits as a no-op CREATE OR REPLACE — acknowledged in expected-diff.allowlist.json (issue #91) so the gate subtracts it and exits 0; (2) `pending` is ONLY 010_create_game_history.sql — 009_add_game_config.sql is APPLIED to prod (migration list Remote=009), so it is NOT pending. `pending` must mirror the allowlist's expectedPending or the gate fails 'Stale expectedPending'.",
-  "objects": [{ "object": "function:public:increment_player_stats" }],
+  "$comment": "Reconciled to post-010-applied prod (post-010 capture). pending is now 011 only (010 applied, Remote=010). objects mirrors the linked observed residual: the six game_history stray grants (G6, acknowledged #176) + increment_player_stats (#91). RLS/policy are NOT listed: under LLD 77b they self-attribute to pending 011 and are dropped by the adapter before residual, so the linked observed never contains them and neither must this offline stand-in. After 011 applies, Phase 2 removes G6 from BOTH files.",
+  "objects": [
+    { "object": "function:public:increment_player_stats" },
+    { "object": "grant:anon:game_history:DELETE" },
+    { "object": "grant:anon:game_history:INSERT" },
+    { "object": "grant:anon:game_history:UPDATE" },
+    { "object": "grant:authenticated:game_history:DELETE" },
+    { "object": "grant:authenticated:game_history:INSERT" },
+    { "object": "grant:authenticated:game_history:UPDATE" }
+  ],
   "expectedFromPending": [],
-  "pending": ["010_create_game_history.sql"]
+  "pending": ["011_lock_down_game_history.sql"]
 }

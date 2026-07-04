@@ -685,7 +685,46 @@ describe("adaptLinkedDiff → evaluateDriftGate (end-to-end, credential-free)", 
     });
   }
 
-  it("REAL pending-010 capture PASSES (game_history cluster dropped; increment_player_stats acknowledged)", () => {
+  it("REAL post-010 capture PASSES against the shipped allowlist (LLD 011: 010 applied, 011 pending, G6 acknowledged)", () => {
+    // Post-010-applied prod: the six game_history stray write grants (G6) are the
+    // direction:add residual that 011 REVOKEs, acknowledged transiently (#176);
+    // increment_player_stats is the cosmetic re-emission (#91). RLS/policy do NOT
+    // appear (prod has no RLS yet). Pairs the shipped Phase-0 allowlist with the
+    // reality it was reconciled to.
+    const adapted = adaptLinkedDiff(
+      {
+        dbDiffStdout: readFixture("db-diff.posto10-pending-011.txt"),
+        migrationListStdout: readFixture(
+          "migration-list.posto10-pending-011.txt",
+        ),
+      },
+      inTreeMigrations(),
+    ) as Adapted;
+    expect(adapted.pending).toEqual(["011_lock_down_game_history.sql"]);
+    // Residual is exactly G6 + increment_player_stats — no RLS/policy objects.
+    expect(ids(adapted)).toEqual(
+      [
+        "function:public:increment_player_stats",
+        "grant:anon:game_history:DELETE",
+        "grant:anon:game_history:INSERT",
+        "grant:anon:game_history:UPDATE",
+        "grant:authenticated:game_history:DELETE",
+        "grant:authenticated:game_history:INSERT",
+        "grant:authenticated:game_history:UPDATE",
+      ].sort(),
+    );
+    const result = gate(adapted);
+    expect(result.ok).toBe(true);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it("REAL pending-010 capture: the game_history cluster self-attributes to pending 010 and drops as benign (adapter-only, pre-010 world)", () => {
+    // The pre-010-applied reality (Capture 1): 010 pending, the whole
+    // game_history cluster shows as drops/revokes and attributes to pending 010,
+    // leaving only increment_player_stats residual. This proves the adapter's
+    // pending-attribution; it no longer pairs with the SHIPPED allowlist (which
+    // is reconciled to the post-010 world), so it uses an inline 010-pending
+    // allowlist rather than gate().
     const adapted = adaptLinkedDiff(
       {
         dbDiffStdout: readFixture("db-diff.pending-010.txt"),
@@ -693,7 +732,23 @@ describe("adaptLinkedDiff → evaluateDriftGate (end-to-end, credential-free)", 
       },
       inTreeMigrations(),
     ) as Adapted;
-    const result = gate(adapted);
+    expect(adapted.pending).toEqual(["010_create_game_history.sql"]);
+    expect(ids(adapted)).toEqual(["function:public:increment_player_stats"]);
+    const result = evaluateDriftGate({
+      observed: adapted.objects,
+      expectedFromPending: adapted.expectedFromPending,
+      allowlist: {
+        expectedPending: ["010_create_game_history.sql"],
+        acknowledgedResidual: [
+          {
+            object: "function:public:increment_player_stats",
+            reason: "Cosmetic diff-engine re-emission noise (unchanged).",
+            issue: "#91",
+          },
+        ],
+      },
+      actualPending: adapted.pending,
+    });
     expect(result.ok).toBe(true);
     expect(result.reasons).toEqual([]);
   });
