@@ -12,7 +12,7 @@ Parent: #97 (slice 1 of 3). Ships **first** — it is the foundation slices 2 (U
 - Backend **read path**: a service method that issues short-lived **signed** read URLs for an attachment key (consumed later by slice 3 triage — not exposed via a route in this slice).
 - **Server-side enforcement**: accepted MIME types (images only), per-file byte cap, and max images per report. Reject violations with a clear 4xx.
 - Data model: link attachments to the `feedback` row by key/path. **No binary in Postgres.**
-- **Retention policy**: documented below (§State Model → Retention). Cleanup mechanism is a stated follow-up; the policy itself is decided here.
+- **Retention policy**: documented below (§State Model → Retention). Deleting a feedback row **must** delete its attachments in the same operation (in scope — one `removeByPrefix` call). The scheduled 90-day sweep is a stated follow-up; the policy itself is decided here.
 - Migration-safety: name-agnostic/idempotent SQL, drift-gate + postcondition + destructive-DDL gate wiring.
 
 **Explicitly NOT in scope:**
@@ -43,11 +43,18 @@ Client (slice 2)                Backend                         Supabase
   POST /feedback  ───────────►  create feedback row  ─────────► INSERT feedback
        (existing)               returns { id }
   POST /feedback/:id/attachments
-     { image: base64, mime } ─► validate (mime/size/count)
+     { image: base64, mime } ─► getFeedbackById(:id)          ─► SELECT feedback (own row?)
+                                owner check: row.userId===userId
+                                   (or admin)  else 403/404
+                                validate (mime/size/count)
                                 upload buffer via service_role ─► storage.objects (private)
-                                append key to feedback.attachment_keys
+                                appendAttachmentKey → keys[]
+                                   (len<=max else remove+400)
                              ◄─ 201 { attachmentId, key }
-  (slice 3 triage) ──────────►  getSignedAttachmentUrl(key)   ─► createSignedUrl(TTL)
+  DELETE /feedback/:id (admin) ► deleteFeedback(id)            ─► DELETE feedback row
+                                removeByPrefix(".../{id}/")    ─► delete all objects (no orphan PII)
+                             ◄─ 200 { deleted: id }
+  (slice 3 triage) ──────────►  getSignedUrl(key)             ─► createSignedUrl(TTL)
                              ◄─ short-lived signed URL
 ```
 
@@ -115,6 +122,8 @@ Shape-based, name-agnostic where it can be, idempotent, read-only; accumulates `
 ```ts
 export interface AttachmentInput {
   feedbackId: string;
+  requesterId: string; // req.userId (guest guestId OR registered sub); NEVER null on this route
+  isAdmin: boolean;    // req.userId ∈ FEEDBACK_ADMIN_IDS (admins may attach to any row)
   data: Buffer;        // decoded from base64 by the handler
   mimeType: string;    // client-declared; validated + cross-checked (E4)
 }
@@ -127,16 +136,27 @@ export interface AttachmentResult {
 export const ATTACHMENT_LIMITS = {
   maxBytesPerFile: 5 * 1024 * 1024, // 5 MB — decision, see Edge Cases E1
   maxPerReport: 3,                  // decision, see Edge Cases E2
-  allowedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
+  allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
 } as const;
+// GIF is intentionally excluded: this is a screenshot-attach use case, and every
+// platform screenshot tool emits PNG/JPEG/WebP. Excluding GIF narrows the accepted
+// surface, keeps the magic-byte sniff to three signatures, and avoids animated-GIF
+// payload concerns. If a real need for GIF appears, add "image/gif" here AND extend
+// the E4 sniff to accept both GIF87a and GIF89a headers.
 
 export class FeedbackAttachmentService {
   constructor(
-    private readonly feedbackRepo: FeedbackRepository,
+    private readonly feedbackRepo: FeedbackRepository, // needs getFeedbackById + appendAttachmentKey
     private readonly storage: AttachmentStorage,
   ) {}
 
-  // Validates mime/size/count, uploads to Storage, appends key to feedback row.
+  // Ordered checks (fail closed, cheapest/security-first, upload last):
+  //   1. Load row via feedbackRepo.getFeedbackById; not found → NotFoundError (E6).
+  //   2. Ownership: unless isAdmin, require row.userId === requesterId; else → AccessDeniedError (E6/E9).
+  //   3. mime allowed (E3), base64 decodes (E5), size in (0, cap] (E1/E10),
+  //      magic bytes match declared mime (E4), current key count < maxPerReport (E2).
+  //   4. Upload buffer to Storage (E7 — no key appended if this throws).
+  //   5. appendAttachmentKey; enforce returned length <= maxPerReport (E2/E11).
   addAttachment(input: AttachmentInput): Promise<AttachmentResult>;
 
   // Slice 3 will call this; issues a short-lived signed read URL.
@@ -156,26 +176,58 @@ export interface AttachmentStorage {
 
 Concrete impl `SupabaseAttachmentStorage` wraps `SupabaseDB`'s client `.storage.from('feedback-attachments')` (`.upload`, `.createSignedUrl`, `.remove`). Kept behind an interface so tests can use an in-memory double and the engine/service layer never couples to the Storage SDK (mirrors the repository pattern already used for the DB).
 
-### Repository addition (`FeedbackRepository` / `SupabaseDB`)
+### Repository additions (`FeedbackRepository` / `SupabaseDB`)
+
+The interface today is only `createFeedback` / `getAllFeedback` / `deleteFeedback` (`database.ts:74`). The ownership check (E6/E9) needs a read-by-id, and linking needs a keyed update. **Both must be added to the interface — they do not exist yet:**
 
 ```ts
+// Read a single feedback row by id (null if not found). Needed for the
+// ownership check before an attachment is accepted.
+getFeedbackById(id: string): Promise<Feedback | null>;
+
 // Append a storage key to an existing feedback row's attachment_keys.
-appendAttachmentKey(feedbackId: string, key: string): Promise<void>;
+// Returns the new keys array so the service can enforce maxPerReport against
+// the authoritative post-append length. Errors if the row does not exist.
+appendAttachmentKey(feedbackId: string, key: string): Promise<string[]>;
 ```
 
-Implemented with a read-modify-write or `array_append` update on the `feedback` row via `service_role`.
+- `getFeedbackById` — `.from("feedback").select("*").eq("id", id).maybeSingle()` via `service_role`, mapped by the existing `mapFeedback` helper. `mapFeedback` must be extended to read the new `attachment_keys` column onto `Feedback.attachmentKeys` (add `attachmentKeys: string[]` to the `Feedback` entity, defaulting to `[]`).
+- `appendAttachmentKey` — a single atomic `array_append` update on the `feedback` row via `service_role` (`update({ attachment_keys: <expr> })` using PostgREST's `array_append`, or an RPC), returning the updated `attachment_keys`. Read-modify-write is acceptable but the count check (E2) MUST be enforced against the value returned by the write, not a separately-read snapshot, to avoid a check-then-append race (see E2/E11).
 
 ### Route (extends existing feedback router)
 
 ```
 POST /feedback/:id/attachments
-  Auth: same middleware as POST /feedback (authenticated OR guest — guests can attach)
+  Auth: same middleware as POST /feedback (authMiddleware — authenticated OR guest).
+        req.userId is ALWAYS set on this route (guest → guestId, registered → sub);
+        the route never runs unauthenticated.
   Body: { image: string (base64), mimeType: string }   // dedicated bounded body parser
   201 → { attachmentId, key }
   400 → { error } for: unknown/non-image mime; decoded size > cap; count > max;
-                       malformed base64; feedback id not found / not owned
+                       malformed/empty base64
+  403 → caller does not own the feedback row (and is not an admin)   [ownership]
+  404 → feedback :id does not exist
   413 → oversized raw body rejected by the route's body-parser limit
 ```
+
+**Ownership rule (Gap 1 — the security boundary this slice introduces):** The
+`feedback` route sits behind `authMiddleware`, which sets `req.userId` for **both**
+principals — a guest's stable per-session `guestId` (`authMiddleware.ts:118`) and a
+registered user's `sub` (`:146`). `createFeedback` already persists that value to
+`feedback.user_id` (`supabaseDb.ts:238`), so **`feedback.user_id` is non-null for
+guest-created rows too** (it is the `guestId`, not null — this corrects the review's
+premise). The enforceable rule is therefore uniform across guests and registered users:
+
+> A caller may attach to `:id` **iff** `getFeedbackById(id).userId === req.userId`,
+> **or** `req.userId ∈ FEEDBACK_ADMIN_IDS` (the same admin set used by GET/DELETE).
+> Otherwise 403 (row exists, not owned) or 404 (row absent). No `service_role` /
+> RLS trickery required — the check is a single application-level equality on a row
+> the backend reads with its `service_role` key.
+
+Because the guest `guestId` is stable for the life of the session and the guest token
+is HMAC-verified per request, a guest cannot spoof another guest's id, and thus cannot
+attach to another guest's (or a registered user's) feedback row. This is a concrete,
+testable check — no rule is deferred to implementation. (Session expiry edge: see E9.)
 
 `GET`/signed-URL route is intentionally **absent** in this slice (slice 3 adds triage read).
 
@@ -196,26 +248,30 @@ export interface SubmitAttachmentResponse { attachmentId: string; key: string; }
 ### Retention (DECISION)
 
 - **Attachments are retained for 90 days from the feedback row's `created_at`, then deleted.** Rationale: a screenshot can contain PII; attaching is user-initiated/opt-in, but that must be paired with a bounded lifetime rather than indefinite storage (privacy principle in #97). 90 days is long enough to triage and act on a report, short enough to bound PII exposure.
-- **When the feedback row is deleted** (existing admin `DELETE /feedback/:id`), its attachments must also be deleted (delete the `feedback-attachments/{id}/` prefix). This slice **should** wire that prefix-delete into the existing delete path since it is trivial and prevents orphaned PII; if it proves non-trivial it may be a fast follow, but the delete path must not silently leave orphans.
-- **The 90-day sweep is a stated follow-up** (a scheduled job / cron using `removeByPrefix` over rows older than 90 days). Not built in this slice; the policy is decided here so slice 2/3 and ops can rely on it. `removeByPrefix` is included in the storage interface so the follow-up needs no interface change.
+- **Delete-on-DELETE is IN SCOPE (not a follow-up).** The existing admin `DELETE /feedback/:id` handler (`submitFeedback.ts:49`) must delete the row's attachments in the same request: after `deleteFeedback(id)` succeeds, call `storage.removeByPrefix("feedback-attachments/" + id + "/")` to remove every object under that feedback's prefix. This is a **single call** on the interface already defined here, so hedging it as "if non-trivial, fast-follow" contradicts this LLD's own bounded-PII rationale — leaving orphaned screenshots in Storage after the operator deletes the report is exactly the indefinite-PII outcome the retention policy forbids. Ordering: delete the DB row first (source of truth), then the objects; if the object delete throws, log and return 500 so the operator retries — a retry re-issues the same idempotent prefix delete (no row remains, only orphan objects to sweep). This is covered by an integration test (see Test Requirements → Integration).
+- **The 90-day sweep is a stated follow-up** (a scheduled job / cron). **It is DB-driven:** object keys carry **no** timestamp (`feedback-attachments/{feedbackId}/{attachmentId}.{ext}`), so the sweep must query `feedback WHERE created_at < now() - interval '90 days' AND array_length(attachment_keys,1) > 0`, then call `removeByPrefix("feedback-attachments/" + id + "/")` per row (and null out the row's `attachment_keys`). The follow-up author must **not** assume a listable object timestamp. Not built in this slice; the policy and the join-key mechanism are decided here so slice 2/3 and ops can rely on it. `removeByPrefix` is in the storage interface so the follow-up needs no interface change.
 
 ## Edge Cases
 
-- **E1 — File too large.** Decoded byte length > `maxBytesPerFile` (5 MB) → 400 with a clear message. Independently, the route's body-parser `limit` (set slightly above 5 MB to allow base64's ~33% inflation, e.g. 7 MB) rejects an oversized raw body with 413 before decode, so a huge payload never buffers unbounded. The global `express.json()` limit is **not** changed.
-- **E2 — Too many attachments.** Appending would make `attachment_keys.length > maxPerReport` (3) → 400, no upload performed.
+- **E1 — File too large.** Decoded byte length > `maxBytesPerFile` (5 MB) → 400 with a clear message. Independently, the route's body-parser `limit` (set slightly above 5 MB to allow base64's ~33% inflation, e.g. 7 MB) rejects an oversized raw body **before** decode. `body-parser` throws an `entity.too.large` error carrying both `.status` and `.statusCode` = **413** and a `.message`. The project's custom `errorHandler` (`server.ts:142` / `middleware/errorHandler.ts`) routes any error matching `instanceOfErrorWithStatus` (has `status` + `message`) through `res.status(err.status)` — so a body-parser oversize **already surfaces as 413, not 500** with no handler change. The implementer must **confirm** this with the explicit integration assertion below (a regression guard, since it depends on `errorHandler` reading `.status`); if a future `errorHandler` change breaks it, add a branch mapping `entity.too.large` → 413. The global `express.json()` limit is **not** changed.
+- **E2 — Too many attachments.** If the row already holds `maxPerReport` (3) keys → 400, no upload performed. A pre-upload count check on the freshly-read row rejects the common case cheaply; the authoritative guard is the post-append length returned by `appendAttachmentKey` (E11).
 - **E3 — Non-image / disallowed type.** `mimeType` not in `allowedMimeTypes` → 400. Client-declared type is not trusted alone (see E4).
-- **E4 — Declared vs. actual type mismatch.** Sniff the decoded buffer's magic bytes and require it to match the declared image mime (a minimal signature check for PNG/JPEG/WebP/GIF; no full decode). Mismatch → 400. Prevents a client mislabeling a non-image as `image/png`.
+- **E4 — Declared vs. actual type mismatch.** Sniff the decoded buffer's magic bytes and require it to match the declared image mime — a minimal signature check for the three allowed types: PNG (`89 50 4E 47`), JPEG (`FF D8 FF`), WebP (`52 49 46 46 …. 57 45 42 50`, i.e. RIFF container + `WEBP` at offset 8); no full decode. Mismatch, or a signature not in this set, → 400. Prevents a client mislabeling a non-image as `image/png`. (If GIF is ever added to `allowedMimeTypes`, also accept `GIF87a`/`GIF89a` here.)
 - **E5 — Malformed base64.** Decode failure → 400 "Invalid image data".
-- **E6 — Unknown / not-owned feedback id.** `:id` does not exist, or (for a non-admin) is not the caller's own feedback row → 404/403; no upload. Prevents attaching to someone else's report.
+- **E6 — Unknown / not-owned feedback id.** `getFeedbackById(:id)` returns null → **404**, no upload. Row exists but `row.userId !== req.userId` and caller is not an admin → **403**, no upload. This is the ownership boundary defined in §Route; it prevents attaching to someone else's report. Return 404 (not 403) for the absent-row case so a non-owner cannot probe which ids exist beyond what they already own.
 - **E7 — Storage upload fails after validation.** Do **not** append the key; surface 5xx; the feedback row simply has no attachment (feedback text already persisted, so the user's report is not lost). No partial/dangling key.
 - **E8 — Key collision.** `attachmentId` is a UUID; collision is negligible. `upload` uses non-upsert mode so an accidental collision errors rather than overwriting.
-- **E9 — Guest submitter.** Guests can submit feedback today; they can also attach. The route uses the same auth middleware; ownership check (E6) uses `feedback.user_id` which may be null for guests — a guest may attach only to a feedback row created in the same guest session flow (backend links by the just-returned id; no cross-user attach). Confirm the ownership rule for null-user rows during implementation; default to "the id must have been created by this request's principal or, for guests, match the session" — if that cannot be cleanly enforced, restrict guest attach and flag to Architect.
+- **E9 — Guest submitter.** Guests attach through the **same** ownership rule as registered users: `authMiddleware` sets `req.userId = session.guestId` (`authMiddleware.ts:118`), `createFeedback` persisted that same value to `feedback.user_id`, so `row.userId === req.userId` holds for the guest's own rows and fails for anyone else's. No null-user special case exists — the review's assumption that guest rows carry `user_id = null` is not what the code does; the guest row carries the `guestId`. **Session-expiry edge:** a guest's session is in-memory (`guestSessionStore`); if it expires or the server restarts between `POST /feedback` and `POST /feedback/:id/attachments`, `authMiddleware` rejects the guest token with 401 before the handler runs (the guest cannot present a valid `req.userId` at all), so there is no window in which an expired guest can attach — the report text is already saved; only the attach is lost, which is acceptable. No rule is deferred; nothing is restricted beyond the ownership equality.
 - **E10 — Empty image.** Zero-byte decoded buffer → 400.
+- **E12 — Client retry after a succeeded-but-unacked upload (duplicate copy).** Each request mints a fresh `attachmentId` UUID, so a client that retries after a response was lost (upload + append actually succeeded server-side) uploads a **second** distinct object and appends a **second** key — a duplicate that counts against `maxPerReport`. This is accepted, not prevented, in this slice: the endpoint is **not** idempotent, retries are the client's responsibility, and the count cap (E2/E11) bounds the blast radius to `maxPerReport` copies. Rationale: an idempotency key would require the client (slice 2, no UI yet) to supply and reuse one, which is out of scope here; documenting the semantics is sufficient for the foundation slice. Slice 2 SHOULD avoid blind auto-retry of a non-idempotent attach, or pass a client-generated idempotency token that a future slice can honor. (No dedup logic is built here.)
+- **E11 — Concurrent attach race (count).** Two in-flight requests for the same `:id` could each pass the pre-upload count check (E2) when the row holds `maxPerReport - 1` keys, then both append → `maxPerReport + 1`. Handling: `appendAttachmentKey` returns the post-append array; the service asserts `returnedLength <= maxPerReport` and, if exceeded, **removes the just-uploaded object** (`storage.removeByPrefix` of its exact key) and returns 400. Prevents exceeding the cap under concurrency without a DB-level constraint. Low-severity (self-attach only), but specified so the implementer does not rely on the read-then-check alone.
 
 ## Dependencies
 
 - **LLD 1 (Supabase Migration)** — migration + gate tooling, `service_role` client, RLS model (002/008/011 patterns). Direct upstream.
-- **Existing feedback stack** — `feedback` table (001), `FeedbackService`, `SupabaseDB.createFeedback`, `POST /feedback` route (server.ts:136), `Feedback` entity.
+- **Existing feedback stack** — `feedback` table (001), `FeedbackService`, `SupabaseDB.createFeedback`, `POST /feedback` route + admin `DELETE /feedback/:id` handler (`submitFeedback.ts:49`, extended here for prefix cleanup), `FeedbackRepository` interface (`database.ts:74` — extended with `getFeedbackById`/`appendAttachmentKey`), `Feedback` entity (extended with `attachmentKeys`).
+- **`authMiddleware`** (`middleware/authMiddleware.ts`) — sets non-null `req.userId` for guests (`guestId`) and registered users (`sub`); the ownership rule (§Route) depends on this. Also `req.isGuest` and the `FEEDBACK_ADMIN_IDS` admin set (`submitFeedback.ts:10`) for the admin bypass.
+- **Custom `errorHandler`** (`middleware/errorHandler.ts`) — already routes `instanceOfErrorWithStatus` errors through `res.status(err.status)`; body-parser's `entity.too.large` (`.status = 413`, `.message`) satisfies that shape, so E1 oversize surfaces as 413 with no handler change. The 413 integration test is the regression guard.
 - **Migration-safety harness** — `verify-drift.mjs` + `expected-diff.allowlist.json`, `verify-postconditions.mjs` + `postconditions/`, `verify-no-destructive-ddl.mjs` + `destructive-ddl.allowlist.json`, `prodShapedFixture` test helper.
 - **`@supabase/supabase-js` `^2.107`** — Storage API (`.storage.from().upload/createSignedUrl/remove`) is available in this version.
 - **No new npm dependency** required (base64 JSON transport; magic-byte sniff is a few bytes of comparison, no library).
@@ -225,7 +281,7 @@ export interface SubmitAttachmentResponse { attachmentId: string; key: string; }
 1. Add `012_create_feedback_attachments_bucket.sql` and its `.postcondition.sql` (1:1 coverage enforced by `verify-postconditions.mjs`).
 2. Add `"012_create_feedback_attachments_bucket.sql"` to `expected-diff.allowlist.json` `expectedPending` **and** to `scripts/fixtures/clean-diff.json` `pending` (and, if the diff engine attributes the `feedback.attachment_keys` add / bucket insert as observed drift on the run that applies it, add the corresponding `expectedFromPending`/`objects` entries) — else the gate fails "Stale/missing expectedPending". Follow the exact lockstep the file `$comment`s describe.
    - **Storage-schema caveat:** the drift gate diffs the `public` schema. The `ALTER TABLE feedback ADD COLUMN attachment_keys` is a `public`-schema change the gate **will** see and must account for. The `storage`-schema bucket/policy changes may be invisible to `supabase db diff` (storage is a managed schema); the **postcondition** is the authoritative check for those. The implementer must verify what the linked-diff adapter emits for this migration on a dry run and wire the allowlist/fixture to match (do not guess).
-3. `destructive-ddl.allowlist.json`: no entry needed — `INSERT`, `CREATE POLICY`, and `ADD COLUMN IF NOT EXISTS` destroy no data. (If the delete-path prefix cleanup in §Retention is implemented with a `DELETE`, that lives in application code, not a migration, so the DDL gate is unaffected.)
+3. `destructive-ddl.allowlist.json`: no entry needed — `INSERT`, `CREATE POLICY`, and `ADD COLUMN IF NOT EXISTS` destroy no data. The in-scope delete-path prefix cleanup (§Retention) is a Storage-API `remove` call in **application code**, not a SQL migration, so the DDL gate is unaffected by it.
 4. Release order (DEVELOPMENT.md "Prod Migration Release"): `supabase db push` → `verify-postconditions.mjs` against prod (pooler, `PGSSLMODE=no-verify`) → then merge/deploy the backend code that reads/writes attachments. Schema leads code.
 
 ## Test Requirements
@@ -235,17 +291,20 @@ export interface SubmitAttachmentResponse { attachmentId: string; key: string; }
 - Rejects mime not in `allowedMimeTypes` (E3); accepts each allowed type.
 - Rejects decoded size > `maxBytesPerFile` (E1) and zero-byte (E10).
 - Rejects when appending would exceed `maxPerReport` (E2).
-- Rejects malformed base64 (E5) and declared/actual mime mismatch via magic-byte sniff (E4).
-- On valid input: calls `storage.upload` with the expected `{feedbackId}/{uuid}.{ext}` key and appends exactly that key to the row (use an in-memory `AttachmentStorage` double + fake repo).
+- Rejects malformed base64 (E5) and declared/actual mime mismatch via magic-byte sniff (E4), including WebP RIFF-container detection.
+- **Ownership (E6/E9):** `getFeedbackById` returns null → `NotFoundError` (→404), never calls `storage.upload`. Row owned by a different `requesterId` and `isAdmin=false` → `AccessDeniedError` (→403), no upload. Row owned by the same `requesterId` (guest OR registered) → allowed. `isAdmin=true` on any row → allowed. (Use a fake repo returning rows with chosen `userId`.)
+- On valid input: calls `storage.upload` with the expected `{feedbackId}/{uuid}.{ext}` key and appends exactly that key via `appendAttachmentKey` (use an in-memory `AttachmentStorage` double + fake repo).
 - On `storage.upload` rejection: does NOT append a key (E7).
+- **Count race (E11):** when `appendAttachmentKey` returns an array longer than `maxPerReport`, the service calls `storage.removeByPrefix` for the just-uploaded key and returns a 400-mapped error (uses a fake repo whose `appendAttachmentKey` returns an over-length array).
 - `getSignedUrl` delegates to the storage double with the expected TTL (default 60 s).
 
 ### Integration (local `supabase start`) — `tests/integration/feedbackAttachment.test.ts`
 
 - **Acceptance-criteria round trip (no UI):** `POST /feedback` → `POST /feedback/:id/attachments` with a small real PNG buffer → 201; then via the service `getSignedUrl(key)` fetch the object and assert the bytes match. Confirms upload → link → signed read.
 - Feedback row's `attachment_keys` contains the returned key; the `feedback` row stores **no** binary (assert column is the key string only).
-- Rejections server-side: oversized (400/413), over-count (400), non-image (400), mismatched-magic-bytes (400).
-- Guest can attach to their own feedback (E9); cannot attach to another principal's feedback id (E6 → 403/404).
+- Rejections server-side: decoded-oversize → **400**; raw-body-oversize → **413** (assert the status is 413, not 500 — proves E1 error mapping through the custom `errorHandler`); over-count → **400**; non-image mime → **400**; mismatched-magic-bytes → **400**.
+- **Ownership (E6/E9):** a guest attaches to its own feedback row → 201; a **second** guest (different session/`guestId`) attaching to the first guest's `:id` → **403**; a registered user attaching to a guest's `:id` → **403**; a non-existent `:id` → **404**; an admin attaching to any row → 201. (Exercises the corrected non-null `user_id` ownership rule for both principal types.)
+- **Delete-path cleanup (Gap 3 — firm requirement):** create a feedback row, attach an object, `DELETE /feedback/:id` as admin → 200; then assert the object is **gone from Storage** (a subsequent `getSignedUrl`/download of the key fails / the prefix lists empty). Proves no orphaned PII survives row deletion.
 - Signed URL is time-limited: after TTL the URL no longer authorizes the fetch (may be marked slow/optional if TTL waiting is impractical — prefer asserting a short TTL is passed to the SDK instead).
 
 ### Migration-safety — `tests/integration/migration-012.test.ts` (prod-shaped, name-agnostic)
