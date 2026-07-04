@@ -75,4 +75,12 @@ export interface FeedbackRepository {
   createFeedback(feedback: Feedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
   deleteFeedback(id: string): Promise<boolean>;
+  /** Read a single feedback row by id (null if not found). */
+  getFeedbackById(id: string): Promise<Feedback | null>;
+  /**
+   * Append a storage key to feedback.attachment_keys. Returns the updated
+   * keys array so the service can enforce maxPerReport against the authoritative
+   * post-append length. Errors if the row does not exist.
+   */
+  appendAttachmentKey(feedbackId: string, key: string): Promise<string[]>;
 }

@@ -1,6 +1,9 @@
 {
-  "$comment": "Base state is Phase 2 post-011 (011_lock_down_game_history.sql applied to prod 2026-07-04): 010 + 011 applied, so they are not pending. 012_prune_game_history.sql (LLD 149) is the new in-tree migration NOT YET applied to prod — it must appear here in expectedPending AND in scripts/fixtures/clean-diff.json's pending array (fixture coupling) or the gate fails 'Stale expectedPending'. Once 012 is applied to prod, remove it from expectedPending + clean-diff pending. acknowledgedResidual keeps only increment_player_stats (#91): cosmetic diff-engine re-emission noise that is functionally unchanged; it MUST stay minimal — a non-empty entry is a deliberate, auditable exception, never a default.",
-  "expectedPending": ["012_prune_game_history.sql"],
+  "$comment": "Base state is Phase 2 post-011 (011_lock_down_game_history.sql applied to prod 2026-07-04): 010 + 011 applied, so they are not pending. TWO in-tree migrations are NOT YET applied to prod and must appear in expectedPending: 012_prune_game_history.sql (LLD 149, game_history retention prune) and 013_create_feedback_attachments_bucket.sql (LLD 150, which adds feedback.attachment_keys — a public-schema change visible to supabase db diff — plus the storage bucket + RLS policies that db diff does NOT see and that the 013 postcondition covers). Each pending migration must ALSO appear in scripts/fixtures/clean-diff.json's pending array (fixture coupling) or the gate fails 'Stale expectedPending'. 013's column add is attributed to pending 013 via expectedFromPending. Once a migration is applied to prod, remove it from expectedPending + clean-diff pending. acknowledgedResidual keeps only increment_player_stats (#91): cosmetic diff-engine re-emission noise that is functionally unchanged; it MUST stay minimal — a non-empty entry is a deliberate, auditable exception, never a default.",
+  "expectedPending": [
+    "012_prune_game_history.sql",
+    "013_create_feedback_attachments_bucket.sql"
+  ],
   "acknowledgedResidual": [
     {
       "object": "function:public:increment_player_stats",

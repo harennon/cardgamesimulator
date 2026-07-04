@@ -28,6 +28,24 @@ Format: each entry has a date, short description, and category. Most recent firs
   - `tests/integration/game-history-prune.test.ts` — integration tests: function + grant set, post-condition coverage, idempotency, age-based deletion (aged rows deleted; floor-adjacent rows retained; empty table; strict < boundary), window-safety invariant (YTD-edge and 30d-edge rows survive prune), idempotency (second run deletes 0), player_stats E1 invariant (real committed prune leaves lifetime aggregate unchanged).
   - `tests/integration/postcondition-runner.test.ts` — full-chain post-condition runner lists updated to `001..012` (incl. `011_lock_down_game_history.sql`) so they cover the prune migration.
 
+- **LLD 150: Feedback attachment storage foundation (private bucket, storage RLS, signed upload/read path)**
+  - `supabase/migrations/013_create_feedback_attachments_bucket.sql` — new migration (renumbered 012→013 on merge: `main` shipped `012_prune_game_history.sql` (LLD 149) first): inserts private `feedback-attachments` bucket (`public=false`), two `storage.objects` RLS deny-by-construction policies scoped to the bucket, `feedback.attachment_keys TEXT[]` column, and `append_feedback_attachment_key` SQL RPC for atomic array append. Idempotent (011 idiom).
+  - `supabase/migrations/postconditions/013_create_feedback_attachments_bucket.postcondition.sql` — shape-based postcondition asserting bucket is private, RLS is enabled, ≥2 bucket-scoped policies exist, and `attachment_keys` is an array column.
+  - `src/shared/model.ts` — adds `SubmitAttachmentRequest` and `SubmitAttachmentResponse` shared types.
+  - `src/backend/database/entities/Feedback.ts` — adds `attachmentKeys: string[]` field (default `[]`).
+  - `src/backend/database/database.ts` — extends `FeedbackRepository` with `getFeedbackById` and `appendAttachmentKey`.
+  - `src/backend/database/supabaseDb.ts` — implements `getFeedbackById`, `appendAttachmentKey` (via `append_feedback_attachment_key` RPC), `storageClient` getter, and updates `mapFeedback` to read `attachment_keys`.
+  - `src/backend/service/attachmentStorage.ts` — NEW: `AttachmentStorage` interface + `SupabaseAttachmentStorage` concrete impl (lazy client getter, `upload`/`createSignedUrl`/`removeByPrefix`).
+  - `src/backend/service/feedbackAttachmentService.ts` — NEW: `FeedbackAttachmentService` with `addAttachment` (ownership check, MIME/size/magic-byte validation, E11 race guard) and `getSignedUrl`/`removeStoragePrefix`.
+  - `src/backend/api/feedback/submitFeedback.ts` — adds `POST /feedback/:id/attachments` route; rewrites `DELETE /feedback/:id` to objects-first ordering (storage cleanup before row delete, 500-on-failure so row stays for retry).
+  - `src/backend/server.ts` + `tests/integration/helpers/testServer.ts` — mounts a 7 MB body parser for `POST /feedback/*/attachments` before the global 100 kb parser.
+  - `supabase/migrations/expected-diff.allowlist.json` + `scripts/fixtures/clean-diff.json` — wired for 013 pending (column drift attributed to pending migration), alongside main's 012_prune_game_history pending entry.
+  - `tests/service/feedbackAttachmentService.test.ts` — 19 unit tests covering all LLD edge cases (E1–E11): ownership, MIME, size, magic bytes, count cap, race guard, signed URL TTL.
+  - `tests/integration/feedbackAttachment.test.ts` — 13 integration tests: round-trip upload+signed-read, 400/413/403/404 rejections, ownership for guest/registered/admin, delete-path cleanup, transient-failure retry.
+  - `tests/integration/migration-013.test.ts` — migration safety tests: public-schema column assertions via prodShapedFixture; storage-schema bucket/policy assertions against real local stack; idempotency; postcondition teeth.
+  - `tests/scripts/drift-gate.test.ts` — updated to reflect 013 now pending alongside main's pending 012_prune_game_history.
+  - `tests/integration/postcondition-runner.test.ts` — full-chain post-condition runner lists extended to include `013_create_feedback_attachments_bucket.sql` (after `012_prune_game_history.sql`) so they cover the feedback-attachments migration.
+
 - **LLD 146: Tonk round-end card-review pause (showdown reveal overlay)**
   - `src/frontend/component/game-ui/tonkDisplay.ts` — adds `TrickRevealRow` interface, `trickRevealRows()`, `trickReasonLabel()`, `trickVerdictHeadline()`, and `shouldEnterTrickReveal()` pure display-derivation helpers (unit-tested in isolation).
   - `src/frontend/component/game/TonkTrickReveal.vue` — NEW component: showdown table overlay rendered after each Tonk trick ends while the game is still `IN_PROGRESS`. Shows one row per player (revealed hand, hand value, delta, running total), sorted best-first. Caller row gold-outlined; best-hand row green delta. Auto-dismiss countdown hairline (`durationMs` CSS animation). Continue button emits `continue` to parent. Mobile: two-area grid layout (`id/delta` top row, cards below). Respects `prefers-reduced-motion`.

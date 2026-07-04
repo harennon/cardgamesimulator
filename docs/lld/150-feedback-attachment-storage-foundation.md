@@ -26,7 +26,7 @@ Parent: #97 (slice 1 of 3). Ships **first** — it is the foundation slices 2 (U
 
 ### Key decisions
 
-1. **Bucket + RLS provisioned by SQL migration, not the Storage API.** Supabase Storage buckets are rows in `storage.buckets`; object-access rules are RLS policies on `storage.objects`. Both are ordinary Postgres objects reachable by our existing migration + postcondition tooling (`supabase db push`, `verify-postconditions.mjs`). Creating the bucket via `INSERT INTO storage.buckets ... ON CONFLICT DO NOTHING` keeps provisioning **idempotent, name-agnostic, versioned, and machine-verifiable** — consistent with LLDs 008/011. This avoids a bootstrap script that races the backend and cannot be gated. New migration: `012_create_feedback_attachments_bucket.sql`.
+1. **Bucket + RLS provisioned by SQL migration, not the Storage API.** Supabase Storage buckets are rows in `storage.buckets`; object-access rules are RLS policies on `storage.objects`. Both are ordinary Postgres objects reachable by our existing migration + postcondition tooling (`supabase db push`, `verify-postconditions.mjs`). Creating the bucket via `INSERT INTO storage.buckets ... ON CONFLICT DO NOTHING` keeps provisioning **idempotent, name-agnostic, versioned, and machine-verifiable** — consistent with LLDs 008/011. This avoids a bootstrap script that races the backend and cannot be gated. New migration: `013_create_feedback_attachments_bucket.sql` (renumbered 012→013 on merge: `main` shipped `012_prune_game_history.sql` (LLD 149) first).
 
 2. **Bucket is private + no client policies = server-only, by construction.** `storage.buckets.public = false` disables the public CDN path. RLS on `storage.objects` is already `ENABLE`d by Supabase's own migrations. We add **only** SELECT/INSERT policies scoped to `bucket_id = 'feedback-attachments'` that are impossible for `anon`/`authenticated` to satisfy — mirroring the `games` table pattern in migration 002 ("no direct client mutation; all access via service_role, which bypasses RLS"). Net effect: every client-side read/write of this bucket is denied; the backend `service_role` key bypasses RLS and is the sole accessor. This is the server-authoritative principle (architecture-principles §1) applied to blob storage. See §Interfaces for the exact policy shape and the "deny by construction" rationale.
 
@@ -63,10 +63,10 @@ Client (slice 2)                Backend                         Supabase
 
 ## Interfaces / Types
 
-### Migration `012_create_feedback_attachments_bucket.sql` (shape, not final text)
+### Migration `013_create_feedback_attachments_bucket.sql` (shape, not final text)
 
 ```sql
--- 012: First use of Supabase Storage. Create a PRIVATE bucket for feedback
+-- 013: First use of Supabase Storage. Create a PRIVATE bucket for feedback
 -- attachments and RLS on storage.objects so clients cannot read/write it
 -- directly; only the backend service_role (bypasses RLS) can. Idempotent &
 -- name-agnostic (008/011 idiom): safe on fresh `supabase start` AND on prod.
@@ -111,7 +111,7 @@ Notes:
 - The `AND false` predicate makes these policies **explicitly deny** for any role bound by RLS. They exist (rather than being omitted) so the postcondition can assert a scoped, intentional deny for this bucket rather than relying on the *absence* of a policy — and so a future author cannot accidentally add a permissive policy without the postcondition/drift gate noticing the change. Omitting policies entirely would also deny (default-deny), but an explicit, named, bucket-scoped deny is auditable and self-documenting.
 - The migration author must confirm against the local stack that `storage.buckets` has a PK/unique on `id` for `ON CONFLICT (id)`; if the constraint is named/absent differently, use `WHERE NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = ...)` guard instead (still idempotent, name-agnostic).
 
-### Postcondition `012_create_feedback_attachments_bucket.postcondition.sql` (shape)
+### Postcondition `013_create_feedback_attachments_bucket.postcondition.sql` (shape)
 
 Shape-based, name-agnostic where it can be, idempotent, read-only; accumulates `bad[]` and RAISEs once (011 idiom). Asserts:
 1. Bucket `feedback-attachments` exists in `storage.buckets`.
@@ -289,8 +289,8 @@ export interface SubmitAttachmentResponse { attachmentId: string; key: string; }
 
 ### Migration-safety wiring (MUST all be done, or CI reddens)
 
-1. Add `012_create_feedback_attachments_bucket.sql` and its `.postcondition.sql` (1:1 coverage enforced by `verify-postconditions.mjs`).
-2. Add `"012_create_feedback_attachments_bucket.sql"` to `expected-diff.allowlist.json` `expectedPending` **and** to `scripts/fixtures/clean-diff.json` `pending` (and, if the diff engine attributes the `feedback.attachment_keys` add / bucket insert as observed drift on the run that applies it, add the corresponding `expectedFromPending`/`objects` entries) — else the gate fails "Stale/missing expectedPending". Follow the exact lockstep the file `$comment`s describe.
+1. Add `013_create_feedback_attachments_bucket.sql` and its `.postcondition.sql` (1:1 coverage enforced by `verify-postconditions.mjs`).
+2. Add `"013_create_feedback_attachments_bucket.sql"` to `expected-diff.allowlist.json` `expectedPending` (alongside main's pending `012_prune_game_history.sql`) **and** to `scripts/fixtures/clean-diff.json` `pending` (and, if the diff engine attributes the `feedback.attachment_keys` add / bucket insert as observed drift on the run that applies it, add the corresponding `expectedFromPending`/`objects` entries) — else the gate fails "Stale/missing expectedPending". Follow the exact lockstep the file `$comment`s describe.
    - **Storage-schema caveat:** the drift gate diffs the `public` schema. The `ALTER TABLE feedback ADD COLUMN attachment_keys` is a `public`-schema change the gate **will** see and must account for. The `storage`-schema bucket/policy changes may be invisible to `supabase db diff` (storage is a managed schema); the **postcondition** is the authoritative check for those. The implementer must verify what the linked-diff adapter emits for this migration on a dry run and wire the allowlist/fixture to match (do not guess).
 3. `destructive-ddl.allowlist.json`: no entry needed — `INSERT`, `CREATE POLICY`, and `ADD COLUMN IF NOT EXISTS` destroy no data. The in-scope delete-path prefix cleanup (§Retention) is a Storage-API `remove` call in **application code**, not a SQL migration, so the DDL gate is unaffected by it.
 4. Release order (DEVELOPMENT.md "Prod Migration Release"): `supabase db push` → `verify-postconditions.mjs` against prod (pooler, `PGSSLMODE=no-verify`) → then merge/deploy the backend code that reads/writes attachments. Schema leads code.
@@ -319,19 +319,19 @@ export interface SubmitAttachmentResponse { attachmentId: string; key: string; }
 - **Delete-path transient-failure retry (proves the recovery narrative):** with an object attached, make `storage.removeByPrefix` throw once (inject a storage double / stub that fails the first call, succeeds after). First `DELETE /feedback/:id` → **500** and the **feedback row still exists** (assert via `getFeedbackById`/`GET`), so the prefix is still recoverable. Retry `DELETE /feedback/:id` → **200**, object **gone**, row gone. Confirms the reordered handler re-attempts cleanup on retry rather than 404-short-circuiting into an orphan (the exact failure the review flagged).
 - Signed URL is time-limited: after TTL the URL no longer authorizes the fetch (may be marked slow/optional if TTL waiting is impractical — prefer asserting a short TTL is passed to the SDK instead).
 
-### Migration-safety — `tests/integration/migration-012.test.ts` (prod-shaped, name-agnostic)
+### Migration-safety — `tests/integration/migration-013.test.ts` (prod-shaped, name-agnostic)
 
 > `prodShapedFixture` uses a throwaway `public`-like schema and cannot host the fixed `storage` schema. Split the assertions: run the `public`-schema part (`feedback.attachment_keys` add) through the fixture; run the `storage`-schema part (bucket + policies) against the **real local `supabase start` `storage` schema** (which has `storage.buckets`/`storage.objects`), cleaning up the test bucket in `finally`. State this split in the test header.
 
-- After applying 012: bucket exists and `public = false` (**security assertion**).
+- After applying 013: bucket exists and `public = false` (**security assertion**).
 - `anon` and `authenticated` cannot read or write an object in the bucket via the anon/auth key (deny-by-construction); `service_role` can (bypasses RLS). Mirror `rls.test.ts` "Security test" style.
 - `feedback.attachment_keys` column exists, is an array, defaults to `{}`.
-- Idempotency: applying 012 twice → exactly the intended bucket + policy set (no duplicate policy, no error) — the fresh-like idempotency assertion 011 uses.
-- The **012 postcondition passes** on the applied schema and **RAISEs** when the bucket is public / missing or the deny policies are absent (postcondition has teeth), mirroring `migration-011.test.ts`.
+- Idempotency: applying 013 twice → exactly the intended bucket + policy set (no duplicate policy, no error) — the fresh-like idempotency assertion 011 uses.
+- The **013 postcondition passes** on the applied schema and **RAISEs** when the bucket is public / missing or the deny policies are absent (postcondition has teeth), mirroring `migration-011.test.ts`.
 
 ### Gate wiring — `tests/scripts/drift-gate.test.ts` (extend)
 
-- With 012 pending and correctly allowlisted (+ fixture updated), the gate passes; with 012 pending but missing from `expectedPending`, it fails "missing from expectedPending" (proves the lockstep is enforced).
+- With 013 pending and correctly allowlisted (+ fixture updated), the gate passes; with 013 pending but missing from `expectedPending`, it fails "missing from expectedPending" (proves the lockstep is enforced).
 
 ### Explicitly not tested here
 

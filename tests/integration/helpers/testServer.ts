@@ -77,6 +77,18 @@ export async function createTestServer(
   }
 
   const app = express();
+  // Higher-limit body parser for feedback attachment route — must precede the
+  // global 100 kb parser (mirrors server.ts wiring).
+  app.use("/feedback", (req, res, next) => {
+    if (
+      req.method === "POST" &&
+      /^\/[^/]+\/attachments(\/.*)?$/.test(req.path)
+    ) {
+      express.json({ limit: "7mb" })(req, res, next);
+    } else {
+      next();
+    }
+  });
   app.use(express.json());
   app.use(helmet());
   app.use(cors({ origin: "*" }));

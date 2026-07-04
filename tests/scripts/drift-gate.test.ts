@@ -251,7 +251,7 @@ const G6 = [
   "grant:authenticated:game_history:UPDATE",
 ];
 
-describe("evaluateDriftGate — 011 game_history lockdown pending (LLD 011)", () => {
+describe("evaluateDriftGate — 011 applied + 012/013 pending (LLD 011 / LLD 149 / LLD 150)", () => {
   const fixture = readJson("scripts/fixtures/clean-diff.json");
   const allowlist = readJson(
     "supabase/migrations/expected-diff.allowlist.json",
@@ -271,18 +271,26 @@ describe("evaluateDriftGate — 011 game_history lockdown pending (LLD 011)", ()
     });
   }
 
-  it("Phase 2 (011 applied): 010 and 011 are no longer pending, G6 removed", () => {
+  it("011 is applied (not in pending); 012_prune (LLD 149) and 013 feedback-attachments (LLD 150) are the pending migrations", () => {
     // 011 has been applied to prod (Prod Migrate run 2026-07-04), so it is no
     // longer pending; 010 was applied earlier. Both are absent from pending and
-    // expectedPending. (012_prune, LLD 149, is the new pending migration — see
-    // the dedicated "012 prune_game_history pending" describe below.)
+    // expectedPending. TWO migrations are now pending: 012_prune_game_history
+    // (LLD 149) and 013_create_feedback_attachments_bucket (LLD 150).
     expect(fixture.pending).not.toContain("011_lock_down_game_history.sql");
     expect(fixture.pending).not.toContain("010_create_game_history.sql");
+    expect(fixture.pending).toContain("012_prune_game_history.sql");
+    expect(fixture.pending).toContain(
+      "013_create_feedback_attachments_bucket.sql",
+    );
     expect(allowlist.expectedPending).not.toContain(
       "011_lock_down_game_history.sql",
     );
     expect(allowlist.expectedPending).not.toContain(
       "010_create_game_history.sql",
+    );
+    expect(allowlist.expectedPending).toContain("012_prune_game_history.sql");
+    expect(allowlist.expectedPending).toContain(
+      "013_create_feedback_attachments_bucket.sql",
     );
   });
 
@@ -313,10 +321,34 @@ describe("evaluateDriftGate — 011 game_history lockdown pending (LLD 011)", ()
   });
 
   it("fails missingExpected when an un-allowlisted migration becomes pending", () => {
-    const result = gateWith(["012_hypothetical.sql"]);
+    const result = gateWith([
+      ...(fixture.pending as string[]),
+      "099_hypothetical.sql",
+    ]);
     expect(result.ok).toBe(false);
-    expect(result.missingExpected).toContain("012_hypothetical.sql");
+    expect(result.missingExpected).toContain("099_hypothetical.sql");
     expect(result.reasons.join(" ")).toMatch(/missing from expectedPending/);
+  });
+
+  it("fails staleExpected if a pending migration (013) is removed from pending but stays in allowlist", () => {
+    // Simulate the post-013-applied world: 013 is applied so it leaves pending,
+    // but the allowlist still lists it → staleExpected. (012_prune stays pending.)
+    const result = evaluateDriftGate({
+      observed: (fixture.objects as { object: string }[]) ?? [],
+      expectedFromPending:
+        (fixture.expectedFromPending as { object: string }[]) ?? [],
+      allowlist: {
+        expectedPending: (allowlist.expectedPending as string[]) ?? [],
+        acknowledgedResidual:
+          (allowlist.acknowledgedResidual as unknown[]) ?? [],
+      },
+      actualPending: ["012_prune_game_history.sql"], // 013 now applied → no longer pending
+    });
+    expect(result.ok).toBe(false);
+    expect(result.staleExpected).toContain(
+      "013_create_feedback_attachments_bucket.sql",
+    );
+    expect(result.reasons.join(" ")).toMatch(/Stale expectedPending/);
   });
 });
 

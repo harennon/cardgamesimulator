@@ -1,6 +1,14 @@
 {
-  "$comment": "Base is Phase 2 post-011 (010 + 011 applied to prod). 012_prune_game_history.sql (LLD 149) is pending (not yet applied), so it is listed in pending here AND in expected-diff.allowlist.json's expectedPending (fixture coupling). 012's prune_game_history function self-attributes to pending 012 and drops as benign, so it never appears as residual — objects still mirrors only increment_player_stats (#91), the cosmetic re-emission that stays acknowledged. After 012 is applied to prod, remove it from pending here + expectedPending.",
-  "objects": [{ "object": "function:public:increment_player_stats" }],
-  "expectedFromPending": [],
-  "pending": ["012_prune_game_history.sql"]
+  "$comment": "Base is Phase 2 post-011 (010 + 011 applied to prod). TWO migrations are pending (not yet applied) and must be listed in pending here AND in expected-diff.allowlist.json's expectedPending (fixture coupling): 012_prune_game_history.sql (LLD 149) and 013_create_feedback_attachments_bucket.sql (LLD 150). 012's prune_game_history function self-attributes to pending 012 and drops as benign, so it never appears as residual. 013 adds feedback.attachment_keys (public-schema change; visible to db diff) attributed to pending 013 via expectedFromPending; 013's storage bucket + RLS policies (storage schema) are NOT emitted by db diff and are verified only by the postcondition. objects therefore mirrors increment_player_stats (#91), the cosmetic re-emission that stays acknowledged, plus the attachment_keys column. After a migration is applied to prod, remove it from pending here + expectedPending.",
+  "objects": [
+    { "object": "function:public:increment_player_stats" },
+    { "object": "column:public:feedback:attachment_keys" }
+  ],
+  "expectedFromPending": [
+    { "object": "column:public:feedback:attachment_keys" }
+  ],
+  "pending": [
+    "012_prune_game_history.sql",
+    "013_create_feedback_attachments_bucket.sql"
+  ]
 }

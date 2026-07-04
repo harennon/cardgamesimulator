@@ -53,6 +53,20 @@ export class Server {
   constructor() {
     this.app = express();
     // add middleware
+    // The feedback attachment route accepts base64-encoded images; the decoded
+    // size cap is 5 MB, so the base64 form is ~6.67 MB + JSON overhead. Mount
+    // a higher-limit body parser for that path BEFORE the global 100 kb parser
+    // so the global one never sees the attachment body.
+    this.app.use("/feedback", (req, res, next) => {
+      if (
+        req.method === "POST" &&
+        /^\/[^/]+\/attachments(\/.*)?$/.test(req.path)
+      ) {
+        express.json({ limit: "7mb" })(req, res, next);
+      } else {
+        next();
+      }
+    });
     this.app.use(express.json());
     this.app.use(helmet());
     this.app.use(

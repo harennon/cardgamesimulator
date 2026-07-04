@@ -94,6 +94,16 @@ export type FeedbackCategory =
   | "feature-request"
   | "other";
 
+export interface SubmitAttachmentRequest {
+  image: string; // base64-encoded image data
+  mimeType: string;
+}
+
+export interface SubmitAttachmentResponse {
+  attachmentId: string;
+  key: string;
+}
+
 export interface SubmitFeedbackRequest {
   category: FeedbackCategory;
   description: string; // 1-500 characters, required
