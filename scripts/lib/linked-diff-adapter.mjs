@@ -214,6 +214,11 @@ export function splitDdlStatements(dbDiffStdout) {
  * @property {string} object     stable id (fixture grammar: constraint:<t>:<name>,
  *                               grant:<role>:<t>:<PRIV>, table:<schema>:<name>,
  *                               index:<schema>:<name>, function:<schema>:<name>).
+ *                               NEW (LLD 77b, v1):
+ *                                 rls:<schema>:<table>           — ENABLE ROW LEVEL SECURITY
+ *                                 policy:<schema>:<table>:<CMD>  — CREATE POLICY (CMD in
+ *                                                                  SELECT|INSERT|UPDATE|DELETE|ALL;
+ *                                                                  name-agnostic, grammar B).
  * @property {"add"|"drop"} direction  "drop" = the statement REMOVES the object
  *                               from prod (drop/revoke — per the confirmed
  *                               direction, prod is MISSING it, so it's declared by
@@ -340,6 +345,50 @@ export function classifyStatement(stmt) {
         direction,
         table,
       }));
+    }
+  }
+
+  // --- RLS enable (LLD 77b v1): ALTER TABLE [ONLY] <t> ENABLE ROW LEVEL SECURITY
+  //     Anchored to `enable ... security$` so `disable ... security` (deferred
+  //     verb) does NOT match and falls through to the F3 throw. Prod-missing the
+  //     shadow-declared RLS ⇒ direction:"drop" (pending-attributable — §Approach).
+  {
+    const re = new RegExp(
+      `^alter\\s+table\\s+(?:only\\s+)?(?:${ID}\\.)?${ID}\\s+enable\\s+row\\s+level\\s+security$`,
+      "i",
+    );
+    const m = s.match(re);
+    if (m) {
+      // groups: [schema?, table]
+      const schema = m[2] ? m[1] : "public";
+      const table = m[2] ?? m[1];
+      return [{ object: `rls:${schema}:${table}`, direction: "drop", table }];
+    }
+  }
+
+  // --- create policy (LLD 77b v1): CREATE POLICY <name> ON <t> [FOR <cmd>] ...
+  //     Anchored to `^create policy`; `drop policy` / `alter policy` (deferred
+  //     verbs) do NOT match and fall through to F3. Name-agnostic id (grammar B):
+  //     the policy name is captured but discarded from the id; the `FOR <cmd>`
+  //     clause defaults to ALL (Postgres default). direction:"drop" (prod-missing).
+  {
+    const re = new RegExp(
+      `^create\\s+policy\\s+(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?:${ID}\\.)?${ID}(?:\\s+for\\s+(select|insert|update|delete|all))?`,
+      "i",
+    );
+    const m = s.match(re);
+    if (m) {
+      // groups: [schema?, table, for-cmd?]
+      const schema = m[2] ? m[1] : "public";
+      const table = m[2] ?? m[1];
+      const cmd = (m[3] ?? "ALL").toUpperCase();
+      return [
+        {
+          object: `policy:${schema}:${table}:${cmd}`,
+          direction: "drop",
+          table,
+        },
+      ];
     }
   }
 
@@ -481,6 +530,11 @@ function buildExpectedFromPending(_residual, _pendingObjects) {
  * @property {Set<string>} functions  function names created by a pending migration.
  * @property {Map<string,string>} byName  declared name → the pending file that
  *                                    declares it (for Gap-A cross-consistency).
+ * @property {Set<string>} rlsTables  table names a pending migration adds RLS or a
+ *                                    policy to (LLD 77b, via a RAW-TEXT scan that
+ *                                    reads inside `DO $$` guard blocks).
+ * @property {Map<string,string>} rlsByName  rls/policy target table → the pending
+ *                                    file that first declares it in scan order.
  */
 
 /**
@@ -493,6 +547,13 @@ function buildExpectedFromPending(_residual, _pendingObjects) {
  * migration 010). Fail-closed: a drop whose owning name is not declared by any
  * pending migration is NOT attributed (→ surfaced as residual by the caller).
  *
+ * RLS/policy targets (LLD 77b) are collected into `rlsTables`/`rlsByName` by a
+ * RAW-TEXT regex scan over the whole migration SQL — deliberately NOT via
+ * splitDdlStatements/classifyStatement, because 011's `CREATE POLICY` lives inside
+ * a `DO $$ ... END $$;` guard block that the splitter treats as opaque. A raw-text
+ * scan matches inside the block body (it is just text to the regex), so the guarded
+ * policy's target table is visible for attribution (§State Model Gap 2).
+ *
  * @param {{file:string, sql:string}[]} pendingMigrations
  * @returns {PendingObjects}
  */
@@ -503,11 +564,22 @@ export function pendingDeclaredObjects(pendingMigrations) {
   const functions = new Set();
   /** @type {Map<string,string>} */
   const byName = new Map();
+  /** @type {Set<string>} */
+  const rlsTables = new Set();
+  /** @type {Map<string,string>} */
+  const rlsByName = new Map();
 
   const tableRe =
     /\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?(?:"?[A-Za-z0-9_]+"?\.)?"?([A-Za-z0-9_]+)"?/gi;
   const functionRe =
     /\bcreate\s+(?:or\s+replace\s+)?function\s+(?:"?[A-Za-z0-9_]+"?\.)?"?([A-Za-z0-9_]+)"?/gi;
+  // RAW-TEXT scans (LLD 77b Gap 2): tolerate the migration-authored forms
+  // (unquoted or quoted table names, the 002/011 grammar), including inside
+  // `DO $$` blocks. These read the whole SQL string, NOT split statements.
+  const enableRlsRe =
+    /\balter\s+table\s+(?:only\s+)?(?:"?[A-Za-z0-9_]+"?\.)?"?([A-Za-z0-9_]+)"?\s+enable\s+row\s+level\s+security/gi;
+  const createPolicyRe =
+    /\bcreate\s+policy\s+(?:"[^"]+"|[A-Za-z0-9_]+)\s+on\s+(?:"?[A-Za-z0-9_]+"?\.)?"?([A-Za-z0-9_]+)"?/gi;
 
   for (const { file, sql } of pendingMigrations) {
     tableRe.lastIndex = 0;
@@ -521,8 +593,18 @@ export function pendingDeclaredObjects(pendingMigrations) {
       functions.add(m[1]);
       if (!byName.has(m[1])) byName.set(m[1], file);
     }
+    enableRlsRe.lastIndex = 0;
+    while ((m = enableRlsRe.exec(sql)) !== null) {
+      rlsTables.add(m[1]);
+      if (!rlsByName.has(m[1])) rlsByName.set(m[1], file);
+    }
+    createPolicyRe.lastIndex = 0;
+    while ((m = createPolicyRe.exec(sql)) !== null) {
+      rlsTables.add(m[1]);
+      if (!rlsByName.has(m[1])) rlsByName.set(m[1], file);
+    }
   }
-  return { tables, functions, byName };
+  return { tables, functions, byName, rlsTables, rlsByName };
 }
 
 /**
@@ -591,6 +673,12 @@ function indexOwningTable(indexName, allTables) {
  *     (`idx_game_history_user_played`, owned by `game_history`) — the longest
  *     match wins, so the applied `game_history` owner is chosen and, not being
  *     pending, the drop surfaces as residual. Guarded by DROP direction.
+ *   - rls:<schema>:<table> / policy:<schema>:<table>:<CMD> (LLD 77b) → dedicated
+ *     branch evaluated FIRST. Attributed iff the target table is affected by a
+ *     pending migration — either pending-CREATEd (pending.tables) OR pending-RLS'd
+ *     (pending.rlsTables). pending.tables is consulted FIRST (the create-table
+ *     byName is the more specific fact); in the milestone case the RLS target table
+ *     (game_history) is created by APPLIED 010 so attribution comes via rlsTables.
  *
  * @param {ClassifiedObject} obj
  * @param {PendingObjects} pending
@@ -598,11 +686,25 @@ function indexOwningTable(indexName, allTables) {
  * @returns {string|null}  the declaring pending filename, or null
  */
 function pendingAttribution(obj, pending, allTables) {
+  const kind = obj.object.split(":")[0];
+
+  // LLD 77b: RLS/policy route through ONE dedicated branch, evaluated FIRST, so
+  // they never fall through the generic pending.tables branch ambiguously.
+  // obj.table is always set for these kinds (the RLS/policy target table).
+  if (kind === "rls" || kind === "policy") {
+    if (obj.table && pending.tables.has(obj.table)) {
+      return pending.byName.get(obj.table) ?? null;
+    }
+    if (obj.table && pending.rlsTables.has(obj.table)) {
+      return pending.rlsByName.get(obj.table) ?? null;
+    }
+    return null;
+  }
+
   if (obj.table && pending.tables.has(obj.table)) {
     return pending.byName.get(obj.table) ?? null;
   }
   const parts = obj.object.split(":");
-  const kind = parts[0];
   if (kind === "function") {
     const name = parts[2];
     return pending.functions.has(name)
