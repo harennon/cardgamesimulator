@@ -21,6 +21,7 @@ import type {
 } from "@shared/socket-events";
 import type { TurnTimerService } from "@/timer/turnTimerService";
 import { injectBoardAi, buildLobbyPlayers } from "@/websocket/socketAiUtils";
+import type { Delayer } from "@/websocket/delayer";
 
 /**
  * Maximum hand size for Big2 (13 cards per player in a 4-player game).
@@ -28,6 +29,12 @@ import { injectBoardAi, buildLobbyPlayers } from "@/websocket/socketAiUtils";
  * seats to completion without truncating a legitimate play-out.
  */
 const MAX_HAND_SIZE = 13;
+
+/** Default pace between successive auto-driven moves (ms). */
+export const DEFAULT_AI_MOVE_DELAY_MS = 1000;
+
+/** Maximum configurable pace; clamps absurd values from hand-crafted configs. */
+export const MAX_AI_MOVE_DELAY_MS = 3000;
 
 function emitSpectatorCount(
   io: TypedServer,
@@ -137,6 +144,10 @@ function armFallbackTimer(
  * (players * (maxHandSize + players) comfortably exceeds any legitimate play-out).
  * A version-progress check detects genuine non-progress (engine not advancing)
  * independently of the count, so the ceiling is only a last-resort safety net.
+ *
+ * The delayer introduces a non-blocking pause between successive auto-driven
+ * moves so each move is broadcast before the next one resolves, making AI
+ * play human-readable. In tests inject ImmediateDelayer for zero wall-clock delay.
  */
 async function autoPlayAbandoned(
   io: TypedServer,
@@ -144,12 +155,21 @@ async function autoPlayAbandoned(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  delayer: Delayer,
 ): Promise<void> {
   const state = await gameService.getGameState(gameId);
   const playerCount = state?.players.length ?? 4;
   // Ceiling: generous enough to drive all remaining seats through their entire
   // hands across multiple tricks; much larger than the old playerCount * 2 cap.
   const maxIterations = playerCount * (MAX_HAND_SIZE + playerCount);
+
+  // Resolve delay once per invocation from the game config; immutable during play.
+  const game = await gameService.getGame(gameId);
+  const configuredDelay = game?.gameConfig?.aiMoveDelayMs;
+  const delayMs = Math.min(
+    Math.max(configuredDelay ?? DEFAULT_AI_MOVE_DELAY_MS, 0),
+    MAX_AI_MOVE_DELAY_MS,
+  );
 
   let lastVersion = state?.version ?? -1;
 
@@ -210,6 +230,7 @@ async function autoPlayAbandoned(
         connectionManager,
         turnTimerService,
       );
+      // No pacing delay after the completing move (LLD 122 timing preserved).
       return;
     }
 
@@ -231,6 +252,11 @@ async function autoPlayAbandoned(
       connectionManager,
       turnTimerService,
     );
+
+    // Pace between successive auto-driven moves so clients can follow each one.
+    // Non-blocking: other games' handlers and socket events run during the gap.
+    await delayer.delay(delayMs);
+
     // Loop continues to check the next player
   }
 
@@ -249,6 +275,7 @@ async function handleGameJoin(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  delayer: Delayer,
 ): Promise<void> {
   const { gameId, role } = payload;
   const { userId, displayName } = socket.data;
@@ -319,6 +346,7 @@ async function handleGameJoin(
             gameService,
             connectionManager,
             turnTimerService,
+            delayer,
           );
         }
       }
@@ -409,6 +437,7 @@ async function handleGameStart(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  delayer: Delayer,
 ): Promise<void> {
   const { gameId } = payload;
   const { userId } = socket.data;
@@ -463,6 +492,7 @@ async function handleGameStart(
       gameService,
       connectionManager,
       turnTimerService,
+      delayer,
     );
 
     ack({ success: true });
@@ -529,6 +559,7 @@ async function handleGameAction(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  delayer: Delayer,
 ): Promise<void> {
   const { gameId, action } = payload;
   const { userId } = socket.data;
@@ -589,6 +620,7 @@ async function handleGameAction(
           gameService,
           connectionManager,
           turnTimerService,
+          delayer,
         );
         ack({ success: true });
         return;
@@ -721,6 +753,7 @@ export async function handleTimerExpired(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  delayer: Delayer,
 ): Promise<void> {
   const state = await gameService.getGameState(gameId);
   if (!state || state.status !== "IN_PROGRESS") return;
@@ -788,6 +821,7 @@ export async function handleTimerExpired(
     gameService,
     connectionManager,
     turnTimerService,
+    delayer,
   );
 }
 
@@ -796,6 +830,7 @@ export function registerSocketHandlers(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  delayer: Delayer,
 ): void {
   io.on("connection", (socket) => {
     socket.on("game:join", (payload, ack) => {
@@ -807,6 +842,7 @@ export function registerSocketHandlers(
         gameService,
         connectionManager,
         turnTimerService,
+        delayer,
       ).catch((err: unknown) => {
         console.error("game:join error", err);
         ack({ success: false, error: "INTERNAL_ERROR" });
@@ -822,6 +858,7 @@ export function registerSocketHandlers(
         gameService,
         connectionManager,
         turnTimerService,
+        delayer,
       ).catch((err: unknown) => {
         console.error("game:start error", err);
         ack({ success: false, error: "INTERNAL_ERROR" });
@@ -852,6 +889,7 @@ export function registerSocketHandlers(
         gameService,
         connectionManager,
         turnTimerService,
+        delayer,
       ).catch((err: unknown) => {
         console.error("game:action error", err);
         ack({ success: false, error: "INVALID_ACTION" });

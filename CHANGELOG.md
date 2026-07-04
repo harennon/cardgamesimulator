@@ -15,7 +15,28 @@ Format: each entry has a date, short description, and category. Most recent firs
   - `src/frontend/component/game/GameBoard.vue` — added `padding-right: 12px` to `.game-board__log` so the Big2 `GameLog` right column content clears the rim equally.
   - Both changes are CSS-only, applied to the grid cell (not the panel components), so panel backgrounds and borders are unaffected. The mobile `display: none` rule makes the desktop padding inert at ≤767px.
 
+- **LLD 141: Player cannot see their own score during a Tonk game**
+  - `src/frontend/component/game-ui/tonkDisplay.ts` — `SeatRow` gains a required `isSelf: boolean` field. `railSeats()` now includes the local player (previously filtered out), marks the local row `isSelf: true`, and sorts it first; non-self rows retain ascending seat order. Spectator render (`myPlayerIndex === -1`) is unchanged: no row matches self.
+  - `src/frontend/component/game-ui/TonkSeatRail.vue` — renders the self chip with `tonk-seat--self` accent class; fan suppressed for self (`!compact && !seat.isSelf`); name displays "You"; tally pill gains `tonk-seat__tally--near` modifier via `isNearLine(seat.tally)`; AiAvatar and AiBadge gated with `!seat.isSelf`; disconnected label gated with `!seat.isSelf`. Imports `isNearLine` from `tonkDisplay`.
+  - `src/frontend/styles/game-variables.css` — adds `--tonk-self: #9b7fe8` self-identity accent token (distinct from `--tonk-cyan` drawable-discard ring and gold active-turn border).
+  - `tests/frontend/tonkDisplay.test.ts` — updated `railSeats` tests to reflect new contract (self included, sorted first, 8-player returns 8 rows, spectator has no self).
+  - `tests/frontend/aiBadgeRendering.test.ts` — replaced "railSeats filters out myPlayerIndex" with the new contract assertion (self present and `isSelf: true`).
+  - `tests/frontend/aiAvatarRendering.test.ts` — updated source-inspection assertions for `AiAvatar`/`AiBadge` v-if to match new `seat.isAi && !seat.isSelf` guard.
+  - `tests/frontend/tonkSeatRailSelf.test.ts` — new test file: 27 tests covering `railSeats` self-chip contract, AI/disconnected suppression invariants, near-150 warning on self, and TonkSeatRail source wiring.
+
+- **LLD 134: Tonk action/discard buttons clipped at bottom of desktop game screen**
+  - `src/frontend/component/game/TonkBoard.vue` — changed the desktop grid's `actions` row from a fixed `64px` to `auto`, so `TonkActionPanel` always has enough room for its one-line (not-your-turn pill), two-line (phase-stepper + buttons), or three-line (error + stepper + buttons) states without being clipped by `overflow: hidden`. Added `min-height: 0` to `.tonk-board__table` (desktop) so the `1fr` table row can yield space to the `auto` actions row at short viewports (768px). `GameBoard.vue` (Big2) and the mobile grid (`--mobile-actions-height`) are untouched.
+
 ### Added
+
+- **LLD 137: AI/CPU move pacing delay (configurable, injectable)**
+  - `src/backend/websocket/delayer.ts` — new `Delayer` interface with `RealDelayer` (production, `setTimeout`-backed with fast-path for `ms <= 0`) and `ImmediateDelayer` (tests, zero wall-clock).
+  - `src/shared/model.ts` — `GameConfig.aiMoveDelayMs?: number` added; persisted in `games.game_config` JSONB; absent → default 1000ms; 0 → instant opt-out; clamped to [0, 3000].
+  - `src/backend/websocket/socketHandler.ts` — `autoPlayAbandoned` gains a `Delayer` parameter; after each successful `broadcastGameState` inside the loop it `await delayer.delay(delayMs)` (paced gap between successive auto-driven moves). Delay is skipped on COMPLETED, B1/B2/B3 guard exits, and on human-only games (never enters the delay branch). Named constants `DEFAULT_AI_MOVE_DELAY_MS = 1000` and `MAX_AI_MOVE_DELAY_MS = 3000` exported. `handleGameJoin`, `handleGameStart`, `handleGameAction`, `handleTimerExpired`, and `registerSocketHandlers` all gain a `delayer` parameter threaded to every `autoPlayAbandoned` call.
+  - `src/backend/server.ts` — constructs `new RealDelayer()` and threads it into `handleTimerExpired` and `registerSocketHandlers`.
+  - `tests/integration/helpers/testServer.ts` — injects `new ImmediateDelayer()` so all integration tests run at zero delay and remain fast.
+  - `tests/websocket/socketHandler.test.ts` — all `setupHandlers*` helpers and the `handleTimerExpired` call updated to pass `new ImmediateDelayer()`.
+  - `tests/websocket/delayer.test.ts` — 14 new tests: `RealDelayer` fast-path and timer-based; `ImmediateDelayer`; pacing insertion verified via `RecordingDelayer` (delay count + value for default, config-override 500ms, 0ms opt-out, absurd clamped to MAX); no-delay on completion/B1/B2; abandoned-human pacing matches AI pacing; human-only game never triggers delay.
 
 - **LLD 128: Polish — AI opponent naming and avatars**
   - `src/shared/aiNames.ts` — new pure shared module: `AI_NAME_POOL` (7 names: Ace, Bishop, Cortex, Domino, Echo, Fable, Gambit) and `aiNameForOrdinal(ordinal)`, a deterministic helper that assigns names by ordinal with a cycling suffix fallback for tables larger than the pool.

@@ -36,6 +36,7 @@ import { FeedbackHandler } from "../../../src/backend/api/feedback/submitFeedbac
 import { FakeTimerProvider } from "../../../src/backend/timer/fakeTimerProvider.js";
 import { TurnTimerService } from "../../../src/backend/timer/turnTimerService.js";
 import { createSeedStateRouter } from "../../../src/backend/api/test/seedState.js";
+import { ImmediateDelayer } from "../../../src/backend/websocket/delayer.js";
 
 export interface TestServerContext {
   app: Express;
@@ -145,6 +146,7 @@ export async function createTestServer(
   app.use(errorHandler);
   const connectionManager = new ConnectionManager();
   const timerProvider = timerProviderOverride ?? new FakeTimerProvider();
+  const delayer = new ImmediateDelayer();
   const turnTimerService = new TurnTimerService(timerProvider, (gameId) => {
     handleTimerExpired(
       io,
@@ -152,9 +154,16 @@ export async function createTestServer(
       gameService,
       connectionManager,
       turnTimerService,
+      delayer,
     ).catch((err: unknown) => console.error("Timer expired error:", err));
   });
-  registerSocketHandlers(io, gameService, connectionManager, turnTimerService);
+  registerSocketHandlers(
+    io,
+    gameService,
+    connectionManager,
+    turnTimerService,
+    delayer,
+  );
 
   // Initialize DB (idempotent across test files in the same process)
   ensureDbInitialized();
