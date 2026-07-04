@@ -134,16 +134,22 @@ Migration 011 is a **data-deleting** migration, so it must clear both gates that
 guard the automated prod `db push` (#91):
 
 1. **Destructive-DDL gate** (commit e85f957, `scripts/verify-no-destructive-ddl.mjs`).
-   The scanner bans `DELETE FROM` / `TRUNCATE` in any `supabase/migrations/*.sql`
-   unless allowlisted per-file + per-op. **The scanner treats dollar-quoted
-   `$$…$$` function bodies as live SQL** (it explicitly does not neutralize
-   them), so the `DELETE FROM game_history` inside `prune_game_history()`'s body
-   **will be flagged**. This is correct and intended: the prune is a genuine,
-   reviewed data-deletion. Add an entry to
-   `supabase/migrations/destructive-ddl.allowlist.json`:
+   The scanner bans `DROP TABLE` / `DROP COLUMN` / `DELETE FROM` / `TRUNCATE` in
+   any `supabase/migrations/*.sql` unless allowlisted per-file + per-op. It
+   neutralizes only `--`/`/* */` comments and **single-quoted** `'…'` literals;
+   dollar-quoted `$$…$$` and `$cron$…$cron$` bodies are **left as live SQL** (the
+   scanner explicitly does not neutralize them). So the `DELETE FROM game_history`
+   inside `prune_game_history()`'s body **will be flagged** — correct and
+   intended: the prune is a genuine, reviewed data-deletion. The scheduled
+   command in the `$cron$` block is *also* scanned as live SQL, but it holds only
+   `SELECT prune_game_history();` and `SELECT` is not banned, so the file's total
+   destructive-op set is exactly `{DELETE}` (one op, from the body). Add an entry
+   to `supabase/migrations/destructive-ddl.allowlist.json`:
    `"011_prune_game_history.sql": ["DELETE"]`, with a `$comment`-style rationale
    noting it is the retention prune, bounded to rows > 13 months old, and never
-   touches `player_stats`. Do **not** loosen the gate globally.
+   touches `player_stats`. Do **not** loosen the gate globally, and do **not**
+   inline the DELETE into the cron command (it would then be flagged inside the
+   `$cron$` block too — the block is not a safe harbor).
 2. **Drift gate** (`scripts/verify-drift.mjs` + `scripts/lib/drift-gate.mjs`).
    Add `011_prune_game_history.sql` to **both** `expected-diff.allowlist.json`
    `expectedPending` **and** `scripts/fixtures/clean-diff.json` `pending`, in the
@@ -219,11 +225,27 @@ END $$;
 > Notes for the implementer:
 > - Use a distinct dollar-quote tag (`$cron$`) for the scheduled command so it
 >   nests inside the outer `$$` DO block cleanly.
-> - The scheduled command string contains `SELECT prune_game_history();` — this
->   is inside a **string literal** (`$cron$…$cron$`), which the destructive-DDL
->   scanner neutralizes; only the literal `DELETE FROM game_history` in the
->   function body needs the allowlist entry. Verify with `npm run
->   verify:no-destructive-ddl` that exactly one `DELETE` is reported for this file.
+> - **How the destructive-DDL scanner sees this file (read carefully).** The
+>   scanner (`scripts/lib/destructive-ddl.mjs`) does **not** neutralize
+>   dollar-quoted bodies. `stripCommentsAndStrings` blanks only `-- ` comments,
+>   `/* … */` comments, and **single-quoted** `'…'` literals; it explicitly
+>   leaves both `$$…$$` and `$cron$…$cron$` bodies **as live SQL**. So every
+>   line above is scanned as executable text. The reason exactly one `DELETE` is
+>   flagged is **not** that the `$cron$` block is neutralized — it is that the
+>   scheduled command holds `SELECT prune_game_history();`, and `SELECT` is not
+>   in the ban list (`DROP TABLE`, `DROP COLUMN`, `DELETE FROM`, `TRUNCATE`).
+>   The only banned keyword anywhere in the file is the literal
+>   `DELETE FROM game_history` in the function body, which is why the allowlist
+>   needs exactly `["DELETE"]`.
+> - **Implication for future edits:** because dollar-quoted bodies are live to
+>   the scanner, do **not** assume a `DELETE FROM …`, `DROP TABLE …`, or
+>   `TRUNCATE …` placed inside any `$…$` block is invisible to the gate — it
+>   will be flagged and will need its own allowlist op. Keep the scheduled
+>   command a bare `SELECT` (never inline the DELETE into the cron command) so
+>   the file's destructive-op set stays exactly `{DELETE}` from the one body
+>   statement.
+> - Verify with `npm run verify:no-destructive-ddl` that exactly one `DELETE` is
+>   reported for this file (confirmed against the scanner at commit e85f957).
 
 ### Migration-safety files (same PR)
 
@@ -236,7 +258,9 @@ END $$;
 
 ### Post-condition `postconditions/011_prune_game_history.postcondition.sql` (shape)
 
-Shape-based, idempotent, read-only. Asserts:
+Shape-based and idempotent. Assertions 1–2 are pure reads. Assertion 3 *invokes*
+the prune but is written to be **non-mutating on every target** (see the
+transaction-wrapping requirement below). Asserts:
 
 1. `prune_game_history` is exactly one visible function, `SECURITY DEFINER`,
    `EXECUTE` granted to `service_role` and REVOKED from anon/authenticated/PUBLIC
@@ -244,26 +268,49 @@ Shape-based, idempotent, read-only. Asserts:
 2. The cron job named `prune-game-history` exists in `cron.job` (**skip this
    assertion when `pg_cron` is absent**, e.g. a bare `supabase start` — see E4 —
    so local coverage still passes; the assertion is enforced against prod where
-   Cron is enabled).
+   Cron is enabled). **Mechanism (the runner has no per-statement skip):** the
+   entire assertion must be self-contained in SQL and reference `cron.job` only
+   from *inside* a guard, so it never errors when the `cron` schema is absent.
+   Use a plpgsql `DO` block gated on
+   `IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN … END IF`,
+   and place the `SELECT … FROM cron.job` inside that branch. A bare
+   top-level `SELECT … FROM cron.job` must **not** appear — it would raise
+   `schema "cron" does not exist` on a bare `supabase start` and fail coverage.
 3. **`player_stats` is unchanged by a prune** (the acceptance-criterion
-   machine-check): snapshot the `player_stats` aggregate totals, invoke
-   `SELECT prune_game_history();`, then assert the snapshot is byte-for-byte
-   unchanged. Because a post-condition runs against a DB that has *only* the
-   migrated schema (no ≥13-month-old rows in a fresh/CI DB), this run deletes 0
-   rows and proves the function does not write `player_stats` on any path. RAISE
-   if any `player_stats` row's `(games_played, games_won, games_lost,
-   total_score, last_played_at)` differs after the call.
+   machine-check): inside an explicit **`BEGIN … ROLLBACK`** transaction,
+   snapshot the `player_stats` aggregate totals, invoke
+   `SELECT prune_game_history();`, assert the snapshot is byte-for-byte
+   unchanged, then **`ROLLBACK`** so nothing the invoke did is ever committed.
+
+> **Why the ROLLBACK is mandatory — do not omit it.** The runner
+> (`scripts/verify-postconditions.mjs`) executes each `.postcondition.sql` via a
+> bare `client.query(sql)` with **no** enclosing transaction and **no** rollback,
+> against whatever DB the env points at — which per Dependencies explicitly
+> includes the **human-owned prod post-condition run**. If assertion 3 called
+> `prune_game_history()` at the top level, on prod that "verification" would
+> **commit a real mass DELETE** of all >13-month rows — turning a read-only check
+> into a mutation of prod. Wrapping the invoke+snapshot+compare in
+> `BEGIN … ROLLBACK` (option (a)) makes the check provably non-mutating on every
+> target: on a fresh/CI DB it deletes 0 rows anyway, and on prod the ROLLBACK
+> discards even a non-zero delete, so the *first real prune* is left to the
+> scheduled `pg_cron` job (never to the verifier). This keeps the post-condition
+> consistent with its "read-only" contract (see State Model / the runner's design
+> intent) while still exercising the function's real code path as the fail-safe
+> proof that pruning cannot mutate the lifetime aggregate.
+>
+> Note: `SECURITY DEFINER` does not open a subtransaction, so a plain
+> `BEGIN; … ROLLBACK;` around the `PERFORM prune_game_history()` fully undoes the
+> DELETE. The runner sends the whole file as one `query()` call, so an explicit
+> `BEGIN/ROLLBACK` pair inside the file is honored.
 
 ```sql
--- sketch of assertion 3
--- 1. capture: SELECT array_agg(... ORDER BY user_id, game_type) FROM player_stats
--- 2. PERFORM prune_game_history();
--- 3. re-capture and RAISE EXCEPTION if the two arrays differ
+-- sketch of assertion 3 (must roll back so prod is never mutated)
+-- BEGIN;
+--   -- 1. capture: SELECT array_agg(... ORDER BY user_id, game_type) FROM player_stats
+--   -- 2. PERFORM prune_game_history();
+--   -- 3. re-capture; RAISE EXCEPTION if the two arrays differ
+-- ROLLBACK;   -- discard the invoke's effects on EVERY target, prod included
 ```
-
-> This post-condition is the only place the prune function is *invoked* in a test
-> context; it doubles as the fail-safe proof that pruning cannot mutate the
-> lifetime aggregate.
 
 ---
 
@@ -284,7 +331,10 @@ Shape-based, idempotent, read-only. Asserts:
 - **Flow:** pg_cron fires daily → `SELECT prune_game_history()` →
   single atomic `DELETE` of rows with `played_at < now() - 13 months` → row count
   logged to `cron.job_run_details` and via `RAISE NOTICE`. No client, no API, no
-  engine.
+  engine. The scheduled `pg_cron` job is the **only** path that ever *commits* a
+  prune — the post-condition invokes the function but rolls it back (see
+  Interfaces / Types, assertion 3), so even the human-owned prod verification
+  never deletes a row.
 - **Read impact:** none. `getWindowedStats`/`getTrackingSince`/`get_windowed_stats`
   only ever read rows inside the 13-month floor (30d and YTD are both < 13
   months), so pruned rows were never readable by any query. `getTrackingSince`
@@ -300,7 +350,7 @@ Shape-based, idempotent, read-only. Asserts:
 | E1 | **Prune must never affect `player_stats`.** | `prune_game_history()` references only `game_history`. The post-condition invokes it and asserts `player_stats` aggregates are byte-for-byte unchanged (machine-checkable acceptance criterion). Hard constraint. |
 | E2 | **Prune must never delete a row a live window still reads.** | Floor is 13 months; YTD's max reach is ~12 months (Dec 31), 30d is 1 month. Deleted rows (`played_at < now() − 13 months`) are strictly older than anything any window reads. 1-month margin covers year-boundary/clock edge. |
 | E3 | **Re-running / running multiple times a day (idempotency).** | DELETE-by-age is naturally idempotent — the second run in the same window finds no rows past the floor. `cron.schedule` by stable job name updates in place, so re-applying migration 011 never creates a duplicate job. |
-| E4 | **`pg_cron` not available on the target (e.g. bare `supabase start`, or a project without Supabase Cron enabled).** | The `cron.schedule` call is guarded by `IF EXISTS (SELECT 1 FROM pg_extension WHERE extname='pg_cron')`; when absent, the migration still creates the function and only skips scheduling (`RAISE NOTICE`). The post-condition's cron-job assertion is likewise skipped when pg_cron is absent, so CI coverage passes; scheduling is enforced against prod, where Supabase Cron is enabled. **Human release step:** confirm Supabase Cron is enabled on the prod project before/at `db push`; if the platform requires `CREATE EXTENSION pg_cron` via the dashboard, that is a one-time human action documented in the release notes. |
+| E4 | **`pg_cron` not available on the target (e.g. bare `supabase start`, or a project without Supabase Cron enabled).** | The `cron.schedule` call is guarded by `IF EXISTS (SELECT 1 FROM pg_extension WHERE extname='pg_cron')`; when absent, the migration still creates the function and only skips scheduling (`RAISE NOTICE`). The post-condition's cron-job assertion is likewise conditional, using the **same guard mechanism**: the runner has no per-statement skip, so the assertion must be self-contained in SQL — a plpgsql `DO` block gated on `IF EXISTS (SELECT 1 FROM pg_extension WHERE extname='pg_cron')` with the `SELECT … FROM cron.job` placed *inside* that branch. A bare top-level `SELECT … FROM cron.job` is forbidden: it raises `schema "cron" does not exist` on a bare `supabase start` and fails coverage. With the guard, CI coverage passes locally; scheduling is enforced against prod, where Supabase Cron is enabled. **Human release step:** confirm Supabase Cron is enabled on the prod project before/at `db push`; if the platform requires `CREATE EXTENSION pg_cron` via the dashboard, that is a one-time human action documented in the release notes. |
 | E5 | **`getTrackingSince` after steady-state pruning.** | Returns the earliest *retained* `played_at` (~13 months ago) rather than the user's true first game. This is acceptable and honest: `trackingSince` labels how far back windowed data reaches, and no window reads past 13 months anyway. Lifetime stats (from `player_stats`) are unaffected, so all-time totals still reflect the user's full record. |
 | E6 | **A single prune run's delete set is unexpectedly large (e.g. first run after enabling on a table that grew for >13 months without pruning).** | Not a concern now (table is <13 months old, so the first steady-state runs delete ~0). If pruning is enabled late on a large table, the first DELETE is still atomic and bounded by the DB; if it ever caused lock/vacuum pressure, batching the delete (LIMIT + loop) is a follow-up — not built speculatively. |
 | E7 | **Fixed 13-month floor documented but never revisited if a longer window is added later.** | If a window longer than YTD is ever introduced (`windowCutoff` gains a case), the floor must be raised to exceed it + margin **before** that window ships, or switch to the monthly-summary rollup (out of scope here). Called out in the migration comment and here as the guardrail. |
@@ -377,10 +427,13 @@ code changes); testing is integration + gate + post-condition.
   `cron.job` (no duplicate).
 - **`player_stats` untouched (E1) — the headline check.** Seed `player_stats`
   rows and `game_history` rows (including >13-month rows). Snapshot the
-  `player_stats` aggregate. Run the prune. Assert `player_stats` is byte-for-byte
-  unchanged (this is also the post-condition assertion; verify it here against a
-  DB that actually has aged rows to delete, which the fresh-CI post-condition
-  cannot).
+  `player_stats` aggregate. Run the prune (here the DELETE actually commits, so
+  aged rows are really removed). Assert `player_stats` is byte-for-byte unchanged
+  *and* that the aged `game_history` rows are gone. This is the mutating twin of
+  the post-condition's assertion 3: the post-condition rolls the invoke back (so
+  it never mutates prod) and thus cannot prove a non-zero delete leaves
+  `player_stats` alone; this integration test provides that proof against a DB
+  that actually has aged rows to delete.
 - **Migration + post-condition coverage.** Apply 011 via the post-condition
   runner; assert `prune_game_history` exists, is `SECURITY DEFINER`, grant set is
   service_role-only; assert the runner's 1:1 coverage passes. Where pg_cron is
@@ -394,8 +447,9 @@ code changes); testing is integration + gate + post-condition.
   `"011_prune_game_history.sql": ["DELETE"]` allowlist entry present, and **fails**
   if the entry is removed (proves the single in-body `DELETE` is genuinely gated
   and the allowlist is load-bearing). Assert exactly one `DELETE` op is reported
-  for the file (the scheduled-command string literal is neutralized and does not
-  count).
+  for the file — not because the `$cron$` block is neutralized (it is scanned as
+  live SQL) but because that block holds only a `SELECT`, so the sole banned
+  keyword in the file is the in-body `DELETE FROM game_history`.
 - **Drift gate.** `npm run verify:drift -- --diff-file scripts/fixtures/clean-diff.json`
   passes with `011_*` in both `expectedPending` and fixture `pending`; assert it
   **fails** if only one is updated (stale-allowlist regression — guards the
