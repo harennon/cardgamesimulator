@@ -1,7 +1,9 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { Client } from "pg";
+import { createClient } from "@supabase/supabase-js";
 import { createProdShapedFixture } from "./helpers/prodShapedFixture.js";
 import { makePgClient } from "./helpers/pgClient.js";
+import { getSupabaseUrl, getSupabaseAnonKey } from "./helpers/env.js";
 
 // ---------------------------------------------------------------------------
 // LLD 150: migration 013 creates the private feedback-attachments bucket,
@@ -229,5 +231,113 @@ END $$;`;
     await expect(c.query(testedSql)).rejects.toThrow(
       /POSTCONDITION FAILED \(013/,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Runtime RLS deny test — mirrors rls.test.ts "Security test" style
+// (LLD 150 §Test Requirements: 'anon and authenticated cannot read or write an
+//  object in the bucket via the anon/auth key; service_role can')
+// ---------------------------------------------------------------------------
+
+describe("Migration 012 — RLS runtime deny: clients cannot access private bucket", () => {
+  const BUCKET = "feedback-attachments";
+  const TEST_KEY = `rls-test-deny-${Date.now()}.png`;
+
+  // Minimal PNG magic bytes — used by service_role write to verify read denial
+  function makePng(): Uint8Array {
+    const buf = new Uint8Array(16);
+    buf[0] = 0x89;
+    buf[1] = 0x50;
+    buf[2] = 0x4e;
+    buf[3] = 0x47;
+    return buf;
+  }
+
+  it("anon key cannot upload to the private bucket (denied by RLS)", async () => {
+    const anonClient = createClient(getSupabaseUrl(), getSupabaseAnonKey());
+    const { error } = await anonClient.storage
+      .from(BUCKET)
+      .upload(TEST_KEY, makePng(), { contentType: "image/png", upsert: true });
+    // RLS deny policy means storage returns an error (not success).
+    expect(error).not.toBeNull();
+  });
+
+  it("anon key cannot read (list) from the private bucket (denied by RLS)", async () => {
+    const anonClient = createClient(getSupabaseUrl(), getSupabaseAnonKey());
+    const { data, error } = await anonClient.storage.from(BUCKET).list();
+    // RLS deny policy blocks reads — returns error or empty list with error.
+    // Supabase Storage may return a policy-violation error or an empty result;
+    // the critical assertion is that no data was readable.
+    if (error) {
+      expect(error).not.toBeNull();
+    } else {
+      // If no error, Storage returned an empty result under deny policy
+      // (Supabase treats RLS-filtered list as empty, not an error for list).
+      // Assert it did not return any objects — deny-by-construction.
+      expect(data).toEqual([]);
+    }
+  });
+
+  it("authenticated (non-service-role) client cannot upload to the private bucket", async () => {
+    const anonClient = createClient(getSupabaseUrl(), getSupabaseAnonKey());
+    // Sign up a fresh user so the client bears a valid authenticated JWT
+    const { data: authData, error: signUpError } = await anonClient.auth.signUp(
+      {
+        email: `rls-012-deny-${Date.now()}@integration.test`,
+        password: "TestPassword123!",
+      },
+    );
+    if (signUpError || !authData.session) {
+      throw new Error(
+        `Failed to create test user: ${signUpError?.message ?? "no session"}. Is Supabase running?`,
+      );
+    }
+
+    const { error } = await anonClient.storage
+      .from(BUCKET)
+      .upload(`auth-deny-${Date.now()}.png`, makePng(), {
+        contentType: "image/png",
+        upsert: true,
+      });
+    // The authenticated client is still bound by RLS — the deny policy applies.
+    expect(error).not.toBeNull();
+  });
+
+  it("service_role key can upload and download from the private bucket (bypasses RLS)", async () => {
+    // service_role bypasses RLS — the backend's only accessor.
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey) {
+      throw new Error(
+        "SUPABASE_SERVICE_ROLE_KEY is not set. Run `supabase start` and export the env vars.",
+      );
+    }
+    const serviceClient = createClient(getSupabaseUrl(), serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const uploadKey = `service-role-test-${Date.now()}.png`;
+    const pngData = makePng();
+
+    try {
+      // Upload succeeds
+      const { error: uploadError } = await serviceClient.storage
+        .from(BUCKET)
+        .upload(uploadKey, pngData, {
+          contentType: "image/png",
+          upsert: false,
+        });
+      expect(uploadError).toBeNull();
+
+      // Read back via signed URL succeeds
+      const { data: urlData, error: urlError } = await serviceClient.storage
+        .from(BUCKET)
+        .createSignedUrl(uploadKey, 30);
+      expect(urlError).toBeNull();
+      expect(urlData?.signedUrl).toMatch(/^https?:\/\//);
+    } finally {
+      // Cleanup: remove the test object regardless of test outcome
+      await serviceClient.storage.from(BUCKET).remove([uploadKey]);
+    }
   });
 });

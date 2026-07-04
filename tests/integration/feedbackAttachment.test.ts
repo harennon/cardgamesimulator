@@ -390,6 +390,7 @@ describe("Feedback attachment integration (LLD 150)", () => {
     const stubbedStorage: AttachmentStorage = {
       upload: vi.fn(),
       createSignedUrl: (...args) => realStorage.createSignedUrl(...args),
+      remove: (...args) => realStorage.remove(...args),
       removeByPrefix: async (prefix: string) => {
         callCount++;
         if (callCount === 1) throw new Error("transient storage error");
@@ -432,5 +433,116 @@ describe("Feedback attachment integration (LLD 150)", () => {
     }
     const fetched = await fetch(signedUrl);
     expect(fetched.ok).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // E7: appendAttachmentKey throws after successful upload → exact-key cleanup
+  // ensures no orphaned object in Storage
+  // -------------------------------------------------------------------------
+
+  it("E7: uploaded object is removed from Storage when appendAttachmentKey throws", async () => {
+    const user = await createTestUser("E7CleanupTest");
+    const feedbackId = await submitFeedback(ctx, user.accessToken);
+
+    const realStorage = new SupabaseAttachmentStorage(
+      () => SupabaseDB.INSTANCE.storageClient,
+    );
+    const pngBuf = makePng();
+
+    // Build a minimal FeedbackRepository stub: getFeedbackById delegates to
+    // the real DB (so we get the real row + ownership check), but
+    // appendAttachmentKey always throws (simulating a DB failure after upload).
+    const stubbedRepo = {
+      createFeedback: SupabaseDB.INSTANCE.createFeedback.bind(
+        SupabaseDB.INSTANCE,
+      ),
+      getAllFeedback: SupabaseDB.INSTANCE.getAllFeedback.bind(
+        SupabaseDB.INSTANCE,
+      ),
+      deleteFeedback: SupabaseDB.INSTANCE.deleteFeedback.bind(
+        SupabaseDB.INSTANCE,
+      ),
+      getFeedbackById: (id: string) => SupabaseDB.INSTANCE.getFeedbackById(id),
+      appendAttachmentKey: async (
+        _id: string,
+        _key: string,
+      ): Promise<string[]> => {
+        throw new Error("simulated db failure for E7");
+      },
+    };
+
+    const svc = new FeedbackAttachmentService(stubbedRepo, realStorage);
+
+    // addAttachment should fail after uploading (appendAttachmentKey throws)
+    await expect(
+      svc.addAttachment({
+        feedbackId,
+        requesterId: user.id,
+        isAdmin: false,
+        data: pngBuf,
+        mimeType: "image/png",
+      }),
+    ).rejects.toThrow("simulated db failure for E7");
+
+    // The cleanup (storage.remove) must have run — the prefix should be empty.
+    const { data: listed } = await SupabaseDB.INSTANCE.storageClient.storage
+      .from("feedback-attachments")
+      .list(feedbackId);
+    const stillExists = listed && listed.length > 0;
+    expect(stillExists).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // E11: concurrent over-count append → exact-key cleanup removes raced object
+  // -------------------------------------------------------------------------
+
+  it("E11: raced object is removed from Storage when appendAttachmentKey returns over-length array", async () => {
+    const user = await createTestUser("E11RaceTest");
+    const feedbackId = await submitFeedback(ctx, user.accessToken);
+
+    const realStorage = new SupabaseAttachmentStorage(
+      () => SupabaseDB.INSTANCE.storageClient,
+    );
+    const pngBuf = makePng();
+
+    // Simulate the race: appendAttachmentKey succeeds but returns an array
+    // longer than maxPerReport (as if a concurrent request already appended).
+    const overLengthResult = ["k1", "k2", "k3", "k4"]; // 4 > maxPerReport=3
+    const stubbedRepo = {
+      createFeedback: SupabaseDB.INSTANCE.createFeedback.bind(
+        SupabaseDB.INSTANCE,
+      ),
+      getAllFeedback: SupabaseDB.INSTANCE.getAllFeedback.bind(
+        SupabaseDB.INSTANCE,
+      ),
+      deleteFeedback: SupabaseDB.INSTANCE.deleteFeedback.bind(
+        SupabaseDB.INSTANCE,
+      ),
+      getFeedbackById: (id: string) => SupabaseDB.INSTANCE.getFeedbackById(id),
+      appendAttachmentKey: async (
+        _id: string,
+        _key: string,
+      ): Promise<string[]> => overLengthResult,
+    };
+
+    const svc = new FeedbackAttachmentService(stubbedRepo, realStorage);
+
+    // addAttachment should upload, then detect the over-length result and clean up
+    await expect(
+      svc.addAttachment({
+        feedbackId,
+        requesterId: user.id,
+        isAdmin: false,
+        data: pngBuf,
+        mimeType: "image/png",
+      }),
+    ).rejects.toThrow();
+
+    // The raced object must now be absent from Storage.
+    const { data: listed } = await SupabaseDB.INSTANCE.storageClient.storage
+      .from("feedback-attachments")
+      .list(feedbackId);
+    const stillExists = listed && listed.length > 0;
+    expect(stillExists).toBe(false);
   });
 });

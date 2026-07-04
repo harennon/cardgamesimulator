@@ -135,14 +135,17 @@ export class FeedbackAttachmentService {
         key,
       );
     } catch (err) {
-      // Cleanup the uploaded object so no orphan remains.
-      await this.storage.removeByPrefix(key).catch(() => undefined);
+      // Cleanup the uploaded object so no orphan remains (E7).
+      // Use exact-key delete — removeByPrefix treats its arg as a folder,
+      // so passing a full file path would list a non-existent folder and
+      // delete nothing.
+      await this.storage.remove(key).catch(() => undefined);
       throw err;
     }
 
     if (updatedKeys.length > ATTACHMENT_LIMITS.maxPerReport) {
-      // Concurrent append raced past the cap — remove the object we just added.
-      await this.storage.removeByPrefix(key).catch(() => undefined);
+      // Concurrent append raced past the cap — remove the object we just added (E11).
+      await this.storage.remove(key).catch(() => undefined);
       throw new AttachmentValidationError(
         `Maximum ${ATTACHMENT_LIMITS.maxPerReport} attachments per report`,
       );

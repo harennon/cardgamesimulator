@@ -25,6 +25,7 @@ function makeStorage(
     createSignedUrl: vi
       .fn()
       .mockResolvedValue("https://signed.example.com/key"),
+    remove: vi.fn().mockResolvedValue(undefined),
     removeByPrefix: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -294,6 +295,34 @@ describe("FeedbackAttachmentService.addAttachment", () => {
     expect(repo.appendAttachmentKey).not.toHaveBeenCalled();
   });
 
+  it("removes just-uploaded object (via storage.remove) when appendAttachmentKey throws (E7 orphan prevention)", async () => {
+    const storage = makeStorage();
+    const appendError = new Error("db error");
+    const repo: FeedbackRepository = {
+      createFeedback: vi.fn(),
+      getAllFeedback: vi.fn(),
+      deleteFeedback: vi.fn(),
+      getFeedbackById: vi.fn().mockResolvedValue(makeFeedbackRow()),
+      appendAttachmentKey: vi.fn().mockRejectedValue(appendError),
+    };
+    const svc = new FeedbackAttachmentService(repo, storage);
+
+    await expect(svc.addAttachment(makeInput())).rejects.toThrow("db error");
+
+    // Upload succeeded, so cleanup must happen via exact-key delete (not removeByPrefix).
+    expect(storage.upload).toHaveBeenCalledOnce();
+    expect(storage.remove).toHaveBeenCalledOnce();
+    expect(storage.removeByPrefix).not.toHaveBeenCalled();
+
+    // The key passed to remove must match the key that was uploaded.
+    const uploadedKey = (storage.upload as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
+    const removedKey = (storage.remove as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
+    expect(removedKey).toBe(uploadedKey);
+    expect(removedKey).toMatch(/^fb-001\/[0-9a-f-]{36}\.png$/);
+  });
+
   // --- E11: concurrent append race ---
 
   it("removes the just-uploaded object and throws when appendAttachmentKey returns over-length array", async () => {
@@ -305,9 +334,11 @@ describe("FeedbackAttachmentService.addAttachment", () => {
     await expect(svc.addAttachment(makeInput())).rejects.toBeInstanceOf(
       AttachmentValidationError,
     );
-    expect(storage.removeByPrefix).toHaveBeenCalledOnce();
-    // The prefix passed should be the exact key that was just uploaded
-    const removedKey = (storage.removeByPrefix as ReturnType<typeof vi.fn>).mock
+    // Must use exact-key delete (storage.remove), NOT removeByPrefix which
+    // treats its arg as a folder prefix and would list an empty folder.
+    expect(storage.remove).toHaveBeenCalledOnce();
+    expect(storage.removeByPrefix).not.toHaveBeenCalled();
+    const removedKey = (storage.remove as ReturnType<typeof vi.fn>).mock
       .calls[0][0] as string;
     expect(removedKey).toMatch(/^fb-001\/[0-9a-f-]{36}\.png$/);
   });

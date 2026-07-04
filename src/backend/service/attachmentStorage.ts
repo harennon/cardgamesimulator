@@ -3,6 +3,8 @@ import { SupabaseClient } from "@supabase/supabase-js";
 export interface AttachmentStorage {
   upload(key: string, data: Buffer, mimeType: string): Promise<void>;
   createSignedUrl(key: string, ttlSeconds: number): Promise<string>;
+  /** Delete a single object by its exact key (no-op if already absent). */
+  remove(key: string): Promise<void>;
   /** Delete all objects under the given prefix (idempotent — no-op if absent). */
   removeByPrefix(prefix: string): Promise<void>;
 }
@@ -38,6 +40,11 @@ export class SupabaseAttachmentStorage implements AttachmentStorage {
       );
     }
     return data.signedUrl;
+  }
+
+  async remove(key: string): Promise<void> {
+    const { error } = await this.client.storage.from(BUCKET).remove([key]);
+    if (error) throw new Error(`Storage remove failed: ${error.message}`);
   }
 
   async removeByPrefix(prefix: string): Promise<void> {
