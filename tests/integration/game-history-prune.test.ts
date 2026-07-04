@@ -513,6 +513,48 @@ describe("prune_game_history — player_stats is untouched (E1, headline check)"
   });
 });
 
+describe("post-condition assertion 3 — ROLLBACK makes prune invoke non-mutating", () => {
+  it("seeding a >13-month row and running the post-condition leaves the row intact (ROLLBACK undoes the invoke)", async () => {
+    // This test guards the mandatory BEGIN...ROLLBACK wrapper in assertion 3
+    // (LLD 149 §Interfaces/Types "Why the ROLLBACK is mandatory"). Without it a
+    // bare PERFORM prune_game_history() at the top level would commit a real DELETE
+    // when the verifier runs against prod after rows have aged past 13 months.
+    const fixture = await createProdShapedFixture({ baseline: "fresh" });
+    try {
+      await fixture.applyMigrations([
+        "010_create_game_history.sql",
+        "011_prune_game_history.sql",
+      ]);
+
+      // Seed a row that is older than 13 months using DB-side arithmetic to avoid
+      // Node/DB clock skew. This row IS past the retention floor and prune would
+      // delete it — but the post-condition's ROLLBACK must undo that delete.
+      await fixture.client.query(
+        `INSERT INTO game_history (user_id, game_type, won, lost, score, played_at)
+         VALUES ($1, 'big2', true, false, 5,
+                 now() - INTERVAL '14 months');`,
+        [USER_A],
+      );
+
+      const beforeCount = await countHistory(fixture);
+      expect(beforeCount).toBe(1);
+
+      // Run the real post-condition file (the one that has the ROLLBACK).
+      // If the ROLLBACK is absent the row would be deleted; if present it survives.
+      await expect(
+        fixture.runPostcondition("011_prune_game_history.postcondition.sql"),
+      ).resolves.toBeUndefined();
+
+      // The aged row must still be present — the post-condition's ROLLBACK
+      // discarded the prune invoke's effects.
+      const afterCount = await countHistory(fixture);
+      expect(afterCount).toBe(1);
+    } finally {
+      await fixture.teardown();
+    }
+  });
+});
+
 describe("drift-gate coupling — 011 in both expectedPending and fixture pending", () => {
   it("the in-tree fixture lists 011 as pending and the allowlist expects it", async () => {
     const { readFileSync } = await import("node:fs");

@@ -7,11 +7,12 @@
 -- security flag + grant set, never a constraint/index name. Idempotent.
 -- The cron-job assertion is self-guarded so it never errors where pg_cron is
 -- absent (e.g. bare supabase start). Assertion 3 invokes prune_game_history()
--- and then verifies player_stats is unchanged. The function only ever touches
--- game_history (never player_stats), so the check is structurally safe; on both
--- CI/fresh and prod the first verification run deletes 0 game_history rows (the
--- table has no rows older than 13 months at this stage), making the invocation
--- a true no-op for data purposes.
+-- inside an explicit BEGIN...ROLLBACK so it is provably non-mutating on every
+-- target (LLD 149 §Interfaces/Types "Why the ROLLBACK is mandatory"). The runner
+-- (scripts/verify-postconditions.mjs) executes this file via a bare client.query()
+-- with no enclosing transaction; without the ROLLBACK the invoke would commit a
+-- real DELETE on prod. The ROLLBACK discards the invoke's effects unconditionally,
+-- leaving the first real prune to the scheduled pg_cron job.
 
 DO $$
 DECLARE
@@ -80,11 +81,15 @@ BEGIN
 END $$;
 
 -- 3. player_stats is unchanged after a prune invocation (acceptance criterion).
--- Snapshots player_stats row count + aggregate hash (shape-agnostic so this
--- assertion holds regardless of which migrations have been applied before 011),
--- calls prune_game_history(), then re-snapshots and asserts equality.
--- prune_game_history() references only game_history — never player_stats — so
--- both the row count and the row hash must be identical before and after.
+-- Wrapped in BEGIN...ROLLBACK so the invoke is non-mutating on EVERY target,
+-- including prod (LLD 149 §Interfaces/Types: "Why the ROLLBACK is mandatory").
+-- The runner sends the whole file as one client.query() with autocommit, so an
+-- explicit BEGIN/ROLLBACK pair at the top level is honored and fully discards
+-- whatever prune_game_history() deletes — even on prod where aged rows exist.
+-- This makes the post-condition provably read-only: the first real prune is always
+-- owned by the scheduled pg_cron job, never by the verifier.
+BEGIN;
+
 DO $$
 DECLARE
   before_count bigint;
@@ -108,3 +113,5 @@ BEGIN
       before_count, after_count, before_hash, after_hash;
   END IF;
 END $$;
+
+ROLLBACK;
