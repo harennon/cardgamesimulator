@@ -8,10 +8,17 @@
       v-for="seat in seats"
       :key="seat.playerId"
       class="tonk-seat"
-      :class="{ 'tonk-seat--active': isActive(seat.seatIndex) }"
+      :class="{
+        'tonk-seat--active': isActive(seat.seatIndex),
+        'tonk-seat--self': seat.isSelf,
+      }"
       data-testid="tonk-seat"
     >
-      <div v-if="!compact" class="tonk-seat__fan" data-testid="tonk-seat-fan">
+      <div
+        v-if="!compact && !seat.isSelf"
+        class="tonk-seat__fan"
+        data-testid="tonk-seat-fan"
+      >
         <div
           v-for="n in Math.min(seat.cardCount, 13)"
           :key="n"
@@ -20,14 +27,19 @@
       </div>
 
       <div class="tonk-seat__info">
-        <AiAvatar v-if="seat.isAi" size="sm" />
-        <span class="tonk-seat__name">{{ seat.displayName }}</span>
-        <AiBadge v-if="seat.isAi" data-testid="ai-badge" />
+        <AiAvatar v-if="seat.isAi && !seat.isSelf" size="sm" />
+        <span class="tonk-seat__name">{{
+          seat.isSelf ? "You" : seat.displayName
+        }}</span>
+        <AiBadge v-if="seat.isAi && !seat.isSelf" data-testid="ai-badge" />
         <div class="tonk-seat__meta">
           <span class="tonk-seat__count">{{ seat.cardCount }}</span>
-          <span class="tonk-seat__tally" data-testid="tonk-seat-tally">{{
-            seat.tally
-          }}</span>
+          <span
+            class="tonk-seat__tally"
+            :class="{ 'tonk-seat__tally--near': isNearLine(seat.tally) }"
+            data-testid="tonk-seat-tally"
+            >{{ seat.tally }}</span
+          >
           <span
             v-if="isActive(seat.seatIndex)"
             class="tonk-seat__phase-tag"
@@ -37,7 +49,7 @@
           >
         </div>
         <span
-          v-if="!seat.isConnected && !seat.isAi"
+          v-if="!seat.isConnected && !seat.isAi && !seat.isSelf"
           class="tonk-seat__disconnected"
           >disconnected</span
         >
@@ -67,6 +79,7 @@ import AiBadge from "./AiBadge.vue";
 import AiAvatar from "./AiAvatar.vue";
 import {
   isCompactRail,
+  isNearLine,
   isWrappingRail,
   phaseClass,
   phaseTag,
@@ -131,6 +144,15 @@ function isActive(seatIndex: number): boolean {
   background: rgba(201, 168, 76, 0.08);
 }
 
+.tonk-seat--self {
+  border-color: var(--tonk-self);
+  background: rgba(155, 127, 232, 0.08);
+}
+
+.tonk-seat--self .tonk-seat__name {
+  color: var(--tonk-self);
+}
+
 .tonk-seat__fan {
   display: flex;
 }
@@ -189,6 +211,10 @@ function isActive(seatIndex: number): boolean {
   background: rgba(0, 0, 0, 0.3);
   padding: 1px 7px;
   border-radius: 8px;
+}
+
+.tonk-seat__tally--near {
+  color: var(--tonk-near-150);
 }
 
 .tonk-seat__phase-tag {
