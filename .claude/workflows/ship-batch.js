@@ -335,6 +335,15 @@ const MECH_MODEL = "global.anthropic.claude-haiku-4-5-20251001-v1:0";
 const hasBlockedLabel = (labels) =>
   Array.isArray(labels) && labels.some((l) => l.startsWith("blocked:"));
 
+// An issue is a pending PROPOSAL if it still carries the "proposal" label.
+// Proposals are AI-generated ideas gated on human review (see the
+// propose-features workflow); approval means a human REMOVES this label and
+// adds triage:fix. Until then they are never selected — even if a human added
+// triage:fix but forgot to remove "proposal", we require the label be gone so
+// approval is unambiguous.
+const hasProposalLabel = (labels) =>
+  Array.isArray(labels) && labels.includes("proposal");
+
 // Decompose a large issue into shippable sub-issues: ask the CEO for the
 // breakdown, create the sub-issues (labeled triage:fix so the NEXT run ships
 // them), then re-label the parent as an epic. Used by both the normal select
@@ -455,8 +464,8 @@ Step 3 — For each issue, check for "Restart:" comments:
 
 Step 4 — Classify each issue:
   A) NEEDS TRIAGE (add to needsTriage):
-     - Has an ACTIVE "Restart:" comment (it is the last comment on the issue — override all other skip rules)
-     - No label starting with "triage:" AND no "blocked:" label (never triaged)
+     - Has an ACTIVE "Restart:" comment (it is the last comment on the issue — override all other skip rules) UNLESS it also has the "proposal" label (proposals are human-gated; never triage them regardless of comments)
+     - No label starting with "triage:" AND no "blocked:" label AND no "proposal" label (never triaged)
      - Has "blocked:frontend-decision" AND a comment containing "Frontend decision:" that is MORE RECENT than the latest "Frontend Design Mockups" comment (decision provided — unblock it)
      - Has "blocked:human" AND a HUMAN comment (not from a bot — i.e. any comment NOT containing the bot marker "Blocked: needs a human") that is MORE RECENT than the latest "Blocked: needs a human" comment (a human acted — unblock it and re-triage)
      - Has "triage:needs-info" BUT updatedAt is more than 24 hours after the issue was last labeled (info was likely provided)
@@ -464,6 +473,7 @@ Step 4 — Classify each issue:
      - Has "triage:close" BUT updatedAt is more recent than when the label was likely applied (pushback received)
 
   B) SKIP (exclude):
+     - Has the "proposal" label — these are AI-generated ideas awaiting human review, gated by the propose-features workflow. Never triage, promote, or ship them. A human approves a proposal by REMOVING the "proposal" label and adding "triage:fix"; only then does it enter the pipeline. Skip regardless of any comments (including "Restart:").
      - Has ANY label starting with "blocked:" (e.g. "blocked:frontend-decision", "blocked:human") with no unblock trigger met above — these are parked on a human gate; never triage or promote until a human clears them
      - Has "triage:fix" label AND no active Restart (handled by selection phase)
      - Has any triage label with no re-triage trigger met AND no active Restart
@@ -521,7 +531,7 @@ Return the issues found.`,
     // human input, can't ship), matching the deferred fetch in the Select phase.
     const deferredCheck = await agent(
       `Run: gh issue list --state open --label "triage:defer" --json number,title,labels --limit 20
-Exclude any issue that also has ANY label starting with "blocked:" (e.g. "blocked:frontend-decision", "blocked:human") — those are parked on a human gate and cannot be shipped.
+Exclude any issue that also has ANY label starting with "blocked:" (e.g. "blocked:frontend-decision", "blocked:human") OR the "proposal" label — those are parked on a human gate and cannot be shipped.
 Return the remaining issues (number and title) — empty array if none.`,
       { label: "check-deferred-pool", schema: ISSUE_POOL_SCHEMA },
     );
@@ -715,7 +725,7 @@ if (fixPool.length === 0) {
 
 Run: gh issue list --state open --label "triage:defer" --json number,title,body,labels --limit 20
 
-Exclude any issue that also has ANY label starting with "blocked:" (e.g. "blocked:frontend-decision", "blocked:human") — those are parked on a human gate and cannot be shipped.
+Exclude any issue that also has ANY label starting with "blocked:" (e.g. "blocked:frontend-decision", "blocked:human") OR the "proposal" label — those are parked on a human gate and cannot be shipped.
 
 For each remaining issue, also get a brief summary:
   gh issue view <number> --json title,body --jq '.body[:200]'
@@ -938,6 +948,10 @@ BLOCKEOF
 // shippable right now, so there is nothing for the CEO to select.
 const blockedReasons = [];
 const eligiblePool = fixPool.filter((i) => {
+  if (hasProposalLabel(i.labels)) {
+    blockedReasons.push(`#${i.number} (proposal — awaiting human approval)`);
+    return false;
+  }
   if (hasBlockedLabel(i.labels)) {
     const blocking = (i.labels || [])
       .filter((l) => l.startsWith("blocked:"))
