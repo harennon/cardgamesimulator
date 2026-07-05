@@ -154,14 +154,14 @@ describe("uploadErrorMessage", () => {
 
   it("maps 400 with size/large keyword in message to too-large", () => {
     const err = {
-      response: { status: 400, data: { message: "File size exceeded" } },
+      response: { status: 400, data: { error: "File size exceeded" } },
     };
     expect(uploadErrorMessage(err)).toContain("too large");
   });
 
   it("maps 400 without size keyword to server message", () => {
     const err = {
-      response: { status: 400, data: { message: "Invalid mime type" } },
+      response: { status: 400, data: { error: "Invalid mime type" } },
     };
     expect(uploadErrorMessage(err)).toBe("Invalid mime type");
   });
@@ -172,7 +172,7 @@ describe("uploadErrorMessage", () => {
   });
 
   it("maps 4xx with server message to that message", () => {
-    const err = { response: { status: 403, data: { message: "Forbidden" } } };
+    const err = { response: { status: 403, data: { error: "Forbidden" } } };
     expect(uploadErrorMessage(err)).toBe("Forbidden");
   });
 

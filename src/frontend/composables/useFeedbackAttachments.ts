@@ -84,7 +84,7 @@ export function blobToBase64(blob: Blob): Promise<string> {
 export function uploadErrorMessage(err: unknown): string {
   if (err && typeof err === "object" && "response" in err) {
     const response = (
-      err as { response?: { status?: number; data?: { message?: string } } }
+      err as { response?: { status?: number; data?: { error?: string } } }
     ).response;
     if (response) {
       const status = response.status ?? 0;
@@ -92,7 +92,7 @@ export function uploadErrorMessage(err: unknown): string {
         return "Image is too large — try a smaller screenshot.";
       }
       if (status === 400) {
-        const msg = response.data?.message ?? "";
+        const msg = response.data?.error ?? "";
         if (
           msg.toLowerCase().includes("size") ||
           msg.toLowerCase().includes("large")
@@ -102,7 +102,7 @@ export function uploadErrorMessage(err: unknown): string {
         return msg || "This image was rejected.";
       }
       if (status >= 400 && status < 500) {
-        return response.data?.message || "This image was rejected.";
+        return response.data?.error || "This image was rejected.";
       }
     }
   }
