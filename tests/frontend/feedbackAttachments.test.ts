@@ -530,6 +530,66 @@ async function runSubmit(deps: SubmitDeps): Promise<{
   return { closed, toastShown, formError, description: description.value };
 }
 
+/**
+ * Stateful submit orchestration that mirrors the FIXED FeedbackWidget.submit():
+ * - savedFeedbackId persists across calls (prevents re-POST on re-Submit).
+ * - reset() clears savedFeedbackId, mirroring closeModal().
+ */
+function makeStatefulSubmitter(deps: SubmitDeps) {
+  let savedFeedbackId: string | null = null;
+
+  async function submit(): Promise<{
+    closed: boolean;
+    toastShown: boolean;
+    formError: string;
+    description: string;
+  }> {
+    let closed = false;
+    let toastShown = false;
+    let formError = "";
+    const description = { value: "some feedback" };
+
+    if (savedFeedbackId === null) {
+      try {
+        const resp = await deps.postFeedback();
+        savedFeedbackId = resp.id;
+      } catch {
+        formError = "Failed to submit. Please try again.";
+        return {
+          closed,
+          toastShown,
+          formError,
+          description: description.value,
+        };
+      }
+    }
+
+    const feedbackId = savedFeedbackId!;
+
+    if (!deps.attachments.hasQueued.value) {
+      closed = true;
+      toastShown = true;
+      savedFeedbackId = null;
+      return { closed, toastShown, formError, description: description.value };
+    }
+
+    const allDone = await deps.attachments.uploadAll(feedbackId);
+    if (allDone) {
+      closed = true;
+      toastShown = true;
+      savedFeedbackId = null;
+    }
+
+    return { closed, toastShown, formError, description: description.value };
+  }
+
+  function reset() {
+    savedFeedbackId = null;
+  }
+
+  return { submit, reset };
+}
+
 describe("submit orchestration", () => {
   it("CE1: zero attachments — calls postFeedback once and closes (no uploadAll)", async () => {
     const postFeedback = vi.fn(() => Promise.resolve({ id: "fb-1" }));
@@ -633,5 +693,55 @@ describe("submit orchestration", () => {
     const skipped = results.filter((r) => r === null);
     expect(ran).toHaveLength(1);
     expect(skipped).toHaveLength(1);
+  });
+
+  it("CE8 re-Submit: after partial upload failure, re-Submit does NOT re-call postFeedback and retries only the error item against the original id", async () => {
+    // First upload attempt always fails (simulates transient 500).
+    let uploadAttempts = 0;
+    const uploadOne = vi.fn(
+      async (_feedbackId: string, item: AttachmentItem) => {
+        uploadAttempts++;
+        // Fail on first attempt for bad.jpg; succeed on retry
+        if (item.name === "bad.jpg" && uploadAttempts <= 2) {
+          throw { response: { status: 500 } };
+        }
+      },
+    );
+    const postFeedback = vi.fn(() => Promise.resolve({ id: "fb-original" }));
+    const attach = useFeedbackAttachments({
+      downscale: stubDownscale(),
+      uploadOne,
+    });
+
+    await attach.addFiles([
+      makeFile("ok.png", "image/png"),
+      makeFile("bad.jpg", "image/jpeg"),
+    ]);
+
+    const { submit } = makeStatefulSubmitter({
+      postFeedback,
+      attachments: attach,
+    });
+
+    // First submit: ok.png succeeds, bad.jpg fails → modal stays open
+    const result1 = await submit();
+    expect(result1.closed).toBe(false);
+    expect(postFeedback).toHaveBeenCalledTimes(1);
+
+    // Reset uploadOne call tracking (not the attempt counter)
+    uploadOne.mockClear();
+    uploadAttempts = 2; // ensure next attempt for bad.jpg succeeds (uploadAttempts will become 3)
+
+    // Second submit (re-Submit): must NOT call postFeedback again; retries only bad.jpg
+    const result2 = await submit();
+    expect(postFeedback).toHaveBeenCalledTimes(1); // still only 1 total — no duplicate row
+    // uploadOne called exactly once (for bad.jpg only; ok.png is already "done")
+    expect(uploadOne).toHaveBeenCalledTimes(1);
+    const retriedItem = uploadOne.mock.calls[0][1] as AttachmentItem;
+    expect(retriedItem.name).toBe("bad.jpg");
+    // The feedbackId used for retry must be the original id, not a new one
+    expect(uploadOne.mock.calls[0][0]).toBe("fb-original");
+    expect(result2.closed).toBe(true);
+    expect(result2.toastShown).toBe(true);
   });
 });

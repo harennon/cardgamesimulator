@@ -18,6 +18,11 @@ const submitting = ref(false);
 const errorMessage = ref("");
 const showToast = ref(false);
 
+// Persists the feedback row id after the first successful POST so that a
+// re-Submit after a partial upload failure retries attachments against the
+// existing row rather than creating a duplicate.
+const savedFeedbackId = ref<string | null>(null);
+
 const route = useRoute();
 const attach = useFeedbackAttachments();
 const maxCount = FEEDBACK_ATTACHMENT_LIMITS.maxCount;
@@ -35,6 +40,7 @@ function closeModal() {
   category.value = "bug";
   description.value = "";
   errorMessage.value = "";
+  savedFeedbackId.value = null;
   attach.clear();
 }
 
@@ -126,22 +132,27 @@ async function submit() {
   submitting.value = true;
   errorMessage.value = "";
 
-  let feedbackId: string;
-  try {
-    const resp = await axiosInstance.post<SubmitFeedbackResponse>(
-      "/api/feedback",
-      {
-        category: category.value,
-        description: description.value,
-        metadata: await buildMetadata(),
-      },
-    );
-    feedbackId = resp.data.id;
-  } catch {
-    errorMessage.value = "Failed to submit. Please try again.";
-    submitting.value = false;
-    return;
+  // Only POST the feedback row when we don't already have a saved id from a
+  // previous partial-failure attempt. This prevents duplicate rows on re-Submit.
+  if (savedFeedbackId.value === null) {
+    try {
+      const resp = await axiosInstance.post<SubmitFeedbackResponse>(
+        "/api/feedback",
+        {
+          category: category.value,
+          description: description.value,
+          metadata: await buildMetadata(),
+        },
+      );
+      savedFeedbackId.value = resp.data.id;
+    } catch {
+      errorMessage.value = "Failed to submit. Please try again.";
+      submitting.value = false;
+      return;
+    }
   }
+
+  const feedbackId = savedFeedbackId.value!;
 
   if (attach.hasQueued.value) {
     const allDone = await attach.uploadAll(feedbackId);
