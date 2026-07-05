@@ -113,3 +113,18 @@ export interface SubmitAttachmentResponse {
   attachmentId: string;
   key: string;
 }
+
+export interface AttachmentLink {
+  key: string; // storage path — for reference/debugging ONLY, never an openable substitute
+  url: string; // short-lived signed read URL (default TTL 60s)
+}
+
+export interface AdminFeedbackEntry {
+  id: string;
+  category: FeedbackCategory;
+  description: string;
+  metadata: unknown; // FeedbackMetadata | null; kept loose to match existing handler shape
+  userId: string | null;
+  createdAt: string; // ISO 8601
+  attachments: AttachmentLink[]; // REPLACES the former `attachmentKeys` field; [] when none
+}

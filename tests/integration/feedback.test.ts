@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import type { SubmitFeedbackResponse } from "../../src/shared/model.js";
+import type {
+  SubmitFeedbackResponse,
+  SubmitAttachmentResponse,
+  AdminFeedbackEntry,
+} from "../../src/shared/model.js";
 import {
   createTestServer,
   type TestServerContext,
@@ -8,6 +12,14 @@ import {
 import { createTestUser } from "./helpers/supabaseUser.js";
 import { createTestGuest } from "./helpers/guestUser.js";
 import { SupabaseDB } from "../../src/backend/database/supabaseDb.js";
+
+// Minimal real PNG (1×1 pixel) — reused from feedbackAttachment.test.ts
+const MINIMAL_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+function pngBase64(): string {
+  return MINIMAL_PNG_BASE64;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -292,6 +304,118 @@ describe("Feedback endpoint integration", () => {
       expect(found).toBeDefined();
       expect(found!.category).toBe("bug");
       expect(found!.createdAt).toBeDefined();
+    } finally {
+      delete process.env.FEEDBACK_ADMIN_IDS;
+    }
+  });
+
+  // GET /feedback — signed URL resolution (LLD 157)
+
+  it("GET /feedback with an attached entry: attachments[0].url is a fetchable signed URL, not the raw key", async () => {
+    const admin = await createTestUser("FeedbackSignedUrl");
+
+    // Create feedback and upload an attachment.
+    const createRes = await request(ctx.app)
+      .post("/feedback")
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ category: "bug", description: "Signed URL test" });
+    expect(createRes.status).toBe(201);
+    const { id } = createRes.body as SubmitFeedbackResponse;
+
+    const attachRes = await request(ctx.app)
+      .post(`/feedback/${id}/attachments`)
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ image: pngBase64(), mimeType: "image/png" });
+    expect(attachRes.status).toBe(201);
+    const { key } = attachRes.body as SubmitAttachmentResponse;
+
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
+    try {
+      const getRes = await request(ctx.app)
+        .get("/feedback")
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(getRes.status).toBe(200);
+
+      const items = getRes.body as AdminFeedbackEntry[];
+      const entry = items.find((f) => f.id === id);
+      expect(entry).toBeDefined();
+      expect(entry!.attachments).toHaveLength(1);
+      const link = entry!.attachments[0];
+
+      // key field is the storage path
+      expect(link.key).toBe(key);
+      // url is a real HTTP URL, not the raw storage key
+      expect(link.url).toMatch(/^https?:\/\//);
+      expect(link.url).not.toBe(key);
+
+      // URL is fetchable — proves it's a valid signed URL pointing to the object
+      const fetched = await fetch(link.url);
+      expect(fetched.ok).toBe(true);
+    } finally {
+      delete process.env.FEEDBACK_ADMIN_IDS;
+    }
+  });
+
+  it("GET /feedback with no-attachment entry: attachments is [] and attachmentKeys is absent", async () => {
+    const admin = await createTestUser("FeedbackNoAttach");
+
+    const createRes = await request(ctx.app)
+      .post("/feedback")
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ category: "other", description: "No attachment entry" });
+    expect(createRes.status).toBe(201);
+    const { id } = createRes.body as SubmitFeedbackResponse;
+
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
+    try {
+      const getRes = await request(ctx.app)
+        .get("/feedback")
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(getRes.status).toBe(200);
+
+      const items = getRes.body as AdminFeedbackEntry[];
+      const entry = items.find((f) => f.id === id);
+      expect(entry).toBeDefined();
+      expect(entry!.attachments).toEqual([]);
+      // The old `attachmentKeys` field must NOT appear on the wire (replaced by `attachments`)
+      expect("attachmentKeys" in entry!).toBe(false);
+    } finally {
+      delete process.env.FEEDBACK_ADMIN_IDS;
+    }
+  });
+
+  it("GET /feedback signed URL contains Supabase token query params (short-lived, not a public URL)", async () => {
+    const admin = await createTestUser("FeedbackSignedUrlParams");
+
+    const createRes = await request(ctx.app)
+      .post("/feedback")
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ category: "bug", description: "Signed URL params test" });
+    expect(createRes.status).toBe(201);
+    const { id } = createRes.body as SubmitFeedbackResponse;
+
+    await request(ctx.app)
+      .post(`/feedback/${id}/attachments`)
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ image: pngBase64(), mimeType: "image/png" });
+
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
+    try {
+      const getRes = await request(ctx.app)
+        .get("/feedback")
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(getRes.status).toBe(200);
+
+      const items = getRes.body as AdminFeedbackEntry[];
+      const entry = items.find((f) => f.id === id);
+      expect(entry).toBeDefined();
+      expect(entry!.attachments).toHaveLength(1);
+      const { url } = entry!.attachments[0];
+
+      // Supabase signed URLs include a `token` query parameter.
+      // This confirms it's a signed (short-lived) URL, not a public object URL.
+      const parsedUrl = new URL(url);
+      expect(parsedUrl.searchParams.has("token")).toBe(true);
     } finally {
       delete process.env.FEEDBACK_ADMIN_IDS;
     }

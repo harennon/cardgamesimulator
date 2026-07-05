@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import { renderFeedback } from "./lib/renderFeedback.mjs";
 
 config({ path: ".env.admin" });
 
@@ -78,26 +79,5 @@ if (category) {
   filtered = rows.filter((r) => r.category === category);
 }
 
-if (filtered.length === 0) {
-  console.log("No feedback found.");
-  process.exit(0);
-}
-
-if (json) {
-  console.log(JSON.stringify(filtered, null, 2));
-  process.exit(0);
-}
-
-console.log(`\n  Feedback (${filtered.length} entries)\n`);
-
-for (const row of filtered) {
-  const date = new Date(row.createdAt).toLocaleString();
-  const meta = row.metadata;
-  const route = meta?.route ?? "—";
-  const userType = meta?.userType ?? "—";
-
-  console.log(`  [${row.category}]  ${date}`);
-  console.log(`  ${row.description}`);
-  console.log(`  route: ${route}  user: ${userType}  id: ${row.id}`);
-  console.log("");
-}
+console.log(renderFeedback(filtered, { json }));
+if (filtered.length === 0) process.exit(0);

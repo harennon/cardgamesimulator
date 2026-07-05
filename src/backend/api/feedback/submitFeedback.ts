@@ -6,6 +6,7 @@ import type {
   SubmitFeedbackResponse,
   SubmitAttachmentRequest,
   SubmitAttachmentResponse,
+  AttachmentLink,
 } from "@shared/model";
 import { FeedbackService, ValidationError } from "@/service/feedbackService";
 import {
@@ -67,17 +68,32 @@ export class FeedbackHandler extends Handler {
     }
 
     const feedback = await feedbackRepo.getAllFeedback();
-    response.status(200).json(
-      feedback.map((f) => ({
+    const entries = await Promise.all(
+      feedback.map(async (f) => ({
         id: f.id,
         category: f.category,
         description: f.description,
         metadata: f.metadata,
         userId: f.userId,
         createdAt: f.createdAt.toISOString(),
-        attachmentKeys: f.attachmentKeys,
+        attachments: await this.resolveAttachments(f.attachmentKeys ?? []),
       })),
     );
+    response.status(200).json(entries);
+  }
+
+  private async resolveAttachments(keys: string[]): Promise<AttachmentLink[]> {
+    const results = await Promise.all(
+      keys.map(async (key) => {
+        try {
+          return { key, url: await this.attachmentService.getSignedUrl(key) };
+        } catch (err) {
+          console.warn(`Failed to sign attachment key ${key}:`, err);
+          return null; // omit — never leak the raw key as a substitute link
+        }
+      }),
+    );
+    return results.filter((r): r is AttachmentLink => r !== null);
   }
 
   public async delete(request: Request, response: Response) {
