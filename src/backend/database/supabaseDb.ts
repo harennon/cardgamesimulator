@@ -48,6 +48,11 @@ export class SupabaseDB
     return this.client;
   }
 
+  /** Returns the initialized Supabase client for storage operations. */
+  public get storageClient(): SupabaseClient {
+    return this.db;
+  }
+
   public async createGame(
     gameId: string,
     gameType: GameType,
@@ -264,6 +269,30 @@ export class SupabaseDB
     return (data ?? []).length > 0;
   }
 
+  public async getFeedbackById(id: string): Promise<Feedback | null> {
+    const { data, error } = await this.db
+      .from("feedback")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw new Error(`getFeedbackById failed: ${error.message}`);
+    if (!data) return null;
+    return this.mapFeedback(data as Record<string, unknown>);
+  }
+
+  public async appendAttachmentKey(
+    feedbackId: string,
+    key: string,
+  ): Promise<string[]> {
+    const { data, error } = await this.db.rpc(
+      "append_feedback_attachment_key",
+      { p_feedback_id: feedbackId, p_key: key },
+    );
+    if (error) throw new Error(`appendAttachmentKey failed: ${error.message}`);
+    // RPC returns the updated attachment_keys array.
+    return (data ?? []) as string[];
+  }
+
   // --- Row mappers (snake_case DB columns -> camelCase domain objects) ---
 
   private mapGame(row: Record<string, unknown>): Game {
@@ -307,6 +336,7 @@ export class SupabaseDB
     fb.metadata = row.metadata as Feedback["metadata"];
     fb.userId = row.user_id as string | null;
     fb.createdAt = new Date(row.created_at as string);
+    fb.attachmentKeys = (row.attachment_keys as string[] | null) ?? [];
     return fb;
   }
 }

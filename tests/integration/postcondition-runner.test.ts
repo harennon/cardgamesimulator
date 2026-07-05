@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   checkCoverage,
   runPostconditions,
+  type RunPostconditionsOptions,
 } from "./helpers/postconditionRunner.js";
 import {
   createProdShapedFixture,
@@ -64,6 +65,13 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
   // prod-shaped-fixture.test.ts. This test proves the migrations + 006 together
   // satisfy every post-condition on a prod-shaped (name-drifted) baseline.
   it("all post-conditions pass against a name-drifted prod-shaped fixture migrated 001..012", async () => {
+    // Migration 013 adds storage-schema objects (bucket, policies) that cannot
+    // be reproduced in the throwaway schema used by prodShapedFixture, and its
+    // postcondition hardcodes nspname='public'. Limit the runner to 001..012 so
+    // this fixture-scoped test remains meaningful without false failures from 013.
+    const postconditionOpts: RunPostconditionsOptions = {
+      upToKey: "012_prune_game_history",
+    };
     const fixture = await createProdShapedFixture({
       baseline: "typeorm-era",
       drift: { pkey1ConstraintNames: true, strayAnonWriteGrants: false },
@@ -84,7 +92,7 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
         "012_prune_game_history.sql",
       ]);
 
-      const result = await runPostconditions(fixture.client);
+      const result = await runPostconditions(fixture.client, postconditionOpts);
       expect(result.failures).toEqual([]);
       expect(result.ok).toBe(true);
     } finally {
@@ -93,6 +101,12 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
   });
 
   it("all post-conditions pass against a fresh baseline migrated 001..012 (same .sql, two contexts)", async () => {
+    // Same reasoning as the name-drifted case above: limit to 001..012 because
+    // 013's postcondition requires the live storage schema and hardcodes
+    // nspname='public', both of which are incompatible with the throwaway schema.
+    const postconditionOpts: RunPostconditionsOptions = {
+      upToKey: "012_prune_game_history",
+    };
     const fixture = await createProdShapedFixture({ baseline: "fresh" });
     try {
       await fixture.applyMigrations([
@@ -110,7 +124,7 @@ describe("Post-condition runner — passes against migrated targets (LLD 77 §6.
         "012_prune_game_history.sql",
       ]);
 
-      const result = await runPostconditions(fixture.client);
+      const result = await runPostconditions(fixture.client, postconditionOpts);
       expect(result.failures).toEqual([]);
       expect(result.ok).toBe(true);
     } finally {
