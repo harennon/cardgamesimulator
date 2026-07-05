@@ -19,4 +19,5 @@ export class Feedback {
   metadata: FeedbackMetadata | null = null;
   userId: string | null = null;
   createdAt: Date = new Date();
+  attachmentKeys: string[] = [];
 }

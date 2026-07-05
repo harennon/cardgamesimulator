@@ -432,3 +432,88 @@ describe("evaluateDriftGate — 012 prune_game_history pending (LLD 149)", () =>
     expect(result.reasons.join(" ")).toMatch(/Stale expectedPending/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// LLD 153: 013_create_feedback_attachments_bucket.sql is pending against prod.
+// Same fixture <-> allowlist coupling rule as 012: 013 must be in BOTH the
+// fixture's pending array AND the allowlist's expectedPending, else the gate
+// fails staleExpected. The attachment_keys column is a public-schema change
+// that supabase db diff sees → it must appear in expectedFromPending.
+// ---------------------------------------------------------------------------
+describe("evaluateDriftGate — 013 feedback_attachments_bucket pending (LLD 153)", () => {
+  const fixture = readJson("scripts/fixtures/clean-diff.json");
+  const allowlist = readJson(
+    "supabase/migrations/expected-diff.allowlist.json",
+  );
+
+  function gateWith(actualPending: string[]) {
+    return evaluateDriftGate({
+      observed: (fixture.objects as { object: string }[]) ?? [],
+      expectedFromPending:
+        (fixture.expectedFromPending as { object: string }[]) ?? [],
+      allowlist: {
+        expectedPending: (allowlist.expectedPending as string[]) ?? [],
+        acknowledgedResidual:
+          (allowlist.acknowledgedResidual as unknown[]) ?? [],
+      },
+      actualPending,
+    });
+  }
+
+  it("the in-tree fixture lists 013 as pending and the allowlist expects it", () => {
+    expect(fixture.pending).toContain(
+      "013_create_feedback_attachments_bucket.sql",
+    );
+    expect(allowlist.expectedPending).toContain(
+      "013_create_feedback_attachments_bucket.sql",
+    );
+  });
+
+  it("the fixture records the attachment_keys column in expectedFromPending", () => {
+    const epf = fixture.expectedFromPending as { object: string }[];
+    const objects = epf.map((e) => e.object);
+    expect(objects).toContain("column:public:feedback:attachment_keys");
+  });
+
+  it("passes against the real fixture + allowlist as shipped", () => {
+    const result = gateWith(fixture.pending as string[]);
+    expect(result.ok).toBe(true);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it("fails staleExpected when 013 is applied but not removed from expectedPending", () => {
+    // Simulate 013 applied to prod (not pending) but still in allowlist.
+    const result = gateWith(
+      (fixture.pending as string[]).filter(
+        (p) => p !== "013_create_feedback_attachments_bucket.sql",
+      ),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.staleExpected).toContain(
+      "013_create_feedback_attachments_bucket.sql",
+    );
+    expect(result.reasons.join(" ")).toMatch(/Stale expectedPending/);
+  });
+
+  it("fails missingExpected when 013 becomes pending but is not in the allowlist", () => {
+    // Simulate the fixture not having 013 in expectedPending.
+    const result = evaluateDriftGate({
+      observed: (fixture.objects as { object: string }[]) ?? [],
+      expectedFromPending:
+        (fixture.expectedFromPending as { object: string }[]) ?? [],
+      allowlist: {
+        expectedPending: (allowlist.expectedPending as string[]).filter(
+          (p) => p !== "013_create_feedback_attachments_bucket.sql",
+        ),
+        acknowledgedResidual:
+          (allowlist.acknowledgedResidual as unknown[]) ?? [],
+      },
+      actualPending: fixture.pending as string[],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.missingExpected).toContain(
+      "013_create_feedback_attachments_bucket.sql",
+    );
+    expect(result.reasons.join(" ")).toMatch(/missing from expectedPending/);
+  });
+});

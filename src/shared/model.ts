@@ -103,3 +103,13 @@ export interface SubmitFeedbackResponse {
   id: string;
   createdAt: string; // ISO 8601
 }
+
+export interface SubmitAttachmentRequest {
+  image: string; // base64-encoded image bytes
+  mimeType: string;
+}
+
+export interface SubmitAttachmentResponse {
+  attachmentId: string;
+  key: string;
+}
