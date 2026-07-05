@@ -69,6 +69,13 @@
   --card-select-duration: 150ms;
   --card-select-easing: ease;
 
+  /* Card deal-in and play-to-center animation tokens (LLD 152) */
+  --deal-duration: 260ms;
+  --deal-stagger: 45ms;
+  --deal-easing: cubic-bezier(0.22, 1, 0.36, 1);
+  --play-duration: 240ms;
+  --play-easing: cubic-bezier(0.22, 1, 0.36, 1);
+
   /* Tonk board tokens (LLD 88) */
   --tonk-cyan: #3fd0d8; /* drawable-discard ring */
   --tonk-phase-discard: #c97b3f; /* warm/amber — discard phase */
@@ -113,5 +120,8 @@
   :root {
     --card-select-duration: 0ms;
     --card-select-easing: linear;
+    --deal-duration: 0ms;
+    --deal-stagger: 0ms;
+    --play-duration: 0ms;
   }
 }
