@@ -73,6 +73,18 @@ export interface VerifyResult {
   ok: boolean;
 }
 
+export interface RunPostconditionsOptions {
+  /**
+   * When set, only postconditions whose key is lexicographically <= this value
+   * are executed. Use when a fixture was only migrated up to a certain migration
+   * and later postconditions cannot be satisfied (e.g. they reference live-only
+   * schemas like `storage.*` or hardcode `nspname = 'public'`).
+   *
+   * Example: `upToKey: '012_prune_game_history'` runs 001..012 only.
+   */
+  upToKey?: string;
+}
+
 /**
  * Runs every post-condition against the provided (connected) client and reports
  * coverage + failures. Does not throw on a failed post-condition — collects it.
@@ -80,11 +92,18 @@ export interface VerifyResult {
  *
  * Run order matches migration order so messages are deterministic.
  */
-export async function runPostconditions(client: Client): Promise<VerifyResult> {
+export async function runPostconditions(
+  client: Client,
+  options?: RunPostconditionsOptions,
+): Promise<VerifyResult> {
   const coverage = checkCoverage();
   const failures: PostconditionFailure[] = [];
 
-  for (const key of postconditionKeys()) {
+  const keys = options?.upToKey
+    ? postconditionKeys().filter((k) => k <= options.upToKey!)
+    : postconditionKeys();
+
+  for (const key of keys) {
     try {
       await client.query(readPostconditionSql(`${key}.postcondition.sql`));
     } catch (err) {

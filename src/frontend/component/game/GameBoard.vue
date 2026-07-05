@@ -42,6 +42,7 @@
         :cards="gameState.you.hand"
         :selected-indices="selectedIndices"
         :interactive="isMyTurn"
+        :dealing="dealing"
         @toggle-card="toggleCard"
       />
     </div>
@@ -108,6 +109,7 @@ import PlayerHand from "@/component/game-ui/PlayerHand.vue";
 import GameLog from "@/component/game-ui/GameLog.vue";
 import ActionPanel from "@/component/game-ui/ActionPanel.vue";
 import DevOverlay from "@/component/DevOverlay.vue";
+import { isFreshDeal } from "@/composables/useCardAnimations";
 
 const isDev = import.meta.env.DEV;
 
@@ -199,7 +201,37 @@ onMounted(() => {
 
 onUnmounted(() => {
   mql.removeEventListener("change", handleMediaChange);
+  if (dealTimer !== null) {
+    clearTimeout(dealTimer);
+    dealTimer = null;
+  }
 });
+
+// --- Deal-in animation state (LLD 152) ---
+// True for one animation window at round/game start; auto-cleared by timer.
+const dealing = ref(false);
+let dealTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Max animation window: (maxCards-1) * stagger + duration + slack
+// Big2 has 13 cards: 12 * 45ms + 260ms + 100ms = 900ms
+const DEAL_CLEAR_MS = 900;
+
+watch(
+  () => props.gameState.you.hand.length,
+  (nextLen, prevLen) => {
+    if (isFreshDeal(prevLen ?? 0, nextLen)) {
+      if (dealTimer !== null) {
+        clearTimeout(dealTimer);
+      }
+      dealing.value = true;
+      dealTimer = setTimeout(() => {
+        dealing.value = false;
+        dealTimer = null;
+      }, DEAL_CLEAR_MS);
+    }
+  },
+  { immediate: true },
+);
 
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === "Escape") logDrawerOpen.value = false;
@@ -282,7 +314,9 @@ watch(logDrawerOpen, (open) => {
 .game-board__hand {
   grid-area: hand;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
   background: var(--felt-light);
   border-top: 2px solid var(--table-rim-light);
 }
@@ -309,7 +343,9 @@ watch(logDrawerOpen, (open) => {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  padding-left: 12px;
+  text-align: center;
+  padding-left: 0;
+  padding-top: 10px;
   margin-bottom: 2px;
 }
 
@@ -356,6 +392,7 @@ watch(logDrawerOpen, (open) => {
   .game-board--mobile .game-board__hand {
     flex-direction: column;
     align-items: flex-start;
+    justify-content: flex-start; /* reset desktop justify-content:center — keep label+hand top-aligned in mobile cell */
     overflow: hidden; /* contain within grid cell */
   }
 }

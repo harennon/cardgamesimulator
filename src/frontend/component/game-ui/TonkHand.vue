@@ -1,5 +1,5 @@
 <template>
-  <div class="tonk-hand" data-testid="tonk-hand">
+  <div class="tonk-hand" :class="{ dealing }" data-testid="tonk-hand">
     <GameCard
       v-for="(card, index) in cards"
       :key="isJoker(card) ? `joker-${card.id}` : `${card.rank}-${card.suit}`"
@@ -14,6 +14,7 @@
         'tonk-hand__card--badselect':
           badSelect && (selectedIndices?.has(index) ?? false),
       }"
+      :style="{ '--i': index }"
       @click="selectable && emit('toggle', index)"
     />
   </div>
@@ -31,8 +32,9 @@ withDefaults(
     selectedIndices?: ReadonlySet<number>;
     dimmedIndices?: ReadonlySet<number>;
     badSelect?: boolean;
+    dealing?: boolean;
   }>(),
-  { selectable: false, badSelect: false },
+  { selectable: false, badSelect: false, dealing: false },
 );
 
 const emit = defineEmits<{ toggle: [index: number] }>();
@@ -72,6 +74,30 @@ const emit = defineEmits<{ toggle: [index: number] }>();
   box-shadow:
     0 8px 24px rgba(224, 85, 85, 0.5),
     3px 6px 16px var(--card-shadow) !important;
+}
+
+/* Deal-in animation (variant A: slide-up). Mirrors PlayerHand.vue. */
+.tonk-hand.dealing .tonk-hand__card {
+  transform-origin: bottom center;
+  animation: dealSlide var(--deal-duration) var(--deal-easing) both;
+  animation-delay: calc(var(--i) * var(--deal-stagger));
+}
+
+@keyframes dealSlide {
+  from {
+    opacity: 0;
+    transform: translateY(46px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tonk-hand.dealing .tonk-hand__card {
+    animation: none;
+  }
 }
 
 @media (max-width: 767px) {

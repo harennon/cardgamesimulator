@@ -1,6 +1,11 @@
 {
-  "$comment": "Phase 2 (post-011-applied): 011 has been applied to prod, so pending is empty and the six game_history stray grants (G6) that 011 REVOKEd are gone from prod — removed from both objects and the allowlist in lockstep. objects now mirrors the linked observed residual: only increment_player_stats (#91), the cosmetic re-emission that stays acknowledged. RLS/policy never appear (self-attribute to their migration and drop as benign).",
+  "$comment": "Base is Phase 2 post-011 (010 + 011 applied to prod). 012_prune_game_history.sql (LLD 149) and 013_create_feedback_attachments_bucket.sql (LLD 153) are pending (not yet applied), so they are listed in pending here AND in expected-diff.allowlist.json's expectedPending (fixture coupling). 013's attachment_keys column add is a public-schema change supabase db diff sees → recorded in objects + expectedFromPending. The storage-schema bucket/policies are NOT emitted by db diff (managed schema); the postcondition is their authoritative check. After each migration is applied to prod, remove it from pending here + expectedPending.",
   "objects": [{ "object": "function:public:increment_player_stats" }],
-  "expectedFromPending": [],
-  "pending": []
+  "expectedFromPending": [
+    { "object": "column:public:feedback:attachment_keys" }
+  ],
+  "pending": [
+    "012_prune_game_history.sql",
+    "013_create_feedback_attachments_bucket.sql"
+  ]
 }
