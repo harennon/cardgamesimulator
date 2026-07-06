@@ -113,3 +113,26 @@ export interface SubmitAttachmentResponse {
   attachmentId: string;
   key: string;
 }
+
+export interface FeedbackMetadata {
+  route: string;
+  gameId?: string;
+  gameStatus?: string;
+  gamePhase?: "lobby" | "in-progress" | "game-over";
+  userType: "guest" | "registered";
+  authState: "authenticated" | "anonymous";
+  browser: string;
+  viewport: { width: number; height: number };
+  timestamp: string;
+}
+
+export interface AdminFeedbackEntry {
+  id: string;
+  category: FeedbackCategory;
+  description: string;
+  metadata: FeedbackMetadata | null;
+  userId: string | null;
+  createdAt: string; // ISO 8601
+  attachmentKeys: string[]; // durable storage keys (not browser-openable)
+  attachments: string[]; // short-lived signed read URLs, index-aligned with attachmentKeys
+}

@@ -17,6 +17,7 @@ import { SupabaseDB } from "../../src/backend/database/supabaseDb.js";
 import type {
   SubmitFeedbackResponse,
   SubmitAttachmentResponse,
+  AdminFeedbackEntry,
 } from "../../src/shared/model.js";
 import {
   FeedbackAttachmentService,
@@ -425,5 +426,130 @@ describe("Feedback attachment integration", () => {
       vi.restoreAllMocks();
       delete process.env.FEEDBACK_ADMIN_IDS;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LLD 158: admin GET /feedback returns signed URLs in the `attachments` field
+// ---------------------------------------------------------------------------
+
+describe("LLD 158: admin GET /feedback — signed URL response", () => {
+  let ctx: TestServerContext;
+
+  beforeAll(async () => {
+    ctx = await createTestServer();
+    // Purge all feedback rows left over from prior test runs so stale
+    // attachment keys pointing to deleted Storage objects don't cause the
+    // GET handler to throw when it tries to sign them (E3 — fail the whole GET).
+    const { createClient } = await import("@supabase/supabase-js");
+    const admin = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
+    await admin
+      .from("feedback")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+  });
+
+  afterAll(async () => {
+    await ctx.close();
+  });
+
+  it("round-trip: POST feedback → attach image → admin GET returns non-empty attachments[0] that is a signed URL and fetches successfully", async () => {
+    const admin = await createTestUser("LLD158RoundTrip");
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
+
+    try {
+      // 1. Create feedback.
+      const fbRes = await request(ctx.app)
+        .post("/feedback")
+        .set("Authorization", `Bearer ${admin.accessToken}`)
+        .send({ category: "bug", description: "LLD158 round-trip" });
+      expect(fbRes.status).toBe(201);
+      const feedbackId = (fbRes.body as SubmitFeedbackResponse).id;
+
+      // 2. Attach an image.
+      const attachRes = await request(ctx.app)
+        .post(`/feedback/${feedbackId}/attachments`)
+        .set("Authorization", `Bearer ${admin.accessToken}`)
+        .send({ image: pngBase64(), mimeType: "image/png" });
+      expect(attachRes.status).toBe(201);
+      const { key } = attachRes.body as SubmitAttachmentResponse;
+
+      // 3. Admin GET /feedback — the entry must have attachments[] with a signed URL.
+      const getRes = await request(ctx.app)
+        .get("/feedback")
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(getRes.status).toBe(200);
+
+      const entries = getRes.body as AdminFeedbackEntry[];
+      const entry = entries.find((e) => e.id === feedbackId);
+      expect(entry).toBeDefined();
+
+      // attachmentKeys still holds the bare key.
+      expect(entry!.attachmentKeys).toContain(key);
+
+      // attachments holds a signed URL, not the raw key.
+      expect(entry!.attachments).toHaveLength(1);
+      const signedUrl = entry!.attachments[0]!;
+      expect(signedUrl).toMatch(/^https?:\/\//);
+      expect(signedUrl).not.toBe(key);
+
+      // The signed URL is genuinely fetchable (proves it is openable).
+      const fetched = await fetch(signedUrl);
+      expect(fetched.ok).toBe(true);
+    } finally {
+      delete process.env.FEEDBACK_ADMIN_IDS;
+    }
+  });
+
+  it("no-attachment entry returns attachments: [] and is otherwise identical to the pre-LLD-158 shape", async () => {
+    const admin = await createTestUser("LLD158NoAttach");
+    process.env.FEEDBACK_ADMIN_IDS = admin.id;
+
+    try {
+      const fbRes = await request(ctx.app)
+        .post("/feedback")
+        .set("Authorization", `Bearer ${admin.accessToken}`)
+        .send({ category: "other", description: "no attach entry" });
+      expect(fbRes.status).toBe(201);
+      const feedbackId = (fbRes.body as SubmitFeedbackResponse).id;
+
+      const getRes = await request(ctx.app)
+        .get("/feedback")
+        .set("Authorization", `Bearer ${admin.accessToken}`);
+      expect(getRes.status).toBe(200);
+
+      const entries = getRes.body as AdminFeedbackEntry[];
+      const entry = entries.find((e) => e.id === feedbackId);
+      expect(entry).toBeDefined();
+
+      // Core fields present and correct.
+      expect(entry!.category).toBe("other");
+      expect(entry!.description).toBe("no attach entry");
+      expect(entry!.createdAt).toBeTruthy();
+
+      // No-attachment invariants: both arrays are empty, no raw key in attachments.
+      expect(entry!.attachmentKeys).toEqual([]);
+      expect(entry!.attachments).toEqual([]);
+    } finally {
+      delete process.env.FEEDBACK_ADMIN_IDS;
+    }
+  });
+
+  it("non-admin GET /feedback returns 403 (no signing occurs)", async () => {
+    const user = await createTestUser("LLD158NonAdmin");
+
+    const res = await request(ctx.app)
+      .get("/feedback")
+      .set("Authorization", `Bearer ${user.accessToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  it("unauthenticated GET /feedback returns 401", async () => {
+    const res = await request(ctx.app).get("/feedback");
+    expect(res.status).toBe(401);
   });
 });

@@ -1,16 +1,6 @@
-import type { FeedbackCategory } from "@shared/model";
+import type { FeedbackCategory, FeedbackMetadata } from "@shared/model";
 
-export interface FeedbackMetadata {
-  route: string;
-  gameId?: string;
-  gameStatus?: string;
-  gamePhase?: "lobby" | "in-progress" | "game-over";
-  userType: "guest" | "registered";
-  authState: "authenticated" | "anonymous";
-  browser: string;
-  viewport: { width: number; height: number };
-  timestamp: string;
-}
+export type { FeedbackMetadata };
 
 export class Feedback {
   id: string = "";
