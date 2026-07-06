@@ -12,6 +12,9 @@ export interface GameConfig {
   practice?: boolean;
   // Synthetic playerIds seated as AI; subset of Game.playerIds.
   aiPlayerIds?: string[];
+  // Pace (ms) between successive auto-driven moves; default 1000, clamp [0, 3000].
+  // Absent → default applies. 0 → instant (opt-out). Future UI may set this per game.
+  aiMoveDelayMs?: number;
 }
 
 export interface CreateGameRequest {
@@ -99,4 +102,37 @@ export interface SubmitFeedbackRequest {
 export interface SubmitFeedbackResponse {
   id: string;
   createdAt: string; // ISO 8601
+}
+
+export interface SubmitAttachmentRequest {
+  image: string; // base64-encoded image bytes
+  mimeType: string;
+}
+
+export interface SubmitAttachmentResponse {
+  attachmentId: string;
+  key: string;
+}
+
+export interface FeedbackMetadata {
+  route: string;
+  gameId?: string;
+  gameStatus?: string;
+  gamePhase?: "lobby" | "in-progress" | "game-over";
+  userType: "guest" | "registered";
+  authState: "authenticated" | "anonymous";
+  browser: string;
+  viewport: { width: number; height: number };
+  timestamp: string;
+}
+
+export interface AdminFeedbackEntry {
+  id: string;
+  category: FeedbackCategory;
+  description: string;
+  metadata: FeedbackMetadata | null;
+  userId: string | null;
+  createdAt: string; // ISO 8601
+  attachmentKeys: string[]; // durable storage keys (not browser-openable)
+  attachments: string[]; // short-lived signed read URLs, index-aligned with attachmentKeys
 }

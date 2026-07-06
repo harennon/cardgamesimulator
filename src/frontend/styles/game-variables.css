@@ -69,16 +69,28 @@
   --card-select-duration: 150ms;
   --card-select-easing: ease;
 
+  /* Card deal-in and play-to-center animation tokens (LLD 152) */
+  --deal-duration: 260ms;
+  --deal-stagger: 45ms;
+  --deal-easing: cubic-bezier(0.22, 1, 0.36, 1);
+  --play-duration: 240ms;
+  --play-easing: cubic-bezier(0.22, 1, 0.36, 1);
+
   /* Tonk board tokens (LLD 88) */
   --tonk-cyan: #3fd0d8; /* drawable-discard ring */
   --tonk-phase-discard: #c97b3f; /* warm/amber — discard phase */
   --tonk-phase-draw: #3f9dc9; /* cool/blue — draw phase */
   --tonk-near-150: #e09a30; /* near-loss-line warning tint */
+  --tonk-self: #9b7fe8; /* self-identity accent (LLD 141) — distinct from cyan (discard ring) and gold (active turn) */
 
   /* AI identity tokens (LLD 120/128) — steel/cool blue; never collides with --gold-accent turn glow */
   --ai-accent: #7fb2ff;
   --ai-accent-line: rgba(127, 178, 255, 0.5);
   --ai-accent-dim: rgba(127, 178, 255, 0.16);
+
+  /* Board rim inset (LLD 143) — matches the desktop ::after border width so grid
+     content clears the wood-rim overlay on all four edges */
+  --board-rim-inset: 12px;
 }
 
 @media (max-width: 767px) {
@@ -108,5 +120,8 @@
   :root {
     --card-select-duration: 0ms;
     --card-select-easing: linear;
+    --deal-duration: 0ms;
+    --deal-stagger: 0ms;
+    --play-duration: 0ms;
   }
 }

@@ -1,0 +1,6 @@
+Diffing schemas: public
+Finished supabase db diff on branch main.
+
+drop policy "game_history_select_own" on "public"."game_history";
+
+alter table "public"."game_history" disable row level security;

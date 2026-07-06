@@ -11,14 +11,20 @@
     <!-- Discard: live pile top -->
     <div class="tonk-piles__slot">
       <div class="tonk-piles__card-wrap">
-        <GameCard
-          v-if="discardTop"
-          :card="discardTop"
-          size="large"
-          data-testid="tonk-discard-top"
-        />
-        <div v-else class="tonk-piles__empty" data-testid="tonk-discard-empty">
-          empty
+        <div :key="currentDiscardKey" class="tonk-piles__discard-anim landing">
+          <GameCard
+            v-if="discardTop"
+            :card="discardTop"
+            size="large"
+            data-testid="tonk-discard-top"
+          />
+          <div
+            v-else
+            class="tonk-piles__empty"
+            data-testid="tonk-discard-empty"
+          >
+            empty
+          </div>
         </div>
         <span
           v-if="lastDiscardCount > 1"
@@ -67,6 +73,7 @@ import type { Card, PlayerPublicInfo } from "@shared/engine-types";
 import type { TonkCard, TonkTurnPhase } from "@shared/tonk-types";
 import GameCard from "./GameCard.vue";
 import { drawableFromName, justPlayedName } from "./tonkDisplay";
+import { discardKey } from "@/composables/useCardAnimations";
 
 // Face-down stock uses GameCard's faceDown path; the card value is unused but
 // the prop is required, so pass a stable placeholder (never rendered face up).
@@ -92,6 +99,12 @@ const drawableFrom = computed(() =>
     props.lastDiscardPlayerIndex,
     props.turnPhase,
   ),
+);
+
+// Key that changes only on a genuinely new discard; the discard wrapper
+// re-enters on each key change, triggering the .landing drop animation.
+const currentDiscardKey = computed(() =>
+  discardKey(props.discardTop, props.discardCount),
 );
 </script>
 
@@ -167,6 +180,29 @@ const drawableFrom = computed(() =>
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 8px;
+}
+
+/* Play-to-center animation (variant 1: drop) for the discard top. Mirrors
+   PlayArea.vue. The wrapper re-enters via :key change on each new discard. */
+.tonk-piles__discard-anim.landing {
+  animation: playDrop var(--play-duration) var(--play-easing) both;
+}
+
+@keyframes playDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-28px) scale(1.14);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tonk-piles__discard-anim.landing {
+    animation: none;
+  }
 }
 
 @media (max-width: 767px) {

@@ -7,6 +7,7 @@ import type {
   TonkCard,
   TonkDrawSource,
   TonkLogEntry,
+  TonkTrickResult,
   TonkTurnPhase,
 } from "@shared/tonk-types";
 import { isJoker } from "@shared/tonk-types";
@@ -114,29 +115,34 @@ export interface SeatRow {
   readonly isAi?: boolean;
   readonly seatIndex: number;
   readonly tally: number;
+  readonly isSelf: boolean;
 }
 
 /**
- * Seats rendered by the rail: every player except myPlayerIndex (or all when
- * myPlayerIndex === -1, the spectator-style contract — E11). Each carries its
- * seat index and tally for the chip.
+ * Seats rendered by the rail: EVERY player, including the local player.
+ * The local player's row is marked isSelf and sorted first; all others keep
+ * ascending seat order. Spectator render (myPlayerIndex === -1) => no isSelf row.
  */
 export function railSeats(
   players: readonly PlayerPublicInfo[],
   tallies: readonly number[],
   myPlayerIndex: number,
 ): SeatRow[] {
-  return players
-    .map((p, seatIndex) => ({
-      playerId: p.playerId,
-      displayName: p.displayName,
-      cardCount: p.cardCount,
-      isConnected: p.isConnected,
-      isAi: p.isAi,
-      seatIndex,
-      tally: tallies[seatIndex] ?? 0,
-    }))
-    .filter((s) => s.seatIndex !== myPlayerIndex);
+  const rows = players.map((p, seatIndex) => ({
+    playerId: p.playerId,
+    displayName: p.displayName,
+    cardCount: p.cardCount,
+    isConnected: p.isConnected,
+    isAi: p.isAi,
+    seatIndex,
+    tally: tallies[seatIndex] ?? 0,
+    isSelf: seatIndex === myPlayerIndex,
+  }));
+  return rows.sort((a, b) => {
+    if (a.isSelf && !b.isSelf) return -1;
+    if (!a.isSelf && b.isSelf) return 1;
+    return a.seatIndex - b.seatIndex;
+  });
 }
 
 const SUIT_SYMBOLS: Record<string, string> = {
@@ -242,6 +248,97 @@ export function isBadSelect(
     if (card) selectedKeys.add(selectionRankKey(card));
   }
   return selectedKeys.size > 1;
+}
+
+// ---------------------------------------------------------------------------
+// LLD 146 — Tonk per-round showdown reveal helpers
+// ---------------------------------------------------------------------------
+
+/** One row in the showdown table shown at round end. */
+export interface TrickRevealRow {
+  readonly seatIndex: number;
+  readonly displayName: string;
+  readonly hand: readonly TonkCard[];
+  readonly handValue: number;
+  readonly delta: number;
+  readonly total: number;
+  readonly isCaller: boolean;
+  readonly isBest: boolean;
+  readonly isSelf: boolean;
+}
+
+/**
+ * Build showdown rows from a completed trick result, sorted best-first
+ * (ascending handValue; ties broken by ascending seat index).
+ */
+export function trickRevealRows(
+  trickResult: TonkTrickResult,
+  players: readonly PlayerPublicInfo[],
+  tallies: readonly number[],
+  myPlayerIndex: number,
+): TrickRevealRow[] {
+  const minValue = Math.min(...trickResult.handValues);
+  const rows: TrickRevealRow[] = players.map((player, seatIndex) => ({
+    seatIndex,
+    displayName: player.displayName,
+    hand: trickResult.revealedHands[seatIndex] ?? [],
+    handValue: trickResult.handValues[seatIndex] ?? 0,
+    delta: trickResult.tallyDeltas[seatIndex] ?? 0,
+    total: tallies[seatIndex] ?? 0,
+    isCaller:
+      trickResult.tonkCallerIndex !== null &&
+      seatIndex === trickResult.tonkCallerIndex,
+    isBest: (trickResult.handValues[seatIndex] ?? 0) === minValue,
+    isSelf: seatIndex === myPlayerIndex,
+  }));
+  return rows.sort(
+    (a, b) => a.handValue - b.handValue || a.seatIndex - b.seatIndex,
+  );
+}
+
+/** Human-readable reason label for why the trick ended. */
+export function trickReasonLabel(reason: "tonk" | "stockout"): string {
+  return reason === "tonk" ? "TONK called" : "Stock ran out";
+}
+
+/**
+ * Verdict headline text.
+ * TONK: "<caller> called Tonk" (substituting "You" for the local seat).
+ * Stock-out: "<best-hand player> wins the round" (substituting "You").
+ */
+export function trickVerdictHeadline(
+  rows: readonly TrickRevealRow[],
+  trickResult: TonkTrickResult,
+): string {
+  if (trickResult.reason === "tonk" && trickResult.tonkCallerIndex !== null) {
+    const callerRow = rows.find((r) => r.isCaller);
+    const callerName = callerRow
+      ? callerRow.isSelf
+        ? "You"
+        : callerRow.displayName
+      : "Someone";
+    return `${callerName} called Tonk`;
+  }
+  // Stock-out: best hand wins
+  const bestRow = rows.find((r) => r.isBest);
+  if (!bestRow) return "Round over";
+  const bestName = bestRow.isSelf ? "You" : bestRow.displayName;
+  return `${bestName} wins the round`;
+}
+
+/**
+ * Pure predicate: should the trick-reveal overlay be entered?
+ * Extracted for unit testing (LLD 146 §Test Requirements).
+ */
+export function shouldEnterTrickReveal(
+  latestTrickNumber: number | null,
+  lastRevealedTrickNumber: number | null,
+  status: string,
+): boolean {
+  if (status !== "IN_PROGRESS") return false;
+  if (latestTrickNumber === null) return false;
+  if (latestTrickNumber === lastRevealedTrickNumber) return false;
+  return true;
 }
 
 export interface RankedTallyRow {

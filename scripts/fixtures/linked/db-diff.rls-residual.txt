@@ -1,0 +1,6 @@
+Diffing schemas: public
+Finished supabase db diff on branch main.
+
+alter table "public"."player_stats" enable row level security;
+
+create policy "player_stats_select_own" on "public"."player_stats" for select using ((auth.uid() = user_id));

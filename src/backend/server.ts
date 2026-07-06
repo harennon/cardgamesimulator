@@ -41,6 +41,7 @@ import { FeedbackHandler } from "@/api/feedback/submitFeedback";
 import { RealTimerProvider } from "@/timer/realTimerProvider";
 import { TurnTimerService } from "@/timer/turnTimerService";
 import { createResolveJoinCodeRouter } from "@/api/game/resolveJoinCode";
+import { RealDelayer } from "@/websocket/delayer";
 
 export class Server {
   private readonly app: Express;
@@ -52,7 +53,15 @@ export class Server {
   constructor() {
     this.app = express();
     // add middleware
-    this.app.use(express.json());
+    // Skip the global 100 kB JSON parser for the feedback attachment route so
+    // the route-level 7 MB parser can handle large base64 image bodies (LLD 153
+    // key decision 3). All other routes still get the default 100 kB limit.
+    this.app.use((req, res, next) => {
+      if (/^\/feedback\/[^/]+\/attachments(\/|$)/i.test(req.path)) {
+        return next();
+      }
+      express.json()(req, res, next);
+    });
     this.app.use(helmet());
     this.app.use(
       cors({
@@ -149,6 +158,7 @@ export class Server {
 
     const connectionManager = new ConnectionManager();
     this.timerProvider = new RealTimerProvider();
+    const delayer = new RealDelayer();
     const turnTimerService = new TurnTimerService(
       this.timerProvider,
       (gameId) => {
@@ -158,6 +168,7 @@ export class Server {
           gameService,
           connectionManager,
           turnTimerService,
+          delayer,
         ).catch((err: unknown) => console.error("Timer expired error", err));
       },
     );
@@ -166,6 +177,7 @@ export class Server {
       gameService,
       connectionManager,
       turnTimerService,
+      delayer,
     );
 
     // Seed endpoint — only loaded in test environments

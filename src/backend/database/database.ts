@@ -75,4 +75,6 @@ export interface FeedbackRepository {
   createFeedback(feedback: Feedback): Promise<Feedback>;
   getAllFeedback(): Promise<Feedback[]>;
   deleteFeedback(id: string): Promise<boolean>;
+  getFeedbackById(id: string): Promise<Feedback | null>;
+  appendAttachmentKey(feedbackId: string, key: string): Promise<string[]>;
 }

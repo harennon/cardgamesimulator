@@ -1,6 +1,11 @@
 {
-  "$comment": "LLD 77 §5.5 — captured/fixture diff representing a CLEAN prod baseline (post-#83): no residual drift. `pending` lists the in-tree migrations not yet applied to prod (009 adds the game_config column, LLD 95; 010 adds the game_history table + get_windowed_stats RPC, LLD 101) and must mirror the allowlist's expectedPending so the gate is honest. The drift gate exits 0 against this. Used as the autonomous-safe / local / placeholder target so the gate runs green with no prod access.",
-  "objects": [],
-  "expectedFromPending": [],
-  "pending": ["009_add_game_config.sql", "010_create_game_history.sql"]
+  "$comment": "Base is Phase 2 post-011 (010 + 011 applied to prod). 012_prune_game_history.sql (LLD 149) and 013_create_feedback_attachments_bucket.sql (LLD 153) are pending (not yet applied), so they are listed in pending here AND in expected-diff.allowlist.json's expectedPending (fixture coupling). 013's attachment_keys column add is a public-schema change supabase db diff sees → recorded in objects + expectedFromPending. The storage-schema bucket/policies are NOT emitted by db diff (managed schema); the postcondition is their authoritative check. After each migration is applied to prod, remove it from pending here + expectedPending.",
+  "objects": [{ "object": "function:public:increment_player_stats" }],
+  "expectedFromPending": [
+    { "object": "column:public:feedback:attachment_keys" }
+  ],
+  "pending": [
+    "012_prune_game_history.sql",
+    "013_create_feedback_attachments_bucket.sql"
+  ]
 }

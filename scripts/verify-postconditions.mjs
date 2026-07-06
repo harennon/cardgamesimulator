@@ -13,13 +13,16 @@
  * (release blocked). Fail-closed: warn-only is rejected (LLD 77 §5.4/§6).
  *
  * Credential-free in the repo: connection params come from the environment and
- * default to the local Supabase Postgres. Pointing it at prod (by exporting prod
- * connection env vars) is a human-owned step; this file stores no secret.
+ * default to the local Supabase Postgres. Pointing it at prod is a human-owned
+ * step (set SUPABASE_DB_URL to the prod pooler connection string); this file
+ * stores no secret. Connection-config selection lives in the pure, unit-tested
+ * scripts/lib/pg-client-config.mjs.
  */
 import { Client } from "pg";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildClientConfig } from "./lib/pg-client-config.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = resolve(__dirname, "../supabase/migrations");
@@ -63,13 +66,7 @@ if (orphaned.length > 0) {
   );
 }
 
-const client = new Client({
-  host: process.env.DB_HOST ?? "localhost",
-  port: Number(process.env.DB_PORT ?? 54322),
-  user: process.env.DB_USER ?? "postgres",
-  password: process.env.DB_PASSWORD ?? "postgres",
-  database: process.env.DB_NAME ?? "postgres",
-});
+const client = new Client(buildClientConfig(process.env));
 
 await client.connect();
 try {

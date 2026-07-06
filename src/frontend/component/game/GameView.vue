@@ -26,13 +26,16 @@
 
   <div
     v-else-if="
-      (displayPhase === 'IN_PROGRESS' || displayPhase === 'SHOW_FINAL_PLAY') &&
+      (displayPhase === 'IN_PROGRESS' ||
+        displayPhase === 'SHOW_FINAL_PLAY' ||
+        displayPhase === 'SHOW_TRICK_RESULT') &&
       gameState
     "
     class="game-view__board-container"
     :class="{
       'game-view__board-container--revealing':
-        displayPhase === 'SHOW_FINAL_PLAY' && gameState.gameType === 'big2',
+        (displayPhase === 'SHOW_FINAL_PLAY' && gameState.gameType === 'big2') ||
+        (displayPhase === 'SHOW_TRICK_RESULT' && gameState.gameType === 'tonk'),
     }"
   >
     <TonkBoard
@@ -62,6 +65,21 @@
       @toggle-card="toggleCard"
       @play="onPlay"
       @pass="onPass"
+    />
+
+    <TonkTrickReveal
+      v-if="
+        displayPhase === 'SHOW_TRICK_RESULT' &&
+        gameState.gameType === 'tonk' &&
+        latestTrickResult
+      "
+      :trick-result="latestTrickResult"
+      :players="gameState.players"
+      :tallies="tonkTallies"
+      :my-player-index="myTonkPlayerIndex"
+      :duration-ms="REVEAL_DURATION_MS"
+      data-testid="tonk-trick-reveal"
+      @continue="dismissTrickReveal"
     />
 
     <div
@@ -115,8 +133,10 @@
     :play-history="gameOverPlayHistory"
     :current-player-id="gameState.you.playerId"
     :total-turns="gameState.turnNumber"
+    :game-type="gameState.gameType"
     :final-play="finalPlay"
     :engine-min="gameState.gameType === 'tonk' ? 3 : 2"
+    :tonk-final-move="tonkFinalMove"
     @rematch="onRematch"
   />
 </template>
@@ -124,14 +144,21 @@
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import type { PlayerInfo, GameType } from "@shared/engine-types";
+import type {
+  PlayerInfo,
+  GameType,
+  PlayerPublicInfo,
+} from "@shared/engine-types";
 import { GAME_TYPE_UI_BOUNDS } from "@/component/statsView";
 import type { Big2PublicState, Big2Play } from "@shared/big2-types";
 import type {
   TonkPublicState,
+  TonkLogEntry,
   TonkDrawSource,
   TonkCard,
+  TonkTrickResult,
 } from "@shared/tonk-types";
+
 import { axiosInstance } from "@/service/http";
 import type { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
 import type { AxiosResponse } from "axios";
@@ -149,9 +176,21 @@ import GameLobbyView from "@/component/game/GameLobbyView.vue";
 import GameBoard from "@/component/game/GameBoard.vue";
 import TonkBoard from "@/component/game/TonkBoard.vue";
 import GameOverView from "@/component/game/GameOverView.vue";
+import TonkTrickReveal from "@/component/game/TonkTrickReveal.vue";
 import GameCard from "@/component/game-ui/GameCard.vue";
+import { shouldEnterTrickReveal } from "@/component/game-ui/tonkDisplay";
 
-type DisplayPhase = "CREATED" | "IN_PROGRESS" | "SHOW_FINAL_PLAY" | "COMPLETED";
+type DisplayPhase =
+  | "CREATED"
+  | "IN_PROGRESS"
+  | "SHOW_FINAL_PLAY"
+  | "SHOW_TRICK_RESULT"
+  | "COMPLETED";
+
+interface TonkFinalMove {
+  entry: TonkLogEntry;
+  players: readonly PlayerPublicInfo[];
+}
 
 const props = defineProps<{
   gameId: string;
@@ -224,6 +263,68 @@ const effectiveStatus = computed(() => status.value ?? restStatus.value);
 
 const displayPhase = ref<DisplayPhase>("CREATED");
 
+// ---------------------------------------------------------------------------
+// LLD 146: Tonk per-round trick-result reveal
+// ---------------------------------------------------------------------------
+
+const REVEAL_DURATION_MS = 6000;
+
+/** Client-local: which trick number has already been shown to this client. */
+const lastRevealedTrickNumber = ref<number | null>(null);
+let revealTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Newest trick-result entry in the Tonk log, or null. */
+const latestTrickResult = computed<TonkTrickResult | null>(() => {
+  if (gameState.value?.gameType !== "tonk") return null;
+  const tonkPublic = gameState.value.gameSpecificPublicState as
+    | TonkPublicState
+    | undefined;
+  if (!tonkPublic) return null;
+  for (let i = tonkPublic.log.length - 1; i >= 0; i--) {
+    const entry = tonkPublic.log[i];
+    if (entry?.trickResult) return entry.trickResult;
+  }
+  return null;
+});
+
+/** Running tallies from the current Tonk state. */
+const tonkTallies = computed<readonly number[]>(() => {
+  if (gameState.value?.gameType !== "tonk") return [];
+  const tonkPublic = gameState.value.gameSpecificPublicState as
+    | TonkPublicState
+    | undefined;
+  return tonkPublic?.tallies ?? [];
+});
+
+/** The local player's seat index in a Tonk game; -1 for spectators. */
+const myTonkPlayerIndex = computed<number>(() => {
+  if (!gameState.value) return -1;
+  return gameState.value.players.findIndex(
+    (p) => p.playerId === gameState.value!.you.playerId,
+  );
+});
+
+function enterTrickReveal(): void {
+  if (revealTimer !== null) {
+    clearTimeout(revealTimer);
+    revealTimer = null;
+  }
+  displayPhase.value = "SHOW_TRICK_RESULT";
+  revealTimer = setTimeout(() => {
+    dismissTrickReveal();
+  }, REVEAL_DURATION_MS);
+}
+
+function dismissTrickReveal(): void {
+  if (revealTimer !== null) {
+    clearTimeout(revealTimer);
+    revealTimer = null;
+  }
+  if (displayPhase.value === "SHOW_TRICK_RESULT") {
+    displayPhase.value = "IN_PROGRESS";
+  }
+}
+
 watch(effectiveStatus, (newStatus, oldStatus) => {
   if (newStatus === "COMPLETED" && oldStatus === "IN_PROGRESS") {
     // Big2 lingers on SHOW_FINAL_PLAY so the winning play stays visible behind a
@@ -253,6 +354,7 @@ function toFeedbackPhase(phase: DisplayPhase): FeedbackGamePhase {
       return "game-over";
     case "IN_PROGRESS":
     case "SHOW_FINAL_PLAY":
+    case "SHOW_TRICK_RESULT":
       return "in-progress";
   }
 }
@@ -289,6 +391,18 @@ const finalPlay = computed<Big2Play | null>(() => {
     | Big2PublicState
     | undefined;
   return publicState?.lastPlay ?? null;
+});
+
+const tonkFinalMove = computed<TonkFinalMove | null>(() => {
+  if (gameState.value?.gameType !== "tonk") return null;
+  const publicState = gameState.value.gameSpecificPublicState as
+    | TonkPublicState
+    | undefined;
+  const log = publicState?.log;
+  if (!log || log.length === 0) return null;
+  const entry = log[log.length - 1];
+  if (!entry.trickResult) return null;
+  return { entry, players: gameState.value.players };
 });
 
 const HAND_TYPE_LABELS: Record<string, string> = {
@@ -424,6 +538,10 @@ onUnmounted(() => {
   disconnect();
   clearGamePhase();
   resetCurrentGameType();
+  if (revealTimer !== null) {
+    clearTimeout(revealTimer);
+    revealTimer = null;
+  }
 });
 
 async function onStartGame(): Promise<void> {
@@ -495,6 +613,39 @@ watch(
     clearSelection();
   },
 );
+
+// LLD 146: detect new trick-result arrivals and enter the reveal phase.
+//
+// E4 seeding: when the first game:state arrives (initialized flips true), seed
+// lastRevealedTrickNumber from the current latestTrickResult so that a round
+// already completed before this client joined does NOT trigger a spurious reveal.
+// This must happen before the latestTrickResult watcher can fire, so we use an
+// immediate watcher on `initialized` that runs once on the initial bind.
+watch(
+  initialized,
+  (isReady) => {
+    if (isReady) {
+      lastRevealedTrickNumber.value =
+        latestTrickResult.value?.trickNumber ?? null;
+    }
+  },
+  { immediate: true },
+);
+
+// After the initial seed above, any subsequent change to latestTrickResult is a
+// genuine new round ending. Check the guard and enter the reveal.
+watch(latestTrickResult, (newResult) => {
+  if (
+    shouldEnterTrickReveal(
+      newResult?.trickNumber ?? null,
+      lastRevealedTrickNumber.value,
+      effectiveStatus.value ?? "",
+    )
+  ) {
+    lastRevealedTrickNumber.value = newResult!.trickNumber;
+    enterTrickReveal();
+  }
+});
 </script>
 
 <style scoped>
@@ -547,6 +698,17 @@ watch(
     filter 0.4s ease,
     transform 0.4s ease;
   pointer-events: none; /* board is non-interactive during reveal */
+}
+
+/* Tonk: TonkBoard uses position:fixed so it escapes the board-container.
+   Apply blur via a :deep rule targeting the fixed .tonk-board root. */
+.game-view__board-container--revealing :deep(.tonk-board) {
+  filter: blur(7px) brightness(0.55) saturate(0.8);
+  transform: scale(1.02);
+  transition:
+    filter 0.4s ease,
+    transform 0.4s ease;
+  pointer-events: none;
 }
 
 /* Direction A reveal layer — full-bleed radial scrim hosting the winner text,
@@ -700,6 +862,10 @@ watch(
   }
 
   .game-view__board-container--revealing :deep(.game-board) {
+    transition: none;
+  }
+
+  .game-view__board-container--revealing :deep(.tonk-board) {
     transition: none;
   }
 }
