@@ -104,11 +104,20 @@
       </div>
 
       <div
+        v-if="isHost && canRematch && aiCount >= 1"
+        class="game-over__rematch-hint"
+        data-testid="rematch-lineup"
+      >
+        Rematch: You + {{ aiCount }} CPU{{ aiCount === 1 ? "" : "s" }}
+        <AiBadge style="flex-shrink: 0" />
+      </div>
+
+      <div
         v-if="isHost && !canRematch"
         class="game-over__rematch-hint"
         data-testid="rematch-too-few"
       >
-        Only you are still here. Need at least 2 players.
+        Only you are still here. Need at least {{ engineMin }} players.
       </div>
 
       <div
@@ -139,6 +148,7 @@ import type {
 import type { Big2HistoryEntry, Big2Play } from "@shared/big2-types";
 import type { TonkLogEntry } from "@shared/tonk-types";
 import GameCard from "@/component/game-ui/GameCard.vue";
+import AiBadge from "@/component/game-ui/AiBadge.vue";
 import {
   deriveBig2Stats,
   getBadgeForPosition,
@@ -177,6 +187,7 @@ const props = defineProps<{
   totalTurns?: number;
   gameType?: GameType;
   finalPlay?: Big2Play | null;
+  engineMin: number;
   tonkFinalMove?: TonkFinalMove | null;
 }>();
 
@@ -186,9 +197,21 @@ const emit = defineEmits<{
 
 const router = useRouter();
 
-// Host can rematch only when at least 2 players are present in the results
-// roster. The server is the final authority; this drives the button's state.
-const canRematch = computed(() => props.isHost && props.players.length >= 2);
+// Count humans and CPUs from the results roster (both already carry isAi from
+// LLD 120). The projected rematch roster = connected humans + re-seated CPUs.
+const humanCount = computed(() => props.players.filter((p) => !p.isAi).length);
+const aiCount = computed(() => props.players.filter((p) => p.isAi).length);
+
+// Host can rematch when there is at least 1 connected human and the projected
+// total (humans + CPUs) satisfies the engine minimum. The server is the final
+// authority; this drives the button state and removes the systematic
+// false-positive for practice games.
+const canRematch = computed(
+  () =>
+    props.isHost &&
+    humanCount.value >= 1 &&
+    props.players.length >= props.engineMin,
+);
 
 const scoreRows = computed(() => {
   const totalPlayers = props.scores.length;

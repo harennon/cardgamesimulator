@@ -510,6 +510,7 @@ async function handleGameRematch(
   gameService: GameService,
   connectionManager: ConnectionManager,
   turnTimerService: TurnTimerService,
+  delayer: Delayer,
 ): Promise<void> {
   const { gameId } = payload;
   const { userId } = socket.data;
@@ -526,25 +527,44 @@ async function handleGameRematch(
 
   try {
     const connectedPlayerIds = connectionManager.getConnectedPlayerIds(gameId);
-    const { newGameId } = await gameService.createRematch(
+    const { newGameId, state } = await gameService.createRematch(
       gameId,
       userId,
       connectedPlayerIds,
     );
 
-    // Register and start the timer for the new game, mirroring handleGameStart.
+    // Register and conditionally start the timer for the new game, mirroring
+    // handleGameStart: if the first dealt seat is AI, defer arming the timer
+    // until autoPlayAbandoned stops at a human (so no redundant timer is armed).
     const newGame = await gameService.getGame(newGameId);
     if (newGame?.turnTimerSeconds != null) {
       turnTimerService.registerGame(newGameId, {
         turnTimerSeconds: newGame.turnTimerSeconds,
       });
-      turnTimerService.startTurn(newGameId, true);
+      const firstSeatId = state.players[state.currentPlayerIndex]?.playerId;
+      const firstIsAi =
+        firstSeatId != null &&
+        (await gameService.isAiSeat(newGameId, firstSeatId));
+      if (!firstIsAi) {
+        turnTimerService.startTurn(newGameId, true);
+      }
     }
 
     // Broadcast to the old room so every connected client navigates to the new game.
     io.to(`game:${gameId}`).emit("game:rematchStarted", { newGameId });
 
     ack({ success: true, newGameId });
+
+    // Drive any CPU-first (or all-CPU-until-human) opening turns, exactly as
+    // handleGameStart does after broadcasting game:started.
+    await autoPlayAbandoned(
+      io,
+      newGameId,
+      gameService,
+      connectionManager,
+      turnTimerService,
+      delayer,
+    );
   } catch (err: unknown) {
     const code = err instanceof Error ? err.message : "INTERNAL_ERROR";
     ack({ success: false, error: code });
@@ -874,6 +894,7 @@ export function registerSocketHandlers(
         gameService,
         connectionManager,
         turnTimerService,
+        delayer,
       ).catch((err: unknown) => {
         console.error("game:rematch error", err);
         ack({ success: false, error: "INTERNAL_ERROR" });

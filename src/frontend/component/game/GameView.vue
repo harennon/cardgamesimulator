@@ -135,6 +135,7 @@
     :total-turns="gameState.turnNumber"
     :game-type="gameState.gameType"
     :final-play="finalPlay"
+    :engine-min="gameState.gameType === 'tonk' ? 3 : 2"
     :tonk-final-move="tonkFinalMove"
     @rematch="onRematch"
   />

@@ -1287,10 +1287,12 @@ describe("GameService", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // LLD 118: createRematch strips practice/AI
+  // LLD 140: createRematch — practice game re-seats AI
   // ---------------------------------------------------------------------------
 
-  describe("createRematch — practice/AI stripping", () => {
+  describe("createRematch — practice AI re-seating (LLD 140)", () => {
+    // Real engines needed so addAiSeats (called internally) exercises the full
+    // flow including the GAME_FULL and INVALID_AI_COUNT guards.
     function makeRematchEngine(): GameEngine {
       return makeEngine({
         initialize: vi
@@ -1301,23 +1303,172 @@ describe("GameService", () => {
       });
     }
 
-    it("rematch of a practice game strips practice and aiPlayerIds; roster is humans only", async () => {
+    // (a) REQUIRED regression — 1-human + N-CPU Big2 practice rematch succeeds.
+    it("(a) 1-human + 2-CPU Big2 practice rematch succeeds: new game IN_PROGRESS with 3 seats, fresh AI ids, practice=true", async () => {
       const cache = new GameCache();
-      const aiId = "ai:00000000-0000-0000-0000-000000000001";
+      const ai1 = "00000000-0000-0000-0000-000000000001";
+      const ai2 = "00000000-0000-0000-0000-000000000002";
       const oldGame = makeCompletedGame({
-        playerIds: ["player-a", "player-b", aiId],
+        playerIds: ["player-a", ai1, ai2],
         playerDisplayNames: {
           "player-a": "Alice",
-          "player-b": "Bob",
-          [aiId]: "CPU 1",
+          [ai1]: "CPU 1",
+          [ai2]: "CPU 2",
         },
-        gameConfig: { practice: true, aiPlayerIds: [aiId] },
+        gameConfig: { practice: true, aiPlayerIds: [ai1, ai2] },
       });
       const repo = makeInMemoryRepo([oldGame]);
       const factory = makeEngineFactory(makeRematchEngine());
       const service = new GameService(cache, factory, repo, makeStatsService());
 
-      // Only the 2 humans are connected
+      const { newGameId, state } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a"], // only the host is connected; AI never hold sockets
+      );
+
+      expect(newGameId).not.toBe("old-game");
+      expect(state.status).toBe("IN_PROGRESS");
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.playerIds).toHaveLength(3);
+      expect(newGame?.playerIds[0]).toBe("player-a"); // host first
+      expect(newGame?.gameConfig.practice).toBe(true);
+      expect(newGame?.gameConfig.aiPlayerIds).toHaveLength(2);
+      // Fresh ids: not equal to old ai1 / ai2
+      expect(newGame?.gameConfig.aiPlayerIds).not.toContain(ai1);
+      expect(newGame?.gameConfig.aiPlayerIds).not.toContain(ai2);
+    });
+
+    // (b) REQUIRED regression — 2-human + 1-CPU mixed practice rematch succeeds.
+    it("(b) 2-human + 1-CPU mixed Big2 practice rematch: new roster = 2 humans + 1 fresh AI, practice=true", async () => {
+      const cache = new GameCache();
+      const ai1 = "00000000-0000-0000-0000-000000000001";
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", "player-b", ai1],
+        playerDisplayNames: {
+          "player-a": "Alice",
+          "player-b": "Bob",
+          [ai1]: "CPU 1",
+        },
+        gameConfig: { practice: true, aiPlayerIds: [ai1] },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "player-b"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.playerIds).toHaveLength(3);
+      expect(newGame?.playerIds).toContain("player-a");
+      expect(newGame?.playerIds).toContain("player-b");
+      expect(newGame?.gameConfig.practice).toBe(true);
+      expect(newGame?.gameConfig.aiPlayerIds).toHaveLength(1);
+      expect(newGame?.gameConfig.aiPlayerIds![0]).not.toBe(ai1); // fresh id
+    });
+
+    // Re-seat count matches the old game.
+    it("old game with 3 AI seats → new game also has 3 fresh AI seats", async () => {
+      const cache = new GameCache();
+      const aiIds = [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000003",
+      ];
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", ...aiIds],
+        playerDisplayNames: Object.fromEntries([
+          ["player-a", "Alice"],
+          ...aiIds.map((id, i) => [id, `CPU ${i + 1}`]),
+        ]),
+        maxPlayers: 4,
+        gameConfig: { practice: true, aiPlayerIds: aiIds },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.gameConfig.aiPlayerIds).toHaveLength(3);
+    });
+
+    // Roster-total guard — practice game below engine min.
+    it("1-human + 1-CPU Tonk practice (total 2 < min 3) → NOT_ENOUGH_PLAYERS; old code intact", async () => {
+      const cache = new GameCache();
+      const ai1 = "00000000-0000-0000-0000-000000000001";
+      const oldGame = makeCompletedGame({
+        gameType: "tonk",
+        playerIds: ["player-a", ai1],
+        playerDisplayNames: { "player-a": "Alice", [ai1]: "CPU 1" },
+        joinCode: "H7K3",
+        gameConfig: { practice: true, aiPlayerIds: [ai1] },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a"]),
+      ).rejects.toThrow("NOT_ENOUGH_PLAYERS");
+
+      // Early throw — old code intact (re-clickable)
+      expect(repo.clearJoinCode).not.toHaveBeenCalled();
+      const reloadedOld = await repo.getGame("old-game");
+      expect(reloadedOld?.joinCode).toBe("H7K3");
+    });
+
+    it("1-human + 2-CPU Tonk practice (total 3 = min 3) → succeeds", async () => {
+      const cache = new GameCache();
+      const ai1 = "00000000-0000-0000-0000-000000000001";
+      const ai2 = "00000000-0000-0000-0000-000000000002";
+      const oldGame = makeCompletedGame({
+        gameType: "tonk",
+        playerIds: ["player-a", ai1, ai2],
+        playerDisplayNames: {
+          "player-a": "Alice",
+          [ai1]: "CPU 1",
+          [ai2]: "CPU 2",
+        },
+        gameConfig: { practice: true, aiPlayerIds: [ai1, ai2] },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.playerIds).toHaveLength(3);
+      expect(newGame?.gameConfig.practice).toBe(true);
+    });
+
+    // REQUIRED regression — human-only rematch unchanged.
+    it("REQUIRED regression: 2-human Big2 human-only rematch succeeds; no practice/aiPlayerIds", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", "player-b"],
+        playerDisplayNames: { "player-a": "Alice", "player-b": "Bob" },
+        gameConfig: {},
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
       const { newGameId } = await service.createRematch(
         "old-game",
         "player-a",
@@ -1327,20 +1478,18 @@ describe("GameService", () => {
       const newGame = await repo.getGame(newGameId);
       expect(newGame?.gameConfig.practice).toBeUndefined();
       expect(newGame?.gameConfig.aiPlayerIds).toBeUndefined();
-      expect(newGame?.playerIds).not.toContain(aiId);
       expect(newGame?.playerIds).toEqual(
         expect.arrayContaining(["player-a", "player-b"]),
       );
     });
 
-    it("rematch of a practice game with only 1 human connected → throws NOT_ENOUGH_PLAYERS", async () => {
+    // REQUIRED regression — human-only Big2 solo still rejected.
+    it("REQUIRED regression: 1 connected human, no AI, Big2 → NOT_ENOUGH_PLAYERS", async () => {
       const cache = new GameCache();
-      const aiId = "ai:00000000-0000-0000-0000-000000000001";
       const oldGame = makeCompletedGame({
-        playerIds: ["player-a", aiId],
-        playerDisplayNames: { "player-a": "Alice", [aiId]: "CPU 1" },
-        joinCode: "H7K3",
-        gameConfig: { practice: true, aiPlayerIds: [aiId] },
+        playerIds: ["player-a", "player-b"],
+        playerDisplayNames: { "player-a": "Alice", "player-b": "Bob" },
+        gameConfig: {},
       });
       const repo = makeInMemoryRepo([oldGame]);
       const factory = makeEngineFactory(makeRematchEngine());
@@ -1351,7 +1500,151 @@ describe("GameService", () => {
       ).rejects.toThrow("NOT_ENOUGH_PLAYERS");
     });
 
-    it("regression: rematch of a human-vs-human Tonk game preserves deckRoundsTarget, no practice added", async () => {
+    // Tonk human-only tightening (Edge Case 7).
+    it("Tonk human-only tightening: 2 connected humans, no AI → NOT_ENOUGH_PLAYERS (Tonk min 3)", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({
+        gameType: "tonk",
+        playerIds: ["player-a", "player-b", "player-c"],
+        playerDisplayNames: {
+          "player-a": "Alice",
+          "player-b": "Bob",
+          "player-c": "Carol",
+        },
+        gameConfig: {},
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a", "player-b"]),
+      ).rejects.toThrow("NOT_ENOUGH_PLAYERS");
+    });
+
+    // maxPlayers headroom (Edge Case 5).
+    it("maxPlayers headroom: 1 human + 3 AI in a 4-slot game re-seats without GAME_FULL", async () => {
+      const cache = new GameCache();
+      const aiIds = [
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000003",
+      ];
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", ...aiIds],
+        playerDisplayNames: Object.fromEntries([
+          ["player-a", "Alice"],
+          ...aiIds.map((id, i) => [id, `CPU ${i + 1}`]),
+        ]),
+        maxPlayers: 4,
+        gameConfig: { practice: true, aiPlayerIds: aiIds },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a"]),
+      ).resolves.toBeDefined();
+    });
+
+    // Idempotency unchanged (Edge Case 9).
+    it("idempotency: second createRematch for the same practice game → REMATCH_ALREADY_STARTED", async () => {
+      const cache = new GameCache();
+      const ai1 = "00000000-0000-0000-0000-000000000001";
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", ai1],
+        playerDisplayNames: { "player-a": "Alice", [ai1]: "CPU 1" },
+        joinCode: "H7K3",
+        gameConfig: { practice: true, aiPlayerIds: [ai1] },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await service.createRematch("old-game", "player-a", ["player-a"]);
+
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a"]),
+      ).rejects.toThrow("REMATCH_ALREADY_STARTED");
+    });
+
+    // Practice flag but empty aiPlayerIds (Edge Case 8).
+    it("practice=true but aiPlayerIds=[] with 1 human → NOT_ENOUGH_PLAYERS (treated as human-only)", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a"],
+        playerDisplayNames: { "player-a": "Alice" },
+        gameConfig: { practice: true, aiPlayerIds: [] },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      await expect(
+        service.createRematch("old-game", "player-a", ["player-a"]),
+      ).rejects.toThrow("NOT_ENOUGH_PLAYERS");
+    });
+
+    it("practice=true but aiPlayerIds=[] with 2 humans → succeeds as human-only (no addAiSeats call)", async () => {
+      const cache = new GameCache();
+      const oldGame = makeCompletedGame({
+        playerIds: ["player-a", "player-b"],
+        playerDisplayNames: { "player-a": "Alice", "player-b": "Bob" },
+        gameConfig: { practice: true, aiPlayerIds: [] },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a", "player-b"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      // addAiSeats was not called, so no AI re-seating
+      expect(newGame?.gameConfig.aiPlayerIds).toBeUndefined();
+      expect(newGame?.playerIds).toHaveLength(2);
+    });
+
+    // deckRoundsTarget preserved through practice rematch.
+    it("Tonk practice rematch preserves deckRoundsTarget", async () => {
+      const cache = new GameCache();
+      const ai1 = "00000000-0000-0000-0000-000000000001";
+      const ai2 = "00000000-0000-0000-0000-000000000002";
+      const oldGame = makeCompletedGame({
+        gameType: "tonk",
+        playerIds: ["player-a", ai1, ai2],
+        playerDisplayNames: {
+          "player-a": "Alice",
+          [ai1]: "CPU 1",
+          [ai2]: "CPU 2",
+        },
+        gameConfig: {
+          practice: true,
+          aiPlayerIds: [ai1, ai2],
+          deckRoundsTarget: 5,
+        },
+      });
+      const repo = makeInMemoryRepo([oldGame]);
+      const factory = makeEngineFactory(makeRematchEngine());
+      const service = new GameService(cache, factory, repo, makeStatsService());
+
+      const { newGameId } = await service.createRematch(
+        "old-game",
+        "player-a",
+        ["player-a"],
+      );
+
+      const newGame = await repo.getGame(newGameId);
+      expect(newGame?.gameConfig.deckRoundsTarget).toBe(5);
+      expect(newGame?.gameConfig.practice).toBe(true);
+    });
+
+    // regression: human-only Tonk rematch preserves deckRoundsTarget, no practice added.
+    it("regression: human-vs-human Tonk rematch preserves deckRoundsTarget, no practice added", async () => {
       const cache = new GameCache();
       const oldGame = makeCompletedGame({
         gameType: "tonk",
