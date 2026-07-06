@@ -1,0 +1,39 @@
+{
+  "stack": "Vue 3 SPA + Express 5 + Socket.IO + Supabase (TypeScript)",
+  "docs": {
+    "principles": ["docs/architecture-principles.md", "docs/testing-principles.md"],
+    "hld": "docs/project-hld.md",
+    "cx": "docs/customer-experience.md",
+    "plan": "docs/execution-plan.md",
+    "lldDir": "docs/lld/",
+    "mockupDir": "docs/mockups/",
+    "frontendConventions": "docs/frontend-conventions.md",
+    "dev": "DEVELOPMENT.md"
+  },
+  "commands": {
+    "install": "npm --prefix {dir} install --silent",
+    "build": "npm --prefix {dir} run build",
+    "lint": "npm --prefix {dir} run lint:fix",
+    "test": "npm --prefix {dir} test",
+    "integrationTest": "npm --prefix {dir} run test:integration",
+    "e2e": "npm --prefix {dir} run test:e2e"
+  },
+  "defaultBranch": "main",
+  "changelog": "CHANGELOG.md",
+  "frontendPaths": ["src/frontend/"],
+  "mockupHosting": {
+    "branch": "gh-pages",
+    "baseUrl": "https://harennon.github.io/cardgamesimulator/"
+  },
+  "feedback": {
+    "list": "node scripts/feedback.mjs --json",
+    "delete": "node scripts/feedback.mjs --delete {id}"
+  },
+  "hasFrontend": true,
+  "mockupPort": 8090,
+  "proposal": {
+    "mode": "improve",
+    "references": ["neal.fun", "popular online card-game clients"],
+    "focus": "Gameplay feel, multiplayer UX, and card-interaction polish for Big2/Tonk."
+  }
+}
