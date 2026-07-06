@@ -6,6 +6,7 @@ import type {
   SubmitFeedbackResponse,
   SubmitAttachmentRequest,
   SubmitAttachmentResponse,
+  AdminFeedbackEntry,
 } from "@shared/model";
 import { FeedbackService, ValidationError } from "@/service/feedbackService";
 import {
@@ -59,7 +60,10 @@ export class FeedbackHandler extends Handler {
     );
   }
 
-  public override async get(request: Request, response: Response) {
+  public override async get(
+    request: Request,
+    response: Response<AdminFeedbackEntry[] | { error: string }>,
+  ) {
     const userId = request.userId;
     if (!userId || !getAdminIds().has(userId)) {
       response.status(403).json({ error: "Forbidden" });
@@ -67,17 +71,28 @@ export class FeedbackHandler extends Handler {
     }
 
     const feedback = await feedbackRepo.getAllFeedback();
-    response.status(200).json(
-      feedback.map((f) => ({
-        id: f.id,
-        category: f.category,
-        description: f.description,
-        metadata: f.metadata,
-        userId: f.userId,
-        createdAt: f.createdAt.toISOString(),
-        attachmentKeys: f.attachmentKeys,
-      })),
+
+    const entries = await Promise.all(
+      feedback.map(async (f) => {
+        const attachments = await Promise.all(
+          f.attachmentKeys.map((key) =>
+            this.attachmentService.getSignedUrl(key),
+          ),
+        );
+        return {
+          id: f.id,
+          category: f.category,
+          description: f.description,
+          metadata: f.metadata,
+          userId: f.userId,
+          createdAt: f.createdAt.toISOString(),
+          attachmentKeys: f.attachmentKeys,
+          attachments,
+        };
+      }),
     );
+
+    response.status(200).json(entries);
   }
 
   public async delete(request: Request, response: Response) {
