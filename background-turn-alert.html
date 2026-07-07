@@ -1,0 +1,1457 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Card Game Simulator</title>
+    <link
+      id="favicon"
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a4a2e'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%23c9a84c'%3E%E2%99%A0%3C/text%3E%3C/svg%3E"
+    />
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        /* ==== The Club tokens (mirror src/frontend/styles/game-variables.css) ==== */
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --error-text: #e05555;
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        /* Chrome (browser sim) tokens — greyscale, deliberately NOT felt so the
+           game tab reads as "the app inside a browser". */
+        --chrome-bg: #202124;
+        --chrome-bar: #35363a;
+        --chrome-tab: #2a2b2e;
+        --chrome-tab-active: #202124;
+        --chrome-text: #c9cbcf;
+        --chrome-text-dim: #80838a;
+        --os-toast-bg: #292a2d;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background:
+          radial-gradient(
+            ellipse 120% 90% at 50% -10%,
+            #14324a 0%,
+            #0a0a0a 60%
+          ),
+          #0a0a0a;
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 24px 24px 120px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .page-head {
+        width: 100%;
+        max-width: 1040px;
+        text-align: center;
+      }
+      .page-head h1 {
+        font-family: var(--font-card);
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        letter-spacing: 0.01em;
+      }
+      .page-head p {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-top: 6px;
+        line-height: 1.5;
+      }
+
+      /* ============================================================= */
+      /* FAUX BROWSER WINDOW                                            */
+      /* ============================================================= */
+      .browser {
+        width: 100%;
+        max-width: 1040px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--chrome-bg);
+        box-shadow:
+          0 24px 70px rgba(0, 0, 0, 0.6),
+          0 0 0 1px rgba(255, 255, 255, 0.04);
+        position: relative;
+      }
+
+      .browser__tabstrip {
+        display: flex;
+        align-items: flex-end;
+        gap: 2px;
+        padding: 8px 10px 0;
+        background: var(--chrome-bar);
+      }
+
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 150px;
+        max-width: 220px;
+        padding: 8px 12px;
+        border-radius: 8px 8px 0 0;
+        background: var(--chrome-tab);
+        color: var(--chrome-text-dim);
+        font-size: 0.78rem;
+        cursor: pointer;
+        position: relative;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
+        white-space: nowrap;
+      }
+      .tab--active {
+        background: var(--chrome-tab-active);
+        color: var(--chrome-text);
+      }
+      .tab__favicon {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        flex-shrink: 0;
+        background-size: cover;
+      }
+      .tab__title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      /* Gold badge dot on the game tab's favicon when alert armed */
+      .tab__favicon--game {
+        position: relative;
+      }
+      .tab__favicon--game.is-badged::after {
+        content: "";
+        position: absolute;
+        top: -3px;
+        right: -3px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        border: 1.5px solid var(--chrome-tab);
+        box-shadow: 0 0 6px var(--gold-glow);
+      }
+      .tab--active .tab__favicon--game.is-badged::after {
+        border-color: var(--chrome-tab-active);
+      }
+      .tab__close {
+        color: var(--chrome-text-dim);
+        font-size: 0.9rem;
+        margin-left: auto;
+      }
+
+      .browser__urlbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        background: var(--chrome-bg);
+      }
+      .urlbar__nav {
+        display: flex;
+        gap: 12px;
+        color: var(--chrome-text-dim);
+        font-size: 0.9rem;
+      }
+      .urlbar__field {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 16px;
+        background: var(--chrome-bar);
+        color: var(--chrome-text);
+        font-size: 0.76rem;
+      }
+      .urlbar__lock {
+        font-size: 0.7rem;
+        color: var(--chrome-text-dim);
+      }
+
+      /* Browser viewport = the game board */
+      .browser__viewport {
+        position: relative;
+        height: 460px;
+        overflow: hidden;
+      }
+      /* Dim overlay shown when we simulate "this tab is in the background" */
+      .browser__viewport.is-hidden-sim::before {
+        content: "You're viewing another tab — the game is in the background";
+        position: absolute;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        background: rgba(6, 4, 2, 0.82);
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        font-style: italic;
+        backdrop-filter: blur(3px);
+      }
+
+      /* ============================================================= */
+      /* GAME BOARD (compact, faithful to The Club)                    */
+      /* ============================================================= */
+      .board {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-rows: 64px 1fr 96px 56px;
+        grid-template-areas:
+          "opponents"
+          "table"
+          "hand"
+          "actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+      }
+      .board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 10px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        pointer-events: none;
+        z-index: 40;
+      }
+
+      /* -- top rail -- */
+      .board__opponents {
+        grid-area: opponents;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 16px;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+        position: relative;
+        z-index: 30;
+      }
+      .room-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 8px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .room-chip span {
+        color: var(--text-muted);
+        letter-spacing: 0.06em;
+      }
+      .opp-list {
+        display: flex;
+        gap: 12px;
+        margin-left: 8px;
+      }
+      .opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 4px 12px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+      }
+      .opp--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .opp__name {
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+      .opp__count {
+        font-size: 0.66rem;
+        color: var(--text-muted);
+      }
+
+      /* -- center -- */
+      .board__table {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        position: relative;
+        z-index: 10;
+      }
+      .turn-pill {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        padding: 5px 18px;
+        border-radius: 20px;
+        background: var(--panel-bg);
+        border: 1px solid rgba(138, 126, 110, 0.3);
+        transition:
+          color 0.2s,
+          border-color 0.2s;
+      }
+      .turn-pill--mine {
+        color: var(--gold-accent);
+        border-color: var(--gold-accent);
+        animation: glow 2s ease-in-out infinite;
+      }
+      @keyframes glow {
+        0%,
+        100% {
+          box-shadow: 0 0 8px var(--gold-glow);
+        }
+        50% {
+          box-shadow:
+            0 0 20px var(--gold-glow),
+            0 0 40px rgba(201, 168, 76, 0.1);
+        }
+      }
+      .last-play {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .last-play__label {
+        font-size: 0.68rem;
+        color: var(--gold-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .card-row {
+        display: flex;
+        gap: 4px;
+      }
+      .card {
+        width: 46px;
+        height: 64px;
+        background: var(--card-face);
+        border-radius: 5px;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+      .card__rank {
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+      .card__suit {
+        font-size: 1.1rem;
+        line-height: 1;
+      }
+      .card--red {
+        color: var(--red-suit);
+      }
+      .card--black {
+        color: #1a1a1a;
+      }
+
+      /* -- hand -- */
+      .board__hand {
+        grid-area: hand;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        position: relative;
+        z-index: 10;
+      }
+      .hand-cards {
+        display: flex;
+      }
+      .hand-cards .card {
+        margin-left: -16px;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+      }
+      .hand-cards .card:first-child {
+        margin-left: 0;
+      }
+      .hand-cards .card.sel {
+        transform: translateY(-14px);
+        border-color: var(--gold-accent);
+        box-shadow: 0 4px 16px var(--gold-glow);
+      }
+
+      /* -- actions -- */
+      .board__actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+        position: relative;
+        z-index: 30;
+      }
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 9px 26px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          opacity 0.15s;
+      }
+      .btn--play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      /* ============================================================= */
+      /* SHARED CONTROL: icon button + switch                          */
+      /* ============================================================= */
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1rem;
+        line-height: 1;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .icon-btn:hover {
+        border-color: var(--gold-accent);
+      }
+      .switch {
+        position: relative;
+        width: 40px;
+        height: 22px;
+        flex-shrink: 0;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .switch__track {
+        position: absolute;
+        inset: 0;
+        border-radius: 22px;
+        background: rgba(138, 126, 110, 0.35);
+        transition: background 0.18s ease;
+      }
+      .switch__track::before {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--text-primary);
+        transition: transform 0.18s ease;
+      }
+      .switch input:checked + .switch__track {
+        background: var(--gold-accent);
+      }
+      .switch input:checked + .switch__track::before {
+        transform: translateX(18px);
+        background: #1a0f06;
+      }
+      .switch input:focus-visible + .switch__track {
+        outline: 2px solid var(--gold-accent);
+        outline-offset: 2px;
+      }
+
+      /* ============================================================= */
+      /* DIRECTION A — settings gear + popover                         */
+      /* ============================================================= */
+      .gear-wrap {
+        margin-left: auto;
+        position: relative;
+      }
+      .settings-pop {
+        position: absolute;
+        top: 42px;
+        right: 0;
+        width: 244px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 6px;
+        z-index: 50;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+      }
+      .settings-pop__title {
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        padding: 8px 10px 4px;
+      }
+      .settings-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 7px;
+      }
+      .settings-row + .settings-row {
+        border-top: 1px solid rgba(138, 126, 110, 0.12);
+      }
+      .settings-row__text {
+        flex: 1;
+        min-width: 0;
+      }
+      .settings-row__label {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .settings-row__hint {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        margin-top: 1px;
+        line-height: 1.35;
+      }
+      .mini-btn {
+        font-family: var(--font-ui);
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--gold-accent);
+        background: transparent;
+        color: var(--gold-accent);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .mini-btn:hover {
+        background: rgba(201, 168, 76, 0.12);
+      }
+      .status-chip {
+        font-size: 0.68rem;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 12px;
+        white-space: nowrap;
+      }
+      .status-chip--on {
+        color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.12);
+      }
+      .status-chip--off {
+        color: var(--text-muted);
+        background: rgba(138, 126, 110, 0.14);
+      }
+      .status-chip--denied {
+        color: var(--error-text);
+        background: rgba(224, 85, 85, 0.12);
+      }
+
+      /* ============================================================= */
+      /* DIRECTION B — inline sound toggle + contextual opt-in card     */
+      /* ============================================================= */
+      .sound-toggle {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        user-select: none;
+      }
+      .sound-toggle__icon {
+        font-size: 1.1rem;
+      }
+      .sound-toggle--muted {
+        opacity: 0.6;
+      }
+      .optin-card {
+        position: absolute;
+        left: 50%;
+        bottom: 68px;
+        transform: translateX(-50%);
+        z-index: 55;
+        width: min(420px, calc(100% - 40px));
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        background: var(--panel-bg);
+        border: 1px solid var(--gold-accent);
+        border-radius: 10px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(10px);
+      }
+      .optin-card__bell {
+        font-size: 1.3rem;
+      }
+      .optin-card__text {
+        flex: 1;
+        min-width: 0;
+      }
+      .optin-card__title {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .optin-card__hint {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: 1px;
+      }
+      .optin-card__actions {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .link-btn {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        cursor: pointer;
+        padding: 6px 8px;
+      }
+      .link-btn:hover {
+        color: var(--text-primary);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      /* ============================================================= */
+      /* OS-LEVEL DESKTOP NOTIFICATION (outside the browser window)     */
+      /* ============================================================= */
+      .os-toast {
+        position: fixed;
+        top: 18px;
+        right: 18px;
+        z-index: 900;
+        width: 320px;
+        display: flex;
+        gap: 12px;
+        padding: 14px;
+        border-radius: 12px;
+        background: var(--os-toast-bg);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+        transform: translateX(120%);
+        transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .os-toast.is-shown {
+        transform: translateX(0);
+      }
+      .os-toast__icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 9px;
+        background: radial-gradient(circle at 50% 40%, #256b42, #16361f);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--gold-accent);
+        font-size: 1.2rem;
+        flex-shrink: 0;
+      }
+      .os-toast__body {
+        flex: 1;
+        min-width: 0;
+      }
+      .os-toast__app {
+        font-size: 0.66rem;
+        color: var(--chrome-text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .os-toast__title {
+        font-size: 0.86rem;
+        font-weight: 600;
+        color: #f1f2f4;
+        margin-top: 2px;
+      }
+      .os-toast__msg {
+        font-size: 0.76rem;
+        color: var(--chrome-text);
+        margin-top: 2px;
+      }
+
+      /* ============================================================= */
+      /* LEGEND (favicon states) + notes                               */
+      /* ============================================================= */
+      .info-grid {
+        width: 100%;
+        max-width: 1040px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .info-card {
+        background: rgba(20, 12, 8, 0.6);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 16px 18px;
+      }
+      .info-card h3 {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--gold-accent);
+        margin-bottom: 12px;
+      }
+      .favicon-legend {
+        display: flex;
+        gap: 24px;
+      }
+      .fav-demo {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .fav-swatch {
+        width: 44px;
+        height: 44px;
+        border-radius: 9px;
+        background: var(--felt);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--gold-accent);
+        font-size: 1.6rem;
+        position: relative;
+        border: 1px solid rgba(0, 0, 0, 0.4);
+      }
+      .fav-swatch--badged::after {
+        content: "";
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: var(--gold-accent);
+        border: 2px solid #0a0a0a;
+        box-shadow: 0 0 8px var(--gold-glow);
+      }
+      .fav-demo span {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+      }
+      .title-flip {
+        font-family: monospace;
+        font-size: 0.82rem;
+        color: var(--text-primary);
+        background: #111;
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin-top: 10px;
+      }
+      .info-card ul {
+        list-style: none;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.7;
+      }
+      .info-card ul li::before {
+        content: "▸ ";
+        color: var(--gold-accent);
+      }
+
+      /* ============================================================= */
+      /* DEMO CONTROL PANEL                                             */
+      /* ============================================================= */
+      .demo {
+        position: fixed;
+        left: 16px;
+        bottom: 16px;
+        z-index: 950;
+        width: 260px;
+        background: rgba(0, 0, 0, 0.92);
+        border: 1px solid #333;
+        border-radius: 10px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .demo__title {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #999;
+      }
+      .demo__group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding-top: 6px;
+        border-top: 1px solid #2a2a2a;
+      }
+      .demo__group-label {
+        font-size: 0.62rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .demo button {
+        font-family: var(--font-ui);
+        font-size: 0.74rem;
+        padding: 7px 10px;
+        border: 1px solid #555;
+        background: #222;
+        color: #ccc;
+        border-radius: 5px;
+        cursor: pointer;
+        text-align: left;
+      }
+      .demo button:hover {
+        background: #333;
+      }
+      .demo button.active {
+        background: var(--gold-accent);
+        color: #000;
+        border-color: var(--gold-accent);
+      }
+      .demo__note {
+        font-size: 0.66rem;
+        color: #888;
+        line-height: 1.4;
+      }
+
+      @media (max-width: 720px) {
+        .info-grid {
+          grid-template-columns: 1fr;
+        }
+        .demo {
+          width: calc(100% - 32px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-head">
+      <h1>Background "Your Turn" Alert</h1>
+      <p>
+        Tab-title flash · badged favicon · optional chime · opt-in desktop
+        notification. Three effects live in <em>browser chrome</em> (simulated
+        below); the chime + permission opt-in are the only in-app UI. Two
+        control-surface directions are shown — toggle between them in the demo
+        panel (bottom-left).
+      </p>
+    </div>
+
+    <!-- ============ FAUX BROWSER ============ -->
+    <div class="browser">
+      <div class="browser__tabstrip">
+        <div class="tab" title="Another tab">
+          <div class="tab__favicon" style="background: #4285f4"></div>
+          <span class="tab__title">MDN — visibilitychange</span>
+          <span class="tab__close">×</span>
+        </div>
+
+        <div class="tab tab--active" id="gameTab">
+          <div class="tab__favicon tab__favicon--game" id="tabFavicon"></div>
+          <span class="tab__title" id="tabTitle">Card Game Simulator</span>
+          <span class="tab__close">×</span>
+        </div>
+
+        <div class="tab" title="Another tab">
+          <div class="tab__favicon" style="background: #ea4335"></div>
+          <span class="tab__title">Inbox (3)</span>
+          <span class="tab__close">×</span>
+        </div>
+      </div>
+
+      <div class="browser__urlbar">
+        <div class="urlbar__nav">
+          <span>←</span><span>→</span><span>⟳</span>
+        </div>
+        <div class="urlbar__field">
+          <span class="urlbar__lock">🔒</span>
+          <span>danbing.app/game/7K2P</span>
+        </div>
+      </div>
+
+      <div class="browser__viewport" id="viewport">
+        <!-- ============ GAME BOARD ============ -->
+        <div class="board">
+          <!-- TOP RAIL -->
+          <div class="board__opponents">
+            <div class="room-chip"><span>ROOM</span> 7K2P</div>
+            <div class="opp-list">
+              <div class="opp opp--active" id="oppCharlie">
+                <span class="opp__name">Charlie</span>
+                <span class="opp__count">11 cards</span>
+              </div>
+              <div class="opp">
+                <span class="opp__name">Dave</span>
+                <span class="opp__count">8 cards</span>
+              </div>
+            </div>
+
+            <!-- DIRECTION A: settings gear (top-rail) -->
+            <div class="gear-wrap" id="gearWrap">
+              <button
+                class="icon-btn"
+                id="gearBtn"
+                aria-label="Alert settings"
+                title="Alert settings"
+              >
+                ⚙
+              </button>
+              <div class="settings-pop hidden" id="settingsPop" role="dialog">
+                <div class="settings-pop__title">Alerts</div>
+                <div class="settings-row">
+                  <div class="settings-row__text">
+                    <div class="settings-row__label">Turn sound</div>
+                    <div class="settings-row__hint">
+                      Soft chime when it's your turn &amp; tab is hidden
+                    </div>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="soundSwitchA" checked />
+                    <span class="switch__track"></span>
+                  </label>
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row__text">
+                    <div class="settings-row__label">Desktop alerts</div>
+                    <div class="settings-row__hint" id="notifHintA">
+                      Get a notification even when this tab is closed-over
+                    </div>
+                  </div>
+                  <button class="mini-btn" id="notifBtnA">Enable</button>
+                  <span
+                    class="status-chip status-chip--on hidden"
+                    id="notifChipA"
+                    >On</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CENTER -->
+          <div class="board__table">
+            <div class="turn-pill" id="turnPill">Charlie's turn</div>
+            <div class="last-play">
+              <div class="last-play__label">Pair</div>
+              <div class="card-row">
+                <div class="card card--black">
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♠</span>
+                </div>
+                <div class="card card--red">
+                  <span class="card__rank">7</span
+                  ><span class="card__suit">♥</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- HAND -->
+          <div class="board__hand">
+            <div class="hand-cards">
+              <div class="card card--black">
+                <span class="card__rank">5</span
+                ><span class="card__suit">♣</span>
+              </div>
+              <div class="card card--red sel">
+                <span class="card__rank">8</span
+                ><span class="card__suit">♦</span>
+              </div>
+              <div class="card card--red sel">
+                <span class="card__rank">8</span
+                ><span class="card__suit">♥</span>
+              </div>
+              <div class="card card--black">
+                <span class="card__rank">J</span
+                ><span class="card__suit">♠</span>
+              </div>
+              <div class="card card--red">
+                <span class="card__rank">K</span
+                ><span class="card__suit">♦</span>
+              </div>
+              <div class="card card--black">
+                <span class="card__rank">2</span
+                ><span class="card__suit">♠</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ACTIONS -->
+          <div class="board__actions" id="actions">
+            <!-- DIRECTION B: inline sound toggle -->
+            <div
+              class="sound-toggle hidden"
+              id="soundToggleB"
+              role="button"
+              tabindex="0"
+              title="Toggle turn sound"
+            >
+              <span class="sound-toggle__icon" id="soundIconB">🔊</span>
+              <span id="soundLabelB">Sound</span>
+            </div>
+            <button class="btn btn--pass" id="passBtn" disabled>Pass</button>
+            <button class="btn btn--play" id="playBtn" disabled>Play</button>
+          </div>
+
+          <!-- DIRECTION B: contextual opt-in card (appears once) -->
+          <div class="optin-card hidden" id="optinCard">
+            <span class="optin-card__bell">🔔</span>
+            <div class="optin-card__text">
+              <div class="optin-card__title">
+                Get a heads-up when it's your turn?
+              </div>
+              <div class="optin-card__hint">
+                We'll ping this tab even while you're away.
+              </div>
+            </div>
+            <div class="optin-card__actions">
+              <button class="link-btn" id="optinNo">Not now</button>
+              <button class="mini-btn" id="optinYes">Enable alerts</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ INFO / LEGEND ============ -->
+    <div class="info-grid">
+      <div class="info-card">
+        <h3>Favicon &amp; title states</h3>
+        <div class="favicon-legend">
+          <div class="fav-demo">
+            <div class="fav-swatch">♠</div>
+            <span>Normal</span>
+          </div>
+          <div class="fav-demo">
+            <div class="fav-swatch fav-swatch--badged">♠</div>
+            <span>Badged (your turn)</span>
+          </div>
+        </div>
+        <div class="title-flip" id="titleFlipDemo">Card Game Simulator</div>
+        <p
+          style="font-size: 0.72rem; color: var(--text-muted); margin-top: 8px"
+        >
+          Title alternates every ~1s while hidden; both reset instantly on
+          focus.
+        </p>
+      </div>
+      <div class="info-card">
+        <h3>Behavior rules</h3>
+        <ul>
+          <li>Fires only when tab is hidden AND it becomes your turn</li>
+          <li>Tab already focused → nothing fires (no flash, no chime)</li>
+          <li>Chime gated by "Turn sound"; unlocked on first in-game tap</li>
+          <li>
+            Notification only if permission already granted — never auto-prompts
+          </li>
+          <li>All effects clear the instant the tab regains focus</li>
+          <li>Players only — spectators get no alert</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============ OS DESKTOP NOTIFICATION ============ -->
+    <div class="os-toast" id="osToast">
+      <div class="os-toast__icon">♠</div>
+      <div class="os-toast__body">
+        <div class="os-toast__app">danbing.app</div>
+        <div class="os-toast__title">Your turn — Big2</div>
+        <div class="os-toast__msg">Tap to return to your game</div>
+      </div>
+    </div>
+
+    <!-- ============ DEMO CONTROLS ============ -->
+    <div class="demo">
+      <div class="demo__title">Demo controls</div>
+
+      <div class="demo__group">
+        <div class="demo__group-label">Control surface</div>
+        <button id="surfA" class="active" onclick="setSurface('A')">
+          A · Settings gear popover
+        </button>
+        <button id="surfB" onclick="setSurface('B')">
+          B · Inline toggle + opt-in card
+        </button>
+      </div>
+
+      <div class="demo__group">
+        <div class="demo__group-label">Simulate (in-page)</div>
+        <button onclick="simTurnWhileHidden()">① Tab hidden → your turn</button>
+        <button onclick="focusTab()">② Return to tab (focus)</button>
+        <button onclick="turnWhileFocused()">
+          ③ Your turn while focused (no-op)
+        </button>
+      </div>
+
+      <div class="demo__group">
+        <div class="demo__group-label">Try it for real</div>
+        <button onclick="armReal()">Arm, then switch to another tab →</button>
+        <div class="demo__note" id="realNote">
+          Arms the alert, then <b>you</b> switch tabs. The real title + favicon
+          of THIS page will flash. Come back to clear.
+        </div>
+      </div>
+
+      <div class="demo__group">
+        <div class="demo__group-label">Notification permission</div>
+        <button id="permDefault" class="active" onclick="setPerm('default')">
+          Not requested
+        </button>
+        <button id="permGranted" onclick="setPerm('granted')">Granted</button>
+        <button id="permDenied" onclick="setPerm('denied')">Denied</button>
+      </div>
+    </div>
+
+    <script>
+      // ---- Normal / badged favicon data URIs (SVG) ----
+      const FAVICON_NORMAL =
+        "data:image/svg+xml," +
+        encodeURIComponent(
+          `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='#1a4a2e'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='#c9a84c'>♠</text></svg>`,
+        );
+      const FAVICON_BADGED =
+        "data:image/svg+xml," +
+        encodeURIComponent(
+          `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='#1a4a2e'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='#c9a84c'>♠</text><circle cx='25' cy='7' r='6' fill='#c9a84c' stroke='#0a0a0a' stroke-width='1.5'/></svg>`,
+        );
+
+      const NORMAL_TITLE = "Card Game Simulator";
+      const ALERT_TITLE = "● Your turn — Big2";
+
+      // ---- State ----
+      let surface = "A";
+      let soundEnabled = true; // persisted (localStorage) in real impl
+      let permission = "default"; // default | granted | denied
+      let flashTimer = null;
+      let flashOn = false;
+      let optinDismissed = false;
+      let audioCtx = null;
+
+      // ---- Elements ----
+      const tabTitleEl = document.getElementById("tabTitle");
+      const tabFaviconEl = document.getElementById("tabFavicon");
+      const realFaviconEl = document.getElementById("favicon");
+      const titleFlipDemo = document.getElementById("titleFlipDemo");
+      const viewport = document.getElementById("viewport");
+      const osToast = document.getElementById("osToast");
+      const turnPill = document.getElementById("turnPill");
+      const optinCard = document.getElementById("optinCard");
+
+      // Favicon swatch inside the tab strip uses a CSS glyph; set its bg image.
+      tabFaviconEl.style.backgroundImage = `url("${FAVICON_NORMAL}")`;
+
+      // ================= CHIME (Web Audio) =================
+      function playChime() {
+        try {
+          audioCtx =
+            audioCtx ||
+            new (window.AudioContext || window.webkitAudioContext)();
+          const now = audioCtx.currentTime;
+          // Two soft sine notes — gentle, non-jarring.
+          [
+            [880, 0.0],
+            [1174.66, 0.12],
+          ].forEach(([freq, delay]) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, now + delay);
+            gain.gain.exponentialRampToValueAtTime(0.18, now + delay + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.5);
+            osc.connect(gain).connect(audioCtx.destination);
+            osc.start(now + delay);
+            osc.stop(now + delay + 0.55);
+          });
+        } catch (e) {
+          /* audio unavailable — degrade silently */
+        }
+      }
+
+      // ================= ALERT EFFECTS =================
+      function startFlash() {
+        if (flashTimer) return;
+        tabFaviconEl.classList.add("is-badged");
+        realFaviconEl.href = FAVICON_BADGED;
+        flashOn = true;
+        flashTimer = setInterval(() => {
+          flashOn = !flashOn;
+          const t = flashOn ? ALERT_TITLE : NORMAL_TITLE;
+          tabTitleEl.textContent = t;
+          document.title = t; // real browser tab flashes too
+          titleFlipDemo.textContent = t;
+        }, 1000);
+        // set immediately
+        tabTitleEl.textContent = ALERT_TITLE;
+        document.title = ALERT_TITLE;
+        titleFlipDemo.textContent = ALERT_TITLE;
+      }
+
+      function clearAllEffects() {
+        if (flashTimer) {
+          clearInterval(flashTimer);
+          flashTimer = null;
+        }
+        tabFaviconEl.classList.remove("is-badged");
+        realFaviconEl.href = FAVICON_NORMAL;
+        tabTitleEl.textContent = NORMAL_TITLE;
+        document.title = NORMAL_TITLE;
+        titleFlipDemo.textContent = NORMAL_TITLE;
+        osToast.classList.remove("is-shown");
+      }
+
+      // Core: arm alert because it's my turn while hidden.
+      function fireAlert() {
+        turnPill.textContent = "Your turn";
+        turnPill.classList.add("turn-pill--mine");
+        startFlash();
+        if (soundEnabled) playChime();
+        if (permission === "granted") {
+          osToast.classList.add("is-shown");
+        }
+        setActionsEnabled(true);
+      }
+
+      function setActionsEnabled(on) {
+        document.getElementById("playBtn").disabled = !on;
+        document.getElementById("passBtn").disabled = !on;
+      }
+
+      // ================= DEMO: in-page simulation =================
+      function simTurnWhileHidden() {
+        viewport.classList.add("is-hidden-sim");
+        fireAlert();
+      }
+      function focusTab() {
+        viewport.classList.remove("is-hidden-sim");
+        clearAllEffects();
+      }
+      function turnWhileFocused() {
+        // Tab is focused: turn becomes mine, but NO alert effects fire.
+        viewport.classList.remove("is-hidden-sim");
+        clearAllEffects();
+        turnPill.textContent = "Your turn";
+        turnPill.classList.add("turn-pill--mine");
+        setActionsEnabled(true);
+      }
+
+      // ================= DEMO: real visibilitychange =================
+      let realArmed = false;
+      function armReal() {
+        realArmed = true;
+        document.getElementById("realNote").innerHTML =
+          "<b style='color:#c9a84c'>Armed.</b> Now switch to another tab — the real title &amp; favicon of this page will flash. Come back to clear.";
+        // Unlock audio on this user gesture so the chime can sound when hidden.
+        try {
+          audioCtx =
+            audioCtx ||
+            new (window.AudioContext || window.webkitAudioContext)();
+          if (audioCtx.state === "suspended") audioCtx.resume();
+        } catch (e) {}
+      }
+      document.addEventListener("visibilitychange", () => {
+        if (!realArmed) return;
+        if (document.hidden) {
+          startFlash();
+          if (soundEnabled) playChime();
+        } else {
+          clearAllEffects();
+          realArmed = false;
+          document.getElementById("realNote").textContent =
+            "Cleared on focus. Re-arm to try again.";
+        }
+      });
+
+      // ================= CONTROL SURFACES =================
+      function setSurface(s) {
+        surface = s;
+        document.getElementById("surfA").classList.toggle("active", s === "A");
+        document.getElementById("surfB").classList.toggle("active", s === "B");
+        // A pieces
+        document
+          .getElementById("gearWrap")
+          .classList.toggle("hidden", s !== "A");
+        document.getElementById("settingsPop").classList.add("hidden");
+        // B pieces
+        document
+          .getElementById("soundToggleB")
+          .classList.toggle("hidden", s !== "B");
+        if (s !== "B") optinCard.classList.add("hidden");
+        syncSoundUI();
+      }
+
+      // ---- Direction A: gear popover ----
+      document.getElementById("gearBtn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        document.getElementById("settingsPop").classList.toggle("hidden");
+      });
+      document.addEventListener("click", () => {
+        document.getElementById("settingsPop").classList.add("hidden");
+      });
+      document.getElementById("settingsPop").addEventListener("click", (e) => {
+        e.stopPropagation();
+      });
+      document
+        .getElementById("soundSwitchA")
+        .addEventListener("change", (e) => {
+          soundEnabled = e.target.checked;
+          syncSoundUI();
+        });
+      document.getElementById("notifBtnA").addEventListener("click", () => {
+        // Explicit user action → request permission (simulated).
+        setPerm("granted");
+      });
+
+      // ---- Direction B: inline toggle + opt-in card ----
+      const soundToggleB = document.getElementById("soundToggleB");
+      soundToggleB.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        syncSoundUI();
+      });
+      soundToggleB.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          soundEnabled = !soundEnabled;
+          syncSoundUI();
+        }
+      });
+      document.getElementById("optinYes").addEventListener("click", () => {
+        setPerm("granted");
+        optinCard.classList.add("hidden");
+        optinDismissed = true;
+      });
+      document.getElementById("optinNo").addEventListener("click", () => {
+        optinCard.classList.add("hidden");
+        optinDismissed = true;
+      });
+
+      function syncSoundUI() {
+        // A switch
+        document.getElementById("soundSwitchA").checked = soundEnabled;
+        // B inline
+        document.getElementById("soundIconB").textContent = soundEnabled
+          ? "🔊"
+          : "🔇";
+        document.getElementById("soundLabelB").textContent = soundEnabled
+          ? "Sound on"
+          : "Muted";
+        soundToggleB.classList.toggle("sound-toggle--muted", !soundEnabled);
+      }
+
+      // ================= PERMISSION STATE =================
+      function setPerm(p) {
+        permission = p;
+        ["Default", "Granted", "Denied"].forEach((k) => {
+          document
+            .getElementById("perm" + k)
+            .classList.toggle("active", k.toLowerCase() === p);
+        });
+        // Direction A chip / button
+        const chip = document.getElementById("notifChipA");
+        const btn = document.getElementById("notifBtnA");
+        chip.classList.remove(
+          "hidden",
+          "status-chip--on",
+          "status-chip--off",
+          "status-chip--denied",
+        );
+        if (p === "granted") {
+          btn.classList.add("hidden");
+          chip.classList.add("status-chip--on");
+          chip.textContent = "On";
+        } else if (p === "denied") {
+          btn.classList.add("hidden");
+          chip.classList.add("status-chip--denied");
+          chip.textContent = "Blocked";
+        } else {
+          btn.classList.remove("hidden");
+          chip.classList.add("hidden");
+        }
+        // Direction B: show the opt-in card only when permission is still
+        // "default" and not yet dismissed (contextual, once).
+        if (surface === "B" && p === "default" && !optinDismissed) {
+          optinCard.classList.remove("hidden");
+        } else {
+          optinCard.classList.add("hidden");
+        }
+      }
+
+      // init
+      setSurface("A");
+      setPerm("default");
+      syncSoundUI();
+    </script>
+  </body>
+</html>
