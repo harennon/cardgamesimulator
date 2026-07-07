@@ -5,7 +5,28 @@
     data-testid="game-board"
   >
     <div class="game-board__opponents">
-      <RoomCodeChip :code="displayCode" />
+      <div class="game-board__header-controls">
+        <RoomCodeChip :code="displayCode" />
+        <button
+          class="turn-alert-toggle"
+          :aria-pressed="turnSoundEnabled"
+          :aria-label="turnSoundEnabled ? 'Turn sound on' : 'Turn sound off'"
+          @click="toggleTurnSound"
+        >
+          <span v-if="turnSoundEnabled" class="turn-alert-toggle__icon"
+            >🔔</span
+          >
+          <span v-else class="turn-alert-toggle__icon">🔕</span>
+        </button>
+        <button
+          v-if="notificationPermission === 'default'"
+          class="turn-alert-notif-btn"
+          aria-label="Enable turn notifications"
+          @click="requestNotificationPermission"
+        >
+          Enable turn notifications
+        </button>
+      </div>
       <OpponentRow
         :players="gameState.players"
         :current-player-index="gameState.currentPlayerIndex"
@@ -110,6 +131,7 @@ import GameLog from "@/component/game-ui/GameLog.vue";
 import ActionPanel from "@/component/game-ui/ActionPanel.vue";
 import DevOverlay from "@/component/DevOverlay.vue";
 import { isFreshDeal } from "@/composables/useCardAnimations";
+import { useTurnAlert } from "@/composables/useTurnAlert";
 
 const isDev = import.meta.env.DEV;
 
@@ -153,6 +175,20 @@ const isMyTurn = computed(
   () => props.gameState.currentPlayerIndex === myPlayerIndex.value,
 );
 
+const isSeatedPlayer = computed(() => myPlayerIndex.value >= 0);
+
+const {
+  unlockAudio,
+  turnSoundEnabled,
+  notificationPermission,
+  toggleTurnSound,
+  requestNotificationPermission,
+} = useTurnAlert({
+  isMyTurn,
+  enabled: isSeatedPlayer,
+  gameLabel: "Big2",
+});
+
 const currentPlayerName = computed(() => {
   const player = props.gameState.players[props.gameState.currentPlayerIndex];
   return player?.displayName ?? "";
@@ -175,14 +211,17 @@ const turnDeadline = computed<number | null>(
 const totalSeconds = computed<number>(() => props.turnTimerSeconds ?? 0);
 
 function toggleCard(index: number): void {
+  unlockAudio();
   emit("toggle-card", index);
 }
 
 function onPlay(): void {
+  unlockAudio();
   emit("play");
 }
 
 function onPass(): void {
+  unlockAudio();
   emit("pass");
 }
 
@@ -305,6 +344,53 @@ watch(logDrawerOpen, (open) => {
 .game-board__opponents {
   grid-area: opponents;
   position: relative;
+}
+
+.game-board__header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.turn-alert-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  min-width: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--gold-accent);
+  font-size: 1.1rem;
+}
+
+.turn-alert-toggle[aria-pressed="false"] {
+  color: var(--text-muted);
+}
+
+.turn-alert-toggle:focus-visible {
+  outline: 2px solid var(--gold-accent);
+  outline-offset: 2px;
+}
+
+.turn-alert-notif-btn {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  background: none;
+  border: 1px solid var(--gold-accent);
+  color: var(--gold-accent);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.turn-alert-notif-btn:focus-visible {
+  outline: 2px solid var(--gold-accent);
+  outline-offset: 2px;
 }
 
 .game-board__table {

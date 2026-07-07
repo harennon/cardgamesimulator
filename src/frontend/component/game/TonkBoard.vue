@@ -14,7 +14,28 @@
     data-testid="tonk-board"
   >
     <div class="tonk-board__opponents">
-      <RoomCodeChip :code="displayCode" />
+      <div class="tonk-board__header-controls">
+        <RoomCodeChip :code="displayCode" />
+        <button
+          class="turn-alert-toggle"
+          :aria-pressed="turnSoundEnabled"
+          :aria-label="turnSoundEnabled ? 'Turn sound on' : 'Turn sound off'"
+          @click="toggleTurnSound"
+        >
+          <span v-if="turnSoundEnabled" class="turn-alert-toggle__icon"
+            >🔔</span
+          >
+          <span v-else class="turn-alert-toggle__icon">🔕</span>
+        </button>
+        <button
+          v-if="notificationPermission === 'default'"
+          class="turn-alert-notif-btn"
+          aria-label="Enable turn notifications"
+          @click="requestNotificationPermission"
+        >
+          Enable turn notifications
+        </button>
+      </div>
       <TonkSeatRail
         :players="gameState.players"
         :tallies="tonkState.tallies"
@@ -57,7 +78,12 @@
         :dimmed-indices="dimmedIndices"
         :bad-select="badSelect"
         :dealing="dealing"
-        @toggle="(index) => emit('toggleCard', index)"
+        @toggle="
+          (index) => {
+            unlockAudio();
+            emit('toggleCard', index);
+          }
+        "
       />
     </div>
 
@@ -110,8 +136,18 @@
         :current-player-name="currentPlayerName"
         :action-error="actionError"
         :action-pending="actionPending"
-        @discard="emit('discard')"
-        @draw="(source) => emit('draw', source)"
+        @discard="
+          () => {
+            unlockAudio();
+            emit('discard');
+          }
+        "
+        @draw="
+          (source) => {
+            unlockAudio();
+            emit('draw', source);
+          }
+        "
         @call-tonk="emit('callTonk')"
       />
     </div>
@@ -149,6 +185,7 @@ import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import type { EnrichedPlayerView } from "@shared/socket-events";
 import type { TonkCard, TonkPublicState } from "@shared/tonk-types";
 import { isFreshDeal } from "@/composables/useCardAnimations";
+import { useTurnAlert } from "@/composables/useTurnAlert";
 import RoomCodeChip from "@/component/game-ui/RoomCodeChip.vue";
 import TonkSeatRail from "@/component/game-ui/TonkSeatRail.vue";
 import TonkPhaseBanner from "@/component/game-ui/TonkPhaseBanner.vue";
@@ -209,6 +246,20 @@ const hasHand = computed(() => myPlayerIndex.value !== -1);
 const isMyTurn = computed(
   () => props.gameState.currentPlayerIndex === myPlayerIndex.value,
 );
+
+const isSeatedPlayer = computed(() => myPlayerIndex.value >= 0);
+
+const {
+  unlockAudio,
+  turnSoundEnabled,
+  notificationPermission,
+  toggleTurnSound,
+  requestNotificationPermission,
+} = useTurnAlert({
+  isMyTurn,
+  enabled: isSeatedPlayer,
+  gameLabel: "Tonk",
+});
 
 const currentPlayerName = computed(() => {
   const player = props.gameState.players[props.gameState.currentPlayerIndex];
@@ -377,6 +428,53 @@ watch(logDrawerOpen, (open) => {
 .tonk-board__opponents {
   grid-area: opponents;
   position: relative;
+}
+
+.tonk-board__header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.turn-alert-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  min-width: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--gold-accent);
+  font-size: 1.1rem;
+}
+
+.turn-alert-toggle[aria-pressed="false"] {
+  color: var(--text-muted);
+}
+
+.turn-alert-toggle:focus-visible {
+  outline: 2px solid var(--gold-accent);
+  outline-offset: 2px;
+}
+
+.turn-alert-notif-btn {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  background: none;
+  border: 1px solid var(--gold-accent);
+  color: var(--gold-accent);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.turn-alert-notif-btn:focus-visible {
+  outline: 2px solid var(--gold-accent);
+  outline-offset: 2px;
 }
 
 .tonk-board__table {
