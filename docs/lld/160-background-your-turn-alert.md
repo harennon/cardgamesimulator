@@ -28,12 +28,12 @@ Follow the established composable pattern (`useTurnCountdown`, `useFeedbackAttac
 The alert **arms and fires** only when all of the following hold on a transition:
 1. `isMyTurn` transitions `false → true` (watch the boolean; do not re-fire while it stays true).
 2. `document.hidden === true` at the moment of the transition (CEO decision 5: if the tab is already focused at turn start, fire nothing).
-3. The local viewer is a **player**, not a spectator (CEO decision 3). The composable is only instantiated by `GameBoard`/`TonkBoard`, which render for players; spectators use the spectator view and never mount it. As defense in depth, the composable accepts an `enabled` ref that the board sets false for non-player contexts.
+3. The local viewer is a **player**, not a spectator (CEO decision 3). Note that `GameBoard`/`TonkBoard` **do** render for spectators (with `myPlayerIndex === -1` — see `TonkBoard.vue` lines 206–210 and `GameView.vue` line 299), so the composable **is** instantiated for a spectator. The primary protection is that `isMyTurn` (`currentPlayerIndex === myPlayerIndex`) can never be `true` when `myPlayerIndex === -1`, so the `false → true` edge never occurs and `arm()` never fires for a spectator. As explicit defense in depth the composable also accepts an `enabled` ref, which the boards bind to a "is a seated player" computed (`myPlayerIndex >= 0`); `arm()` bails when `enabled` is false.
 
 If the turn flips while hidden and the user later returns, effects clear. If `isMyTurn` becomes true while **visible**, we record no armed state and fire nothing.
 
 ### The four effects
-1. **Title flash** — save the original `document.title` once, then `setInterval` (gentle cadence, **1200 ms** toggle) alternating between the original and `● Your turn — <GameLabel>` (e.g. `● Your turn — Big2`). Cleared by restoring the saved title and clearing the interval. When `prefers-reduced-motion: reduce` is set, do not flash/animate — instead set the attention title **once, statically** (still informative, no motion).
+1. **Title flash** — save the original `document.title` once, then `setInterval` (gentle cadence, **1200 ms** toggle) alternating between the original and `● Your turn — <GameLabel>` (e.g. `● Your turn — Big2`). Cleared by restoring the saved title and clearing the interval. When `prefers-reduced-motion: reduce` is set, do not flash/animate — instead set the attention title **once, statically** (still informative, no motion). The preference is read **live at each `arm()`** via `window.matchMedia("(prefers-reduced-motion: reduce)").matches` (not cached at init), so an OS setting change mid-session is honored on the next armed turn.
 2. **Favicon badge** — canvas-generated to avoid shipping/committing new binary assets and to sidestep cross-origin canvas taint from the CDN favicon. On arm: create (or reuse) a `<link rel="icon">` element, draw a 32×32 canvas (solid rounded-rect background in the app gold `#c9a84c` + a contrasting dot), and set the link `href` to the canvas `toDataURL()`. On clear: restore the original favicon by removing the injected link (or resetting its href to the saved original). Feature-detect `canvas.getContext("2d")`; if unavailable, skip silently.
 3. **Chime** — a single short soft tone. Generated at runtime via `AudioContext` (oscillator + short gain envelope, ~150 ms) rather than shipping an audio file — no new asset to commit, no decode/network dependency, and it respects the unlock gesture cleanly. Gated by the persisted `turnSound` setting (default on) AND `document.hidden`. Played exactly once per arm. Feature-detect `AudioContext`/`webkitAudioContext`; absent → skip.
 4. **Web Notification** — only if `Notification` exists and `Notification.permission === "granted"`. Construct `new Notification("Your turn — <GameLabel>", { tag: "turn-alert", ... })`. Store the handle so it can be `.close()`d on clear. Never call `requestPermission()` here — permission is requested only from the explicit user toggle (see Frontend Design). If permission is `default` or `denied`, silently skip; never throw.
@@ -59,14 +59,15 @@ The control is a single switch labeled **"Turn sound"**:
 - **Off:** muted speaker icon, muted color. `aria-label`: "Turn sound off".
 - Tapping toggles the persisted `turnSound` boolean immediately; no confirmation.
 
-Per CLAUDE.md this adds a visible control and would normally get a `frontend-architect` mockup first; the placement is execution-level (where a minor icon switch lives), so it is resolved here inline. A one-screen mockup MAY be produced at implementation time and dropped in `docs/mockups/` for confirmation, but is not a blocker.
+This feature adds **two** visible in-game controls (the "Turn sound" toggle and the conditional "Enable turn notifications" button), both new to the board header cluster. Per CLAUDE.md — "for any LLD that changes visual UI, the `frontend-architect` must produce HTML mockups (served on port 8090) for user review **before** the LLD is finalized" — this is **not** downgradable to an at-implementation option. A `frontend-architect` mockup of the header cluster (Turn sound toggle in its on/off states plus the conditional notification opt-in button) **must** be produced and approved before this LLD is treated as final and handed to the implementer. The placement described here (adjacent to `RoomCodeChip`) is the proposed direction the mockup should render for approval, not a substitute for it.
 
 ### Chime default: ON (CEO decision 1)
 `turnSound` defaults to **true** — the whole point is to catch a player who has tabbed away. The mute choice persists in `localStorage` under key `cgs.turnSound` (`"true"`/`"false"`); an absent/invalid value reads as `true`. Honored on the next game/reload.
 
 ### Notification permission: opt-in on action (CEO decision 2)
 - **Never** call `Notification.requestPermission()` on page load or on mount.
-- The **first time** the player enables/interacts to opt into notifications, request permission contextually. Because the primary visible control is the "Turn sound" switch, the notification opt-in rides a distinct, explicit affordance rather than being silently coupled to sound: when `Notification.permission === "default"`, the sound toggle's context menu / long-press (or a small "Enable turn notifications" inline link shown once next to the toggle) triggers `requestPermission()`. The request is always a direct response to that click.
+- The notification opt-in is a **single, dedicated, keyboard-activatable `<button>`** — an inline "Enable turn notifications" button — rendered adjacent to the "Turn sound" toggle **only** when `Notification.permission === "default"` (i.e. never asked yet). Clicking (or activating via keyboard) it calls `requestNotificationPermission()`, which is a direct response to that gesture. There is **no** long-press and **no** context menu — those are not keyboard-accessible and are poorly discoverable, contradicting the Accessibility section; they are explicitly dropped.
+- Once permission is decided (`granted` or `denied`), the opt-in button is no longer rendered (`v-if="notificationPermission === 'default'"`), so the player is never re-prompted and there is no dangling control.
 - If the user grants: subsequent background turns fire a Web Notification. If denied or dismissed: we never ask again automatically and never throw; title/favicon/chime still work.
 - We store no permission state ourselves — `Notification.permission` is the single source of truth, read live at fire time.
 
@@ -142,15 +143,22 @@ export function useTurnAlert(opts: UseTurnAlertOptions): UseTurnAlertReturn;
 Both boards already expose `const isMyTurn = computed(...)` and know their game type. In `<script setup>`:
 
 ```ts
+// `enabled` is the seated-player gate (spectators have myPlayerIndex === -1).
+const isSeatedPlayer = computed(() => myPlayerIndex.value >= 0);
+
 const { turnSoundEnabled, notificationPermission, toggleTurnSound,
         requestNotificationPermission, unlockAudio } = useTurnAlert({
   isMyTurn,
+  enabled: isSeatedPlayer,
   gameLabel: props.gameState.gameType === "tonk" ? "Tonk" : "Big2",
 });
-// Call unlockAudio() from the first card-tap / action handler.
 ```
 
-The "Turn sound" toggle button lives in the same header cluster as `RoomCodeChip` and binds `aria-pressed="turnSoundEnabled"`, `@click="toggleTurnSound"`. The notification opt-in affordance (shown only when `notificationPermission === 'default'`) calls `requestNotificationPermission()`.
+**`unlockAudio()` call sites (concrete handlers):**
+- `GameBoard.vue` — call `unlockAudio()` at the top of `toggleCard(index)` (line 177), `onPlay()` (line 181), and `onPass()` (line 185). These are the only user-initiated in-game gestures on the Big2 board; `toggleCard` fires on the very first card tap, which is the earliest reliable unlock point.
+- `TonkBoard.vue` — the board delegates actions to child components via emits. Attach `unlockAudio()` in the existing emit forwarders: the `@toggle` handler (`(index) => { unlockAudio(); emit('toggleCard', index); }`, line 60), and the `@discard` (line 113) and `@draw` (line 114) handlers. `@toggle` (card tap in `TonkHand`) is the earliest unlock point.
+
+The "Turn sound" toggle button lives in the same header cluster as `RoomCodeChip` and binds `aria-pressed="turnSoundEnabled"`, `@click="toggleTurnSound"`. The notification opt-in button (rendered only when `notificationPermission === 'default'`, `v-if`) calls `requestNotificationPermission()` on `@click`.
 
 ## State Model
 
@@ -197,7 +205,7 @@ Note: if `isMyTurn` is still `true` when the tab regains focus and then the tab 
 | E11 | `prefers-reduced-motion: reduce` | Title set once statically (no interval); favicon badge still applied (static); no animation. (AC.) |
 | E12 | `localStorage` unavailable / throws (private mode, quota) | Reads default to `true`; writes wrapped in try/catch and swallowed; setting simply won't persist. No throw. |
 | E13 | Component unmounts (navigate away / rematch) while armed | `onScopeDispose` → `clear()` + remove listeners; title/favicon restored so the next route starts clean. |
-| E14 | Spectator context | Composable not mounted for spectators; `enabled=false` as defense in depth → `arm()` always bails. (CEO decision 3.) |
+| E14 | Spectator context | The composable **is** mounted for spectators (boards render with `myPlayerIndex === -1`), but `isMyTurn` can never be `true` for a spectator, so the `false → true` edge never occurs and `arm()` never runs. `enabled` (bound to `myPlayerIndex >= 0`) is `false` and makes `arm()` bail as explicit defense in depth. (CEO decision 3.) |
 | E15 | Multiple game tabs open | Each tab runs its own composable independently; the setting is shared via `localStorage` but effects are per-tab (only the hidden tab whose turn it is flashes). Acceptable. |
 | E16 | Two boards mount briefly during transition | Only one board is rendered per phase (`GameView` v-if). If overlap ever occurred, both would restore the same `savedTitle` — idempotent restore keeps it correct. |
 | E17 | Notification still open when tab refocuses | `clear()` calls `activeNotification.close()`. |
