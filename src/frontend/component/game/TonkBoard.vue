@@ -15,6 +15,13 @@
   >
     <div class="tonk-board__opponents">
       <RoomCodeChip :code="displayCode" />
+      <TurnAlertMenu
+        v-if="isPlayer"
+        :sound-enabled="soundEnabled"
+        :notif-state="notifState"
+        @update:sound-enabled="setSoundEnabled"
+        @request-notifications="requestNotificationPermission"
+      />
       <TonkSeatRail
         :players="gameState.players"
         :tallies="tonkState.tallies"
@@ -57,7 +64,12 @@
         :dimmed-indices="dimmedIndices"
         :bad-select="badSelect"
         :dealing="dealing"
-        @toggle="(index) => emit('toggleCard', index)"
+        @toggle="
+          (index) => {
+            unlockAudio();
+            emit('toggleCard', index);
+          }
+        "
       />
     </div>
 
@@ -110,9 +122,24 @@
         :current-player-name="currentPlayerName"
         :action-error="actionError"
         :action-pending="actionPending"
-        @discard="emit('discard')"
-        @draw="(source) => emit('draw', source)"
-        @call-tonk="emit('callTonk')"
+        @discard="
+          () => {
+            unlockAudio();
+            emit('discard');
+          }
+        "
+        @draw="
+          (source) => {
+            unlockAudio();
+            emit('draw', source);
+          }
+        "
+        @call-tonk="
+          () => {
+            unlockAudio();
+            emit('callTonk');
+          }
+        "
       />
     </div>
   </div>
@@ -157,11 +184,13 @@ import TonkHand from "@/component/game-ui/TonkHand.vue";
 import TonkActionPanel from "@/component/game-ui/TonkActionPanel.vue";
 import TonkTallyPanel from "@/component/game-ui/TonkTallyPanel.vue";
 import TonkLog from "@/component/game-ui/TonkLog.vue";
+import TurnAlertMenu from "@/component/game-ui/TurnAlertMenu.vue";
 import type { TonkDrawSource } from "@shared/tonk-types";
 import {
   dimmedSelectionIndices,
   isBadSelect,
 } from "@/component/game-ui/tonkDisplay";
+import { useTurnAlert } from "@/composables/useTurnAlert";
 
 const props = defineProps<{
   gameState: EnrichedPlayerView;
@@ -209,6 +238,18 @@ const hasHand = computed(() => myPlayerIndex.value !== -1);
 const isMyTurn = computed(
   () => props.gameState.currentPlayerIndex === myPlayerIndex.value,
 );
+
+const isPlayer = computed(() => myPlayerIndex.value >= 0);
+const isInProgress = computed(() => props.gameState.status === "IN_PROGRESS");
+const gameType = computed(() => props.gameState.gameType);
+
+const {
+  soundEnabled,
+  setSoundEnabled,
+  notifState,
+  requestNotificationPermission,
+  unlockAudio,
+} = useTurnAlert({ isPlayer, isInProgress, isMyTurn, gameType });
 
 const currentPlayerName = computed(() => {
   const player = props.gameState.players[props.gameState.currentPlayerIndex];

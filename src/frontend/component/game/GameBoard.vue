@@ -6,6 +6,13 @@
   >
     <div class="game-board__opponents">
       <RoomCodeChip :code="displayCode" />
+      <TurnAlertMenu
+        v-if="isPlayer"
+        :sound-enabled="soundEnabled"
+        :notif-state="notifState"
+        @update:sound-enabled="setSoundEnabled"
+        @request-notifications="requestNotificationPermission"
+      />
       <OpponentRow
         :players="gameState.players"
         :current-player-index="gameState.currentPlayerIndex"
@@ -109,7 +116,9 @@ import PlayerHand from "@/component/game-ui/PlayerHand.vue";
 import GameLog from "@/component/game-ui/GameLog.vue";
 import ActionPanel from "@/component/game-ui/ActionPanel.vue";
 import DevOverlay from "@/component/DevOverlay.vue";
+import TurnAlertMenu from "@/component/game-ui/TurnAlertMenu.vue";
 import { isFreshDeal } from "@/composables/useCardAnimations";
+import { useTurnAlert } from "@/composables/useTurnAlert";
 
 const isDev = import.meta.env.DEV;
 
@@ -153,6 +162,18 @@ const isMyTurn = computed(
   () => props.gameState.currentPlayerIndex === myPlayerIndex.value,
 );
 
+const isPlayer = computed(() => myPlayerIndex.value >= 0);
+const isInProgress = computed(() => props.gameState.status === "IN_PROGRESS");
+const gameType = computed(() => props.gameState.gameType);
+
+const {
+  soundEnabled,
+  setSoundEnabled,
+  notifState,
+  requestNotificationPermission,
+  unlockAudio,
+} = useTurnAlert({ isPlayer, isInProgress, isMyTurn, gameType });
+
 const currentPlayerName = computed(() => {
   const player = props.gameState.players[props.gameState.currentPlayerIndex];
   return player?.displayName ?? "";
@@ -175,14 +196,17 @@ const turnDeadline = computed<number | null>(
 const totalSeconds = computed<number>(() => props.turnTimerSeconds ?? 0);
 
 function toggleCard(index: number): void {
+  unlockAudio();
   emit("toggle-card", index);
 }
 
 function onPlay(): void {
+  unlockAudio();
   emit("play");
 }
 
 function onPass(): void {
+  unlockAudio();
   emit("pass");
 }
 
