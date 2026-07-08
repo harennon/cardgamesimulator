@@ -30,7 +30,11 @@
 - **Tri-state in `useSocket`, driven by Manager events.** The Socket.IO **Manager** (`socket.io`) emits `reconnect_attempt(attempt)`, `reconnect(attempt)`, and `reconnect_failed`. These give a clean "reconnecting (attempt N/10)" vs "gave up" distinction that a lone `connected=false` cannot. We expose a single `connectionState` computed plus a raw `connected` boolean and a `reconnectAttempt` counter. Rationale (answers open question 1): using Manager events keeps the terminal-vs-reconnecting distinction authoritative rather than inferred from timers.
 - **Separate transient errors from terminal errors.** `connect_error` no longer writes a generic `error` string. Instead: `SERVER_FULL` (and any future terminal handshake error) sets a dedicated `terminalError` ref and disconnects; all other `connect_error`s are treated as transient (they are part of the reconnection cycle) and only affect `connected`/`reconnecting`. This is the core fix for bug #1.
 - **`joinError` is reserved for board-less failures.** `GameView` stops watching `socketError`→`joinError`. `joinError` is set only by: REST 401 / not-found, the `game:join` ack failing, `connect()` failing to produce a socket, or `useSocket.terminalError` (SERVER_FULL). These are all cases where there is no board to preserve.
-- **Non-destructive banner, board stays mounted.** The banner is an absolutely-positioned overlay inside `game-view__board-container`, rendered while a board is live (`displayPhase` is IN_PROGRESS / SHOW_FINAL_PLAY / SHOW_TRICK_RESULT). The board dims slightly but stays rendered and in place. On `reconnect`, `connectionState` returns to `connected`, the banner disappears, and the server re-emits `game:state` so the view re-syncs — no navigation, no manual reload.
+- **Non-destructive banner, board stays mounted.** The banner is an absolutely-positioned overlay inside `game-view__board-container`, rendered while a board is live (`displayPhase` is IN_PROGRESS / SHOW_FINAL_PLAY / SHOW_TRICK_RESULT). The board dims slightly but stays rendered and in place. On `reconnect`, `connectionState` returns to `connected` and the banner disappears — no navigation, no manual reload.
+- **Re-sync on reconnect is driven by an explicit re-`game:join`, NOT by an automatic `game:state` re-emit.** This corrects a wrong assumption in the original draft. The server emits `game:state` **only inside the `game:join` handler** (`socketHandler.ts:359`), and the client emits `game:join` exactly once, in `GameView.onMounted` (`GameView.vue:520`). Socket.IO's Manager-level reconnection does **not** re-run the app-level join. Two mechanisms therefore matter, and the design must not rely on the first alone:
+  - **`connectionStateRecovery` (server, `socketServer.ts:53-55`, `maxDisconnectionDuration: 30_000`).** For disconnects shorter than 30s the server transparently restores room membership and replays missed packets onto the *same* logical session, so short blips re-sync with no app-level action. This is the sole reason short reconnects work today; the banner just needs to clear.
+  - **The client reconnect budget can exceed the recovery window.** `reconnectionAttempts: 10` with delay `1000 → max 5000` (`useSocket.ts`) spans ~40s. An attempt that lands **after** the 30s window produces a **fresh** socket where recovery fails: the client is not re-added to the game room and receives no `game:state`, yet `connect` fires and `connectionState` flips to `connected`. Without a fix the player is silently orphaned on a stale board — directly violating E2.
+  - **Fix:** `GameView` re-emits `game:join` on every **reconnect** `connect` (i.e. every `connect` after the first). This is idempotent and correct in *both* cases: if recovery succeeded it harmlessly re-fetches current state; if recovery failed it re-adds the socket to the room and pulls a fresh `game:state`. The design does **not** depend on distinguishing recovered vs fresh — it always re-joins on reconnect. See Interfaces for the exact wiring and the initial-vs-reconnect guard.
 - **Terminal recovery = "Reload to rejoin".** After `reconnect_failed` (all 10 attempts exhausted), the banner escalates to a red terminal state with a **"Reload to rejoin"** button that calls `window.location.reload()` (answers open question 2). Reload re-runs the full mount/join flow, which is the most robust recovery given the socket manager has given up. We deliberately do not offer a bare `connect()` retry: the composable's `connect()` guards against re-entry when `socket.value` is already set, and re-running the mount flow is what actually re-establishes REST seed + join.
 - **Action-ack timeout = 8s, no auto-retry.** Each ack await races against an 8s timer (answers open question 3). On timeout the promise resolves to `{ success: false, error: "Couldn't reach the server — reconnecting…" }`, `actionError` is set (surfaced in the existing action-panel error line), and `actionPending` resets via the existing `finally`. No auto-retry — the player re-submits on reconnect. The server is authoritative per turn, so a re-submit of a stale action is simply rejected; a duplicate of a still-valid action is the player's explicit choice.
 - **Buttons locked with a reason.** Panels receive a `disabledReason: string | null` prop. When non-null it forces `disabled` on all action buttons and sets a `title` (hover tooltip) + `aria` affordance so the control does not look clickable. `GameView` passes `"Reconnecting…"` while reconnecting and `"Disconnected — reload to rejoin"` when terminal.
@@ -38,10 +42,12 @@
 
 ### Data flow
 ```
-useSocket (Manager events) → connectionState/connected/reconnectAttempt/terminalError
+useSocket (Manager events + disconnect reason) →
+        connectionState/connected/reconnectAttempt/terminalError
         │
         ├─ GameView: connectionState → banner overlay + disabledReason
         │             terminalError  → joinError (SERVER_FULL only)
+        │             s.on("connect") [reconnect only] → re-emit game:join → fresh game:state
         │
         └─ GameView → GameBoard/TonkBoard (disabledReason prop)
                           → ActionPanel/TonkActionPanel (disabledReason)
@@ -97,17 +103,21 @@ export function useSocket(): {
 };
 ```
 Event wiring inside `connect()`:
-- `s.on("connect")` → `connected=true`, `connectionState="connected"`, `reconnectAttempt=0`, clear transient state.
-- `s.on("disconnect")` → `connected=false`. Set `connectionState="reconnecting"` **only if** the disconnect reason is one the manager will retry (i.e. not a client-initiated `io client disconnect`); otherwise leave it. (Simplest correct rule: set `reconnecting` on disconnect; `connect`/`reconnect_failed` will correct it.)
+- `s.on("connect")` → `connected=true`, `connectionState="connected"`, `reconnectAttempt=0`, clear transient state. **This is the only signal `GameView` needs to trigger a reconnect re-join** (see below); `useSocket` itself does not emit `game:join`.
+- `s.on("disconnect", reason)` → `connected=false`. **Branch on `reason`** because Socket.IO does *not* auto-reconnect for every reason:
+  - If the reason is one the manager will retry (`"transport close"`, `"transport error"`, `"ping timeout"`) → `connectionState="reconnecting"`; a later `connect` or `reconnect_failed` corrects it.
+  - If the reason is a **non-retrying** one — `"io server disconnect"` (server called `socket.disconnect()`; requires a *manual* `connect()`, the manager will not retry) → route to **terminal**: `connectionState="terminal"`. Neither `reconnect_attempt`/`reconnect_failed` nor `connect` will fire on their own, so treating it as `reconnecting` would strand the amber banner and the locked buttons forever. Terminal offers the "Reload to rejoin" affordance, which is the correct recovery.
+  - `"io client disconnect"` (our own `disconnect()` on unmount) → leave state as-is; the view is tearing down. Do not set `reconnecting`.
+  - The reason→state mapping is extracted into a pure helper (`classifyDisconnect(reason)` in `connectionState.ts`, see below) so it is unit-testable and the two "non-retrying / terminal" reasons are enumerated in one place.
 - `s.on("connect_error", err)` → if `err.message === "SERVER_FULL"` set `terminalError` and `s.disconnect()`; **else do nothing** (transient — part of reconnection).
 - `s.io.on("reconnect_attempt", (n) => { connectionState="reconnecting"; reconnectAttempt=n; })`
 - `s.io.on("reconnect", () => { /* 'connect' will also fire */ })`
 - `s.io.on("reconnect_failed", () => { connectionState="terminal"; })`
-- `disconnect()` (manual) must set `connectionState="connected"`-neutral or leave as-is on unmount; ensure it does not leave a stale `terminal`/`reconnecting` for the next `connect()`. Reset refs at the top of `connect()`.
+- `disconnect()` (manual) must not leave a stale `terminal`/`reconnecting` for the next `connect()`. Reset refs at the top of `connect()`.
 
 > Note: `connect_error` also fires on the **initial** connection attempt (before any board exists). During mount, `GameView` awaits `connect()` and then checks `socket.value`; a first-attempt failure is handled by the existing `joinError = "Could not connect to server."` path, not the banner. The banner only appears once a board is live.
 
-### Connection-state mapping helper (pure, exported for unit test)
+### Connection-state mapping helpers (pure, exported for unit test)
 Extract the reducer logic so it is testable without a socket:
 ```ts
 // src/frontend/composables/connectionState.ts
@@ -119,8 +129,50 @@ export function deriveConnectionState(i: ConnInputs): ConnectionState {
   if (i.reconnectFailed) return "terminal";
   return i.connected ? "connected" : "reconnecting";
 }
+
+/**
+ * Socket.IO does NOT auto-reconnect for every disconnect reason. Map the
+ * reason to the connection state the drop should produce.
+ *  - "retry":    manager will attempt reconnection → reconnecting banner
+ *  - "terminal": manager will NOT retry (server-initiated) → terminal banner
+ *  - "ignore":   our own teardown → leave state unchanged
+ */
+export type DisconnectClass = "retry" | "terminal" | "ignore";
+export function classifyDisconnect(reason: string): DisconnectClass {
+  if (reason === "io client disconnect") return "ignore";
+  // Non-retrying: server explicitly disconnected the socket; needs manual connect().
+  if (reason === "io server disconnect") return "terminal";
+  // "transport close" | "transport error" | "ping timeout" and anything else
+  // the manager treats as retryable.
+  return "retry";
+}
 ```
-`useSocket` composes its refs through this function so the mapping is unit-testable in the node env (no DOM, no real socket), matching the project's pure-function test pattern.
+`useSocket` composes its refs through these functions so the mapping is unit-testable in the node env (no DOM, no real socket), matching the project's pure-function test pattern.
+
+### `GameView.vue` reconnect re-join (the E2 fix)
+The join listeners and `game:join` emit currently live inline in `onMounted` (`GameView.vue:488-532`). Refactor the join step into a named function so it can be re-run on reconnect:
+```ts
+// bind lobby/rematch/state/action listeners + emit game:join (idempotent).
+function joinGame(s: TypedClientSocket): void { /* existing lines 488-532 body */ }
+```
+- `onMounted`: after `await connect()`, call `joinGame(s)` for the **initial** join (unchanged behavior).
+- **Reconnect handling:** register a `connect` listener that distinguishes the first connect from subsequent (reconnect) ones and re-joins only on reconnects:
+  ```ts
+  let hasJoinedOnce = false;
+  s.on("connect", () => {
+    if (!hasJoinedOnce) { hasJoinedOnce = true; return; } // initial join done in onMounted
+    // Reconnect: recovery may or may not have restored the room. Re-join is
+    // idempotent — it re-fetches state if recovered, re-adds to the room and
+    // pulls fresh game:state if recovery lapsed (> 30s). Do NOT rebind the
+    // lobby/state/action listeners (still attached to the same socket); only
+    // re-emit game:join.
+    s.emit("game:join", { gameId: props.gameId, role: "player" }, (response) => {
+      if (!response.success) { joinError.value = response.error ?? "Failed to rejoin game."; }
+    });
+  });
+  ```
+  Note: because Socket.IO reuses the same client `Socket` instance across Manager reconnections, the `lobby:*` / `game:rematchStarted` / `bindState` / `bindActions` listeners bound in `onMounted` remain attached and must **not** be re-bound (rebinding would double-fire). Only `game:join` is re-emitted.
+- A re-join whose ack fails on reconnect (game genuinely gone) sets `joinError` — a legitimate board-less terminal case (e.g. the game was deleted while offline).
 
 ### `useGameActions.ts` (ack timeout)
 Introduce one private helper used by every emitting method:
@@ -158,7 +210,11 @@ Threaded through `GameBoard.vue` and `TonkBoard.vue` as a pass-through prop of t
 
 ## State Model
 
-All state is **in-memory / ephemeral client state**. Nothing is persisted; no new server state. The server remains the single source of truth for game state, which is re-delivered via `game:state` on reconnect.
+All state is **in-memory / ephemeral client state**. Nothing is persisted; no new server state. The server remains the single source of truth for game state.
+
+**Re-sync mechanism (correctness depends on this).** Game state is re-delivered via `game:state`, which the server emits **only** from its `game:join` handler (`socketHandler.ts:359`) — never automatically on a socket reconnect. Two backend/client facts govern re-sync:
+- Server-side `connectionStateRecovery` (`socketServer.ts:53-55`, `maxDisconnectionDuration: 30_000`) transparently restores room membership and replays missed events for reconnects **within 30s**.
+- The client reconnect budget (~40s, 10 attempts) can outlast that window, producing a fresh socket where recovery fails. To cover both, `GameView` **re-emits `game:join` on every reconnect `connect`** (Interfaces → "reconnect re-join"), which re-pulls `game:state` regardless of whether recovery succeeded. The design never assumes an automatic re-emit.
 
 | State | Owner | Lifetime | Notes |
 |---|---|---|---|
@@ -170,19 +226,25 @@ All state is **in-memory / ephemeral client state**. Nothing is persisted; no ne
 | `disabledReason` | `GameView` (computed) | derived | `null` when connected, else the reason string |
 | `actionPending` / `actionError` | `useGameActions` | per action | `actionPending` always resets in `finally`; `actionError` shows the timeout message |
 
-**Transitions on the happy reconnect path:** live board → WiFi drop → `disconnect` fires → `connectionState="reconnecting"` → banner shows, buttons lock → manager retries (`reconnect_attempt` bumps counter) → `reconnect` + `connect` fire → `connectionState="connected"`, `reconnectAttempt=0` → banner clears, buttons unlock → server re-emits `game:state` → board re-syncs. **No `joinError` was ever touched; no navigation occurred.**
+**Transitions on the happy reconnect path:** live board → WiFi drop → `disconnect(reason)` fires → `classifyDisconnect(reason)` returns `retry` → `connectionState="reconnecting"` → banner shows, buttons lock → manager retries (`reconnect_attempt` bumps counter) → `reconnect` + `connect` fire → `connectionState="connected"`, `reconnectAttempt=0` → banner clears, buttons unlock → `GameView`'s reconnect `connect` handler re-emits `game:join` → server responds with fresh `game:state` → board re-syncs (works whether or not `connectionStateRecovery` restored the session). **No `joinError` was ever touched; no navigation occurred.**
 
-**Terminal path:** …reconnecting… → 10 attempts fail → `reconnect_failed` → `connectionState="terminal"` → red banner + "Reload to rejoin". `joinError` still untouched (board stays behind the banner); only a user-initiated reload leaves the view.
+**Terminal paths (all land on the red "Reload to rejoin" banner, board still behind it):**
+- 10 reconnection attempts fail → `reconnect_failed` → `connectionState="terminal"`.
+- Server-initiated disconnect (`disconnect("io server disconnect")`, non-retrying) → `classifyDisconnect` returns `terminal` → `connectionState="terminal"` immediately (no attempts fire). This is the case that would otherwise strand the amber banner forever.
+
+`joinError` stays untouched in both; only a user-initiated reload leaves the view.
 
 ## Edge Cases
 
 - **E1 — Transient blip mid-game.** `connect_error` during reconnection no longer sets any error. Board stays; banner shows reconnecting. **(Primary acceptance criterion.)**
-- **E2 — Successful reconnect.** `connect`/`reconnect` clears `connectionState` to `connected`, banner disappears, buttons re-enable, `game:state` re-syncs. No manual reload. **(Guards against the old "permanently stranded" bug — verify `joinError` was never set.)**
+- **E2 — Successful reconnect (within 30s recovery window).** `connect`/`reconnect` clears `connectionState` to `connected`, banner disappears, buttons re-enable. `connectionStateRecovery` already restored the room; the reconnect `game:join` re-emit harmlessly re-fetches current `game:state`. No manual reload. **(Guards against the old "permanently stranded" bug — verify `joinError` was never set.)**
+- **E2b — Reconnect after the 30s recovery window lapses (attempt lands 30–40s in).** The manager produces a fresh socket; `connectionStateRecovery` fails silently and the socket is NOT in the game room. `connect` still fires and `connectionState` flips to `connected`. Because `GameView` re-emits `game:join` on every reconnect `connect`, the server re-adds the socket to `game:${gameId}` and emits fresh `game:state` — the board re-syncs instead of leaving the player silently orphaned on a stale board. **(This is the specific failure the design must not regress: `connected` without a re-join = stale board.)**
 - **E3 — Reconnect exhausted (10 attempts).** `reconnect_failed` → terminal banner + "Reload to rejoin". Only case approaching the old full-screen severity, but board is still behind it.
 - **E4 — Action attempted while offline.** Button is already locked (disabledReason). If somehow triggered, the emit's ack never returns; the 8s timeout resolves `{success:false}`, `actionError` shows "Couldn't reach the server — reconnecting…", `actionPending` resets. No infinite spinner.
 - **E5 — Action in flight when the drop happens.** Same as E4: the pending ack times out at 8s and surfaces the message; player re-submits after reconnect. No auto-retry.
 - **E6 — Ack arrives after timeout.** `settled` guard in `emitWithTimeout` ignores the late ack; no double-resolve, no state flap.
 - **E7 — SERVER_FULL / auth handshake failure.** Routed to `terminalError` → `joinError` → full-screen error, unchanged behavior. Distinct from transient `connect_error`.
+- **E7b — Server-initiated disconnect (`"io server disconnect"`).** The manager will NOT auto-reconnect for this reason, so no `reconnect_attempt`/`reconnect_failed`/`connect` will ever fire. `classifyDisconnect` maps it directly to `terminal`, so the banner escalates to red "Reload to rejoin" instead of a permanent amber "reconnecting…" with permanently locked buttons. **(Guards the "banner stranded forever" failure the reviewer flagged.)**
 - **E8 — Initial connect fails at mount (no board yet).** Handled by existing `joinError = "Could not connect to server."` in `onMounted`; banner not involved (no board to preserve).
 - **E9 — Drop while in lobby (`CREATED`).** Out of scope for this LLD; lobby keeps current behavior (no banner). The banner renders only for live-board phases. Documented as an optional follow-up.
 - **E10 — Spectator drops.** Banner shows identically; there are no action buttons to lock. Board stays rendered.
@@ -192,12 +254,12 @@ All state is **in-memory / ephemeral client state**. Nothing is persisted; no ne
 - **E14 — Rapid flap (drop→reconnect→drop).** State follows the latest event; `reconnectAttempt` resets on each `connect`. Banner toggles accordingly; buttons follow `disabledReason`. No accumulation because refs are absolute values, not increments beyond the manager's own counter.
 
 ## Dependencies
-## Dependencies
 
 **Must exist (all already present):**
 - `useSocket.ts` (`socket.io-client` Manager exposes `socket.io.on(...)` — the reconnection events used here are standard socket.io-client v4 API; no new dependency).
 - `useGameActions.ts`, `GameView.vue`, `GameBoard.vue`, `TonkBoard.vue`, `ActionPanel.vue`, `TonkActionPanel.vue` — all edited in place.
-- Server continues to emit `game:state` on (re)join — already the case (`GameView.onMounted` binds state before `game:join`, and the server re-emits state for IN_PROGRESS games).
+- **Server-side `connectionStateRecovery` (`socketServer.ts:53-55`, `maxDisconnectionDuration: 30_000`).** The happy short-reconnect path relies on this to restore room membership and replay missed events within 30s. **The design does NOT assume the server auto-re-emits `game:state`** — that only happens inside the `game:join` handler (`socketHandler.ts:359`). Re-sync for reconnects beyond 30s is guaranteed by `GameView`'s reconnect `game:join` re-emit (see Interfaces / State Model), not by recovery. Implementers must not remove or rely on changing `connectionStateRecovery`; it is the existing backing for short blips and no backend change is in scope.
+- The server's `game:join` handler returns current `game:state` for IN_PROGRESS/COMPLETED games (`socketHandler.ts:353-369`) — the mechanism the reconnect re-join reuses.
 - Existing `--error-text` / `--gold-accent` CSS variables in `game-variables.css`.
 
 **New file:** `src/frontend/component/game-ui/ConnectionBanner.vue` (presentational), and `src/frontend/composables/connectionState.ts` (pure mapping helper).
@@ -216,6 +278,14 @@ Follow the project's frontend test convention: **node environment, no DOM mount*
 - `{connected:false, reconnectFailed:true}` → `"terminal"`.
 - `reconnectFailed:true` dominates even if `connected` momentarily true (terminal is sticky until reset).
 - Simulate the event sequence (connect → disconnect → reconnect_attempt(3) → reconnect → connect) against ref-mirrored reducer logic and assert `connectionState` and `reconnectAttempt` values at each step, including reset to 0 on `connect`.
+- `classifyDisconnect`: `"transport close"` / `"transport error"` / `"ping timeout"` / any unknown reason → `"retry"`; `"io server disconnect"` → `"terminal"`; `"io client disconnect"` → `"ignore"`. **(Regression guard for the "banner stranded forever on a non-retrying disconnect" bug.)**
+
+### Unit — reconnect re-join (`tests/frontend/reconnectRejoin.test.ts`)
+Transcribe `GameView`'s reconnect `connect` handler logic (the `hasJoinedOnce` guard + `game:join` re-emit):
+- The **first** `connect` does NOT emit `game:join` (initial join is done by `onMounted`); it only flips `hasJoinedOnce`.
+- Every **subsequent** `connect` (reconnect) emits `game:join` exactly once with `{ gameId, role: "player" }`. **(Regression guard for the "orphaned on stale board after >30s recovery lapse" bug — proves re-sync does not rely on an automatic `game:state` re-emit.)**
+- A re-join whose ack returns `{success:false}` sets `joinError` (game genuinely gone while offline).
+- The reconnect handler does NOT re-bind `bindState`/`bindActions`/`lobby:*` listeners (assert they are attached once) — prevents double-fire on the reused socket.
 
 ### Unit — "connection error does NOT set joinError while a board is live" (`tests/frontend/connectionBannerJoinError.test.ts`)
 - Transcribe the new `GameView` rule: a transient `connect_error` / `disconnect` while `displayPhase` is a live-board phase must **not** mutate `joinError` (assert `joinError` stays `null`) and must set `connectionState="reconnecting"`.
