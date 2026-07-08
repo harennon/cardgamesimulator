@@ -35,20 +35,38 @@ const LIVE_BOARD_PHASES: DisplayPhase[] = [
  *   - joinError only receives terminalError (not transient connect_errors).
  *   - connectionState is derived from Manager events.
  *   - disabledReason is computed from connectionState.
+ *   - E8: terminal while no board → joinError = "Could not connect to server."
  */
-function createGameViewState(initialPhase: DisplayPhase = "IN_PROGRESS") {
+function createGameViewState(
+  initialPhase: DisplayPhase = "IN_PROGRESS",
+  hasBoardAlready: boolean = true,
+) {
   const displayPhase = ref<DisplayPhase>(initialPhase);
   const joinError = ref<string | null>(null);
   const terminalError = ref<string | null>(null);
+
+  // Simulates gameState: null means no board has arrived yet (E8 scenario).
+  const gameState = ref<{ status: string } | null>(
+    hasBoardAlready ? { status: "IN_PROGRESS" } : null,
+  );
 
   // Mirror the LLD 162 rule: terminalError → joinError, nothing else touches it.
   watch(terminalError, (err) => {
     if (err) joinError.value = err;
   });
 
+  // LLD 162 E8: terminal while no board (gameState === null) → set joinError.
+  // This is the watcher added to GameView.vue to fix the initial-connect failure.
+  const connectionState = ref<ConnectionState>("connected");
+
+  watch(connectionState, (state) => {
+    if (state === "terminal" && gameState.value === null && !joinError.value) {
+      joinError.value = "Could not connect to server.";
+    }
+  });
+
   const connected = ref(false);
   let _reconnectFailed = false;
-  const connectionState = ref<ConnectionState>("connected");
   const reconnectAttempt = ref(0);
 
   function _updateState() {
@@ -108,6 +126,7 @@ function createGameViewState(initialPhase: DisplayPhase = "IN_PROGRESS") {
 
   return {
     displayPhase,
+    gameState,
     joinError,
     terminalError,
     connectionState,
@@ -260,5 +279,54 @@ describe("disabledReason computed", () => {
 
     gv.onConnect();
     expect(gv.disabledReason.value).toBeNull();
+  });
+});
+
+describe("E8 — initial connect failure (no board yet) surfaces joinError", () => {
+  // Regression guard: when connectionState reaches 'terminal' before any
+  // game:state has arrived (gameState === null), joinError must be set so the
+  // user sees an error message rather than being stranded on 'Connecting…'.
+
+  it("terminal while gameState is null sets joinError", async () => {
+    // hasBoardAlready=false → gameState.value = null (no board yet)
+    const gv = createGameViewState("IN_PROGRESS", false);
+
+    gv.onDisconnect("transport close");
+    gv.onReconnectFailed(); // all attempts exhausted
+    await nextTick();
+
+    expect(gv.joinError.value).toBe("Could not connect to server.");
+  });
+
+  it("terminal while board is live does NOT set joinError (banner handles it)", async () => {
+    // hasBoardAlready=true → gameState.value is set (board is live)
+    const gv = createGameViewState("IN_PROGRESS", true);
+
+    gv.onConnect();
+    await nextTick();
+
+    gv.onDisconnect("transport close");
+    gv.onReconnectFailed();
+    await nextTick();
+
+    // Board is live: joinError must stay null; the red banner handles terminal.
+    expect(gv.joinError.value).toBeNull();
+    expect(gv.connectionState.value).toBe("terminal");
+  });
+
+  it("joinError is not set twice if already set (idempotent)", async () => {
+    const gv = createGameViewState("IN_PROGRESS", false);
+
+    // First terminal event sets joinError.
+    gv.onReconnectFailed();
+    await nextTick();
+    expect(gv.joinError.value).toBe("Could not connect to server.");
+
+    // Simulate a second terminal event (e.g. from server disconnect after
+    // reconnect_failed). joinError must not be overwritten with the same value.
+    const firstValue = gv.joinError.value;
+    gv.onReconnectFailed();
+    await nextTick();
+    expect(gv.joinError.value).toBe(firstValue);
   });
 });

@@ -225,6 +225,18 @@ const {
 watch(terminalError, (err) => {
   if (err) joinError.value = err;
 });
+
+// LLD 162 E8: If the initial connection reaches 'terminal' (all reconnect
+// attempts exhausted) before any board has been shown (gameState is still
+// null), surface a joinError so the user sees an actionable message instead
+// of being stranded on "Connecting…" forever.
+// Once a board is live (gameState !== null), terminal state is handled by the
+// red "Reload to rejoin" banner — joinError must NOT be set in that case.
+watch(connectionState, (state) => {
+  if (state === "terminal" && gameState.value === null && !joinError.value) {
+    joinError.value = "Could not connect to server.";
+  }
+});
 const {
   gameState,
   status,
