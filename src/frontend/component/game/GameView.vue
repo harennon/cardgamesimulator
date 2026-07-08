@@ -36,6 +36,8 @@
       'game-view__board-container--revealing':
         (displayPhase === 'SHOW_FINAL_PLAY' && gameState.gameType === 'big2') ||
         (displayPhase === 'SHOW_TRICK_RESULT' && gameState.gameType === 'tonk'),
+      'game-view__board-container--disconnected':
+        connectionState !== 'connected',
     }"
   >
     <TonkBoard
@@ -47,6 +49,7 @@
       :action-pending="actionPending"
       :turn-timer-seconds="turnTimerSeconds"
       :room-code="roomCode"
+      :disabled-reason="disabledReason"
       @toggle-card="toggleCard"
       @discard="onDiscard"
       @draw="onDraw"
@@ -62,9 +65,19 @@
       :turn-timer-seconds="turnTimerSeconds"
       :room-code="roomCode"
       :game-over="displayPhase === 'SHOW_FINAL_PLAY'"
+      :disabled-reason="disabledReason"
       @toggle-card="toggleCard"
       @play="onPlay"
       @pass="onPass"
+    />
+
+    <!-- LLD 162: Non-destructive reconnecting banner. Absolutely positioned
+         sibling inside game-view__board-container (position: relative),
+         z-index 90 — above board content, below reveal layer (101). -->
+    <ConnectionBanner
+      :connection-state="connectionState"
+      :reconnect-attempt="reconnectAttempt"
+      :max-reconnect-attempts="maxReconnectAttempts"
     />
 
     <TonkTrickReveal
@@ -163,6 +176,7 @@ import { axiosInstance } from "@/service/http";
 import type { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
 import type { AxiosResponse } from "axios";
 import { useSocket } from "@/composables/useSocket";
+import ConnectionBanner from "@/component/game-ui/ConnectionBanner.vue";
 import { useGameState } from "@/composables/useGameState";
 import { useGameActions } from "@/composables/useGameActions";
 import { useCardSelection } from "@/composables/useCardSelection";
@@ -196,10 +210,32 @@ const props = defineProps<{
   gameId: string;
 }>();
 
-const { socket, error: socketError, connect, disconnect } = useSocket();
+const {
+  socket,
+  connectionState,
+  reconnectAttempt,
+  maxReconnectAttempts,
+  terminalError,
+  connect,
+  disconnect,
+} = useSocket();
 
-watch(socketError, (err) => {
+// Terminal handshake errors (SERVER_FULL, auth) → joinError (board-less path).
+// Transient connect_errors do NOT reach here; they are absorbed by useSocket.
+watch(terminalError, (err) => {
   if (err) joinError.value = err;
+});
+
+// LLD 162 E8: If the initial connection reaches 'terminal' (all reconnect
+// attempts exhausted) before any board has been shown (gameState is still
+// null), surface a joinError so the user sees an actionable message instead
+// of being stranded on "Connecting…" forever.
+// Once a board is live (gameState !== null), terminal state is handled by the
+// red "Reload to rejoin" banner — joinError must NOT be set in that case.
+watch(connectionState, (state) => {
+  if (state === "terminal" && gameState.value === null && !joinError.value) {
+    joinError.value = "Could not connect to server.";
+  }
 });
 const {
   gameState,
@@ -277,8 +313,7 @@ let revealTimer: ReturnType<typeof setTimeout> | null = null;
 const latestTrickResult = computed<TonkTrickResult | null>(() => {
   if (gameState.value?.gameType !== "tonk") return null;
   const tonkPublic = gameState.value.gameSpecificPublicState as
-    | TonkPublicState
-    | undefined;
+    TonkPublicState | undefined;
   if (!tonkPublic) return null;
   for (let i = tonkPublic.log.length - 1; i >= 0; i--) {
     const entry = tonkPublic.log[i];
@@ -291,8 +326,7 @@ const latestTrickResult = computed<TonkTrickResult | null>(() => {
 const tonkTallies = computed<readonly number[]>(() => {
   if (gameState.value?.gameType !== "tonk") return [];
   const tonkPublic = gameState.value.gameSpecificPublicState as
-    | TonkPublicState
-    | undefined;
+    TonkPublicState | undefined;
   return tonkPublic?.tallies ?? [];
 });
 
@@ -388,16 +422,14 @@ const gameOverPlayHistory = computed(() => {
 
 const finalPlay = computed<Big2Play | null>(() => {
   const publicState = gameState.value?.gameSpecificPublicState as
-    | Big2PublicState
-    | undefined;
+    Big2PublicState | undefined;
   return publicState?.lastPlay ?? null;
 });
 
 const tonkFinalMove = computed<TonkFinalMove | null>(() => {
   if (gameState.value?.gameType !== "tonk") return null;
   const publicState = gameState.value.gameSpecificPublicState as
-    | TonkPublicState
-    | undefined;
+    TonkPublicState | undefined;
   const log = publicState?.log;
   if (!log || log.length === 0) return null;
   const entry = log[log.length - 1];
@@ -429,6 +461,24 @@ const finalPlayByName = computed(() => {
   );
   return player?.displayName ?? finalPlay.value.playerId;
 });
+
+// ---------------------------------------------------------------------------
+// LLD 162: Non-destructive reconnecting state
+// ---------------------------------------------------------------------------
+
+/**
+ * Reason string forwarded to action panels to force-disable all buttons while
+ * the connection is not live. Null when connected (buttons behave normally).
+ */
+const disabledReason = computed<string | null>(() => {
+  if (connectionState.value === "reconnecting") return "Reconnecting…";
+  if (connectionState.value === "terminal")
+    return "Disconnected — reload to rejoin";
+  return null;
+});
+
+/** True once the initial game:join has been emitted from onMounted. */
+let hasJoinedOnce = false;
 
 onMounted(async () => {
   // Resolve the current player's ID from the auth source eagerly, before the
@@ -517,6 +567,32 @@ onMounted(async () => {
   bindState(s);
   bindActions(s);
 
+  // Re-join on reconnect (LLD 162 E2 / E2b fix).
+  // The same socket instance is reused across Manager reconnections, so the
+  // lobby/state/action listeners bound above remain attached and must NOT be
+  // re-bound here (would cause double-fires). We only re-emit game:join so the
+  // server re-adds the socket to the game room and re-delivers game:state.
+  // This covers both: recovery within 30 s (idempotent) and fresh sockets
+  // after the 30 s window lapses (re-sync from scratch).
+  s.on("connect", () => {
+    if (!hasJoinedOnce) {
+      // First connect: initial join is handled below, just mark the flag.
+      hasJoinedOnce = true;
+      return;
+    }
+    // Subsequent connects are reconnects — re-emit game:join.
+    s.emit(
+      "game:join",
+      { gameId: props.gameId, role: "player" },
+      (response) => {
+        if (!response.success) {
+          // Game was deleted or is no longer accessible while offline.
+          joinError.value = response.error ?? "Failed to rejoin game.";
+        }
+      },
+    );
+  });
+
   s.emit("game:join", { gameId: props.gameId, role: "player" }, (response) => {
     if (!response.success) {
       joinError.value = response.error ?? "Failed to join game.";
@@ -602,8 +678,7 @@ async function onCallTonk(): Promise<void> {
 const tonkTurnPhase = computed<string | null>(() => {
   if (gameState.value?.gameType !== "tonk") return null;
   const publicState = gameState.value.gameSpecificPublicState as
-    | TonkPublicState
-    | undefined;
+    TonkPublicState | undefined;
   return publicState?.turnPhase ?? null;
 });
 
@@ -686,6 +761,15 @@ watch(latestTrickResult, (newResult) => {
   width: 100vw;
   height: 100vh; /* fallback for older browsers */
   height: 100dvh; /* dynamic viewport — accounts for mobile URL bar */
+}
+
+/* LLD 162: Dim the live board (no blur) while disconnected so it stays legible
+   but conveys a non-interactive state. pointer-events:none prevents accidental
+   interaction during the reconnect window. Do NOT reuse --revealing blur. */
+.game-view__board-container--disconnected :deep(.game-board),
+.game-view__board-container--disconnected :deep(.tonk-board) {
+  filter: brightness(0.7);
+  pointer-events: none;
 }
 
 /* Direction A — blur + dim the live board behind the reveal layer. The blur is

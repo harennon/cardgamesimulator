@@ -50,7 +50,9 @@
           v-if="canCallTonk"
           class="tonk-action-panel__btn tonk-action-panel__btn--tonk"
           data-testid="tonk-call-tonk-btn"
-          :disabled="!isMyTurn || actionPending"
+          :disabled="!isMyTurn || actionPending || !!disabledReason"
+          :title="disabledReason ?? undefined"
+          :aria-disabled="!!disabledReason || undefined"
           @click="emit('callTonk')"
         >
           Call TONK
@@ -58,7 +60,14 @@
         <button
           class="tonk-action-panel__btn tonk-action-panel__btn--primary"
           data-testid="tonk-discard-btn"
-          :disabled="!isMyTurn || selectionCount === 0 || actionPending"
+          :disabled="
+            !isMyTurn ||
+            selectionCount === 0 ||
+            actionPending ||
+            !!disabledReason
+          "
+          :title="disabledReason ?? undefined"
+          :aria-disabled="!!disabledReason || undefined"
           @click="emit('discard')"
         >
           Discard<span
@@ -74,7 +83,9 @@
         <button
           class="tonk-action-panel__btn tonk-action-panel__btn--primary tonk-action-panel__btn--source"
           data-testid="tonk-draw-stock-btn"
-          :disabled="!isMyTurn || actionPending"
+          :disabled="!isMyTurn || actionPending || !!disabledReason"
+          :title="disabledReason ?? undefined"
+          :aria-disabled="!!disabledReason || undefined"
           @click="emit('draw', 'stock')"
         >
           <span>Draw stock</span>
@@ -85,7 +96,14 @@
         <button
           class="tonk-action-panel__btn tonk-action-panel__btn--ghost tonk-action-panel__btn--source"
           data-testid="tonk-take-discard-btn"
-          :disabled="!isMyTurn || drawableDiscard === null || actionPending"
+          :disabled="
+            !isMyTurn ||
+            drawableDiscard === null ||
+            actionPending ||
+            !!disabledReason
+          "
+          :title="disabledReason ?? undefined"
+          :aria-disabled="!!disabledReason || undefined"
           @click="emit('draw', 'discard')"
         >
           <span>Take discard</span>
@@ -119,6 +137,8 @@ const props = defineProps<{
   currentPlayerName: string;
   actionError?: string | null;
   actionPending?: boolean;
+  /** When non-null, all action buttons are disabled and show this as a hover title. */
+  disabledReason?: string | null;
 }>();
 
 const emit = defineEmits<{

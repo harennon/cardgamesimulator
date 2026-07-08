@@ -5,7 +5,9 @@
       <button
         v-if="canPass"
         class="action-panel__btn action-panel__btn--pass"
-        :disabled="!isMyTurn || actionPending"
+        :disabled="!isMyTurn || actionPending || !!disabledReason"
+        :title="disabledReason ?? undefined"
+        :aria-disabled="!!disabledReason || undefined"
         @click="emit('pass')"
       >
         Pass
@@ -13,7 +15,14 @@
       <button
         v-if="canPlay"
         class="action-panel__btn action-panel__btn--play"
-        :disabled="!isMyTurn || selectedCardCount === 0 || actionPending"
+        :disabled="
+          !isMyTurn ||
+          selectedCardCount === 0 ||
+          actionPending ||
+          !!disabledReason
+        "
+        :title="disabledReason ?? undefined"
+        :aria-disabled="!!disabledReason || undefined"
         @click="emit('play')"
       >
         Play
@@ -32,6 +41,8 @@ const props = defineProps<{
   isMyTurn: boolean;
   actionError?: string | null;
   actionPending?: boolean;
+  /** When non-null, all action buttons are disabled and show this as a hover title. */
+  disabledReason?: string | null;
 }>();
 
 const emit = defineEmits<{
