@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Non-destructive "Reconnecting…" state — mockups</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <style>
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --error-text: #e05555;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+        /* Reconnect banner tokens (proposed) */
+        --warn-amber: #e0a24a;
+        --warn-amber-dim: rgba(224, 162, 74, 0.16);
+        --danger: #d84a4a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #0d0d0d;
+        font-family: var(--font-ui);
+        color: var(--text-primary);
+        padding: 24px;
+      }
+
+      .page-head {
+        max-width: 1180px;
+        margin: 0 auto 20px;
+      }
+      .page-head h1 {
+        font-family: var(--font-card);
+        font-size: 1.5rem;
+        color: var(--gold-accent);
+        margin: 0 0 6px;
+      }
+      .page-head p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin: 0;
+        max-width: 760px;
+        line-height: 1.5;
+      }
+
+      /* --- Toolbar of demo states --- */
+      .toolbar {
+        max-width: 1180px;
+        margin: 0 auto 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .toolbar__label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-right: 4px;
+      }
+      .toolbar button {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 8px 14px;
+        border-radius: 6px;
+        border: 1.5px solid var(--table-rim-light);
+        background: var(--panel-bg);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .toolbar button:hover {
+        border-color: var(--text-muted);
+      }
+      .toolbar button.active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.14);
+        color: var(--gold-accent);
+      }
+      .toolbar__sep {
+        width: 1px;
+        height: 22px;
+        background: var(--table-rim-light);
+        margin: 0 4px;
+      }
+
+      /* --- Board frame (scaled-down GameBoard) --- */
+      .stage {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .board {
+        position: relative;
+        height: 620px;
+        display: grid;
+        grid-template-rows: 74px 1fr 150px 60px;
+        grid-template-columns: 1fr 240px;
+        grid-template-areas:
+          "opponents opponents"
+          "table     log"
+          "hand      log"
+          "actions   actions";
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 50%,
+          var(--felt-light) 0%,
+          var(--felt) 50%,
+          #0f2e1c 100%
+        );
+        border: 12px solid var(--table-rim);
+        border-image: linear-gradient(
+            135deg,
+            var(--table-rim-light),
+            var(--table-rim),
+            #1a0f08
+          )
+          1;
+        overflow: hidden;
+        border-radius: 2px;
+      }
+
+      /* opponents row */
+      .opponents {
+        grid-area: opponents;
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        justify-content: center;
+        background: var(--table-rim);
+        border-bottom: 2px solid var(--table-rim-light);
+      }
+      .opp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 5px 10px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        position: relative;
+      }
+      .opp--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .opp__cards {
+        display: flex;
+      }
+      .opp__cards i {
+        width: 22px;
+        height: 31px;
+        margin-left: -8px;
+        border-radius: 3px;
+        border: 1px solid var(--gold-accent);
+        background: linear-gradient(135deg, #8b1a1a, #5c1010);
+      }
+      .opp__cards i:first-child {
+        margin-left: 0;
+      }
+      .opp__name {
+        font-size: 0.76rem;
+        font-weight: 600;
+      }
+      .opp__count {
+        font-size: 0.66rem;
+        color: var(--text-muted);
+      }
+      .opp__disc {
+        font-size: 0.62rem;
+        color: var(--error-text);
+      }
+
+      /* table / play area */
+      .table {
+        grid-area: table;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      .table__turn {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+      }
+      .table__play {
+        display: flex;
+        gap: 4px;
+      }
+      .pcard {
+        width: 46px;
+        height: 65px;
+        background: var(--card-face);
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 1rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+      .pcard.red {
+        color: var(--red-suit);
+      }
+      .pcard.black {
+        color: #1a1a1a;
+      }
+
+      /* hand */
+      .hand {
+        grid-area: hand;
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .hand__label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+      }
+      .hand__cards {
+        display: flex;
+      }
+      .hcard {
+        width: 46px;
+        height: 65px;
+        margin-left: -14px;
+        background: var(--card-face);
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.95rem;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+      }
+      .hcard:first-child {
+        margin-left: 0;
+      }
+      .hcard.red {
+        color: var(--red-suit);
+      }
+      .hcard.black {
+        color: #1a1a1a;
+      }
+
+      /* log */
+      .log {
+        grid-area: log;
+        background: var(--panel-bg);
+        border-left: 1px solid var(--table-rim-light);
+        padding: 10px 12px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        line-height: 1.7;
+        overflow: hidden;
+      }
+      .log b {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      /* actions */
+      .actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+        position: relative;
+      }
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 10px 26px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease;
+        position: relative;
+      }
+      .btn--play {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--pass {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1.5px solid var(--text-muted);
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* =====================================================================
+     RECONNECT BANNER — non-destructive overlay, pinned to top of board.
+     Sits ABOVE board content (z 90) but BELOW the wood rim so it reads as
+     an in-game overlay, not a replacement screen.
+     ===================================================================== */
+      .rbanner {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 90;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 16px;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(6px);
+        animation: bannerDrop 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+        max-width: calc(100% - 48px);
+      }
+      @keyframes bannerDrop {
+        from {
+          transform: translate(-50%, -14px);
+          opacity: 0;
+        }
+        to {
+          transform: translate(-50%, 0);
+          opacity: 1;
+        }
+      }
+      .rbanner--reconnecting {
+        background: linear-gradient(
+          180deg,
+          rgba(60, 40, 12, 0.92),
+          rgba(42, 28, 8, 0.92)
+        );
+        border: 1px solid var(--warn-amber);
+        color: #f4d9a8;
+      }
+      .rbanner--terminal {
+        background: linear-gradient(
+          180deg,
+          rgba(70, 20, 20, 0.94),
+          rgba(48, 12, 12, 0.94)
+        );
+        border: 1px solid var(--danger);
+        color: #f6c9c9;
+      }
+      .rbanner__dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .rbanner--reconnecting .rbanner__dot {
+        background: var(--warn-amber);
+        animation: pulseDot 1.4s ease-in-out infinite;
+      }
+      .rbanner--terminal .rbanner__dot {
+        background: var(--danger);
+      }
+      @keyframes pulseDot {
+        0% {
+          box-shadow: 0 0 0 0 rgba(224, 162, 74, 0.55);
+        }
+        70% {
+          box-shadow: 0 0 0 8px rgba(224, 162, 74, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(224, 162, 74, 0);
+        }
+      }
+      .rbanner__attempt {
+        font-weight: 400;
+        font-size: 0.72rem;
+        opacity: 0.75;
+      }
+      .rbanner__btn {
+        font-family: var(--font-ui);
+        font-size: 0.76rem;
+        font-weight: 700;
+        padding: 5px 14px;
+        border-radius: 999px;
+        border: none;
+        cursor: pointer;
+        background: var(--danger);
+        color: #fff;
+        margin-left: 4px;
+      }
+      .rbanner__btn:hover {
+        background: #e85c5c;
+      }
+
+      /* Full-board dim while offline. Board stays rendered underneath. */
+      .board.is-offline .opponents,
+      .board.is-offline .table,
+      .board.is-offline .hand,
+      .board.is-offline .log {
+        filter: saturate(0.72) brightness(0.82);
+        transition: filter 0.3s ease;
+      }
+
+      /* Button lock affordance — reason surfaced via tooltip on hover. */
+      .lock-wrap {
+        position: relative;
+        display: inline-flex;
+      }
+      .lock-wrap[data-reason]:hover::after {
+        content: attr(data-reason);
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        background: #150d06;
+        color: #f4d9a8;
+        border: 1px solid var(--warn-amber);
+        font-size: 0.72rem;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 6px;
+        pointer-events: none;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Action toast — surfaces a timed-out in-flight action. */
+      .atoast {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 95;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #2a1608;
+        border: 1px solid var(--warn-amber);
+        color: #f4d9a8;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 7px 14px;
+        border-radius: 8px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+        animation: bannerDrop 0.22s ease both;
+        white-space: nowrap;
+      }
+
+      /* spectator variant of the actions bar */
+      .spectator-note {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        background: var(--table-rim);
+        border-top: 2px solid var(--table-rim-light);
+      }
+
+      /* caption legend under each board */
+      .caption {
+        max-width: 1180px;
+        margin: 12px auto 40px;
+        padding: 12px 16px;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 8px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      .caption b {
+        color: var(--gold-accent);
+        font-weight: 600;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .rbanner,
+        .atoast {
+          animation: none;
+        }
+        .rbanner--reconnecting .rbanner__dot {
+          animation: none;
+        }
+      }
+    </style>
+    <div class="page-head">
+      <h1>Non-destructive "Reconnecting…" state</h1>
+      <p>
+        A transient socket drop no longer nukes the live board. The board stays
+        rendered underneath a compact inline banner; action buttons lock with a
+        reason. Only genuine terminal failures escalate. Use the state switcher
+        to preview each state — this single board re-renders in place, exactly
+        as the real <code>GameView</code> would.
+      </p>
+    </div>
+
+    <div class="toolbar">
+      <span class="toolbar__label">Connection state</span>
+      <button data-state="online" class="active">Online (baseline)</button>
+      <button data-state="reconnecting">Reconnecting…</button>
+      <button data-state="reconnecting-attempts">
+        Reconnecting (attempt 6/10)
+      </button>
+      <button data-state="action-timeout">In-flight action timed out</button>
+      <button data-state="terminal">Terminal — gave up</button>
+      <span class="toolbar__sep"></span>
+      <span class="toolbar__label">Seat</span>
+      <button data-seat="player" class="active">Player</button>
+      <button data-seat="spectator">Spectator</button>
+    </div>
+
+    <div class="stage">
+      <div class="board" id="board">
+        <!-- BANNER injected here by JS -->
+
+        <div class="opponents">
+          <div class="opp opp--active">
+            <div class="opp__cards"><i></i><i></i><i></i><i></i><i></i></div>
+            <span class="opp__name">Mei</span>
+            <span class="opp__count">5 cards</span>
+          </div>
+          <div class="opp">
+            <div class="opp__cards"><i></i><i></i><i></i></div>
+            <span class="opp__name">Diego</span>
+            <span class="opp__count">3 cards</span>
+          </div>
+          <div class="opp">
+            <div class="opp__cards">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <span class="opp__name">Priya</span>
+            <span class="opp__count">7 cards</span>
+          </div>
+        </div>
+
+        <div class="table">
+          <div class="table__turn" id="turnLabel">Mei's turn</div>
+          <div class="table__play">
+            <div class="pcard red">Q&#9829;</div>
+            <div class="pcard red">Q&#9830;</div>
+          </div>
+        </div>
+
+        <div class="hand">
+          <div class="hand__label">Your hand (5)</div>
+          <div class="hand__cards">
+            <div class="hcard black">3&#9827;</div>
+            <div class="hcard red">7&#9829;</div>
+            <div class="hcard black">9&#9824;</div>
+            <div class="hcard red">J&#9830;</div>
+            <div class="hcard black">K&#9827;</div>
+          </div>
+        </div>
+
+        <div class="log">
+          <div><b>Priya</b> played 5&#9829; 5&#9824;</div>
+          <div><b>Mei</b> played Q&#9829; Q&#9830;</div>
+          <div><b>Diego</b> passed</div>
+          <div><b>You</b> passed</div>
+        </div>
+
+        <!-- ACTIONS injected here by JS (player) / spectator note -->
+        <div class="actions" id="actions"></div>
+      </div>
+
+      <div class="caption" id="caption"></div>
+    </div>
+
+    <script>
+      const board = document.getElementById("board");
+      const actions = document.getElementById("actions");
+      const caption = document.getElementById("caption");
+
+      let connState = "online"; // online | reconnecting | reconnecting-attempts | action-timeout | terminal
+      let seat = "player"; // player | spectator
+
+      const CAPTIONS = {
+        online:
+          "<b>Baseline.</b> Socket connected. Play / Pass enabled on your turn. No banner. This is what the board looks like today when everything is fine.",
+        reconnecting:
+          "<b>Transient drop.</b> connected=false, reconnecting. A compact amber banner appears; the board stays fully rendered (just dimmed) so you keep all context. Play / Pass lock with a reason. On reconnect the banner clears automatically and controls re-enable — no navigation.",
+        "reconnecting-attempts":
+          "<b>Reconnecting with progress.</b> Same non-destructive banner, driven off the Socket.IO manager's reconnect_attempt events, showing attempt N/10 so the wait feels honest rather than frozen.",
+        "action-timeout":
+          "<b>Action attempted while offline.</b> Buttons are already locked, but if a Play/Pass was in flight when the socket dropped, the ack await times out (~8s) and surfaces a clear toast instead of a spinner that never resolves. actionPending resets; re-submit on reconnect.",
+        terminal:
+          "<b>Reconnection exhausted (all 10 attempts).</b> The ONLY state that approaches today's full-screen treatment — and even here the board is preserved behind a red terminal banner with a concrete recovery action (Reload to rejoin). Distinct from a genuine join failure, which still shows the full-screen error unchanged.",
+      };
+
+      function bannerHTML() {
+        if (connState === "reconnecting") {
+          return `<div class="rbanner rbanner--reconnecting" role="status" aria-live="polite">
+            <span class="rbanner__dot"></span>
+            <span>Connection lost — reconnecting…</span>
+          </div>`;
+        }
+        if (
+          connState === "reconnecting-attempts" ||
+          connState === "action-timeout"
+        ) {
+          return `<div class="rbanner rbanner--reconnecting" role="status" aria-live="polite">
+            <span class="rbanner__dot"></span>
+            <span>Connection lost — reconnecting…</span>
+            <span class="rbanner__attempt">attempt 6 / 10</span>
+          </div>`;
+        }
+        if (connState === "terminal") {
+          return `<div class="rbanner rbanner--terminal" role="alert">
+            <span class="rbanner__dot"></span>
+            <span>Connection lost — couldn't reach the server.</span>
+            <button class="rbanner__btn" onclick="setState('online')">Reload to rejoin</button>
+          </div>`;
+        }
+        return "";
+      }
+
+      function playerActionsHTML() {
+        const offline = connState !== "online";
+        const reason =
+          connState === "terminal"
+            ? "Disconnected — reload to rejoin"
+            : "Reconnecting…";
+        const dis = offline ? "disabled" : "";
+        const wrapAttr = offline ? `data-reason="${reason}"` : "";
+        const toast =
+          connState === "action-timeout"
+            ? `<div class="atoast" role="alert">⚠ Couldn't reach the server — reconnecting…</div>`
+            : "";
+        return `
+          ${toast}
+          <span class="lock-wrap" ${wrapAttr}>
+            <button class="btn btn--pass" ${dis}>Pass</button>
+          </span>
+          <span class="lock-wrap" ${wrapAttr}>
+            <button class="btn btn--play" ${dis}>Play</button>
+          </span>`;
+      }
+
+      function render() {
+        // banner
+        const existing = board.querySelector(".rbanner, .atoast-holder");
+        if (existing) existing.remove();
+        const oldBanner = board.querySelector(".rbanner");
+        if (oldBanner) oldBanner.remove();
+        const bh = bannerHTML();
+        if (bh) board.insertAdjacentHTML("afterbegin", bh);
+
+        // offline dim
+        board.classList.toggle("is-offline", connState !== "online");
+
+        // actions area — player vs spectator
+        if (seat === "spectator") {
+          actions.className = "spectator-note";
+          actions.innerHTML = "👁 Spectating — no actions to take";
+        } else {
+          actions.className = "actions";
+          actions.innerHTML = playerActionsHTML();
+        }
+
+        caption.innerHTML = CAPTIONS[connState];
+
+        // toolbar active states
+        document
+          .querySelectorAll("[data-state]")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.state === connState),
+          );
+        document
+          .querySelectorAll("[data-seat]")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.seat === seat),
+          );
+      }
+
+      window.setState = function (s) {
+        connState = s;
+        render();
+      };
+
+      document.querySelectorAll("[data-state]").forEach((b) =>
+        b.addEventListener("click", () => {
+          connState = b.dataset.state;
+          render();
+        }),
+      );
+      document.querySelectorAll("[data-seat]").forEach((b) =>
+        b.addEventListener("click", () => {
+          seat = b.dataset.seat;
+          render();
+        }),
+      );
+
+      render();
+    </script>
+  </body>
+</html>
