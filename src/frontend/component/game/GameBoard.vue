@@ -79,6 +79,7 @@
         :is-my-turn="isMyTurn"
         :action-error="actionError"
         :action-pending="actionPending"
+        :disabled-reason="disabledReason"
         @play="onPlay"
         @pass="onPass"
       />
@@ -145,8 +146,10 @@ const props = withDefaults(
     turnTimerSeconds: number | null;
     roomCode: string;
     gameOver?: boolean;
+    /** Forwarded to ActionPanel — non-null forces all buttons disabled. */
+    disabledReason?: string | null;
   }>(),
-  { gameOver: false },
+  { gameOver: false, disabledReason: null },
 );
 
 const emit = defineEmits<{
