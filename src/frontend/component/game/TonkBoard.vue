@@ -110,6 +110,7 @@
         :current-player-name="currentPlayerName"
         :action-error="actionError"
         :action-pending="actionPending"
+        :disabled-reason="disabledReason"
         @discard="emit('discard')"
         @draw="(source) => emit('draw', source)"
         @call-tonk="emit('callTonk')"
@@ -171,6 +172,8 @@ const props = defineProps<{
   selectionCount: number;
   actionError: string | null;
   actionPending: boolean;
+  /** Forwarded to TonkActionPanel — non-null forces all buttons disabled. */
+  disabledReason?: string | null;
 }>();
 
 const emit = defineEmits<{
