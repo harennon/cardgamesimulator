@@ -32,11 +32,14 @@ process.env.SUPABASE_JWT_SECRET = "test-secret";
 const { JoinGameHandler } =
   await import("../../src/backend/api/game/joinGame.js");
 
+const noopLog = { warn: () => {}, info: () => {}, error: () => {} };
+
 function makeRequest(userId: string, gameId: string) {
   return {
     userId,
     body: { gameId },
     headers: {},
+    log: noopLog,
   } as unknown as Parameters<(typeof JoinGameHandler.INSTANCE)["post"]>[0];
 }
 

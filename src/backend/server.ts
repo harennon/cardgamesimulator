@@ -1,10 +1,17 @@
 import * as https from "https";
 import * as http from "http";
 import * as fs from "fs";
-import express, { type Express } from "express";
+import express, {
+  type Express,
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 import helmet from "helmet";
 import cors from "cors";
 import morgan from "morgan";
+import { nanoid } from "nanoid";
+import { logger, withContext } from "@/util/logger";
 
 import { Handler } from "@/api/handler";
 import { ServeAppHandler } from "@/api/serveApp";
@@ -73,6 +80,19 @@ export class Server {
     this.app.use(
       morgan(":method :url :status :res[content-length] - :response-time ms"),
     );
+
+    // Per-request correlation middleware: mints requestId, reads x-correlation-id header.
+    // Attaches a child logger to req so downstream handlers can use req.log.
+    this.app.use((req: Request, _res: Response, next: NextFunction) => {
+      const requestId = nanoid();
+      const correlationId =
+        typeof req.headers["x-correlation-id"] === "string"
+          ? req.headers["x-correlation-id"]
+          : undefined;
+      (req as Request & { log: ReturnType<typeof withContext> }).log =
+        withContext({ requestId, correlationId });
+      next();
+    });
 
     // Set up guest session store and auth middleware (dependency injection)
     this.guestSessionStore = new GuestSessionStore();
@@ -169,7 +189,7 @@ export class Server {
           connectionManager,
           turnTimerService,
           delayer,
-        ).catch((err: unknown) => console.error("Timer expired error", err));
+        ).catch((err: unknown) => logger.error({ err }, "Timer expired error"));
       },
     );
     registerSocketHandlers(
@@ -197,7 +217,7 @@ export class Server {
 
     // start server
     const port = process.env.BACKEND_PORT || 3000;
-    console.log(`Listening on port ${port}`);
+    logger.info({ port }, "Listening on port");
     this.server.listen(port);
   }
 
@@ -217,7 +237,7 @@ export class Server {
       return https.createServer(options, app);
     } else {
       if (process.env.NODE_ENV !== "production") {
-        console.log(
+        logger.info(
           "Please set up valid certificates to create an HTTPS server.",
         );
       }

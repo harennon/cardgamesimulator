@@ -164,8 +164,9 @@ export class CreateGameHandler extends Handler {
     [request.userId, request.body.gameType, request.body.maxPlayers].forEach(
       (value) => {
         if (!value) {
-          console.error(
-            `Invalid request received. UserId: ${request.userId}, Request: ${request.body}`,
+          request.log?.warn(
+            { userId: request.userId },
+            "Invalid createGame request received",
           );
           throw new BadRequestError();
         }

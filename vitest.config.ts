@@ -13,6 +13,14 @@ export default defineConfig({
         find: /^@\/component(\/.*)?$/,
         replacement: resolve(__dirname, "./src/frontend/component$1"),
       },
+      {
+        find: /^@\/composables\/(useCorrelation|useFeedbackContext|useFeedbackAttachments|connectionState)(\.js)?$/,
+        replacement: resolve(__dirname, "./src/frontend/composables/$1"),
+      },
+      {
+        find: /^@\/observability\/(sentry)(\.js)?$/,
+        replacement: resolve(__dirname, "./src/frontend/observability/$1"),
+      },
       { find: "@", replacement: resolve(__dirname, "./src/backend") },
     ],
   },

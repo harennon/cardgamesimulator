@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { nanoid } from "nanoid";
 import type { TypedSocket } from "./socketServer.js";
 import type { SupabaseJWTPayload } from "@/middleware/authMiddleware";
 import { getCachedJwksKey } from "@/middleware/authMiddleware";
@@ -35,6 +36,14 @@ export function createSocketAuthMiddleware(
       return;
     }
 
+    // Read client-supplied correlation id from handshake auth (transport-agnostic).
+    // E7: client may omit it (old client, direct curl) — we accept undefined, never mint a substitute.
+    const rawCorrelationId = socket.handshake.auth?.correlationId;
+    const correlationId =
+      typeof rawCorrelationId === "string" && rawCorrelationId
+        ? rawCorrelationId
+        : undefined;
+
     if (token.startsWith("guest:")) {
       const payload = verifyGuestToken(token, jwtSecret as string);
       if (!payload) {
@@ -51,6 +60,8 @@ export function createSocketAuthMiddleware(
       socket.data.userId = session.guestId;
       socket.data.displayName = session.displayName;
       socket.data.isGuest = true;
+      socket.data.correlationId = correlationId;
+      socket.data.requestId = nanoid();
       next();
       return;
     }
@@ -79,6 +90,8 @@ export function createSocketAuthMiddleware(
       socket.data.displayName =
         decoded.user_metadata?.display_name ?? decoded.email;
       socket.data.isGuest = false;
+      socket.data.correlationId = correlationId;
+      socket.data.requestId = nanoid();
       next();
     } catch {
       next(new Error("UNAUTHORIZED: Invalid token"));

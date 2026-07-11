@@ -112,8 +112,9 @@ export class JoinGameHandler extends Handler {
   private validateRequest(request: Request<JoinGameRequest>) {
     [request.userId, request.body.gameId].forEach((value) => {
       if (!value) {
-        console.error(
-          `Invalid request received. UserId: ${request.userId}, Request: ${request.body}`,
+        request.log?.warn(
+          { userId: request.userId },
+          "Invalid joinGame request received",
         );
         throw new BadRequestError();
       }

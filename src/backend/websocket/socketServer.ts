@@ -6,6 +6,7 @@ import type {
   ServerToClientEvents,
 } from "@shared/socket-events";
 import type { SocketData } from "./types.js";
+import { logger } from "@/util/logger";
 
 export type TypedServer = Server<
   ClientToServerEvents,
@@ -58,8 +59,9 @@ export function createSocketServer(
   io.use((socket, next) => {
     if (io.engine.clientsCount >= MAX_CONNECTIONS) {
       rejectionTimestamps.push(Date.now());
-      console.warn(
-        `Connection rejected: cap reached (${io.engine.clientsCount}/${MAX_CONNECTIONS})`,
+      logger.warn(
+        { current: io.engine.clientsCount, max: MAX_CONNECTIONS },
+        "Connection rejected: cap reached",
       );
       return next(new Error("SERVER_FULL"));
     }

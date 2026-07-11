@@ -8,6 +8,21 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Added
+
+- **LLD 166: Frontend error/observability capture (Sentry SDK) with shared correlation key**
+  - `src/frontend/observability/sentry.ts` — new `initObservability(app, router)` helper, guards behind `VITE_SENTRY_DSN` (no-op when unset). Exports `recordBreadcrumb`, `setSentryTag`, `setSentryContext` as guarded no-ops safe to call before init. `@sentry/vue` installed; `@sentry/vite-plugin` added to `vite.config.js` (gated on `SENTRY_AUTH_TOKEN`, uploads then deletes source maps).
+  - `src/frontend/composables/useCorrelation.ts` — new module-singleton composable minting a `cx_<8-char nanoid>` correlation id per tab. `bindGame(id)` / `unbindGame()` push both ids to Sentry scope as tags and context.
+  - `src/frontend/main.ts` — calls `initObservability(app, router)` before `.mount`.
+  - `src/frontend/composables/useSocket.ts` — adds module-scoped socket breadcrumb throttle (1 breadcrumb per `reason` per 10 s, suppressed count on next emit). `connect_error` and `disconnect` handlers record breadcrumbs. `SERVER_FULL` emits an un-throttled high-signal breadcrumb. `correlationId` is passed in socket `auth`.
+  - `src/frontend/component/FeedbackWidget.vue` — `buildMetadata()` now includes `correlationId` and `correlationGameId` fields; template/styles unchanged.
+  - `src/backend/util/logger.ts` — new thin `pino` JSON logger with `withContext({ correlationId?, gameId?, requestId? })` child-logger helper.
+  - `src/backend/**` — replaced all ~26 `console.*` calls across `index.ts`, `server.ts`, `errorHandler.ts`, `socketServer.ts`, `socketHandler.ts`, `gameService.ts`, `statsService.ts`, and three API handlers with structured `logger.*` calls carrying only identifiers and event types.
+  - `scripts/errors.mjs` — new Sentry REST CLI tool mirroring `feedback.mjs`. Supports `--json`, `--recent <N>`, `--since <ISO>`, `--correlation-id`, `--game-id`. Added `"errors"` script to `package.json`.
+  - `.env.example` — added `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `LOG_LEVEL`.
+  - `vitest.config.ts` — added aliases for `@/composables/useCorrelation` and `@/observability/sentry` to resolve to frontend in tests.
+  - Tests: `tests/util/logger.test.ts`, `tests/frontend/useCorrelation.test.ts`, `tests/frontend/socketBreadcrumbThrottle.test.ts`, `tests/frontend/observabilityInit.test.ts`, `tests/frontend/buildMetadataCorrelation.test.ts`, `tests/scripts/errors.test.ts`.
+
 ### Fixed
 
 - **LLD 165: "Server not reachable" warning shown while game is still playable**

@@ -12,6 +12,7 @@ import type { Game } from "@/database/entities/Game";
 import { SeededPRNG } from "@/engine/prng";
 import type { StatsService } from "@/service/statsService";
 import { aiNameForOrdinal } from "@shared/aiNames";
+import { logger } from "@/util/logger";
 
 // Per-engine minimum player counts. Centralised here so startGame can guard
 // correctly without hardcoding 2 everywhere (Tonk requires 3).
@@ -365,7 +366,7 @@ export class GameService {
         this.statsService
           .recordGameCompletion(result.newState, practice)
           .catch((err: unknown) =>
-            console.error("Stats recording failed:", err),
+            logger.error({ gameId, err }, "Stats recording failed"),
           );
       }
       await this.gameRepo.saveGame(game);

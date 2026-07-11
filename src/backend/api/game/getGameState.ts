@@ -32,8 +32,9 @@ export class GetGameStateHandler extends Handler {
 
   private validateRequest(request: Request<GetGameStateRequest>) {
     if (!request.query.gameId) {
-      console.error(
-        `Invalid request received. UserId: ${request.userId}, Request: ${request.body}`,
+      request.log?.warn(
+        { userId: request.userId },
+        "Invalid getGameState request received",
       );
       throw new BadRequestError();
     }

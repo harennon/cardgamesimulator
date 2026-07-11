@@ -183,6 +183,7 @@ import { useCardSelection } from "@/composables/useCardSelection";
 import { useFeedbackContext } from "@/composables/useFeedbackContext";
 import type { FeedbackGamePhase } from "@/composables/useFeedbackContext";
 import { useCurrentGameType } from "@/composables/useCurrentGameType";
+import { useCorrelation } from "@/composables/useCorrelation";
 import { getSession } from "@/service/authService";
 import { restoreGuestSession } from "@/service/guestService";
 import { buildRestLobbyPlayers } from "@/component/game/lobbyUtils";
@@ -313,7 +314,8 @@ let revealTimer: ReturnType<typeof setTimeout> | null = null;
 const latestTrickResult = computed<TonkTrickResult | null>(() => {
   if (gameState.value?.gameType !== "tonk") return null;
   const tonkPublic = gameState.value.gameSpecificPublicState as
-    TonkPublicState | undefined;
+    | TonkPublicState
+    | undefined;
   if (!tonkPublic) return null;
   for (let i = tonkPublic.log.length - 1; i >= 0; i--) {
     const entry = tonkPublic.log[i];
@@ -326,7 +328,8 @@ const latestTrickResult = computed<TonkTrickResult | null>(() => {
 const tonkTallies = computed<readonly number[]>(() => {
   if (gameState.value?.gameType !== "tonk") return [];
   const tonkPublic = gameState.value.gameSpecificPublicState as
-    TonkPublicState | undefined;
+    | TonkPublicState
+    | undefined;
   return tonkPublic?.tallies ?? [];
 });
 
@@ -379,6 +382,7 @@ watch(effectiveStatus, (newStatus, oldStatus) => {
 
 const { setGamePhase, clearGamePhase } = useFeedbackContext();
 const { setCurrentGameType, resetCurrentGameType } = useCurrentGameType();
+const { bindGame, unbindGame: unbindCorrelation } = useCorrelation();
 
 function toFeedbackPhase(phase: DisplayPhase): FeedbackGamePhase {
   switch (phase) {
@@ -422,14 +426,16 @@ const gameOverPlayHistory = computed(() => {
 
 const finalPlay = computed<Big2Play | null>(() => {
   const publicState = gameState.value?.gameSpecificPublicState as
-    Big2PublicState | undefined;
+    | Big2PublicState
+    | undefined;
   return publicState?.lastPlay ?? null;
 });
 
 const tonkFinalMove = computed<TonkFinalMove | null>(() => {
   if (gameState.value?.gameType !== "tonk") return null;
   const publicState = gameState.value.gameSpecificPublicState as
-    TonkPublicState | undefined;
+    | TonkPublicState
+    | undefined;
   const log = publicState?.log;
   if (!log || log.length === 0) return null;
   const entry = log[log.length - 1];
@@ -601,6 +607,9 @@ onMounted(async () => {
       return;
     }
 
+    // Bind correlation context to this game for Sentry tagging.
+    bindGame(props.gameId);
+
     isHost.value =
       currentPlayerId !== "" &&
       initialPlayerIds.length > 0 &&
@@ -609,6 +618,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  unbindCorrelation();
   unbindState();
   unbindActions();
   disconnect();
@@ -678,7 +688,8 @@ async function onCallTonk(): Promise<void> {
 const tonkTurnPhase = computed<string | null>(() => {
   if (gameState.value?.gameType !== "tonk") return null;
   const publicState = gameState.value.gameSpecificPublicState as
-    TonkPublicState | undefined;
+    | TonkPublicState
+    | undefined;
   return publicState?.turnPhase ?? null;
 });
 

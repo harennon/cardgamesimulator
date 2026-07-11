@@ -7,6 +7,7 @@ import { restoreGuestSession } from "@/service/guestService";
 import { getSession } from "@/service/authService";
 import { useFeedbackContext } from "@/composables/useFeedbackContext";
 import { useFeedbackAttachments } from "@/composables/useFeedbackAttachments";
+import { useCorrelation } from "@/composables/useCorrelation";
 
 const isOpen = ref(false);
 const category = ref<FeedbackCategory>("bug");
@@ -56,6 +57,7 @@ async function buildMetadata() {
   }
   const guestSession = restoreGuestSession();
   const { gamePhase } = useFeedbackContext();
+  const { correlationId, gameId: correlationGameId } = useCorrelation();
   return {
     route: route.fullPath,
     gameId: (route.params.gameId as string) || undefined,
@@ -65,6 +67,8 @@ async function buildMetadata() {
     browser: navigator.userAgent.slice(0, 200),
     viewport: { width: window.innerWidth, height: window.innerHeight },
     timestamp: new Date().toISOString(),
+    correlationId: correlationId.value,
+    correlationGameId: correlationGameId.value,
   };
 }
 
