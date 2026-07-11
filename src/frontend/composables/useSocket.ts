@@ -20,6 +20,9 @@ export type TypedClientSocket = Socket<
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 
+/** Grace window before a transient disconnect surfaces the reconnecting banner. */
+export const RECONNECTING_GRACE_MS = 1750;
+
 export interface UseSocketReturn {
   socket: ShallowRef<TypedClientSocket | null>;
   connected: DeepReadonly<Ref<boolean>>;
@@ -41,6 +44,29 @@ export function useSocket(): UseSocketReturn {
   // Track whether the manager has fully exhausted reconnection.
   let _reconnectFailed = false;
 
+  // One pending grace-timer handle per useSocket() instance.
+  let _graceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function _clearGraceTimer(): void {
+    if (_graceTimer !== null) {
+      clearTimeout(_graceTimer);
+      _graceTimer = null;
+    }
+  }
+
+  // Debounced entry into "reconnecting". Collapses repeated calls into one
+  // pending transition. Does nothing if the timer is already pending.
+  function _scheduleReconnecting(): void {
+    if (_graceTimer !== null) return; // already pending — don't restart the clock
+    _graceTimer = setTimeout(() => {
+      _graceTimer = null;
+      // Guard: only surface reconnecting if we are still disconnected and not terminal.
+      if (!connected.value && !_reconnectFailed) {
+        connectionState.value = "reconnecting";
+      }
+    }, RECONNECTING_GRACE_MS);
+  }
+
   function _updateConnectionState(): void {
     connectionState.value = deriveConnectionState({
       connected: connected.value,
@@ -53,6 +79,8 @@ export function useSocket(): UseSocketReturn {
     if (socket.value) {
       return;
     }
+
+    _clearGraceTimer(); // no stale pending transition from a prior socket
 
     // Reset all state for a fresh connection attempt (handles the E12 re-mount case).
     connected.value = false;
@@ -71,7 +99,7 @@ export function useSocket(): UseSocketReturn {
 
     const s = io(import.meta.env.VITE_API_BASE_URL || "", {
       auth: { token },
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
       reconnectionDelay: 1000,
@@ -84,7 +112,8 @@ export function useSocket(): UseSocketReturn {
       connected.value = true;
       _reconnectFailed = false;
       reconnectAttempt.value = 0;
-      _updateConnectionState();
+      _clearGraceTimer(); // cancel any pending "reconnecting" transition
+      _updateConnectionState(); // → "connected", immediate (never debounced)
     });
 
     s.on("disconnect", (reason) => {
@@ -96,12 +125,13 @@ export function useSocket(): UseSocketReturn {
       }
       if (cls === "terminal") {
         // Server-initiated: manager will NOT auto-retry; show red banner.
+        _clearGraceTimer(); // terminal is immediate — cancel any pending grace
         _reconnectFailed = false; // not the "exhausted" terminal path
         connectionState.value = "terminal";
         return;
       }
-      // cls === "retry": manager will attempt reconnection.
-      connectionState.value = "reconnecting";
+      // cls === "retry": schedule reconnecting after the grace window.
+      _scheduleReconnecting();
     });
 
     s.on("connect_error", (err) => {
@@ -120,8 +150,8 @@ export function useSocket(): UseSocketReturn {
     // --- Manager-level reconnect events ---
 
     s.io.on("reconnect_attempt", (attempt: number) => {
-      connectionState.value = "reconnecting";
-      reconnectAttempt.value = attempt;
+      reconnectAttempt.value = attempt; // synchronous (not yet visible until banner shows)
+      _scheduleReconnecting(); // debounced: no-op if timer already pending
     });
 
     s.io.on("reconnect", () => {
@@ -129,6 +159,7 @@ export function useSocket(): UseSocketReturn {
     });
 
     s.io.on("reconnect_failed", () => {
+      _clearGraceTimer(); // terminal is immediate — cancel any pending grace
       _reconnectFailed = true;
       connectionState.value = "terminal";
     });
@@ -137,6 +168,7 @@ export function useSocket(): UseSocketReturn {
   }
 
   function disconnect(): void {
+    _clearGraceTimer(); // don't fire reconnecting after teardown
     socket.value?.disconnect();
     socket.value = null;
     connected.value = false;
