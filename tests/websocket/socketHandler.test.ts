@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { logger } from "../../src/backend/util/logger.js";
 import type {
   TypedServer,
   TypedSocket,
@@ -1184,7 +1185,7 @@ describe("socketHandler — autoPlayAbandoned exit-branch regression (LLD 122)",
    * armFallbackTimer must be called; error must NOT be rethrown; console.warn called.
    */
   it("B2: applyAction throws on AI auto-action → armFallbackTimer called, warn logged, no throw", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     const aiState = makeAiFirstState(aiId, humanId);
     const postActionState = { ...aiState, version: 3 };
@@ -1255,11 +1256,12 @@ describe("socketHandler — autoPlayAbandoned exit-branch regression (LLD 122)",
     );
     expect(fallbackCall).toBeDefined();
 
-    // console.warn called once with the caught error (B2 log)
+    // logger.warn called once with the caught error (B2 log)
     expect(warnSpy).toHaveBeenCalledOnce();
-    const warnArgs = warnSpy.mock.calls[0];
-    // The thrown error must be passed as an argument
-    expect(warnArgs).toContain(thrownError);
+    const warnArgs = warnSpy.mock.calls[0] as unknown[];
+    // pino logger.warn(obj, msg) — the error is in the first argument object
+    const logObj = warnArgs[0] as Record<string, unknown>;
+    expect(logObj["err"]).toBe(thrownError);
 
     warnSpy.mockRestore();
   });
@@ -1270,7 +1272,7 @@ describe("socketHandler — autoPlayAbandoned exit-branch regression (LLD 122)",
    * armFallbackTimer must be called and console.warn must be called once.
    */
   it("B3: version-stall divergence → armFallbackTimer called, warn logged", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     // AI is current; version is always the same after any apply (no progress)
     const stalledAiState = makeAiFirstState(aiId, humanId);

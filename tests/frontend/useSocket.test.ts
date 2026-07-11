@@ -62,6 +62,23 @@ vi.mock("@/service/guestService", () => ({
   restoreGuestSession: vi.fn().mockReturnValue(null),
 }));
 
+vi.mock("@/observability/sentry", () => ({
+  isInitialised: vi.fn().mockReturnValue(false),
+  initObservability: vi.fn(),
+  recordBreadcrumb: vi.fn(),
+  setSentryTag: vi.fn(),
+  setSentryContext: vi.fn(),
+}));
+
+vi.mock("@/composables/useCorrelation", () => ({
+  useCorrelation: vi.fn().mockReturnValue({
+    correlationId: { value: "cx_test1234" },
+    gameId: { value: undefined },
+    bindGame: vi.fn(),
+    unbindGame: vi.fn(),
+  }),
+}));
+
 vi.mock("vue", async () => {
   const actual = await vi.importActual<typeof import("vue")>("vue");
   return {

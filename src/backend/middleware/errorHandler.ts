@@ -1,5 +1,6 @@
 import { instanceOfErrorWithStatus, InternalServerError } from "@/util/errors";
 import { Next, Request, Response } from "@/util/types";
+import { logger } from "@/util/logger";
 
 export const errorHandler = function (
   err: Error,
@@ -7,7 +8,10 @@ export const errorHandler = function (
   res: Response,
   next: Next,
 ) {
-  console.error(err.stack);
+  logger.error(
+    { err: err.message, stack: err.stack },
+    "Unhandled request error",
+  );
   if (res.headersSent) {
     return next(err);
   }

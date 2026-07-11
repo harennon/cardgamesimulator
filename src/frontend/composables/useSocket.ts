@@ -10,6 +10,48 @@ import { getAccessToken } from "@/service/authService";
 import { getGuestToken } from "@/service/guestService";
 import { classifyDisconnect, deriveConnectionState } from "./connectionState";
 import type { ConnectionState } from "./connectionState";
+import { recordBreadcrumb } from "@/observability/sentry";
+import { useCorrelation } from "@/composables/useCorrelation";
+
+// ---------------------------------------------------------------------------
+// Socket breadcrumb throttle — module-scoped, not per-instance
+// ---------------------------------------------------------------------------
+
+const _socketBreadcrumbThrottle = new Map<
+  string,
+  { lastEmit: number; suppressed: number }
+>();
+export const SOCKET_BREADCRUMB_WINDOW_MS = 10_000;
+
+function recordSocketFailure(
+  reason: string,
+  data: Record<string, unknown>,
+): void {
+  const { correlationId, gameId } = useCorrelation();
+  const now = Date.now();
+  const entry = _socketBreadcrumbThrottle.get(reason);
+
+  if (entry && now - entry.lastEmit < SOCKET_BREADCRUMB_WINDOW_MS) {
+    entry.suppressed += 1;
+    return;
+  }
+
+  const suppressedSince = entry?.suppressed ?? 0;
+  _socketBreadcrumbThrottle.set(reason, { lastEmit: now, suppressed: 0 });
+
+  recordBreadcrumb({
+    category: "socket",
+    message: reason,
+    level: "warning",
+    data: {
+      correlationId: correlationId.value,
+      gameId: gameId.value,
+      reason,
+      ...data,
+      ...(suppressedSince > 0 ? { suppressedSince } : {}),
+    },
+  });
+}
 
 export type { ConnectionState };
 
@@ -97,8 +139,9 @@ export function useSocket(): UseSocketReturn {
       return;
     }
 
+    const { correlationId } = useCorrelation();
     const s = io(import.meta.env.VITE_API_BASE_URL || "", {
-      auth: { token },
+      auth: { token, correlationId: correlationId.value },
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
@@ -128,16 +171,25 @@ export function useSocket(): UseSocketReturn {
         _clearGraceTimer(); // terminal is immediate — cancel any pending grace
         _reconnectFailed = false; // not the "exhausted" terminal path
         connectionState.value = "terminal";
+        recordSocketFailure("disconnect", { reason, cls });
         return;
       }
       // cls === "retry": schedule reconnecting after the grace window.
       _scheduleReconnecting();
+      recordSocketFailure("disconnect", { reason, cls });
     });
 
     s.on("connect_error", (err) => {
       if (err.message === "SERVER_FULL") {
         terminalError.value =
           "Server is at capacity. Please try again shortly.";
+        // SERVER_FULL is distinct/un-throttled (rare, high-signal)
+        recordBreadcrumb({
+          category: "socket",
+          message: "connect_error:server_full",
+          level: "error",
+          data: { reason: "server_full" },
+        });
         s.disconnect();
         return;
       }
@@ -145,6 +197,7 @@ export function useSocket(): UseSocketReturn {
       // do NOT set an error string or flip connectionState here; the
       // disconnect/reconnect_attempt/reconnect_failed events govern the banner.
       connected.value = false;
+      recordSocketFailure("connect_error", { message: err.message });
     });
 
     // --- Manager-level reconnect events ---

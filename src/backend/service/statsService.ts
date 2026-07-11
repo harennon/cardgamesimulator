@@ -1,6 +1,7 @@
 import type { InternalGameState } from "@shared/engine-types";
 import type { PlayerStatsRepository, StatsDelta } from "@/database/database";
 import type { GuestSessionStore } from "@/guest/guestSessionStore";
+import { logger } from "@/util/logger";
 
 export class StatsService {
   constructor(
@@ -64,9 +65,9 @@ export class StatsService {
           delta,
         );
       } catch (err: unknown) {
-        console.error(
-          `Failed to record stats for player ${playerScore.playerId}:`,
-          err,
+        logger.error(
+          { playerId: playerScore.playerId, err },
+          "Failed to record stats for player",
         );
       }
 
@@ -79,9 +80,9 @@ export class StatsService {
           score: playerScore.score,
         });
       } catch (err: unknown) {
-        console.error(
-          `Failed to record game history for player ${playerScore.playerId}:`,
-          err,
+        logger.error(
+          { playerId: playerScore.playerId, err },
+          "Failed to record game history for player",
         );
       }
     }

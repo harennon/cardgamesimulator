@@ -1,11 +1,12 @@
 import "@/env";
 
 import { Server } from "@/server";
+import { logger } from "@/util/logger";
 
 const onCloseSignal = (server: Server, force: boolean) => {
-  console.log("Close signal received, shutting down");
+  logger.info("Close signal received, shutting down");
   server.close(force, (force: boolean) => {
-    console.log(`Closing dependencies with force = ${force}`);
+    logger.info({ force }, "Closing dependencies");
   });
 
   if (force) {
@@ -14,7 +15,7 @@ const onCloseSignal = (server: Server, force: boolean) => {
 };
 
 process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled rejection:", reason);
+  logger.error({ reason }, "Unhandled rejection");
 });
 
 try {
@@ -23,6 +24,5 @@ try {
   process.on("SIGTERM", () => onCloseSignal(server, false));
   process.on("SIGINT", () => onCloseSignal(server, true));
 } catch (err) {
-  console.error("Encountered error while starting server");
-  console.error(err);
+  logger.error({ err }, "Encountered error while starting server");
 }

@@ -2,6 +2,7 @@ import type { TypedServer, TypedSocket } from "./socketServer.js";
 import type { ConnectionManager } from "./connectionManager.js";
 import type { GameService } from "@/service/gameService";
 import { engineFactory } from "@/engine/game-engine-factory";
+import { logger } from "@/util/logger";
 import type {
   PlayerPublicInfo,
   PlayerInfo,
@@ -211,9 +212,9 @@ async function autoPlayAbandoned(
     } catch (err: unknown) {
       // B2: engine rejected the auto-action — a real defect, not a benign race
       // for AI/auto seats which are single-threaded. Arm fallback for bounded retry.
-      console.warn(
-        `autoPlayAbandoned: auto-action rejected by engine for game ${gameId}; armed fallback timer`,
-        err,
+      logger.warn(
+        { gameId, err },
+        "autoPlayAbandoned: auto-action rejected by engine; armed fallback timer",
       );
       armFallbackTimer(gameId, turnTimerService);
       return;
@@ -237,8 +238,9 @@ async function autoPlayAbandoned(
     // Version-progress check: if a successful applyAction failed to advance the
     // engine state, treat it as divergence (B3) rather than looping forever.
     if (newState != null && newState.version === lastVersion) {
-      console.warn(
-        `autoPlayAbandoned: divergence guard hit (version stall after ${i + 1} iterations) for game ${gameId}; armed fallback timer`,
+      logger.warn(
+        { gameId, iterations: i + 1 },
+        "autoPlayAbandoned: divergence guard hit (version stall); armed fallback timer",
       );
       armFallbackTimer(gameId, turnTimerService);
       return;
@@ -261,8 +263,9 @@ async function autoPlayAbandoned(
   }
 
   // B3: absolute ceiling exhausted — genuine engine non-progress.
-  console.warn(
-    `autoPlayAbandoned: divergence guard hit (${maxIterations} iterations) for game ${gameId}; armed fallback timer`,
+  logger.warn(
+    { gameId, maxIterations },
+    "autoPlayAbandoned: divergence guard hit (max iterations); armed fallback timer",
   );
   armFallbackTimer(gameId, turnTimerService);
 }
@@ -787,7 +790,10 @@ export async function handleTimerExpired(
   } catch (err: unknown) {
     // If applyAction throws (e.g., concurrent player action already advanced the turn),
     // return silently. The concurrent action's handler already restarted the timer.
-    console.warn("Timer auto-action failed (likely concurrent action):", err);
+    logger.warn(
+      { gameId, err },
+      "Timer auto-action failed (likely concurrent action)",
+    );
     return;
   }
 
@@ -864,7 +870,7 @@ export function registerSocketHandlers(
         turnTimerService,
         delayer,
       ).catch((err: unknown) => {
-        console.error("game:join error", err);
+        logger.error({ err }, "game:join error");
         ack({ success: false, error: "INTERNAL_ERROR" });
       });
     });
@@ -880,7 +886,7 @@ export function registerSocketHandlers(
         turnTimerService,
         delayer,
       ).catch((err: unknown) => {
-        console.error("game:start error", err);
+        logger.error({ err }, "game:start error");
         ack({ success: false, error: "INTERNAL_ERROR" });
       });
     });
@@ -896,7 +902,7 @@ export function registerSocketHandlers(
         turnTimerService,
         delayer,
       ).catch((err: unknown) => {
-        console.error("game:rematch error", err);
+        logger.error({ err }, "game:rematch error");
         ack({ success: false, error: "INTERNAL_ERROR" });
       });
     });
@@ -912,7 +918,7 @@ export function registerSocketHandlers(
         turnTimerService,
         delayer,
       ).catch((err: unknown) => {
-        console.error("game:action error", err);
+        logger.error({ err }, "game:action error");
         ack({ success: false, error: "INVALID_ACTION" });
       });
     });
@@ -926,7 +932,7 @@ export function registerSocketHandlers(
         gameService,
         turnTimerService,
       ).catch((err: unknown) => {
-        console.error("game:leave error", err);
+        logger.error({ err }, "game:leave error");
       });
     });
 
@@ -938,7 +944,7 @@ export function registerSocketHandlers(
         gameService,
         turnTimerService,
       ).catch((err: unknown) => {
-        console.error("disconnect error", err);
+        logger.error({ err }, "disconnect error");
       });
     });
   });

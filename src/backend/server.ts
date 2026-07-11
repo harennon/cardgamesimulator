@@ -5,6 +5,7 @@ import express, { type Express } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import morgan from "morgan";
+import { logger } from "@/util/logger";
 
 import { Handler } from "@/api/handler";
 import { ServeAppHandler } from "@/api/serveApp";
@@ -169,7 +170,7 @@ export class Server {
           connectionManager,
           turnTimerService,
           delayer,
-        ).catch((err: unknown) => console.error("Timer expired error", err));
+        ).catch((err: unknown) => logger.error({ err }, "Timer expired error"));
       },
     );
     registerSocketHandlers(
@@ -197,7 +198,7 @@ export class Server {
 
     // start server
     const port = process.env.BACKEND_PORT || 3000;
-    console.log(`Listening on port ${port}`);
+    logger.info({ port }, "Listening on port");
     this.server.listen(port);
   }
 
@@ -217,7 +218,7 @@ export class Server {
       return https.createServer(options, app);
     } else {
       if (process.env.NODE_ENV !== "production") {
-        console.log(
+        logger.info(
           "Please set up valid certificates to create an HTTPS server.",
         );
       }
