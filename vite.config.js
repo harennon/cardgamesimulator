@@ -28,6 +28,15 @@ export default defineConfig(async () => {
     );
   }
 
+  // Only generate source maps when Sentry will upload-and-delete them (E9).
+  // Without the token the maps would be built but not cleaned up, exposing
+  // source code in the shipped bundle directory.
+  const hasSentryToken = Boolean(
+    process.env.SENTRY_AUTH_TOKEN &&
+    process.env.SENTRY_ORG &&
+    process.env.SENTRY_PROJECT,
+  );
+
   return {
     define: {
       // enable devtools
@@ -46,10 +55,11 @@ export default defineConfig(async () => {
     build: {
       outDir: resolve(__dirname, "./build/frontend"),
       emptyOutDir: true,
-      // Generate source maps without the `//# sourceMappingURL` reference so
-      // they never appear in shipped JS bundles. Maps are uploaded to Sentry
-      // then deleted (E9).
-      sourcemap: "hidden",
+      // "hidden" generates maps without sourceMappingURL comment in JS;
+      // the Sentry plugin then uploads and deletes them (E9).
+      // When Sentry is not configured we skip map generation entirely so
+      // no .map files land in build/frontend.
+      sourcemap: hasSentryToken ? "hidden" : false,
     },
     assetsInclude: ["**/*.cert"],
     server: {

@@ -1,12 +1,11 @@
 /**
  * Unit tests for the socket breadcrumb throttle in useSocket.ts (LLD 166).
  *
- * Tests run in node environment — we import the throttle state and the
- * SOCKET_BREADCRUMB_WINDOW_MS constant directly to keep the test pure.
+ * Tests drive the real connect_error / disconnect handlers on a mocked socket
+ * and observe mockRecordBreadcrumb call counts, exercising the actual
+ * module-private recordSocketFailure + _socketBreadcrumbThrottle code.
  *
- * The recordSocketFailure function is module-private; we test it indirectly
- * by observing the recordBreadcrumb mock call count and arguments, which is
- * the only observable effect of the throttle.
+ * Fake timers are used to control the 10-second window without wall-clock delay.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -25,19 +24,44 @@ vi.mock("../../src/frontend/observability/sentry.js", () => ({
   setSentryContext: vi.fn(),
 }));
 
-// Mock socket.io-client so useSocket.ts can load without a browser
+// Socket.io-client mock — supports registering and firing socket-level events
+const socketListeners = new Map<string, ((...args: unknown[]) => void)[]>();
+const ioListeners = new Map<string, ((...args: unknown[]) => void)[]>();
+
+const mockSocketIo = {
+  on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+    const existing = ioListeners.get(event) ?? [];
+    ioListeners.set(event, [...existing, handler]);
+  }),
+};
+
+const mockSocket = {
+  on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+    const existing = socketListeners.get(event) ?? [];
+    socketListeners.set(event, [...existing, handler]);
+  }),
+  off: vi.fn(),
+  disconnect: vi.fn(),
+  connected: false,
+  io: mockSocketIo,
+};
+
+function emitSocket(event: string, ...args: unknown[]): void {
+  const handlers = socketListeners.get(event) ?? [];
+  for (const h of handlers) h(...args);
+}
+
 vi.mock("socket.io-client", () => ({
-  io: vi.fn(),
+  io: vi.fn(() => mockSocket),
 }));
 
-// Mock auth services
 vi.mock("../../src/frontend/service/authService.js", () => ({
-  getAccessToken: vi.fn().mockResolvedValue(null),
+  getAccessToken: vi.fn().mockResolvedValue("fake-token"),
   getSession: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../../src/frontend/service/guestService.js", () => ({
-  getGuestToken: vi.fn().mockReturnValue("guest:test"),
+  getGuestToken: vi.fn().mockReturnValue(null),
   restoreGuestSession: vi.fn().mockReturnValue(null),
 }));
 
@@ -50,41 +74,39 @@ vi.mock("../../src/frontend/composables/useCorrelation.js", () => ({
   }),
 }));
 
-// Import the module under test AFTER mocks
-const { SOCKET_BREADCRUMB_WINDOW_MS } =
+vi.mock("vue", async () => {
+  const actual = await vi.importActual<typeof import("vue")>("vue");
+  return { ...actual, onUnmounted: vi.fn() };
+});
+
+// Import the REAL useSocket after mocks are set up
+const { useSocket, SOCKET_BREADCRUMB_WINDOW_MS } =
   await import("../../src/frontend/composables/useSocket.js");
 
-// We need to reach recordSocketFailure which is module-private.
-// We test it by driving the connect_error handler on a mocked socket instance.
-// Instead, we test the throttle logic in isolation by re-implementing it here
-// against the exported SOCKET_BREADCRUMB_WINDOW_MS constant — this proves the
-// constant is correct and that the throttle window is as specified.
-
 // ---------------------------------------------------------------------------
-// Throttle logic — mirrors the implementation for isolated testing
+// Helpers
 // ---------------------------------------------------------------------------
 
-function makeThrottledRecorder(windowMs: number) {
-  const state = new Map<string, { lastEmit: number; suppressed: number }>();
+// The module-level _socketBreadcrumbThrottle Map persists across tests.
+// Each test jumps the fake clock well past any lastEmit from prior tests by
+// starting at EPOCH_BASE + (testIndex * EPOCH_STEP), which is always
+// > lastEmit + WINDOW regardless of what previous tests emitted.
+const EPOCH_BASE = Date.now() + SOCKET_BREADCRUMB_WINDOW_MS * 10;
+const EPOCH_STEP = SOCKET_BREADCRUMB_WINDOW_MS * 3;
+let testEpoch = EPOCH_BASE;
 
-  return function record(
-    reason: string,
-    now: number,
-    emit: (suppressedSince: number) => void,
-  ) {
-    const entry = state.get(reason);
-    if (entry && now - entry.lastEmit < windowMs) {
-      entry.suppressed += 1;
-      return;
-    }
-    const suppressedSince = entry?.suppressed ?? 0;
-    state.set(reason, { lastEmit: now, suppressed: 0 });
-    emit(suppressedSince);
-  };
+async function setupSocket(): Promise<void> {
+  socketListeners.clear();
+  ioListeners.clear();
+  mockSocket.disconnect.mockClear();
+  mockRecordBreadcrumb.mockClear();
+
+  const { connect } = useSocket();
+  await connect();
 }
 
 // ---------------------------------------------------------------------------
-// Tests
+// Tests: SOCKET_BREADCRUMB_WINDOW_MS export
 // ---------------------------------------------------------------------------
 
 describe("SOCKET_BREADCRUMB_WINDOW_MS", () => {
@@ -93,64 +115,79 @@ describe("SOCKET_BREADCRUMB_WINDOW_MS", () => {
   });
 });
 
-describe("socket breadcrumb throttle logic", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+// ---------------------------------------------------------------------------
+// Tests: real recordSocketFailure via connect_error / disconnect handlers
+// ---------------------------------------------------------------------------
+
+describe("socket breadcrumb throttle — real module code", () => {
+  beforeEach(async () => {
+    // Set fake clock to a fresh epoch far ahead of any prior test's lastEmit
+    // so the module-level throttle Map is effectively expired at test start.
+    testEpoch += EPOCH_STEP;
+    vi.useFakeTimers({ now: testEpoch });
+    await setupSocket();
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("first call for a reason emits immediately", () => {
-    const emitted: number[] = [];
-    const record = makeThrottledRecorder(10_000);
-    record("connect_error", 0, (s) => emitted.push(s));
-    expect(emitted).toHaveLength(1);
-    expect(emitted[0]).toBe(0); // no suppressed prior
+  it("first connect_error emits a breadcrumb immediately", () => {
+    emitSocket("connect_error", new Error("timeout"));
+    expect(mockRecordBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(mockRecordBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "socket", message: "connect_error" }),
+    );
   });
 
-  it("second call within window does NOT emit", () => {
-    const emitted: number[] = [];
-    const record = makeThrottledRecorder(10_000);
-    record("connect_error", 0, () => emitted.push(1));
-    record("connect_error", 5_000, () => emitted.push(2)); // within window
-    expect(emitted).toHaveLength(1);
+  it("second connect_error within the window is suppressed (no second breadcrumb)", () => {
+    emitSocket("connect_error", new Error("timeout"));
+    vi.advanceTimersByTime(SOCKET_BREADCRUMB_WINDOW_MS / 2);
+    emitSocket("connect_error", new Error("timeout"));
+    expect(mockRecordBreadcrumb).toHaveBeenCalledTimes(1);
   });
 
-  it("third call after window DOES emit with suppressed count", () => {
-    const emitted: Array<{ suppressedSince: number }> = [];
-    const record = makeThrottledRecorder(10_000);
-    record("connect_error", 0, () => emitted.push({ suppressedSince: 0 }));
-    record("connect_error", 5_000, () => emitted.push({ suppressedSince: -1 })); // suppressed
-    record("connect_error", 5_000, () => emitted.push({ suppressedSince: -1 })); // suppressed
-    record("connect_error", 10_001, (s) =>
-      emitted.push({ suppressedSince: s }),
-    ); // after window
-    expect(emitted).toHaveLength(2);
-    expect(emitted[1]!.suppressedSince).toBe(2); // two were suppressed
+  it("third connect_error after the window fires with suppressedSince in data", () => {
+    emitSocket("connect_error", new Error("timeout"));
+    // suppress two within the window
+    vi.advanceTimersByTime(1_000);
+    emitSocket("connect_error", new Error("timeout"));
+    vi.advanceTimersByTime(1_000);
+    emitSocket("connect_error", new Error("timeout"));
+    // advance past the window from the first emit
+    vi.advanceTimersByTime(SOCKET_BREADCRUMB_WINDOW_MS);
+    emitSocket("connect_error", new Error("timeout"));
+
+    expect(mockRecordBreadcrumb).toHaveBeenCalledTimes(2);
+    const secondCall = mockRecordBreadcrumb.mock.calls[1]![0] as {
+      data?: Record<string, unknown>;
+    };
+    expect(secondCall.data?.suppressedSince).toBeGreaterThan(0);
   });
 
-  it("different reasons are throttled independently", () => {
-    const emitted: string[] = [];
-    const record = makeThrottledRecorder(10_000);
-    record("connect_error", 0, () => emitted.push("connect_error"));
-    record("disconnect", 0, () => emitted.push("disconnect")); // different reason
-    record("connect_error", 500, () => emitted.push("connect_error-2")); // throttled
-    expect(emitted).toEqual(["connect_error", "disconnect"]);
+  it("disconnect and connect_error are throttled independently", () => {
+    emitSocket("connect_error", new Error("timeout"));
+    emitSocket("disconnect", "transport close");
+    // Both are distinct reasons — both should emit
+    expect(mockRecordBreadcrumb).toHaveBeenCalledTimes(2);
   });
 
-  it("suppressed count resets after the window expires", () => {
-    const suppressedCounts: number[] = [];
-    const record = makeThrottledRecorder(10_000);
-    record("disconnect", 0, (s) => suppressedCounts.push(s));
-    record("disconnect", 1_000, () => {}); // suppressed
-    record("disconnect", 2_000, () => {}); // suppressed
-    record("disconnect", 10_001, (s) => suppressedCounts.push(s)); // new window
-    record("disconnect", 10_500, () => {}); // suppressed in new window
-    record("disconnect", 20_002, (s) => suppressedCounts.push(s)); // next window
-    expect(suppressedCounts[0]).toBe(0); // first emit, no prior suppressed
-    expect(suppressedCounts[1]).toBe(2); // two suppressed in first window
-    expect(suppressedCounts[2]).toBe(1); // one suppressed in second window
+  it("SERVER_FULL connect_error is NOT throttled — emits even within the window", () => {
+    // SERVER_FULL is handled directly in the connect_error handler as a special
+    // terminal path that calls recordBreadcrumb without going through the throttle.
+    emitSocket("connect_error", new Error("SERVER_FULL"));
+    // SERVER_FULL emits a distinct breadcrumb and also calls disconnect()
+    expect(mockRecordBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "connect_error:server_full" }),
+    );
+  });
+
+  it("breadcrumb data carries correlationId and gameId", () => {
+    emitSocket("connect_error", new Error("timeout"));
+    const call = mockRecordBreadcrumb.mock.calls[0]![0] as {
+      data?: Record<string, unknown>;
+    };
+    expect(call.data?.correlationId).toBe("cx_test1234");
+    expect(call.data?.gameId).toBe("game-001");
   });
 });

@@ -4,7 +4,13 @@ import type { Router } from "vue-router";
 let _initialised = false;
 
 /** No-op unless VITE_SENTRY_DSN is set. Installs Vue + browser error capture. */
-export function initObservability(app: App, router: Router): void {
+export function initObservability(
+  app: App,
+  // router kept for forward-compatibility with LLD interface; not wired to
+  // browserTracingIntegration (disabled per LLD — trace_id does not survive WebSockets).
+  _router: Router,
+  correlationId?: string,
+): void {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (!dsn) return;
 
@@ -15,18 +21,23 @@ export function initObservability(app: App, router: Router): void {
         Sentry.init({
           app,
           dsn,
-          // Router integration for breadcrumbs on navigation (no tracing)
-          integrations: [],
+          integrations: [
+            // Vue integration: installs app.config.errorHandler, window.onerror,
+            // and unhandledrejection capture.
+            Sentry.vueIntegration({ app }),
+          ],
           // Tracing off — trace_id does not survive WebSocket frames
           tracesSampleRate: 0,
           // Replay off (paid feature)
           replaysSessionSampleRate: 0,
           replaysOnErrorSampleRate: 0,
           sendDefaultPii: false,
-          // Supply router so Sentry captures navigation breadcrumbs
-          ...(router ? { Vue: app } : {}),
         });
         _initialised = true;
+        // Stamp the session-stable correlation id on all subsequent events.
+        if (correlationId) {
+          Sentry.setTag("correlation_id", correlationId);
+        }
       } catch (e) {
         console.warn(
           "[observability] Sentry.init failed, continuing without error capture:",
