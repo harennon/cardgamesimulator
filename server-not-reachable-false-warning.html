@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Connection banner — grace-window fix — Card Game UI Mockup</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --black-suit: #1a1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --error-text: #e05555;
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-family: var(--font-card);
+        font-size: 1.5rem;
+        color: var(--gold-accent);
+        margin-bottom: 4px;
+      }
+
+      .subtitle {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-bottom: 20px;
+        max-width: 760px;
+        line-height: 1.5;
+      }
+
+      /* ---- Control bar ---- */
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 22px;
+      }
+
+      .controls .label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-right: 4px;
+      }
+
+      .btn {
+        font-family: var(--font-ui);
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 8px 14px;
+        border-radius: 6px;
+        border: 1px solid var(--table-rim-light);
+        background: rgba(45, 24, 16, 0.5);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      .btn:hover {
+        border-color: var(--gold-accent);
+      }
+
+      .btn--drop {
+        border-color: var(--error-text);
+        color: var(--error-text);
+      }
+
+      .btn--drop:hover {
+        background: rgba(224, 85, 85, 0.12);
+      }
+
+      .divider {
+        width: 1px;
+        align-self: stretch;
+        background: var(--table-rim-light);
+        margin: 0 4px;
+      }
+
+      /* ---- Three-panel comparison grid ---- */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .variant {
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .variant__head {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--table-rim-light);
+      }
+
+      .variant__title {
+        font-weight: 700;
+        font-size: 0.95rem;
+      }
+
+      .variant__desc {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-top: 3px;
+        line-height: 1.4;
+        min-height: 2.4em;
+      }
+
+      .variant--recommended .variant__head {
+        border-bottom-color: var(--gold-accent);
+      }
+
+      .variant--recommended .variant__title::after {
+        content: "Recommended";
+        font-size: 0.62rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #1a0f06;
+        background: var(--gold-accent);
+        border-radius: 4px;
+        padding: 2px 6px;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+
+      /* ---- Mini felt board (stand-in for the live GameBoard) ---- */
+      .board-wrap {
+        position: relative;
+        height: 240px;
+        overflow: hidden;
+      }
+
+      .board {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 12px;
+        background: radial-gradient(
+          ellipse 80% 70% at 50% 45%,
+          var(--felt-light) 0%,
+          var(--felt) 55%,
+          #0f2e1c 100%
+        );
+        transition: filter 0.25s ease;
+      }
+
+      /* The --disconnected modifier: dim + non-interactive, exactly as GameView applies it */
+      .board--disconnected {
+        filter: brightness(0.7);
+        pointer-events: none;
+      }
+
+      .board__opponents {
+        display: flex;
+        gap: 10px;
+      }
+
+      .oppo {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.66rem;
+        color: var(--text-primary);
+      }
+
+      .oppo__cards {
+        display: flex;
+      }
+
+      .mini-card {
+        width: 20px;
+        height: 28px;
+        border-radius: 3px;
+        background: linear-gradient(135deg, #6b1414, #8b1a1a);
+        border: 1px solid rgba(0, 0, 0, 0.4);
+        margin-left: -8px;
+      }
+
+      .oppo--turn {
+        color: var(--gold-accent);
+      }
+
+      .turn-pill {
+        font-size: 0.62rem;
+        font-weight: 700;
+        color: #1a0f06;
+        background: var(--gold-accent);
+        border-radius: 10px;
+        padding: 2px 8px;
+      }
+
+      .board__hand {
+        display: flex;
+        justify-content: center;
+      }
+
+      .hand-card {
+        width: 40px;
+        height: 56px;
+        border-radius: 5px;
+        background: var(--card-face);
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        margin-left: -12px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: 3px 4px;
+        font-family: var(--font-card);
+        font-weight: 700;
+        font-size: 0.7rem;
+      }
+
+      .hand-card.red {
+        color: var(--red-suit);
+      }
+      .hand-card.black {
+        color: var(--black-suit);
+      }
+
+      .board__actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .act-btn {
+        font-family: var(--font-ui);
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 6px 16px;
+        border-radius: 6px;
+        border: none;
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+
+      .act-btn--ghost {
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-primary);
+      }
+
+      /* Disabled look when disabledReason is set (buttons locked) */
+      .board--disconnected .act-btn {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* ---- Connection banner (unchanged component styling) ---- */
+      .connection-banner {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 90;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-family: var(--font-ui);
+        font-size: 0.78rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .connection-banner--reconnecting {
+        background: rgba(201, 168, 76, 0.18);
+        border: 1.5px solid var(--gold-accent);
+        color: var(--gold-accent);
+        animation: bannerPulse 1.8s ease-in-out infinite;
+      }
+
+      .connection-banner--terminal {
+        background: rgba(224, 85, 85, 0.15);
+        border: 1.5px solid var(--error-text);
+        color: var(--error-text);
+      }
+
+      .connection-banner__dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+        flex-shrink: 0;
+      }
+
+      .connection-banner__reload-btn {
+        font-family: var(--font-ui);
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 5px;
+        border: 1.5px solid var(--error-text);
+        background: transparent;
+        color: var(--error-text);
+        cursor: pointer;
+      }
+
+      .connection-banner__reload-btn:hover {
+        background: var(--error-text);
+        color: #fff;
+      }
+
+      @keyframes bannerPulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.55;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .connection-banner--reconnecting {
+          animation: none;
+        }
+      }
+
+      /* ---- Status footer / telemetry per variant ---- */
+      .variant__status {
+        padding: 10px 16px;
+        border-top: 1px solid var(--table-rim-light);
+        font-size: 0.74rem;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .status-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .status-row .k {
+        color: var(--text-muted);
+      }
+
+      .status-row .v {
+        font-weight: 600;
+        font-family: var(--font-ui);
+      }
+
+      .v--connected {
+        color: #6fcf7c;
+      }
+      .v--grace {
+        color: var(--gold-accent);
+      }
+      .v--reconnecting {
+        color: var(--gold-accent);
+      }
+      .v--terminal {
+        color: var(--error-text);
+      }
+
+      /* Socket LED */
+      .socket-led {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+      .socket-led--up {
+        background: #6fcf7c;
+        box-shadow: 0 0 6px #6fcf7c;
+      }
+      .socket-led--down {
+        background: var(--error-text);
+        box-shadow: 0 0 6px var(--error-text);
+      }
+
+      .banner-flag {
+        font-weight: 700;
+      }
+      .banner-flag--shown {
+        color: var(--error-text);
+      }
+      .banner-flag--hidden {
+        color: #6fcf7c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>Connection banner — transient-blip grace window</h1>
+      <p class="subtitle">
+        The banner component and its terminal state are unchanged (they match
+        the approved LLD 162 design). This fix is about <strong>timing</strong>:
+        a WebSocket blip that recovers within a short grace window should never
+        surface a "Connection lost" banner or lock the board. Use the controls
+        below to simulate outages of different lengths and compare today's
+        behavior against the two proposed options.
+      </p>
+
+      <div class="controls">
+        <span class="label">Simulate outage</span>
+        <button class="btn btn--drop" data-blip="800">Blip 0.8s</button>
+        <button class="btn btn--drop" data-blip="1500">Blip 1.5s</button>
+        <button class="btn btn--drop" data-blip="4000">Drop 4s</button>
+        <button class="btn btn--drop" data-blip="0">
+          Hard drop (stays down)
+        </button>
+        <div class="divider"></div>
+        <button class="btn" id="restore">Restore now</button>
+        <button class="btn" id="reset">Reset all</button>
+      </div>
+
+      <div class="grid" id="grid"></div>
+    </div>
+
+    <script>
+      // Three variant models. Each defines how a socket "down" event maps to a
+      // banner, given its grace window (ms). GRACE=0 reproduces today's bug.
+      const VARIANTS = [
+        {
+          id: "today",
+          title: "Today (no grace)",
+          desc: "Banner + board-dim fire the instant the socket drops. A <1s blip flashes the alarm — the reported bug.",
+          grace: 0,
+          recommended: false,
+        },
+        {
+          id: "grace",
+          title: "Option A — grace window",
+          desc: "1.5s debounce before the banner shows. Socket state tracked internally; UI only reacts if the drop outlasts the window.",
+          grace: 1500,
+          recommended: true,
+        },
+        {
+          id: "grace-poll",
+          title: "Option B — grace + polling fallback",
+          desc: "Same 1.5s grace, plus websocket→polling transport fallback so brief WS interruptions don't even register as drops.",
+          grace: 1500,
+          polling: true,
+          recommended: false,
+        },
+      ];
+
+      // ---- Board markup (shared) ----
+      function boardHTML() {
+        return `
+          <div class="board__opponents">
+            <div class="oppo"><div class="oppo__cards"><div class="mini-card"></div><div class="mini-card"></div><div class="mini-card"></div></div>West</div>
+            <div class="oppo oppo--turn"><span class="turn-pill">North</span><div class="oppo__cards"><div class="mini-card"></div><div class="mini-card"></div></div></div>
+            <div class="oppo"><div class="oppo__cards"><div class="mini-card"></div><div class="mini-card"></div><div class="mini-card"></div><div class="mini-card"></div></div>East</div>
+          </div>
+          <div class="board__hand">
+            <div class="hand-card black">3&spades;</div>
+            <div class="hand-card red">7&hearts;</div>
+            <div class="hand-card black">10&clubs;</div>
+            <div class="hand-card red">J&diams;</div>
+            <div class="hand-card black">A&spades;</div>
+          </div>
+          <div class="board__actions">
+            <button class="act-btn act-btn--ghost">Pass</button>
+            <button class="act-btn">Play</button>
+          </div>`;
+      }
+
+      // ---- Per-variant runtime state ----
+      // socketUp: raw transport state. bannerState: what the UI shows
+      //   (connected | reconnecting | terminal). graceTimer: pending debounce.
+      const state = VARIANTS.map((v) => ({
+        cfg: v,
+        socketUp: true,
+        bannerState: "connected",
+        graceTimer: null,
+        attempt: 0,
+      }));
+
+      const grid = document.getElementById("grid");
+
+      // Build each variant panel once.
+      state.forEach((s, i) => {
+        const el = document.createElement("div");
+        el.className =
+          "variant" + (s.cfg.recommended ? " variant--recommended" : "");
+        el.innerHTML = `
+          <div class="variant__head">
+            <div class="variant__title">${s.cfg.title}</div>
+            <div class="variant__desc">${s.cfg.desc}</div>
+          </div>
+          <div class="board-wrap">
+            <div class="board" data-board="${i}">${boardHTML()}</div>
+            <div data-banner="${i}"></div>
+          </div>
+          <div class="variant__status">
+            <div class="status-row">
+              <span class="k">Socket transport</span>
+              <span class="v" data-socket="${i}"></span>
+            </div>
+            <div class="status-row">
+              <span class="k">UI banner</span>
+              <span class="v" data-flag="${i}"></span>
+            </div>
+            <div class="status-row">
+              <span class="k">disabledReason</span>
+              <span class="v" data-reason="${i}"></span>
+            </div>
+          </div>`;
+        grid.appendChild(el);
+      });
+
+      function render(i) {
+        const s = state[i];
+        const board = document.querySelector(`[data-board="${i}"]`);
+        const bannerHost = document.querySelector(`[data-banner="${i}"]`);
+        const socketEl = document.querySelector(`[data-socket="${i}"]`);
+        const flagEl = document.querySelector(`[data-flag="${i}"]`);
+        const reasonEl = document.querySelector(`[data-reason="${i}"]`);
+
+        const disconnected = s.bannerState !== "connected";
+        board.classList.toggle("board--disconnected", disconnected);
+
+        // Banner
+        if (s.bannerState === "reconnecting") {
+          bannerHost.innerHTML = `<div class="connection-banner connection-banner--reconnecting">
+            <span class="connection-banner__dot"></span>
+            <span>Connection lost — reconnecting…${s.attempt > 0 ? " (" + s.attempt + "/10)" : ""}</span>
+          </div>`;
+        } else if (s.bannerState === "terminal") {
+          bannerHost.innerHTML = `<div class="connection-banner connection-banner--terminal">
+            <span>Connection lost</span>
+            <button class="connection-banner__reload-btn">Reload to rejoin</button>
+          </div>`;
+        } else {
+          bannerHost.innerHTML = "";
+        }
+
+        // Telemetry
+        socketEl.innerHTML = s.socketUp
+          ? `<span class="socket-led socket-led--up"></span>up (websocket${s.cfg.polling ? "+polling" : ""})`
+          : `<span class="socket-led socket-led--down"></span>down`;
+
+        let flag, flagClass;
+        if (s.bannerState === "connected") {
+          if (!s.socketUp) {
+            flag = "hidden (within grace)";
+            flagClass = "banner-flag--hidden";
+          } else {
+            flag = "hidden";
+            flagClass = "banner-flag--hidden";
+          }
+        } else if (s.bannerState === "reconnecting") {
+          flag = "SHOWN — amber";
+          flagClass = "banner-flag--shown";
+        } else {
+          flag = "SHOWN — red terminal";
+          flagClass = "banner-flag--shown";
+        }
+        flagEl.className = "v banner-flag " + flagClass;
+        flagEl.textContent = flag;
+
+        const reason =
+          s.bannerState === "reconnecting"
+            ? '"Reconnecting…"'
+            : s.bannerState === "terminal"
+              ? '"Disconnected — reload to rejoin"'
+              : "null";
+        reasonEl.textContent = reason;
+        reasonEl.className =
+          "v " +
+          (s.bannerState === "connected" ? "v--connected" : "v--reconnecting");
+      }
+
+      state.forEach((_, i) => render(i));
+
+      // ---- Simulation engine ----
+      // socketDown(): transport goes down. Each variant arms its grace timer;
+      // the banner only appears once the grace window elapses while still down.
+      function socketDown(i) {
+        const s = state[i];
+        s.socketUp = false;
+        if (s.graceTimer) clearTimeout(s.graceTimer);
+        if (s.cfg.grace === 0) {
+          // Today: immediate banner, no debounce.
+          s.bannerState = "reconnecting";
+          s.attempt = 1;
+        } else {
+          // Grace: stay "connected" (silent) until the window elapses.
+          s.graceTimer = setTimeout(() => {
+            if (!s.socketUp) {
+              s.bannerState = "reconnecting";
+              s.attempt = 1;
+              render(i);
+            }
+            s.graceTimer = null;
+          }, s.cfg.grace);
+        }
+        render(i);
+      }
+
+      function socketUp(i) {
+        const s = state[i];
+        s.socketUp = true;
+        if (s.graceTimer) {
+          clearTimeout(s.graceTimer);
+          s.graceTimer = null;
+        }
+        s.bannerState = "connected";
+        s.attempt = 0;
+        render(i);
+      }
+
+      function socketTerminal(i) {
+        const s = state[i];
+        s.socketUp = false;
+        if (s.graceTimer) {
+          clearTimeout(s.graceTimer);
+          s.graceTimer = null;
+        }
+        // A hard drop still respects grace before escalating; here we jump to
+        // reconnecting after grace, then terminal after the reconnect budget.
+        const showReconnecting = () => {
+          if (!s.socketUp) {
+            s.bannerState = "reconnecting";
+            s.attempt = 3;
+            render(i);
+            // Escalate to terminal after a short (mock) exhausted-budget delay.
+            s.graceTimer = setTimeout(() => {
+              if (!s.socketUp) {
+                s.bannerState = "terminal";
+                render(i);
+              }
+            }, 2500);
+          }
+        };
+        if (s.cfg.grace === 0) showReconnecting();
+        else s.graceTimer = setTimeout(showReconnecting, s.cfg.grace);
+        render(i);
+      }
+
+      // Blip buttons: duration>0 auto-restores; duration 0 = hard drop (terminal).
+      document.querySelectorAll("[data-blip]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const dur = parseInt(btn.dataset.blip, 10);
+          if (dur === 0) {
+            state.forEach((_, i) => socketTerminal(i));
+            return;
+          }
+          state.forEach((_, i) => socketDown(i));
+          setTimeout(() => {
+            state.forEach((_, i) => socketUp(i));
+          }, dur);
+        });
+      });
+
+      document.getElementById("restore").addEventListener("click", () => {
+        state.forEach((_, i) => socketUp(i));
+      });
+
+      document.getElementById("reset").addEventListener("click", () => {
+        state.forEach((_, i) => socketUp(i));
+      });
+    </script>
+  </body>
+</html>
