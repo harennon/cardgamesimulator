@@ -4,7 +4,6 @@ import { GetGameStateRequest, GetGameStateResponse } from "@shared/model";
 import { gameRepo } from "@/database";
 import { BadRequestError, NotFoundError } from "@/util/errors";
 import { serializeGameForPlayer } from "@/util/serializer";
-import { logger } from "@/util/logger";
 
 export class GetGameStateHandler extends Handler {
   public static INSTANCE: GetGameStateHandler = new GetGameStateHandler();
@@ -33,7 +32,7 @@ export class GetGameStateHandler extends Handler {
 
   private validateRequest(request: Request<GetGameStateRequest>) {
     if (!request.query.gameId) {
-      logger.warn(
+      request.log?.warn(
         { userId: request.userId },
         "Invalid getGameState request received",
       );

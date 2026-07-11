@@ -2,7 +2,7 @@ import type { TypedServer, TypedSocket } from "./socketServer.js";
 import type { ConnectionManager } from "./connectionManager.js";
 import type { GameService } from "@/service/gameService";
 import { engineFactory } from "@/engine/game-engine-factory";
-import { logger } from "@/util/logger";
+import { logger, withContext } from "@/util/logger";
 import type {
   PlayerPublicInfo,
   PlayerInfo,
@@ -30,6 +30,22 @@ import type { Delayer } from "@/websocket/delayer";
  * seats to completion without truncating a legitimate play-out.
  */
 const MAX_HAND_SIZE = 13;
+
+/**
+ * Returns a child logger carrying the socket's correlation/request identifiers.
+ * Reads socket.data.{correlationId,requestId} which are set in socketAuth.ts.
+ * gameId is optional — only pass it when the handler has a gameId in scope.
+ */
+function socketLog(
+  socket: TypedSocket,
+  gameId?: string,
+): ReturnType<typeof withContext> {
+  return withContext({
+    correlationId: socket.data.correlationId,
+    requestId: socket.data.requestId,
+    gameId,
+  });
+}
 
 /** Default pace between successive auto-driven moves (ms). */
 export const DEFAULT_AI_MOVE_DELAY_MS = 1000;
@@ -870,7 +886,7 @@ export function registerSocketHandlers(
         turnTimerService,
         delayer,
       ).catch((err: unknown) => {
-        logger.error({ err }, "game:join error");
+        socketLog(socket, payload?.gameId).error({ err }, "game:join error");
         ack({ success: false, error: "INTERNAL_ERROR" });
       });
     });
@@ -886,7 +902,7 @@ export function registerSocketHandlers(
         turnTimerService,
         delayer,
       ).catch((err: unknown) => {
-        logger.error({ err }, "game:start error");
+        socketLog(socket, payload?.gameId).error({ err }, "game:start error");
         ack({ success: false, error: "INTERNAL_ERROR" });
       });
     });
@@ -902,7 +918,7 @@ export function registerSocketHandlers(
         turnTimerService,
         delayer,
       ).catch((err: unknown) => {
-        logger.error({ err }, "game:rematch error");
+        socketLog(socket, payload?.gameId).error({ err }, "game:rematch error");
         ack({ success: false, error: "INTERNAL_ERROR" });
       });
     });
@@ -918,7 +934,7 @@ export function registerSocketHandlers(
         turnTimerService,
         delayer,
       ).catch((err: unknown) => {
-        logger.error({ err }, "game:action error");
+        socketLog(socket, payload?.gameId).error({ err }, "game:action error");
         ack({ success: false, error: "INVALID_ACTION" });
       });
     });
@@ -932,7 +948,7 @@ export function registerSocketHandlers(
         gameService,
         turnTimerService,
       ).catch((err: unknown) => {
-        logger.error({ err }, "game:leave error");
+        socketLog(socket, payload?.gameId).error({ err }, "game:leave error");
       });
     });
 
@@ -944,7 +960,7 @@ export function registerSocketHandlers(
         gameService,
         turnTimerService,
       ).catch((err: unknown) => {
-        logger.error({ err }, "disconnect error");
+        socketLog(socket).error({ err }, "disconnect error");
       });
     });
   });

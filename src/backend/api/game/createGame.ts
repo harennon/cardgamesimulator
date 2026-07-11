@@ -11,7 +11,6 @@ import { generateJoinCode } from "@/service/joinCodeService";
 import { Game } from "@/database/entities/Game";
 import type { GameType } from "@shared/engine-types";
 import type { GameService } from "@/service/gameService";
-import { logger } from "@/util/logger";
 
 const VALID_TIMER_VALUES: ReadonlySet<number> = new Set([30, 60, 90]);
 
@@ -165,7 +164,7 @@ export class CreateGameHandler extends Handler {
     [request.userId, request.body.gameType, request.body.maxPlayers].forEach(
       (value) => {
         if (!value) {
-          logger.warn(
+          request.log?.warn(
             { userId: request.userId },
             "Invalid createGame request received",
           );

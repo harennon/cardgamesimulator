@@ -57,6 +57,8 @@ process.env.SUPABASE_JWT_SECRET = "test-secret";
 const { CreateGameHandler } =
   await import("../../src/backend/api/game/createGame.js");
 
+const noopLog = { warn: () => {}, info: () => {}, error: () => {} };
+
 function makeRequest(
   userId: string,
   gameType: string,
@@ -70,6 +72,7 @@ function makeRequest(
     displayName,
     body: { gameType, maxPlayers, turnTimerSeconds, deckRoundsTarget },
     headers: {},
+    log: noopLog,
   } as unknown as Parameters<(typeof CreateGameHandler.INSTANCE)["post"]>[0];
 }
 

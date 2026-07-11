@@ -8,7 +8,6 @@ import {
   NotFoundError,
   OptimisticLockError,
 } from "@/util/errors";
-import { logger } from "@/util/logger";
 
 function deduplicateDisplayName(
   requested: string,
@@ -113,7 +112,7 @@ export class JoinGameHandler extends Handler {
   private validateRequest(request: Request<JoinGameRequest>) {
     [request.userId, request.body.gameId].forEach((value) => {
       if (!value) {
-        logger.warn(
+        request.log?.warn(
           { userId: request.userId },
           "Invalid joinGame request received",
         );
