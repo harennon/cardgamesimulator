@@ -30,11 +30,9 @@ function makeDeps(
 ): FeedbackAttachmentDeps {
   let urlCounter = 0;
   return {
-    downscale: vi
-      .fn()
-      .mockResolvedValue({
-        blob: makeBlob(100, "image/jpeg"),
-      } as DownscaleResult),
+    downscale: vi.fn().mockResolvedValue({
+      blob: makeBlob(100, "image/jpeg"),
+    } as DownscaleResult),
     uploadAttachment: vi.fn().mockResolvedValue(undefined),
     createObjectURL: vi
       .fn()
@@ -454,6 +452,49 @@ describe("useFeedbackAttachments", () => {
         "encoded-data-here",
         "image/jpeg",
       );
+    });
+  });
+
+  describe("uploadAll — 413 graceful-error path (LLD 163)", () => {
+    it("axios-like 413 rejection marks the attachment 'error' and returns false", async () => {
+      // Simulates nginx returning 413 before reaching Express: axios rejects with
+      // an error that has a response.status of 413. The raw nginx HTML body is
+      // ignored by the composable — it catches any thrown error identically.
+      const axiosLike413 = Object.assign(
+        new Error("Request Entity Too Large"),
+        {
+          response: { status: 413, data: "<html>413</html>" },
+        },
+      );
+      const deps = makeDeps({
+        downscale: vi
+          .fn()
+          .mockResolvedValue({ blob: makeBlob(50, "image/jpeg") }),
+        uploadAttachment: vi.fn().mockRejectedValue(axiosLike413),
+      });
+      const { attachments, addFiles, uploadAll } = useFeedbackAttachments(deps);
+      await addFiles([makeFile("screenshot.jpg", 1500000, "image/jpeg")]);
+
+      const result = await uploadAll("feed-413");
+
+      expect(result).toBe(false);
+      expect(attachments.value[0].status).toBe("error");
+    });
+
+    it("413 rejection does not propagate — uploadAll resolves (never throws)", async () => {
+      const axiosLike413 = Object.assign(
+        new Error("Request Entity Too Large"),
+        {
+          response: { status: 413, data: "<html>413</html>" },
+        },
+      );
+      const deps = makeDeps({
+        uploadAttachment: vi.fn().mockRejectedValue(axiosLike413),
+      });
+      const { addFiles, uploadAll } = useFeedbackAttachments(deps);
+      await addFiles([makeFile("big.jpg", 2000000, "image/jpeg")]);
+
+      await expect(uploadAll("feed-413-nothrow")).resolves.toBe(false);
     });
   });
 

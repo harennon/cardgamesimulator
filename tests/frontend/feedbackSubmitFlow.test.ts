@@ -285,12 +285,10 @@ describe("feedbackSubmitFlow", () => {
     });
 
     it("feedbackId is retained after attachment failure (for Retry)", async () => {
-      const postFeedback = vi
-        .fn()
-        .mockResolvedValue({
-          id: "fb-retain",
-          createdAt: "2026-01-01T00:00:00Z",
-        });
+      const postFeedback = vi.fn().mockResolvedValue({
+        id: "fb-retain",
+        createdAt: "2026-01-01T00:00:00Z",
+      });
       const attachments = makeAttachmentsComposable(
         [makeQueuedAttachment("a1")],
         false,
@@ -330,6 +328,59 @@ describe("feedbackSubmitFlow", () => {
       expect(postFeedback).not.toHaveBeenCalled();
       // uploadAll called with the existing id
       expect(attachments.uploadAll).toHaveBeenCalledWith("fb-existing");
+    });
+  });
+
+  describe("E7-413 — attachment 413 graceful error (LLD 163)", () => {
+    it("when uploadAll returns false (e.g. 413 from nginx), attachError shows the friendly message", async () => {
+      // uploadAll returns false regardless of whether the underlying cause was a
+      // 413, network error, or any other rejection — the modal stays open and
+      // the friendly message is shown instead of raw nginx HTML.
+      const postFeedback = vi
+        .fn()
+        .mockResolvedValue({ id: "fb-413", createdAt: "2026-01-01T00:00:00Z" });
+      const closeModal = vi.fn();
+      const showToast = vi.fn();
+      const attachments = makeAttachmentsComposable(
+        [makeQueuedAttachment("img1")],
+        false, // uploadAll returns false — simulates 413 caught inside uploadAll
+      );
+
+      const result = await runSubmit(makeInitialState(), {
+        postFeedback,
+        attachments,
+        closeModal,
+        showToast,
+      });
+
+      expect(closeModal).not.toHaveBeenCalled();
+      expect(showToast).not.toHaveBeenCalled();
+      expect(result.attachError).toBe(
+        "Some attachments failed to upload. Retry or remove them.",
+      );
+      expect(result.submitting).toBe(false);
+    });
+
+    it("feedbackId is retained after 413 failure so retry does not create a duplicate row", async () => {
+      const postFeedback = vi
+        .fn()
+        .mockResolvedValue({
+          id: "fb-413-retain",
+          createdAt: "2026-01-01T00:00:00Z",
+        });
+      const attachments = makeAttachmentsComposable(
+        [makeQueuedAttachment("img2")],
+        false,
+      );
+
+      const result = await runSubmit(makeInitialState(), {
+        postFeedback,
+        attachments,
+        closeModal: vi.fn(),
+        showToast: vi.fn(),
+      });
+
+      expect(result.feedbackId).toBe("fb-413-retain");
     });
   });
 
