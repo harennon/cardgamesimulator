@@ -8,6 +8,14 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Fixed
+
+- **LLD 163: Feedback screenshot upload fails (nginx body-size limit)**
+  - `nginx/production.conf` — added `client_max_body_size 7m;` scoped to `location /api/` so that feedback screenshot uploads (base64-encoded, ~1–7 MB) are no longer rejected by nginx with `413 Request Entity Too Large` before reaching Express. Directive is commented to reference `ATTACHMENT_BODY_LIMIT` in `submitFeedback.ts` to keep the two layers in sync.
+  - `src/frontend/nginx.conf` — same `client_max_body_size 7m;` added to `location /api/` for the Docker Compose frontend container. Both configs changed together to prevent environment divergence.
+  - `tests/frontend/useFeedbackAttachments.test.ts` — added two tests in a new "413 graceful-error path (LLD 163)" describe block: confirms that an axios-like 413 rejection marks the attachment `"error"` and `uploadAll` returns `false` (never throws).
+  - `tests/frontend/feedbackSubmitFlow.test.ts` — added two tests in a new "E7-413" describe block: confirms that when `uploadAll` returns `false` (as when a 413 is caught inside it), the friendly `attachError` message is shown, the modal stays open, and `feedbackId` is retained for retry.
+
 ### Added
 
 - **LLD 162: Non-destructive "Reconnecting…" state for the local player's own connection**
