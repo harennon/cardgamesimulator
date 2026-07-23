@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quick-Emote Table Reactions — Card Game UI Mockup</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --felt: #1a4a2e;
+        --felt-light: #256b42;
+        --table-rim: #2d1810;
+        --table-rim-light: #4a2c1e;
+        --card-face: #faf3e8;
+        --gold-accent: #c9a84c;
+        --gold-glow: rgba(201, 168, 76, 0.3);
+        --red-suit: #8b1a1a;
+        --text-primary: #e8dcc8;
+        --text-muted: #8a7e6e;
+        --panel-bg: rgba(20, 12, 8, 0.85);
+        --font-ui: "DM Sans", sans-serif;
+        --font-card: "Libre Baskerville", serif;
+
+        /* Emote-specific tokens (proposed) */
+        --emote-tray-bg: rgba(20, 12, 8, 0.92);
+        --emote-supportive: #6fbf73; /* calm green tint for friendly group */
+        --emote-taunt: #d4843a; /* warm amber tint for playful-taunt group */
+        --emote-float-duration: 2600ms;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background: #0a0a0a;
+        color: var(--text-primary);
+        padding: 32px 20px 80px;
+        line-height: 1.5;
+      }
+
+      /* ===== Page scaffolding (mockup chrome, not shipped) ===== */
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .page__title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gold-accent);
+        margin-bottom: 4px;
+      }
+      .page__sub {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-bottom: 28px;
+        max-width: 760px;
+      }
+      .section-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--gold-accent);
+        border-bottom: 1px solid var(--table-rim-light);
+        padding-bottom: 6px;
+        margin: 40px 0 18px;
+      }
+      .note {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin: 10px 0 4px;
+      }
+
+      /* ===== Miniature felt board frame ===== */
+      .board {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 10px solid var(--table-rim);
+        background: radial-gradient(
+          ellipse 80% 70% at 50% 45%,
+          var(--felt-light) 0%,
+          var(--felt) 55%,
+          #0f2e1c 100%
+        );
+        min-height: 420px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
+      .board--spectator {
+        min-height: 320px;
+      }
+
+      /* Opponents strip */
+      .opponents {
+        display: flex;
+        gap: 18px;
+        justify-content: center;
+        padding: 14px 16px 10px;
+        background: rgba(45, 24, 16, 0.55);
+        border-bottom: 1px solid var(--table-rim-light);
+        flex-wrap: wrap;
+      }
+      .seat {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 14px 6px;
+        border-radius: 10px;
+        border: 2px solid transparent;
+        min-width: 92px;
+      }
+      .seat--active {
+        border-color: var(--gold-accent);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .seat__avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #5c1010, #8b1a1a);
+        border: 2px solid var(--gold-accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: var(--card-face);
+      }
+      .seat__name {
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+      .seat__count {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+      }
+
+      /* Center play area */
+      .play-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        position: relative;
+      }
+      .play-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+      }
+      .mini-cards {
+        display: flex;
+        gap: 6px;
+      }
+      .mini-card {
+        width: 46px;
+        height: 64px;
+        border-radius: 5px;
+        background: var(--card-face);
+        color: var(--black-suit, #1a1a1a);
+        font-family: var(--font-card);
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+      }
+      .mini-card.red {
+        color: var(--red-suit);
+      }
+
+      /* Own hand + action bar */
+      .self-strip {
+        background: var(--felt-light);
+        border-top: 2px solid var(--table-rim-light);
+        padding: 10px 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .self-hand {
+        display: flex;
+        justify-content: center;
+      }
+      .self-hand .mini-card {
+        margin-left: -14px;
+      }
+      .self-hand .mini-card:first-child {
+        margin-left: 0;
+      }
+      .action-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        justify-content: center;
+        position: relative;
+      }
+      .btn {
+        font-family: var(--font-ui);
+        font-weight: 600;
+        border-radius: 6px;
+        padding: 9px 22px;
+        cursor: pointer;
+        border: none;
+        font-size: 0.85rem;
+      }
+      .btn--primary {
+        background: var(--gold-accent);
+        color: #1a0f06;
+      }
+      .btn--secondary {
+        background: transparent;
+        border: 1.5px solid var(--text-muted);
+        color: var(--text-primary);
+      }
+
+      /* ===== Emote trigger + tray ===== */
+      .emote-launcher {
+        position: relative;
+      }
+      .emote-trigger {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: 1.5px solid var(--gold-accent);
+        background: var(--panel-bg);
+        color: var(--gold-accent);
+        font-size: 1.2rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          transform 0.15s ease,
+          background 0.15s ease;
+      }
+      .emote-trigger:hover {
+        transform: translateY(-2px);
+        background: rgba(201, 168, 76, 0.16);
+      }
+
+      .emote-tray {
+        position: absolute;
+        bottom: 54px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--emote-tray-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 14px;
+        padding: 10px 12px;
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(8px);
+        display: grid;
+        gap: 10px;
+        z-index: 40;
+      }
+      .emote-tray__group-label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+      .emote-tray__group {
+        display: flex;
+        gap: 8px;
+      }
+      .emote-tray__group--supportive .emote-btn {
+        border-color: rgba(111, 191, 115, 0.4);
+      }
+      .emote-tray__group--taunt .emote-btn {
+        border-color: rgba(212, 132, 58, 0.45);
+      }
+      .emote-btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        border: 1px solid var(--table-rim-light);
+        background: rgba(45, 24, 16, 0.5);
+        font-size: 1.5rem;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        transition:
+          transform 0.12s ease,
+          background 0.12s ease;
+        position: relative;
+      }
+      .emote-btn:hover {
+        transform: translateY(-3px) scale(1.06);
+        background: rgba(201, 168, 76, 0.14);
+      }
+      .emote-btn__caption {
+        font-size: 0.44rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .emote-btn:active {
+        transform: scale(0.92);
+      }
+
+      /* Cooldown / disabled tray state — quiet, no error */
+      .emote-tray--cooldown .emote-btn {
+        pointer-events: none;
+        opacity: 0.4;
+        filter: saturate(0.4);
+      }
+      .cooldown-bar {
+        grid-column: 1 / -1;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(138, 126, 110, 0.25);
+        overflow: hidden;
+      }
+      .cooldown-bar__fill {
+        height: 100%;
+        width: 100%;
+        background: var(--gold-accent);
+        transform-origin: left;
+        animation: cooldown 2.2s linear forwards;
+      }
+      @keyframes cooldown {
+        from {
+          transform: scaleX(0);
+        }
+        to {
+          transform: scaleX(1);
+        }
+      }
+      .emote-trigger--cooldown {
+        opacity: 0.45;
+        cursor: default;
+        border-color: var(--text-muted);
+        color: var(--text-muted);
+      }
+
+      /* Hide-emotes toggle (per-client) */
+      .hide-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        user-select: none;
+      }
+      .hide-toggle__switch {
+        width: 34px;
+        height: 18px;
+        border-radius: 10px;
+        background: rgba(138, 126, 110, 0.3);
+        position: relative;
+        transition: background 0.15s ease;
+      }
+      .hide-toggle__switch::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--text-primary);
+        transition: transform 0.15s ease;
+      }
+      .hide-toggle--on .hide-toggle__switch {
+        background: var(--gold-accent);
+      }
+      .hide-toggle--on .hide-toggle__switch::after {
+        transform: translateX(16px);
+      }
+
+      /* ===== Floating reaction overlay ===== */
+      .reaction {
+        position: absolute;
+        left: 50%;
+        top: -6px;
+        transform: translateX(-50%);
+        font-size: 2rem;
+        pointer-events: none;
+        z-index: 30;
+        filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.55));
+        animation: floatUp var(--emote-float-duration)
+          cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+      .reaction--taunt {
+        text-shadow: 0 0 14px rgba(212, 132, 58, 0.6);
+      }
+      @keyframes floatUp {
+        0% {
+          opacity: 0;
+          transform: translateX(-50%) translateY(6px) scale(0.4);
+        }
+        14% {
+          opacity: 1;
+          transform: translateX(-50%) translateY(-8px) scale(1.15);
+        }
+        28% {
+          transform: translateX(-50%) translateY(-18px) scale(1);
+        }
+        80% {
+          opacity: 1;
+          transform: translateX(-50%) translateY(-46px) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translateX(-50%) translateY(-64px) scale(0.9);
+        }
+      }
+
+      /* ===== Palette showcase (documentation panel) ===== */
+      .palette {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 12px;
+      }
+      .palette__card {
+        background: var(--panel-bg);
+        border: 1px solid var(--table-rim-light);
+        border-radius: 10px;
+        padding: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .palette__card--taunt {
+        border-left: 3px solid var(--emote-taunt);
+      }
+      .palette__card--supportive {
+        border-left: 3px solid var(--emote-supportive);
+      }
+      .palette__glyph {
+        font-size: 1.8rem;
+      }
+      .palette__meta strong {
+        display: block;
+        font-size: 0.85rem;
+      }
+      .palette__meta span {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .reaction {
+          animation: fadeStatic var(--emote-float-duration) linear forwards;
+        }
+        .cooldown-bar__fill {
+          animation: cooldown 2.2s linear forwards;
+        }
+        @keyframes fadeStatic {
+          0% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-24px);
+          }
+          12% {
+            opacity: 1;
+          }
+          80% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-24px);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-24px);
+          }
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1 class="page__title">Quick-Emote Table Reactions</h1>
+      <p class="page__sub">
+        Tap-to-send ephemeral reactions that float over the sender's seat for
+        everyone at the table — players and spectators. No free-text chat: a
+        fixed, curated palette spanning supportive hype and light competitive
+        banter. Click emotes below to see them animate; try the cooldown and the
+        "hide emotes" toggle.
+      </p>
+
+      <div class="section-label">
+        1 · Player board — live tray + floating reactions
+      </div>
+      <p class="note">
+        The tray anchors to a compact button in the action bar. Reactions float
+        from the <em>sender's own seat</em> only (never targeted at an
+        opponent).
+      </p>
+
+      <div class="board" id="playerBoard">
+        <div class="opponents">
+          <div class="seat" data-seat="bob">
+            <div class="seat__avatar">B</div>
+            <div class="seat__name">Bob</div>
+            <div class="seat__count">9 cards</div>
+          </div>
+          <div class="seat seat--active" data-seat="charlie">
+            <div class="seat__avatar">C</div>
+            <div class="seat__name">Charlie</div>
+            <div class="seat__count">11 cards</div>
+          </div>
+          <div class="seat" data-seat="dave">
+            <div class="seat__avatar">D</div>
+            <div class="seat__name">Dave</div>
+            <div class="seat__count">8 cards</div>
+          </div>
+        </div>
+
+        <div class="play-area">
+          <div class="play-label">Last play — Bob (Pair)</div>
+          <div class="mini-cards">
+            <div class="mini-card">7♠</div>
+            <div class="mini-card red">7♥</div>
+          </div>
+        </div>
+
+        <div class="self-strip">
+          <div class="self-hand">
+            <div class="mini-card">3♣</div>
+            <div class="mini-card red">5♥</div>
+            <div class="mini-card">9♣</div>
+            <div class="mini-card red">J♦</div>
+            <div class="mini-card">K♠</div>
+          </div>
+          <div class="action-bar">
+            <button class="btn btn--primary">Play</button>
+            <button class="btn btn--secondary">Pass</button>
+
+            <div class="emote-launcher" data-seat="you" data-self="1">
+              <button
+                class="emote-trigger"
+                id="emoteTrigger"
+                aria-label="Open reactions"
+                aria-expanded="false"
+              >
+                😀
+              </button>
+              <!-- tray injected by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="action-bar"
+        style="justify-content: flex-end; margin-top: 10px"
+      >
+        <label class="hide-toggle" id="hideToggle">
+          <span class="hide-toggle__switch"></span>
+          Hide emotes (local)
+        </label>
+      </div>
+
+      <div class="section-label">
+        2 · Spectator view — same reactions, view-only
+      </div>
+      <p class="note">
+        Spectators receive <code>game:emoteReceived</code> for the whole room
+        and can send from their own compact affordance. Reactions still anchor
+        to the <em>playing</em> seats. This re-engages otherwise-passive
+        watchers.
+      </p>
+
+      <div class="board board--spectator" id="spectatorBoard">
+        <div class="opponents">
+          <div class="seat" data-seat="alice">
+            <div class="seat__avatar">A</div>
+            <div class="seat__name">Alice</div>
+            <div class="seat__count">13 cards</div>
+          </div>
+          <div class="seat" data-seat="bob">
+            <div class="seat__avatar">B</div>
+            <div class="seat__name">Bob</div>
+            <div class="seat__count">9 cards</div>
+          </div>
+          <div class="seat seat--active" data-seat="charlie">
+            <div class="seat__avatar">C</div>
+            <div class="seat__name">Charlie</div>
+            <div class="seat__count">11 cards</div>
+          </div>
+          <div class="seat" data-seat="dave">
+            <div class="seat__avatar">D</div>
+            <div class="seat__name">Dave</div>
+            <div class="seat__count">8 cards</div>
+          </div>
+        </div>
+
+        <div class="play-area">
+          <div class="play-label">Spectating · 2 watching</div>
+          <div class="mini-cards">
+            <div class="mini-card">7♠</div>
+            <div class="mini-card red">7♥</div>
+          </div>
+          <div
+            class="emote-launcher"
+            data-seat="spectator"
+            style="margin-top: 14px"
+          >
+            <button
+              class="emote-trigger"
+              id="specTrigger"
+              aria-label="Open reactions"
+              aria-expanded="false"
+            >
+              😀
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="self-strip"
+          style="justify-content: center; text-align: center"
+        >
+          <span class="play-label">View only — no hand</span>
+        </div>
+      </div>
+
+      <div class="section-label">
+        3 · Proposed palette (tone calibration for review)
+      </div>
+      <p class="note">
+        Eight emotes, two moods. Supportive (green) = hype your table.
+        Playful-taunt (amber) = light banter, kept firmly good-natured. Final
+        glyphs/labels are what this review decides.
+      </p>
+      <div class="palette" id="paletteGrid"></div>
+    </div>
+
+    <script>
+      // Curated palette — single source of truth (mirrors proposed EmoteKind union)
+      const PALETTE = [
+        { kind: "thumbs_up", glyph: "👍", label: "Nice!", mood: "supportive" },
+        { kind: "laugh", glyph: "😂", label: "LOL", mood: "supportive" },
+        { kind: "clap", glyph: "👏", label: "Clap", mood: "supportive" },
+        {
+          kind: "nice_play",
+          glyph: "🔥",
+          label: "Nice play",
+          mood: "supportive",
+        },
+        { kind: "cheeky", glyph: "😏", label: "Cheeky", mood: "taunt" },
+        { kind: "too_slow", glyph: "⏰", label: "Too slow", mood: "taunt" },
+        { kind: "ooof", glyph: "😅", label: "Ooof", mood: "taunt" },
+        { kind: "gg_ez", glyph: "👑", label: "GG EZ", mood: "taunt" },
+      ];
+
+      const byMood = (m) => PALETTE.filter((e) => e.mood === m);
+
+      // --- Palette showcase panel ---
+      document.getElementById("paletteGrid").innerHTML = PALETTE.map(
+        (e) => `
+        <div class="palette__card palette__card--${e.mood}">
+          <span class="palette__glyph">${e.glyph}</span>
+          <span class="palette__meta">
+            <strong>${e.label}</strong>
+            <span>${e.mood === "taunt" ? "playful taunt" : "supportive"}</span>
+          </span>
+        </div>`,
+      ).join("");
+
+      // --- Local "hide emotes" preference ---
+      let emotesHidden = false;
+      const hideToggle = document.getElementById("hideToggle");
+      hideToggle.addEventListener("click", () => {
+        emotesHidden = !emotesHidden;
+        hideToggle.classList.toggle("hide-toggle--on", emotesHidden);
+      });
+
+      // --- Cooldown state (simulated per-client mirror of server rate limit) ---
+      const COOLDOWN_MS = 2200;
+      let onCooldown = false;
+
+      function buildTray() {
+        const groups = [
+          ["Supportive", "supportive"],
+          ["Banter", "taunt"],
+        ]
+          .map(
+            ([label, mood]) => `
+            <div>
+              <div class="emote-tray__group-label">${label}</div>
+              <div class="emote-tray__group emote-tray__group--${mood}">
+                ${byMood(mood)
+                  .map(
+                    (e) => `
+                  <button class="emote-btn" data-kind="${e.kind}" title="${e.label}">
+                    <span>${e.glyph}</span>
+                    <span class="emote-btn__caption">${e.label}</span>
+                  </button>`,
+                  )
+                  .join("")}
+              </div>
+            </div>`,
+          )
+          .join("");
+        return groups;
+      }
+
+      // Wire a launcher (trigger + injected tray) to a seat.
+      function wireLauncher(launcher) {
+        const trigger = launcher.querySelector(".emote-trigger");
+        const seat = launcher.dataset.seat;
+        const isSelf = launcher.dataset.self === "1";
+        let tray = null;
+
+        function closeTray() {
+          if (tray) {
+            tray.remove();
+            tray = null;
+          }
+          trigger.setAttribute("aria-expanded", "false");
+        }
+        function openTray() {
+          if (tray || onCooldown) return;
+          tray = document.createElement("div");
+          tray.className = "emote-tray";
+          tray.innerHTML = buildTray();
+          launcher.appendChild(tray);
+          trigger.setAttribute("aria-expanded", "true");
+          tray.querySelectorAll(".emote-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const kind = btn.dataset.kind;
+              send(seat, isSelf, kind);
+              closeTray();
+            });
+          });
+        }
+        trigger.addEventListener("click", () => {
+          if (onCooldown) return;
+          tray ? closeTray() : openTray();
+        });
+        document.addEventListener("click", (e) => {
+          if (tray && !launcher.contains(e.target)) closeTray();
+        });
+      }
+
+      // Spawn a floating reaction on the matching seat(s) across BOTH boards,
+      // simulating the room-scoped rebroadcast to players + spectators.
+      function spawnReaction(seat, kind) {
+        if (emotesHidden) return;
+        const meta = PALETTE.find((e) => e.kind === kind);
+        if (!meta) return; // unknown kind — server would have rejected it
+        document.querySelectorAll(`[data-seat="${seat}"]`).forEach((seatEl) => {
+          // Only anchor to actual seats / launchers, not palette cards.
+          if (
+            !seatEl.classList.contains("seat") &&
+            !seatEl.classList.contains("emote-launcher")
+          )
+            return;
+          const r = document.createElement("div");
+          r.className =
+            "reaction" + (meta.mood === "taunt" ? " reaction--taunt" : "");
+          r.textContent = meta.glyph;
+          seatEl.appendChild(r);
+          setTimeout(() => r.remove(), 2800);
+        });
+      }
+
+      // Sender path: emit locally, then start cooldown (quiet-tray guardrail).
+      function send(seat, isSelf, kind) {
+        spawnReaction(seat, kind);
+        if (isSelf || seat === "spectator") startCooldown();
+      }
+
+      function startCooldown() {
+        onCooldown = true;
+        document.querySelectorAll(".emote-trigger").forEach((t) => {
+          t.classList.add("emote-trigger--cooldown");
+        });
+        setTimeout(() => {
+          onCooldown = false;
+          document.querySelectorAll(".emote-trigger").forEach((t) => {
+            t.classList.remove("emote-trigger--cooldown");
+          });
+        }, COOLDOWN_MS);
+      }
+
+      document.querySelectorAll(".emote-launcher").forEach(wireLauncher);
+
+      // Ambient demo: other players/spectators react on their own so the
+      // reviewer sees inbound reactions without interacting.
+      const AMBIENT = [
+        { seat: "bob", kind: "laugh" },
+        { seat: "charlie", kind: "gg_ez" },
+        { seat: "dave", kind: "too_slow" },
+        { seat: "alice", kind: "clap" },
+        { seat: "charlie", kind: "cheeky" },
+      ];
+      let ai = 0;
+      setInterval(() => {
+        const a = AMBIENT[ai++ % AMBIENT.length];
+        spawnReaction(a.seat, a.kind);
+      }, 3200);
+    </script>
+  </body>
+</html>
