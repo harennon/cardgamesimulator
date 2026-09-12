@@ -8,6 +8,12 @@ Format: each entry has a date, short description, and category. Most recent firs
 
 ## [Unreleased]
 
+### Added
+
+- **LLD 169: Public "Join by room code" for signed-out users**
+  - `src/frontend/component/HomeView.vue` — added a room-code entry form inside the `v-else` (signed-out) branch, above the existing "or" divider and Log In / Sign Up buttons. Includes a monospace letter-spaced uppercase text input (label "Have a room code?", placeholder `WXYZ`, `maxlength="4"`, `autocapitalize="characters"`), an inline `btn-primary` "Join" button, and an inline `form-card__error` error message. Client-side normalises input via `.trim().toUpperCase()` and validates against `SHORT_CODE_REGEX = /^[A-Z0-9]{4}$/i` before calling `GET /api/games/join/:code`. On success, navigates to `/game/:gameId/join` (GuestEntryView via `joinRouteGuard`) — not to the board directly. Error cases: format mismatch → "No game found for that code." (no request); 404 → same; network failure → "Network error. Please try again."; other → "Something went wrong. Please try again." Input is preserved on all error paths. A `resolving` ref guards against double-submit. No backend or route changes.
+  - `tests/frontend/homeView.test.ts` — extended with pure-function tests for the signed-out branch: valid code (upper and lowercase) triggers `GET /api/games/join/<UPPERCASED>` and navigates to `/game/:gameId/join`; invalid format shows error and makes no request; server 404 shows error without navigation; network error shows appropriate message; signed-in branch never shows the room-code form.
+
 ### Fixed
 
 - **LLD 165: "Server not reachable" warning shown while game is still playable**
